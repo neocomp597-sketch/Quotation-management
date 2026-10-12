@@ -1,4 +1,5 @@
 const Contract = require('../models/Contract');
+const { formatDate } = require('../utils/dateFormat');
 const ContractClause = require('../models/ContractClause');
 const DocumentTheme = require('../models/DocumentTheme');
 const ContractTemplate = require('../models/ContractTemplate');
@@ -403,7 +404,6 @@ const generateDocument = async (req, res) => {
         productsTableHtml += `</tbody></table>`;
 
         // Format dates
-        const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '-';
 
         // Variable Replacer Map
         const variables = {

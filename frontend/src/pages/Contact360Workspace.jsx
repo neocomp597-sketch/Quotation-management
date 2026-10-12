@@ -15,6 +15,7 @@ import {
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { contactService } from '../services/api';
+import { formatDate, formatDateTime } from '../utils/helpers';
 
 const TABS = [
     { id: 'overview', label: 'Overview', icon: <MdContactPhone size={18} /> },
@@ -172,7 +173,7 @@ const Contact360Workspace = () => {
                                 </div>
                                 <div>
                                     <span className="text-slate-400 text-xs font-bold uppercase block">Last Interaction</span>
-                                    <span className="font-bold text-slate-800">{contact.lastInteractionDate ? new Date(contact.lastInteractionDate).toLocaleDateString() : '-'}</span>
+                                    <span className="font-bold text-slate-800">{formatDate(contact.lastInteractionDate)}</span>
                                 </div>
                             </div>
                         </div>
@@ -225,7 +226,7 @@ const Contact360Workspace = () => {
                                             </td>
                                             <td className="px-6 py-4 text-slate-500">{m.agenda || '-'}</td>
                                             <td className="px-6 py-4 text-right text-slate-400">
-                                                {m.startDateTime ? new Date(m.startDateTime).toLocaleString() : '-'}
+                                                {formatDateTime(m.startDateTime)}
                                             </td>
                                         </tr>
                                     ))}
@@ -264,7 +265,7 @@ const Contact360Workspace = () => {
                                                     {t.status}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-right text-slate-400">{new Date(t.createdAt).toLocaleDateString()}</td>
+                                            <td className="px-6 py-4 text-right text-slate-400">{formatDate(t.createdAt)}</td>
                                         </tr>
                                     ))}
                                     {tickets.length === 0 && (
@@ -292,7 +293,7 @@ const Contact360Workspace = () => {
                                         <div className="flex items-center gap-2">
                                             <span className="font-black text-slate-900 text-sm">{item.title}</span>
                                             <span className="text-[10px] font-bold text-slate-400">
-                                                {item.date ? new Date(item.date).toLocaleString() : ''}
+                                                {formatDateTime(item.date, '')}
                                             </span>
                                         </div>
                                         <p className="text-xs font-medium text-slate-600 mt-1">{item.description}</p>

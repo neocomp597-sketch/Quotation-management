@@ -14,6 +14,7 @@ import {
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { meetingService, customerService, enquiryService, userService } from '../services/api';
+import { formatDate } from '../utils/helpers';
 
 // Searchable dropdown component for Related Record
 const RecordSearchDropdown = ({ items, selectedId, onSelect, placeholder, labelField, subLabelField }) => {
@@ -423,7 +424,7 @@ const CreateMeeting = () => {
                                             <div>
                                                 <p className="font-bold text-slate-800">{hist.title}</p>
                                                 <p className="text-[10px] text-slate-500 font-medium">
-                                                    {new Date(hist.startDateTime).toLocaleDateString()} • {hist.organizerId?.name || 'Unknown'}
+                                                    {formatDate(hist.startDateTime)} • {hist.organizerId?.name || 'Unknown'}
                                                 </p>
                                             </div>
                                             <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-amber-100 text-amber-800">

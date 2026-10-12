@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend } from 'recharts';
 import { MdAssignment, MdHistory, MdTrendingUp, MdOutlinePriceCheck, MdAdd, MdCheckCircle, MdCancel, MdInfo, MdPercent, MdCalendarMonth } from 'react-icons/md';
 import { cpqService, quotationService, customerService } from '../services/api';
+import { formatDate } from '../utils/helpers';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 
@@ -330,7 +331,7 @@ const CustomerPricingDashboard = ({ customerId: propCustomerId, inlineMode = fal
                                         <div className="flex items-center gap-1.5 text-[9px] text-slate-400 font-bold">
                                             <MdCalendarMonth size={12} />
                                             <span>
-                                                {new Date(ctr.startDate).toLocaleDateString()} - {new Date(ctr.endDate).toLocaleDateString()}
+                                                {formatDate(ctr.startDate)} - {formatDate(ctr.endDate)}
                                             </span>
                                         </div>
                                     </div>
@@ -371,7 +372,7 @@ const CustomerPricingDashboard = ({ customerId: propCustomerId, inlineMode = fal
                                         return (
                                             <tr key={q._id} className="hover:bg-slate-50/50 transition-colors">
                                                 <td className="px-4 py-4 font-bold text-slate-900">{q.quotationNumber}</td>
-                                                <td className="px-4 py-4">{new Date(q.createdAt).toLocaleDateString()}</td>
+                                                <td className="px-4 py-4">{formatDate(q.createdAt)}</td>
                                                 <td className="px-4 py-4 text-slate-500">{q.salesperson?.name || 'Self'}</td>
                                                 <td className="px-4 py-4 font-bold text-slate-900">₹{(q.grandTotal || q.total || 0).toLocaleString()}</td>
                                                 <td className="px-4 py-4 text-center">

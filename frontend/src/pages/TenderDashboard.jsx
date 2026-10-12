@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { tenderService, customerService, userService, payrollService } from '../services/api';
+import { formatDate } from '../utils/helpers';
 import { 
     ResponsiveContainer, PieChart, Pie, Cell, 
     BarChart, Bar, XAxis, YAxis, Tooltip, Legend,
@@ -440,7 +441,7 @@ const TenderDashboard = () => {
                                         <td className="py-3 px-4 truncate max-w-xs">{t.title}</td>
                                         <td className="py-3 px-4">
                                             <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-rose-50 text-rose-600 text-xs font-bold">
-                                                {new Date(t.deadlineDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                {formatDate(t.deadlineDate)}
                                             </span>
                                         </td>
                                         <td className="py-3 px-4 text-right text-slate-900 font-bold">{formatCurrency(t.value)}</td>

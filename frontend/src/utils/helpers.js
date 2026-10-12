@@ -43,35 +43,29 @@ export const generateQuotationNo = (sequence) => {
 };
 
 /**
- * Format Date
+ * ARCRM shows every date as DD.MM.YYYY (local day). `fallback` is returned for an empty or
+ * invalid value. Use these instead of toLocaleDateString so the format is the same everywhere.
  */
-export const formatDate = (date) => {
-  if (!date) return "-";
+const pad2 = (value) => String(value).padStart(2, "0");
+
+export const formatDate = (date, fallback = "-") => {
+  if (!date) return fallback;
 
   const parsedDate = new Date(date);
-  if (Number.isNaN(parsedDate.getTime())) return "-";
+  if (Number.isNaN(parsedDate.getTime())) return fallback;
 
-  return parsedDate.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  return `${pad2(parsedDate.getDate())}.${pad2(parsedDate.getMonth() + 1)}.${parsedDate.getFullYear()}`;
 };
 
-export const formatDateTime = (date) => {
-  if (!date) return "-";
+// DD.MM.YYYY, hh:mm AM/PM
+export const formatDateTime = (date, fallback = "-") => {
+  if (!date) return fallback;
 
   const parsedDate = new Date(date);
-  if (Number.isNaN(parsedDate.getTime())) return "-";
+  if (Number.isNaN(parsedDate.getTime())) return fallback;
 
-  return parsedDate.toLocaleString("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
+  const time = parsedDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+  return `${formatDate(parsedDate)}, ${time}`;
 };
 
 /**

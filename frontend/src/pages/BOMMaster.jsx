@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { MdAdd, MdEdit, MdSearch, MdVisibility, MdFileDownload, MdPublish } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { bomService } from '../services/api';
+import { formatDate } from '../utils/helpers';
 import PaginationControls from '../components/PaginationControls';
 
 const LIST_PAGE_SIZE = 20;
@@ -208,7 +209,7 @@ const BOMMaster = () => {
                                                     </span>
                                                 </td>
                                                 <td className="p-4 text-sm text-slate-500 whitespace-nowrap">
-                                                    {bom.updatedAt ? new Date(bom.updatedAt).toLocaleDateString('en-IN') : '-'}
+                                                    {formatDate(bom.updatedAt)}
                                                 </td>
                                                 <td className="p-4 text-right whitespace-nowrap">
                                                     <button

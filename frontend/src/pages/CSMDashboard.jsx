@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { csmService, branchService } from '../services/api';
+import { formatDateTime } from '../utils/helpers';
 import { 
     ResponsiveContainer, PieChart, Pie, Cell, 
     BarChart, Bar, XAxis, YAxis, Tooltip
@@ -213,13 +214,7 @@ const CSMDashboard = () => {
 
     const formatVisitDate = (dateString) => {
         try {
-            const d = new Date(dateString);
-            return d.toLocaleDateString('en-IN', {
-                day: '2-digit',
-                month: 'short',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
+            return formatDateTime(dateString, dateString);
         } catch (e) {
             return dateString;
         }

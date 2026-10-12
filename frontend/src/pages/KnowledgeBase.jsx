@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { csmService } from '../services/api';
+import { formatDate } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import { MdBook, MdSearch, MdAdd, MdRemoveRedEye, MdEdit, MdDelete, MdStorage } from 'react-icons/md';
@@ -272,7 +273,7 @@ const KnowledgeBase = () => {
                                                 <MdRemoveRedEye size={12} />
                                                 <span>{art.views} views</span>
                                             </div>
-                                            <span>{new Date(art.createdAt).toLocaleDateString()}</span>
+                                            <span>{formatDate(art.createdAt)}</span>
                                         </div>
                                     </button>
                                 ))

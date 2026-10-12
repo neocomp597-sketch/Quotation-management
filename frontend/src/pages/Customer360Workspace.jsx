@@ -37,7 +37,7 @@ import {
     Tooltip
 } from 'recharts';
 import { customerAnalyticsService } from '../services/api';
-import { resolveImageUrl } from '../utils/helpers';
+import { resolveImageUrl, formatDate, formatDateTime } from '../utils/helpers';
 
 // Fallback icon for contact list
 const MdPeople360 = () => (
@@ -220,7 +220,7 @@ const Customer360Workspace = () => {
                                     <div className="flex justify-between"><span className="text-slate-400">Territory Group</span><span className="text-slate-800">{customer.territory?.name || 'Unassigned'}</span></div>
                                     <div className="flex justify-between"><span className="text-slate-400">PAN Identification</span><span className="text-slate-800 font-mono">{customer.pan || 'N/A'}</span></div>
                                     <div className="flex justify-between"><span className="text-slate-400">GST Registration</span><span className="text-slate-800 font-mono">{customer.gstin || 'N/A'}</span></div>
-                                    <div className="flex justify-between"><span className="text-slate-400">Date Registered</span><span className="text-slate-800">{new Date(customer.createdAt).toLocaleDateString()}</span></div>
+                                    <div className="flex justify-between"><span className="text-slate-400">Date Registered</span><span className="text-slate-800">{formatDate(customer.createdAt)}</span></div>
                                 </div>
                             </div>
 
@@ -262,7 +262,7 @@ const Customer360Workspace = () => {
                                                 <div className="text-slate-400 text-[10px] mt-0.5">{item.description}</div>
                                             </div>
                                         </div>
-                                        <span className="text-slate-400 text-[10px] font-bold">{new Date(item.date).toLocaleDateString()}</span>
+                                        <span className="text-slate-400 text-[10px] font-bold">{formatDate(item.date)}</span>
                                     </div>
                                 ))}
                             </div>
@@ -359,7 +359,7 @@ const Customer360Workspace = () => {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-slate-400">
-                                                {deal.dealId?.expectedCloseDate ? new Date(deal.dealId.expectedCloseDate).toLocaleDateString() : 'N/A'}
+                                                {formatDate(deal.dealId?.expectedCloseDate, 'N/A')}
                                             </td>
                                         </tr>
                                     ))}
@@ -407,7 +407,7 @@ const Customer360Workspace = () => {
                                                     {q.status}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-right text-slate-400">{new Date(q.createdAt).toLocaleDateString()}</td>
+                                            <td className="px-6 py-4 text-right text-slate-400">{formatDate(q.createdAt)}</td>
                                         </tr>
                                     ))}
                                     {quotations.length === 0 && (
@@ -443,8 +443,8 @@ const Customer360Workspace = () => {
                                         <tr key={c._id} className="hover:bg-slate-50/50">
                                             <td className="px-6 py-4 font-mono font-black text-slate-900">{c.contractNumber}</td>
                                             <td className="px-6 py-4">{c.title}</td>
-                                            <td className="px-6 py-4 text-slate-500">{new Date(c.startDate).toLocaleDateString()}</td>
-                                            <td className="px-6 py-4 text-slate-500">{new Date(c.endDate).toLocaleDateString()}</td>
+                                            <td className="px-6 py-4 text-slate-500">{formatDate(c.startDate)}</td>
+                                            <td className="px-6 py-4 text-slate-500">{formatDate(c.endDate)}</td>
                                             <td className="px-6 py-4 text-right font-mono text-indigo-600">₹{(c.value || 0).toLocaleString()}</td>
                                             <td className="px-6 py-4">
                                                 <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
@@ -505,7 +505,7 @@ const Customer360Workspace = () => {
                                                     {o.status}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-right text-slate-400">{new Date(o.orderDate).toLocaleDateString()}</td>
+                                            <td className="px-6 py-4 text-right text-slate-400">{formatDate(o.orderDate)}</td>
                                         </tr>
                                     ))}
                                     {orders.length === 0 && (
@@ -547,7 +547,7 @@ const Customer360Workspace = () => {
                                                     Paid
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-right text-slate-400">{new Date(i.date).toLocaleDateString()}</td>
+                                            <td className="px-6 py-4 text-right text-slate-400">{formatDate(i.date)}</td>
                                         </tr>
                                     ))}
                                     {invoices.length === 0 && (
@@ -593,12 +593,12 @@ const Customer360Workspace = () => {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-slate-500">
-                                                {asset.installationDate ? new Date(asset.installationDate).toLocaleDateString() : '-'}
+                                                {formatDate(asset.installationDate)}
                                             </td>
                                             <td className="px-6 py-4">
                                                 {asset.warrantyEndDate ? (
                                                     <span className={new Date(asset.warrantyEndDate) > new Date() ? 'text-emerald-600 font-bold' : 'text-rose-500 font-bold'}>
-                                                        {new Date(asset.warrantyEndDate).toLocaleDateString()}
+                                                        {formatDate(asset.warrantyEndDate)}
                                                         {new Date(asset.warrantyEndDate) > new Date() ? ' ✓' : ' (Expired)'}
                                                     </span>
                                                 ) : '-'}
@@ -653,7 +653,7 @@ const Customer360Workspace = () => {
                                                     {t.status}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-right text-slate-400">{new Date(t.createdAt).toLocaleDateString()}</td>
+                                            <td className="px-6 py-4 text-right text-slate-400">{formatDate(t.createdAt)}</td>
                                         </tr>
                                     ))}
                                     {tickets.length === 0 && (
@@ -682,7 +682,7 @@ const Customer360Workspace = () => {
                                         <div className="flex items-center gap-3 flex-wrap">
                                             <span className="text-xs font-black text-slate-800 uppercase tracking-wide">{item.title}</span>
                                             <span className="text-[9px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded">
-                                                {new Date(item.date).toLocaleString()}
+                                                {formatDateTime(item.date)}
                                             </span>
                                         </div>
                                         <p className="text-slate-500 text-xs font-medium leading-relaxed">{item.description}</p>

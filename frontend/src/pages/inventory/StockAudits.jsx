@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import { formatDate } from '../../utils/helpers';
 import {
     MdFactCheck,
     MdAdd,
@@ -127,7 +128,7 @@ const StockAudits = () => {
                                             {getStatusBadge(cnt.status)}
                                         </td>
                                         <td className="px-5 py-4 text-xs text-slate-400">
-                                            {new Date(cnt.scheduledDate).toLocaleDateString('en-IN')}
+                                            {formatDate(cnt.scheduledDate)}
                                         </td>
                                         <td className="px-5 py-4 text-right space-x-2">
                                             {['In_Progress', 'Pending_Review'].includes(cnt.status) && (

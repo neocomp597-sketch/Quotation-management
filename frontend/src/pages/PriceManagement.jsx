@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { cpqService, productService, customerService, importService } from '../services/api';
+import { formatDate } from '../utils/helpers';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import { 
@@ -793,7 +794,7 @@ const PriceManagement = ({ mode = 'price-books' }) => {
                                             <tr key={curr._id} className="hover:bg-slate-50/50 transition-colors">
                                                 <td className="py-3.5 font-bold text-slate-900">{curr.fromCurrency} ➔ {curr.toCurrency}</td>
                                                 <td className="py-3.5 font-extrabold text-emerald-600">{curr.rate}</td>
-                                                <td className="py-3.5 text-slate-500">{new Date(curr.effectiveDate).toLocaleDateString()}</td>
+                                                <td className="py-3.5 text-slate-500">{formatDate(curr.effectiveDate)}</td>
                                             </tr>
                                         ))}
                                     </tbody>

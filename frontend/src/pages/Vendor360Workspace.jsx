@@ -20,6 +20,7 @@ import {
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { vendorService, vendorCatalogService } from '../services/api';
+import { formatDate, formatDateTime } from '../utils/helpers';
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 
@@ -475,7 +476,7 @@ const Vendor360Workspace = () => {
                                             <td className="px-6 py-4 font-mono">{p.totalQty || 0}</td>
                                             <td className="px-6 py-4 text-right font-mono">₹{(p.totalTax || 0).toLocaleString()}</td>
                                             <td className="px-6 py-4 text-right font-mono text-primary-600 font-black">₹{(p.grandTotal || 0).toLocaleString()}</td>
-                                            <td className="px-6 py-4 text-right text-slate-400">{new Date(p.date || p.createdAt).toLocaleDateString()}</td>
+                                            <td className="px-6 py-4 text-right text-slate-400">{formatDate(p.date || p.createdAt)}</td>
                                         </tr>
                                     ))}
                                     {purchases.length === 0 && (
@@ -515,7 +516,7 @@ const Vendor360Workspace = () => {
                                                     {q.status}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-right text-slate-400">{new Date(q.createdAt).toLocaleDateString()}</td>
+                                            <td className="px-6 py-4 text-right text-slate-400">{formatDate(q.createdAt)}</td>
                                         </tr>
                                     ))}
                                     {quotations.length === 0 && (
@@ -577,7 +578,7 @@ const Vendor360Workspace = () => {
                                         <div className="flex items-center gap-2">
                                             <span className="font-black text-slate-900 text-sm">{item.title}</span>
                                             <span className="text-[10px] font-bold text-slate-400">
-                                                {item.date ? new Date(item.date).toLocaleString() : ''}
+                                                {formatDateTime(item.date, '')}
                                             </span>
                                         </div>
                                         <p className="text-xs font-medium text-slate-600 mt-1">{item.description}</p>

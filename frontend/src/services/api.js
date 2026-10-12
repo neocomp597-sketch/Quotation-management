@@ -468,6 +468,9 @@ export const serialTransferService = {
   // An earlier customer recorded afterwards; stays inactive.
   addPastEntry: (assetId, data) => api.post(`/serial-transfers/serials/${assetId}/past-entry`, data),
   listHistory: (params = {}) => api.get("/serial-transfers/history", { params }),
+  // Customer Activity Log: ownership = Active (current owners) | Inactive (earlier owners).
+  listActivity: (params = {}) => api.get("/serial-transfers/activity", { params }),
+  exportActivity: (params = {}) => api.get("/serial-transfers/activity/export", { params, responseType: "blob" }),
 };
 
 export const companySettingsService = {
@@ -968,15 +971,14 @@ export const csmService = {
   verifyEntitlements: (params = {}) => api.get("/csm/entitlements/verify", { params }),
   getWarranties: () => api.get("/csm/warranties"),
   createWarranty: (data) => api.post("/csm/warranties", data),
+  lookupWarrantySerial: (params) => api.get("/csm/warranties/serial-lookup", { params }),
   getAmcs: () => api.get("/csm/amcs"),
   createAmc: (data) => api.post("/csm/amcs", data),
   getAssets: (params = {}) => api.get("/csm/assets", { params }),
   createAsset: (data) => api.post("/csm/assets", data),
   createSingleAsset: (data) => api.post("/csm/assets/single", data),
-  updateAsset: (id, data) => api.put(`/csm/assets/${id}`, data),
   returnAsset: (id, returnReason) => api.post(`/csm/assets/${id}/return`, { returnReason }),
   getReturnHistory: () => api.get("/csm/assets/return-history"),
-  deleteAsset: (id) => api.delete(`/csm/assets/${id}`),
   getAssetSummary: (params = {}) => api.get("/csm/assets/summary", { params }),
   getAssetActivity: (serialNumber) => api.get("/csm/assets/activity", { params: { serialNumber } }),
   searchSerialNumbers: (q) => api.get("/csm/assets/search-serials", { params: { q } }),

@@ -7,7 +7,7 @@ import { customerService, uploadService, importService, territoryService, userSe
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import PaginationControls from '../components/PaginationControls';
-import { resolveImageUrl } from '../utils/helpers';
+import { resolveImageUrl, formatDate } from '../utils/helpers';
 import { isValidGSTIN, isValidPAN, isValidMobile } from '../utils/validation';
 import CustomerPricingDashboard from './CustomerPricingDashboard';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
@@ -1276,12 +1276,12 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
                                                             </span>
                                                         </td>
                                                         <td className="px-4 py-3 text-xs">
-                                                            {asset.installationDate ? new Date(asset.installationDate).toLocaleDateString('en-IN') : '-'}
+                                                            {formatDate(asset.installationDate)}
                                                         </td>
                                                         <td className="px-4 py-3 text-xs">
                                                             {asset.warrantyEndDate ? (
                                                                 <span className={new Date(asset.warrantyEndDate) > new Date() ? 'text-teal-600 font-bold' : 'text-rose-500 font-bold'}>
-                                                                    {new Date(asset.warrantyEndDate).toLocaleDateString('en-IN')}
+                                                                    {formatDate(asset.warrantyEndDate)}
                                                                     {new Date(asset.warrantyEndDate) > new Date() ? ' ✓' : ' (Expired)'}
                                                                 </span>
                                                             ) : '-'}

@@ -4,7 +4,8 @@ const Asset = require('../models/Asset');
 const AssetHistory = require('../models/AssetHistory');
 const Product = require('../models/Product');
 const Customer = require('../models/Customer');
-const RolePermission = require('../models/RolePermission');
+const SerialTransfer = require('../models/SerialTransfer');
+const { formatDate } = require('../utils/dateFormat');
 const mongoose = require('mongoose');
 const { productMgrPopulate, applyProductMgrs, applyProductMgrsToAll, stripMgrFields } = require('../utils/productMgr');
 const { loadDivisionSegmentLookup, resolveDivisionSegment } = require('../utils/divisionSegment');
@@ -39,14 +40,172 @@ const resolveEntitlementBranch = async (customerId, req) => {
     return req.user?.activeBranchId || null;
 };
 
-// Warranty CRUD
-exports.createWarranty = async (req, res) => {
+const httpError = (status, message, extra = {}) => Object.assign(new Error(message), { status, extra });
+
+const ownerName = (customer, fallback = '') => customer?.companyName || customer?.customerName || fallback;
+
+/**
+ * The sold serial number a warranty is registered against, with its product and current customer.
+ * The current customer is the Active owner in Serial No Transfer (the asset's customer is moved
+ * with every transfer), so a warranty can never be registered for an earlier owner.
+ */
+const findSoldSerial = async (companyId, serialNumber, assetId) => {
+    const serial = String(serialNumber || '').trim();
+    if (!serial) throw httpError(400, 'Enter the serial number.');
+
+    const assets = await Asset.find({ companyId, serialNumber: buildExactRegex(serial) })
+        .populate({ path: 'customerId', select: 'customerName companyName externalCode', options: { bypassTenant: true } })
+        .populate({ path: 'productId', select: 'productName productCode', options: { bypassTenant: true } })
+        .lean();
+    if (!assets.length) throw httpError(404, `Serial number ${serial} was not found in Invoice Bulk Upload.`);
+
+    const sold = assets.filter((asset) => asset.status === 'SOLD');
+    if (!sold.length) {
+        throw httpError(422, `Serial number ${serial} has no current customer (status ${assets[0].status}). A warranty can be registered only for a sold serial number.`);
+    }
+    const chosen = assetId ? sold.find((asset) => String(asset._id) === String(assetId)) : sold.length === 1 ? sold[0] : null;
+    if (!chosen) {
+        throw httpError(409, `Serial number ${serial} is on more than one sold entry. Choose the product.`, {
+            choices: sold.map((asset) => ({
+                assetId: asset._id,
+                productCode: asset.productId?.productCode || asset.productCode,
+                productName: asset.productId?.productName || asset.productName,
+                customerName: ownerName(asset.customerId, asset.customerNameStr)
+            }))
+        });
+    }
+
+    // Populate leaves customerId null when the customer was deleted, so read the stored id too.
+    const assetCustomer = chosen.customerId || null;
+    const [current, stored] = await Promise.all([
+        SerialTransfer.findOne({ assetId: chosen._id, isActive: true }).select('customerId').lean(),
+        assetCustomer ? null : Asset.findById(chosen._id).select('customerId').lean()
+    ]);
+    const customerId = current?.customerId || assetCustomer?._id || stored?.customerId || null;
+    if (!customerId) throw httpError(422, `Serial number ${serial} is not linked to a customer. Link the customer in Invoice Bulk Upload first.`);
+    const customer = String(customerId) === String(assetCustomer?._id)
+        ? assetCustomer
+        : await Customer.findById(customerId).select('customerName companyName externalCode').setOptions({ bypassTenant: true }).lean();
+    if (!customer) {
+        throw httpError(422, `The customer of serial number ${serial}${chosen.customerNameStr ? ` (${chosen.customerNameStr})` : ''} no longer exists in Customer Master. Restore the customer or transfer the serial to an existing customer first.`);
+    }
+    if (!chosen.productId?._id) throw httpError(422, `The product of serial number ${serial} is missing from Product Master.`);
+
+    return {
+        asset: chosen,
+        product: { _id: chosen.productId._id, productCode: chosen.productId.productCode, productName: chosen.productId.productName },
+        customer: { _id: customerId, name: ownerName(customer, chosen.customerNameStr), code: customer?.externalCode || chosen.customerCode || '' }
+    };
+};
+
+// Warranties of the same serial (by entry or by serial number text, for imported warranties).
+const sameSerialFilter = (companyId, asset) => ({
+    companyId,
+    $or: [{ assetId: asset._id }, { serialNumber: buildExactRegex(asset.serialNumber) }]
+});
+
+const warrantySummary = (warranty) => warranty && ({
+    _id: warranty._id,
+    serialNumber: warranty.serialNumber,
+    purchaseDate: warranty.purchaseDate,
+    expiryDate: warranty.expiryDate,
+    status: warranty.status,
+    customerName: ownerName(warranty.customerId),
+    productName: warranty.productId?.productName || ''
+});
+
+const sendWarrantyError = (res, error, fallback) => {
+    if (error.status) return res.status(error.status).json({ message: error.message, ...error.extra });
+    console.error(fallback, error);
+    return res.status(500).json({ message: error.message || fallback });
+};
+
+/** Add Warranty: serial number lookup that fills Customer and Product (?serialNumber&assetId). */
+exports.lookupWarrantySerial = async (req, res) => {
     try {
-        const branchId = req.body.branchId || await resolveEntitlementBranch(req.body.customerId, req);
-        const doc = await Warranty.create({ ...req.body, branchId, companyId: req.user?.companyId });
-        res.status(201).json(doc);
+        const companyId = req.user?.companyId;
+        const { asset, product, customer } = await findSoldSerial(companyId, req.query.serialNumber, req.query.assetId);
+        const warranties = await Warranty.find(sameSerialFilter(companyId, asset))
+            .populate('customerId', 'customerName companyName')
+            .populate('productId', 'productName')
+            .sort({ expiryDate: -1 })
+            .lean();
+        res.json({
+            assetId: asset._id,
+            serialNumber: asset.serialNumber,
+            invoiceNumber: asset.invoiceNumber || '',
+            saleDate: asset.saleDate || asset.invoiceDate || null,
+            product,
+            customer,
+            warranties: warranties.map(warrantySummary)
+        });
     } catch (error) {
-        res.status(400).json({ message: error.message });
+        sendWarrantyError(res, error, 'Serial number lookup failed');
+    }
+};
+
+const toDate = (value) => {
+    const date = value ? new Date(value) : null;
+    return date && !Number.isNaN(date.getTime()) ? date : null;
+};
+
+/**
+ * Registers a warranty for a sold serial number. Customer and product come from the serial (its
+ * current owner), not from the request. A serial cannot have two warranties whose periods overlap;
+ * a renewal starting after the earlier warranty's expiry is allowed. The check and the insert run
+ * in one transaction that also writes the asset, so two simultaneous requests for the same serial
+ * conflict: one commits and the other is retried, finds that warranty and is refused.
+ */
+exports.createWarranty = async (req, res) => {
+    let session;
+    try {
+        const companyId = req.user?.companyId;
+        const purchaseDate = toDate(req.body.purchaseDate);
+        const expiryDate = toDate(req.body.expiryDate);
+        if (!purchaseDate) throw httpError(400, 'Enter a valid purchase date.');
+        if (!expiryDate) throw httpError(400, 'Enter a valid expiry date.');
+        if (expiryDate <= purchaseDate) throw httpError(400, 'Expiry date must be after the purchase date.');
+
+        const { asset, product, customer } = await findSoldSerial(companyId, req.body.serialNumber, req.body.assetId);
+        const branchId = await resolveEntitlementBranch(customer._id, req);
+
+        let created;
+        session = await mongoose.startSession();
+        await session.withTransaction(async () => {
+            await Asset.updateOne({ _id: asset._id }, { $inc: { warrantyRegistrations: 1 } }, { session });
+            const overlapping = await Warranty.findOne({
+                ...sameSerialFilter(companyId, asset),
+                purchaseDate: { $lte: expiryDate },
+                expiryDate: { $gte: purchaseDate }
+            })
+                .populate('customerId', 'customerName companyName')
+                .populate('productId', 'productName')
+                .session(session)
+                .lean();
+            if (overlapping) {
+                const until = formatDate(overlapping.expiryDate);
+                throw httpError(409, `Serial number ${asset.serialNumber} already has a warranty valid until ${until}. A renewal must start after that date.`, {
+                    existing: warrantySummary(overlapping)
+                });
+            }
+            [created] = await Warranty.create([{
+                customerId: customer._id,
+                productId: product._id,
+                assetId: asset._id,
+                invoiceId: asset.invoiceId || undefined,
+                serialNumber: asset.serialNumber,
+                purchaseDate,
+                expiryDate,
+                status: expiryDate > new Date() ? 'Active' : 'Expired',
+                branchId,
+                companyId
+            }], { session });
+        });
+        res.status(201).json(created);
+    } catch (error) {
+        sendWarrantyError(res, error, 'Warranty registration failed');
+    } finally {
+        if (session) await session.endSession();
     }
 };
 
@@ -446,162 +605,12 @@ exports.createSingleAsset = async (req, res) => {
     }
 };
 
-// Edit Single Entry: updates one Invoice Bulk Upload record in place.
-exports.updateAsset = async (req, res) => {
-    try {
-        const companyId = req.user?.companyId;
-        const { id } = req.params;
-        if (!isValidObjectId(id)) {
-            return res.status(400).json({ message: 'Invalid entry id' });
-        }
-
-        const asset = await Asset.findOne({ _id: id, companyId });
-        if (!asset) {
-            return res.status(404).json({ message: 'Entry not found' });
-        }
-
-        const body = req.body || {};
-        const has = (key) => Object.prototype.hasOwnProperty.call(body, key);
-
-        // Division / Segment stay mandatory, the segment must belong to the division.
-        let divisionSegment;
-        try {
-            const lookup = await loadDivisionSegmentLookup(companyId);
-            divisionSegment = resolveDivisionSegment(lookup, {
-                divisionId: has('divisionId') ? body.divisionId : asset.divisionId,
-                segmentId: has('segmentId') ? body.segmentId : asset.segmentId
-            }, { required: true });
-        } catch (err) {
-            return res.status(err.statusCode || 400).json({ message: err.message });
-        }
-
-        const update = {
-            divisionId: divisionSegment.division._id,
-            segmentId: divisionSegment.segment._id
-        };
-
-        if (has('serialNumber')) {
-            const cleanSN = String(body.serialNumber || '').trim();
-            if (!cleanSN) return res.status(400).json({ message: 'Serial Number is required' });
-            if (cleanSN.toLowerCase() !== String(asset.serialNumber || '').toLowerCase()) {
-                const duplicate = await Asset.findOne({
-                    _id: { $ne: asset._id },
-                    serialNumber: buildExactRegex(cleanSN),
-                    status: { $nin: ['RETURN', 'RETURNED'] }
-                }).setOptions({ bypassTenant: true }).select('_id').lean();
-                if (duplicate) {
-                    return res.status(400).json({ message: `Duplicate entry: Serial Number (${cleanSN}) already exists in the system.` });
-                }
-            }
-            update.serialNumber = cleanSN;
-        }
-
-        if (has('productCode')) {
-            const cleanProductCode = String(body.productCode || '').trim();
-            if (!cleanProductCode) return res.status(400).json({ message: 'Product Code is required' });
-            let product = await Product.findOne({ companyId, productCode: buildExactRegex(cleanProductCode) });
-            if (!product) {
-                product = await Product.create({
-                    companyId,
-                    productCode: cleanProductCode,
-                    productName: String(body.productName || '').trim() || cleanProductCode,
-                    hsnCode: 'N/A',
-                    gstPercentage: 18,
-                    basePrice: 0,
-                    mrp: 0,
-                    uom: 'Nos',
-                    status: 'Active'
-                });
-            }
-            update.productId = product._id;
-            update.productCode = product.productCode;
-            update.productName = product.productName;
-        }
-
-        if (has('status')) {
-            const allowed = Asset.schema.path('status').enumValues;
-            if (!allowed.includes(body.status)) return res.status(400).json({ message: 'Invalid status' });
-            update.status = body.status;
-        }
-
-        if (has('customer') || has('customerCode')) {
-            const searchTarget = String(body.customerCode || body.customer || '').trim();
-            if (!searchTarget) {
-                Object.assign(update, { customerId: null, customerCode: '', customerNameStr: '', customerPostalCode: '' });
-            } else {
-                let customer = await Customer.findOne({
-                    companyId,
-                    $or: [
-                        { externalCode: buildExactRegex(searchTarget) },
-                        { customerName: buildExactRegex(searchTarget) },
-                        { companyName: buildExactRegex(searchTarget) }
-                    ]
-                }).setOptions({ bypassBranch: true });
-                if (!customer) {
-                    customer = await Customer.create({
-                        companyId,
-                        externalCode: searchTarget,
-                        customerName: String(body.customer || searchTarget).trim(),
-                        companyName: String(body.customer || searchTarget).trim(),
-                        createdBy: req.user?.id || null
-                    });
-                }
-                const rawPin = customer.billingAddress?.pincode || customer.pincode || '';
-                Object.assign(update, {
-                    customerId: customer._id,
-                    customerCode: customer.externalCode || searchTarget,
-                    customerNameStr: customer.companyName || customer.customerName || searchTarget,
-                    customerPostalCode: String(rawPin).trim(),
-                    customerMobile: asset.customerMobile || customer.mobile || ''
-                });
-            }
-        }
-
-        if (has('invoiceNumber')) update.invoiceNumber = String(body.invoiceNumber || '').trim();
-        if (has('saleDate')) update.saleDate = body.saleDate ? new Date(body.saleDate) : null;
-        if (has('location')) update.location = String(body.location || '').trim();
-        if (has('indicatorField')) update.indicatorField = String(body.indicatorField || '').trim().slice(0, 20);
-        if (has('projectCode')) update.projectCode = String(body.projectCode || '').trim();
-        if (has('projectName')) update.projectName = String(body.projectName || '').trim();
-
-        await Asset.updateOne({ _id: asset._id }, { $set: update });
-
-        const updatedDoc = applyProductMgrs(
-            await Asset.findById(asset._id)
-                .populate({ path: 'customerId', select: 'customerName companyName externalCode billingAddress pincode mobile', options: { bypassTenant: true } })
-                .populate(productMgrPopulate())
-                .populate(DIVISION_POPULATE)
-                .populate(SEGMENT_POPULATE)
-                .lean()
-        );
-
-        await AssetHistory.create({
-            companyId,
-            branchId: updatedDoc.branchId || null,
-            assetId: updatedDoc._id,
-            serialNumber: updatedDoc.serialNumber,
-            productCode: updatedDoc.productId?.productCode || updatedDoc.productCode || '',
-            productName: updatedDoc.productId?.productName || updatedDoc.productName || '',
-            productId: updatedDoc.productId?._id || null,
-            customerId: updatedDoc.customerId?._id || null,
-            customerCode: updatedDoc.customerCode || '',
-            customerName: updatedDoc.customerNameStr || '',
-            customerPostalCode: updatedDoc.customerPostalCode || '',
-            invoiceNumber: updatedDoc.invoiceNumber || '',
-            saleDate: updatedDoc.saleDate || null,
-            location: updatedDoc.location || '',
-            indicatorField: updatedDoc.indicatorField || '',
-            transactionType: 'UPDATE',
-            status: updatedDoc.status,
-            createdBy: req.user?.id || null
-        });
-
-        res.json({ message: 'Entry updated successfully', data: updatedDoc });
-    } catch (error) {
-        console.error('updateAsset error:', error);
-        res.status(500).json({ message: error.message || 'Error updating entry' });
-    }
-};
+// Invoice Bulk Upload entries cannot be edited or deleted once saved (Import, Add Single Entry,
+// Sales Return and Export still work). The PUT/DELETE routes answer with this so a direct API call
+// gets a clear refusal instead of a 404.
+exports.rejectEntryChange = (req, res) => res.status(405).json({
+    message: 'Invoice Bulk Upload entries cannot be edited or deleted.'
+});
 
 // Process Sales Return (Requirement #6, #7, #8)
 exports.returnAsset = async (req, res) => {
@@ -679,39 +688,6 @@ exports.getReturnHistory = async (req, res) => {
     } catch (error) {
         console.error('getReturnHistory error:', error);
         res.status(500).json({ message: error.message || 'Error fetching return history' });
-    }
-};
-
-// Delete Entry (Requirement #11, #12)
-exports.deleteAsset = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const companyId = req.user?.companyId;
-        const user = req.user;
-
-        let isAuthorized = false;
-        if (user.role === 'admin' || user.role === 'superadmin' || user.isSuperAdmin) {
-            isAuthorized = true;
-        } else {
-            const rolePerm = await RolePermission.findOne({ role: user.role, companyId }).lean();
-            if (rolePerm && (rolePerm.menuVisibility?.invoice_bulk_upload_delete || rolePerm.menuVisibility?.master_serials_delete)) {
-                isAuthorized = true;
-            }
-        }
-
-        if (!isAuthorized) {
-            return res.status(403).json({ message: 'Permission denied: Only Company Admin or users with Delete Invoice Bulk Upload Entry permission can delete entries.' });
-        }
-
-        const asset = await Asset.findOneAndDelete({ _id: id, companyId });
-        if (!asset) {
-            return res.status(404).json({ message: 'Entry not found' });
-        }
-
-        res.json({ message: 'Invoice Bulk Upload entry deleted successfully' });
-    } catch (error) {
-        console.error('deleteAsset error:', error);
-        res.status(500).json({ message: error.message || 'Error deleting entry' });
     }
 };
 

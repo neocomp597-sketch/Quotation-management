@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { MdArrowBack, MdEdit, MdFileDownload, MdPictureAsPdf, MdToggleOff, MdToggleOn, MdHistory, MdUploadFile, MdAdd, MdChevronRight, MdFormatListNumbered } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { bomService } from '../services/api';
+import { formatDateTime } from '../utils/helpers';
 import BOMComponentsTable from '../components/bom/BOMComponentsTable';
 
 const Field = ({ label, children }) => (
@@ -12,7 +13,6 @@ const Field = ({ label, children }) => (
     </div>
 );
 
-const formatDateTime = (value) => (value ? new Date(value).toLocaleString('en-IN') : '');
 const mgrLabel = (mgr) => (mgr ? (mgr.description || mgr.code || '') : '');
 const sameKey = (a, b) => String(a || '').trim().toUpperCase() === String(b || '').trim().toUpperCase();
 
@@ -707,7 +707,7 @@ const BOMDetails = () => {
                                             {entry.status}
                                         </span>
                                         <span className="font-bold text-slate-700">{entry.changedByName || 'Unknown user'}</span>
-                                        <span className="text-slate-500">{formatDateTime(entry.changedAt)}</span>
+                                        <span className="text-slate-500">{formatDateTime(entry.changedAt, '')}</span>
                                         {entry.reason && <span className="text-slate-500">— {entry.reason}</span>}
                                     </li>
                                 ))}

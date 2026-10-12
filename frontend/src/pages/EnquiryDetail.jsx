@@ -10,7 +10,7 @@ import {
 import { toast } from 'react-toastify';
 import { enquiryService, userService, salespersonService, payrollService } from '../services/api';
 import Modal from '../components/Modal';
-import { formatDate, buildSalesExecutiveList } from '../utils/helpers';
+import { formatDate, formatDateTime, buildSalesExecutiveList } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
 
 const StatusPill = ({ status }) => {
@@ -887,7 +887,7 @@ const EnquiryDetail = () => {
                                                     {log.actionType}
                                                 </span>
                                                 <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">
-                                                    {new Date(log.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                                                    {formatDateTime(log.date)}
                                                 </span>
                                             </div>
                                             <p className="text-xs text-slate-800 dark:text-slate-100 font-bold leading-relaxed">{log.note}</p>
@@ -950,7 +950,7 @@ const EnquiryDetail = () => {
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 text-xs">
                                                     <div>
                                                         <span className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase block">Appointment Date & Time</span>
-                                                        <span className="text-slate-900 dark:text-white font-black">{visit.visitDate ? new Date(visit.visitDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A'}</span>
+                                                        <span className="text-slate-900 dark:text-white font-black">{formatDateTime(visit.visitDate, 'N/A')}</span>
                                                     </div>
                                                     <div>
                                                         <span className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase block">Assigned Representative</span>

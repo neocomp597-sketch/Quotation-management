@@ -26,6 +26,7 @@ import { flowchartService } from '../services/api';
 import { FLOWCHART_TEMPLATES } from '../constants/FlowchartTemplates';
 import Modal from './Modal';
 import { toast } from 'react-toastify';
+import { formatDate } from '../utils/helpers';
 
 const NODE_TYPES = [
     { type: 'start', label: 'Start', color: '#10b981', shape: 'pill' },
@@ -488,7 +489,7 @@ const FlowchartCanvas = ({
             pdf.setFontSize(8);
             pdf.setTextColor(148, 163, 184); // slate-400
             pdf.text(
-                `Generated on ${new Date().toLocaleDateString()} • ${nodes.length} nodes • ${edges.length} connectors`,
+                `Generated on ${formatDate(new Date())} • ${nodes.length} nodes • ${edges.length} connectors`,
                 margin,
                 yOffset
             );
@@ -1148,7 +1149,7 @@ const FlowchartCanvas = ({
                                                 Version {v.versionNumber}
                                             </span>
                                             <span className="text-[10px] text-slate-400 font-bold">
-                                                {new Date(v.createdAt).toLocaleDateString()}
+                                                {formatDate(v.createdAt)}
                                             </span>
                                         </div>
                                         <p className="text-[11px] text-slate-500 font-medium">

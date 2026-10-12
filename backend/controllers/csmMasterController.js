@@ -135,6 +135,12 @@ exports.seedMhData = async (req, res) => {
         const AMC = require('../models/AMC');
         const CustomerContact = require('../models/CustomerContact');
 
+        // The demo seed replaces all tickets, Invoice Bulk Upload entries, warranties and AMCs of
+        // the company, so it only runs for a company that has no Invoice Bulk Upload entries yet.
+        if (await Asset.exists({ companyId }).setOptions({ bypassBranch: true })) {
+            return res.status(409).json({ message: 'Demo data cannot be loaded: this company already has Invoice Bulk Upload entries, which the demo would erase.' });
+        }
+
         // 1. Ensure categories exist
         const categoriesData = [
             { name: 'Substation Fault', description: 'Transformer, breaker, or switchgear failure' },

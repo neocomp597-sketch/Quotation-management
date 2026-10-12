@@ -7,6 +7,7 @@ import { MdArrowBack, MdFileDownload, MdPictureAsPdf, MdSync } from 'react-icons
 import { csmService } from '../services/api';
 import AssetActivityLog from '../components/AssetActivityLog';
 import { filterActivity, formatActivityDate } from '../utils/assetActivity';
+import { formatDate } from '../utils/helpers';
 
 // Asset Lifecycle Detail of one serial number, as a full page (it used to be a popup on
 // Invoice Bulk Upload): the record, its coverage and its activity log, with PDF / Excel export.
@@ -30,7 +31,6 @@ const resolveMgr = (asset, key) => {
 
 const codeLabel = (doc) => (doc && typeof doc === 'object' ? [doc.code, doc.description].filter(Boolean).join(' - ') : '');
 
-const formatDate = (value) => (value ? new Date(value).toLocaleDateString('en-IN') : '');
 const formatDateTime = formatActivityDate;
 
 const AssetLifecycle = () => {
@@ -80,7 +80,7 @@ const AssetLifecycle = () => {
             ['Product Name', asset.productId?.productName || asset.productName || ''],
             ['Product Code', asset.productId?.productCode || asset.productCode || ''],
             ['Invoice Number', asset.invoiceNumber || ''],
-            ['Date of Sale', formatDate(asset.saleDate || asset.invoiceDate)],
+            ['Date of Sale', formatDate(asset.saleDate || asset.invoiceDate, '')],
             ['Postal Code', asset.customerPostalCode || ''],
             ['Location', asset.location || ''],
             ['Division', codeLabel(asset.divisionId)],
@@ -89,8 +89,8 @@ const AssetLifecycle = () => {
             ['Project', [asset.projectCode, asset.projectName].filter(Boolean).join(' - ')],
             ...MGR_FIELDS.map((key, i) => [`MGR ${i + 1}`, resolveMgr(asset, key)]),
             ['Coverage', isCovered ? 'Covered (Warranty/AMC)' : 'Out of Warranty/AMC'],
-            ['Warranty Expiry', formatDate(summary?.warranty?.expiryDate)],
-            ['Last Service', formatDate(summary?.lastServiceDate)],
+            ['Warranty Expiry', formatDate(summary?.warranty?.expiryDate, '')],
+            ['Last Service', formatDate(summary?.lastServiceDate, '')],
             ['Open Tickets', String(summary?.ticketCounts?.open ?? 0)],
             ['Closed Tickets', String(summary?.ticketCounts?.closed ?? 0)]
         ];
@@ -337,9 +337,9 @@ const AssetLifecycle = () => {
                         <div className="p-6 bg-white border border-slate-200 rounded-[2rem] shadow-sm space-y-4">
                             <span className="block text-xs font-black uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-3">Coverage & Service</span>
                             {[
-                                ['Warranty', summary?.warranty ? `${summary.warranty.status || ''}${summary.warranty.expiryDate ? ` · until ${formatDate(summary.warranty.expiryDate)}` : ''}` : 'None'],
-                                ['AMC', summary?.amc ? `${summary.amc.contractNo || 'Active'} · until ${formatDate(summary.amc.endDate)}` : 'None'],
-                                ['Last Service', formatDate(summary?.lastServiceDate) || 'None'],
+                                ['Warranty', summary?.warranty ? `${summary.warranty.status || ''}${summary.warranty.expiryDate ? ` · until ${formatDate(summary.warranty.expiryDate, '')}` : ''}` : 'None'],
+                                ['AMC', summary?.amc ? `${summary.amc.contractNo || 'Active'} · until ${formatDate(summary.amc.endDate, '')}` : 'None'],
+                                ['Last Service', formatDate(summary?.lastServiceDate, '') || 'None'],
                                 ['Open Tickets', summary?.ticketCounts?.open ?? 0],
                                 ['Closed Tickets', summary?.ticketCounts?.closed ?? 0]
                             ].map(([label, value]) => (

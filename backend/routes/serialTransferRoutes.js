@@ -14,5 +14,7 @@ router.get('/serials/:assetId', serialTransferController.getSerial);
 router.post('/serials/:assetId/transfer', serialTransferController.transferSerial);
 router.post('/serials/:assetId/past-entry', serialTransferController.addPastEntry);
 router.get('/history', serialTransferController.listHistory);
+router.get('/activity', serialTransferController.listActivity);
+router.get('/activity/export', serialTransferController.exportActivity);
 
 module.exports = router;

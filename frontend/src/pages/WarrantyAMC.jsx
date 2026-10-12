@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { csmService, customerService, productService, importService, voucherService } from '../services/api';
+import { csmService, customerService, importService, voucherService } from '../services/api';
+import { formatDate, formatDateTime } from '../utils/helpers';
 import { toast } from 'react-toastify';
 import { 
     MdSecurity, MdAssignmentTurnedIn, MdCheckCircle, 
@@ -8,6 +9,28 @@ import {
 } from 'react-icons/md';
 import Modal from '../components/Modal';
 import SearchableSelect from '../components/SearchableSelect';
+import SerialSearchInput from '../components/bom/SerialSearchInput';
+
+const EMPTY_FORM = {
+    customerId: '',
+    productId: '',
+    assetId: '',
+    purchaseDate: '',
+    expiryDate: '',
+    serialNumber: '',
+    contractNo: '',
+    startDate: '',
+    endDate: '',
+    visitsAllowed: 4,
+    amount: ''
+};
+
+// A stored date as the yyyy-mm-dd of the local day, for a date input.
+const toInputDate = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+};
 
 const WarrantyAMC = () => {
     const [activeSection, setActiveSection] = useState('warranties');
@@ -32,22 +55,56 @@ const WarrantyAMC = () => {
 
     // List dependencies for forms
     const [customers, setCustomers] = useState([]);
-    const [products, setProducts] = useState([]);
 
     // Modal state
     const [showModal, setShowModal] = useState(false);
-    const [formData, setFormData] = useState({
-        customerId: '',
-        productId: '',
-        purchaseDate: '',
-        expiryDate: '',
-        serialNumber: '',
-        contractNo: '',
-        startDate: '',
-        endDate: '',
-        visitsAllowed: 4,
-        amount: ''
-    });
+    const [formData, setFormData] = useState(EMPTY_FORM);
+    const [submitting, setSubmitting] = useState(false);
+    const [formError, setFormError] = useState('');
+    // Add Warranty: the serial number fills Customer (its current owner) and Product.
+    // status: idle | loading | found | error
+    const [serialLookup, setSerialLookup] = useState({ status: 'idle' });
+
+    const openForm = (section) => {
+        setFormData(EMPTY_FORM);
+        setSerialLookup({ status: 'idle' });
+        setFormError('');
+        setActiveSection(section);
+        setShowModal(true);
+    };
+
+    const lookupSerial = async (serialNumber, assetId) => {
+        const serial = String(serialNumber || '').trim();
+        if (!serial) return;
+        setSerialLookup({ status: 'loading', serial });
+        setFormError('');
+        try {
+            const { data } = await csmService.lookupWarrantySerial({ serialNumber: serial, assetId: assetId || undefined });
+            setSerialLookup({ status: 'found', serial: data.serialNumber, data });
+            setFormData((prev) => ({
+                ...prev,
+                serialNumber: data.serialNumber,
+                assetId: data.assetId,
+                customerId: data.customer._id,
+                productId: data.product._id,
+                purchaseDate: prev.purchaseDate || toInputDate(data.saleDate)
+            }));
+        } catch (error) {
+            setSerialLookup({
+                status: 'error',
+                serial,
+                message: error.response?.data?.message || 'Serial number lookup failed. Check that the backend is running.',
+                choices: error.response?.data?.choices || []
+            });
+            setFormData((prev) => ({ ...prev, assetId: '', customerId: '', productId: '' }));
+        }
+    };
+
+    const changeSerial = (value) => {
+        setFormData((prev) => ({ ...prev, serialNumber: value, assetId: '', customerId: '', productId: '' }));
+        setSerialLookup({ status: 'idle' });
+        setFormError('');
+    };
 
     const fetchLists = async () => {
         setLoading(true);
@@ -68,12 +125,8 @@ const WarrantyAMC = () => {
 
     const loadFormDependencies = async () => {
         try {
-            const [custRes, prodRes] = await Promise.all([
-                customerService.getAll({ limit: 500 }),
-                productService.getAll({ limit: 500 })
-            ]);
+            const custRes = await customerService.getAll({ limit: 500 });
             setCustomers(custRes.data?.data || custRes.data || []);
-            setProducts(prodRes.data?.data || prodRes.data || []);
         } catch (error) {
             console.error('Error preloading entities:', error);
         }
@@ -145,17 +198,10 @@ const WarrantyAMC = () => {
         })
     ), [customers]);
 
-    const productOptions = useMemo(() => (
-        products.map(product => ({
-            value: product._id,
-            label: product.productCode ? `${product.productCode} - ${product.productName}` : product.productName || 'Unnamed Product'
-        }))
-    ), [products]);
-
     const invoiceOptions = useMemo(() => (
         customerInvoices.map(invoice => ({
             value: invoice._id,
-            label: `${invoice.voucherNumber || 'Invoice'} - ${invoice.date ? new Date(invoice.date).toLocaleDateString() : 'No date'} - Rs ${Number(invoice.grandTotal || 0).toLocaleString('en-IN')}`
+            label: `${invoice.voucherNumber || 'Invoice'} - ${formatDate(invoice.date, 'No date')} - Rs ${Number(invoice.grandTotal || 0).toLocaleString('en-IN')}`
         }))
     ), [customerInvoices]);
 
@@ -221,14 +267,27 @@ const WarrantyAMC = () => {
 
     const handleCreate = async (e) => {
         e.preventDefault();
+        if (submitting) return;
+        if (activeSection === 'warranties') {
+            if (serialLookup.status !== 'found') {
+                setFormError('Enter the serial number and select it so Customer and Product are filled.');
+                return;
+            }
+            if (formData.expiryDate <= formData.purchaseDate) {
+                setFormError('Expiry date must be after the purchase date.');
+                return;
+            }
+        }
+        setSubmitting(true);
+        setFormError('');
         try {
             if (activeSection === 'warranties') {
+                // Customer and product are taken from the serial number on the server.
                 await csmService.createWarranty({
-                    customerId: formData.customerId,
-                    productId: formData.productId,
+                    serialNumber: formData.serialNumber,
+                    assetId: formData.assetId,
                     purchaseDate: formData.purchaseDate,
-                    expiryDate: formData.expiryDate,
-                    serialNumber: formData.serialNumber
+                    expiryDate: formData.expiryDate
                 });
                 toast.success('Warranty registered successfully');
             } else {
@@ -245,7 +304,15 @@ const WarrantyAMC = () => {
             setShowModal(false);
             fetchLists();
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Registration failed');
+            const message = error.response?.data?.message || (error.response ? 'Registration failed' : 'The server could not be reached. Try again.');
+            setFormError(message);
+            toast.error(message);
+            const existing = error.response?.data?.existing;
+            if (existing && serialLookup.status === 'found' && !serialLookup.data.warranties.some((w) => w._id === existing._id)) {
+                setSerialLookup((prev) => ({ ...prev, data: { ...prev.data, warranties: [existing, ...prev.data.warranties] } }));
+            }
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -313,7 +380,7 @@ const WarrantyAMC = () => {
 
     const downloadErrorReport = () => {
         if (!importResult || !importResult.errors || importResult.errors.length === 0) return;
-        const blobContent = `Import Error Report for ${importResult.type === 'warranty' ? 'Warranties' : 'AMCs'}\nGenerated on: ${new Date().toLocaleString()}\n\nFailed rows details:\n` + importResult.errors.join('\n');
+        const blobContent = `Import Error Report for ${importResult.type === 'warranty' ? 'Warranties' : 'AMCs'}\nGenerated on: ${formatDateTime(new Date())}\n\nFailed rows details:\n` + importResult.errors.join('\n');
         const url = window.URL.createObjectURL(new Blob([blobContent], { type: 'text/plain' }));
         const link = document.createElement('a');
         link.href = url;
@@ -338,44 +405,14 @@ const WarrantyAMC = () => {
                 <div className="flex flex-wrap items-center gap-2">
                     {/* Add Buttons */}
                     <button
-                        onClick={() => {
-                            setFormData({
-                                customerId: '',
-                                productId: '',
-                                purchaseDate: '',
-                                expiryDate: '',
-                                serialNumber: '',
-                                contractNo: '',
-                                startDate: '',
-                                endDate: '',
-                                visitsAllowed: 4,
-                                amount: ''
-                            });
-                            setActiveSection('warranties');
-                            setShowModal(true);
-                        }}
+                        onClick={() => openForm('warranties')}
                         className="flex items-center gap-1.5 px-4 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-md active:scale-95"
                     >
                         <MdAdd size={16} />
                         Add Warranty
                     </button>
                     <button
-                        onClick={() => {
-                            setFormData({
-                                customerId: '',
-                                productId: '',
-                                purchaseDate: '',
-                                expiryDate: '',
-                                serialNumber: '',
-                                contractNo: '',
-                                startDate: '',
-                                endDate: '',
-                                visitsAllowed: 4,
-                                amount: ''
-                            });
-                            setActiveSection('amc');
-                            setShowModal(true);
-                        }}
+                        onClick={() => openForm('amc')}
                         className="flex items-center gap-1.5 px-4 py-3 bg-teal-600 hover:bg-teal-700 text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-md active:scale-95"
                     >
                         <MdAdd size={16} />
@@ -506,7 +543,7 @@ const WarrantyAMC = () => {
                                                 {entitlementRes.warranty.isActive ? 'Active' : coverageDetails.warranty.status || 'Not Active'}
                                             </p>
                                             <p className="text-[10px] text-slate-500">
-                                                Expiry: {coverageDetails.warranty.expiryDate ? new Date(coverageDetails.warranty.expiryDate).toLocaleDateString() : '-'}
+                                                Expiry: {formatDate(coverageDetails.warranty.expiryDate)}
                                             </p>
                                             <p className="text-[10px] text-slate-500">Serial: {coverageDetails.warranty.serialNumber || '-'}</p>
                                         </>
@@ -524,7 +561,7 @@ const WarrantyAMC = () => {
                                             </p>
                                             <p className="text-[10px] text-slate-500">Contract: {coverageDetails.amc.contractNo || '-'}</p>
                                             <p className="text-[10px] text-slate-500">
-                                                Validity: {coverageDetails.amc.startDate ? new Date(coverageDetails.amc.startDate).toLocaleDateString() : '-'} to {coverageDetails.amc.endDate ? new Date(coverageDetails.amc.endDate).toLocaleDateString() : '-'}
+                                                Validity: {formatDate(coverageDetails.amc.startDate)} to {formatDate(coverageDetails.amc.endDate)}
                                             </p>
                                         </>
                                     ) : (
@@ -538,7 +575,7 @@ const WarrantyAMC = () => {
                                         <div className="space-y-1">
                                             {scheduledVisits.slice(0, 3).map((visit) => (
                                                 <p key={visit._id} className="text-[10px] text-primary-600">
-                                                    {visit.visitNo} - {visit.scheduledDate ? new Date(visit.scheduledDate).toLocaleDateString() : 'Date pending'}
+                                                    {visit.visitNo} - {formatDate(visit.scheduledDate, 'Date pending')}
                                                     {visit.engineerId?.name ? ` - ${visit.engineerId.name}` : ''}
                                                 </p>
                                             ))}
@@ -558,7 +595,7 @@ const WarrantyAMC = () => {
                                     <p className="text-[10px] text-primary-700 font-black uppercase tracking-widest mb-1">Scheduled maintenance</p>
                                     {scheduledVisits.slice(0, 3).map((visit) => (
                                         <p key={visit._id} className="text-[10px] text-primary-600 font-bold">
-                                            {visit.visitNo} - {visit.scheduledDate ? new Date(visit.scheduledDate).toLocaleDateString() : 'Date pending'}
+                                            {visit.visitNo} - {formatDate(visit.scheduledDate, 'Date pending')}
                                         </p>
                                     ))}
                                 </div>
@@ -625,8 +662,8 @@ const WarrantyAMC = () => {
                                             <td className="px-6 py-4 font-black text-slate-900">{w.serialNumber || 'N/A'}</td>
                                             <td className="px-6 py-4 text-slate-900">{w.customerId?.companyName || w.customerId?.customerName}</td>
                                             <td className="px-6 py-4 text-slate-500">{w.productId?.productName}</td>
-                                            <td className="px-6 py-4 text-slate-400">{new Date(w.purchaseDate).toLocaleDateString()}</td>
-                                            <td className="px-6 py-4 text-slate-400">{new Date(w.expiryDate).toLocaleDateString()}</td>
+                                            <td className="px-6 py-4 text-slate-400">{formatDate(w.purchaseDate)}</td>
+                                            <td className="px-6 py-4 text-slate-400">{formatDate(w.expiryDate)}</td>
                                             <td className="px-6 py-4 text-center">
                                                 <span className={`px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider ${w.status === 'Active' ? 'bg-teal-50 text-teal-600 border-teal-200' : 'bg-rose-50 text-rose-500 border-rose-200'}`}>
                                                     {w.status}
@@ -661,7 +698,7 @@ const WarrantyAMC = () => {
                                         <tr key={a._id} className="hover:bg-slate-50/50 transition-colors">
                                             <td className="px-6 py-4 font-black text-slate-900">{a.contractNo}</td>
                                             <td className="px-6 py-4 text-slate-900">{a.customerId?.companyName || a.customerId?.customerName}</td>
-                                            <td className="px-6 py-4 text-slate-400">{new Date(a.startDate).toLocaleDateString()} - {new Date(a.endDate).toLocaleDateString()}</td>
+                                            <td className="px-6 py-4 text-slate-400">{formatDate(a.startDate)} - {formatDate(a.endDate)}</td>
                                             <td className="px-6 py-4 text-slate-500">{a.visitsAllowed} Allowed / {a.visitsUsed} Used</td>
                                             <td className="px-6 py-4 font-black text-teal-600">₹{a.amount || 0}</td>
                                             <td className="px-6 py-4 text-center">
@@ -696,51 +733,80 @@ const WarrantyAMC = () => {
                         <button
                             type="submit"
                             form="warranty-amc-form"
-                            className="flex-1 w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg"
+                            disabled={submitting || (activeSection === 'warranties' && serialLookup.status !== 'found')}
+                            className="flex-1 w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            Register
+                            {submitting ? 'Registering…' : 'Register'}
                         </button>
                     </>
                 }
             >
                 <form id="warranty-amc-form" onSubmit={handleCreate} className="space-y-4">
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Customer *</label>
-                        <SearchableSelect
-                            value={formData.customerId}
-                            onChange={val => setFormData({ ...formData, customerId: val })}
-                            options={customerOptions}
-                            placeholder="Select Customer"
-                            noResultsText="No customers found"
-                            inputClass="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold bg-white text-left cursor-pointer"
-                            menuClass="max-h-56"
-                        />
-                    </div>
-
                     {activeSection === 'warranties' ? (
                         <>
                             <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Product *</label>
-                                <SearchableSelect
-                                    value={formData.productId}
-                                    onChange={val => setFormData({ ...formData, productId: val })}
-                                    options={productOptions}
-                                    placeholder="Select Product"
-                                    noResultsText="No products found"
-                                    inputClass="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold bg-white text-left cursor-pointer"
-                                    menuClass="max-h-56"
-                                />
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Serial Number *</label>
+                                <div className="flex gap-2">
+                                    <div className="flex-1">
+                                        <SerialSearchInput
+                                            value={formData.serialNumber}
+                                            onChange={changeSerial}
+                                            onSelect={(asset) => lookupSerial(asset.serialNumber, asset.status === 'SOLD' ? asset._id : undefined)}
+                                            placeholder="Search or enter serial number"
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => lookupSerial(formData.serialNumber)}
+                                        disabled={!formData.serialNumber.trim() || serialLookup.status === 'loading'}
+                                        className="px-4 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
+                                    >
+                                        {serialLookup.status === 'loading' ? 'Checking…' : 'Find'}
+                                    </button>
+                                </div>
+                                {serialLookup.status === 'error' && (
+                                    <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+                                        {serialLookup.message}
+                                        {serialLookup.choices?.map((choice) => (
+                                            <button
+                                                key={choice.assetId}
+                                                type="button"
+                                                onClick={() => lookupSerial(serialLookup.serial, choice.assetId)}
+                                                className="mt-1 block w-full rounded-lg bg-white px-3 py-2 text-left text-slate-700 hover:bg-slate-50"
+                                            >
+                                                {choice.productCode} · {choice.productName} — {choice.customerName || 'No customer'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Serial Number *</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={formData.serialNumber}
-                                    onChange={e => setFormData({ ...formData, serialNumber: e.target.value })}
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                                />
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Customer</label>
+                                <p className="w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 min-h-[2.9rem]">
+                                    {serialLookup.status === 'found'
+                                        ? <>{serialLookup.data.customer.name}{serialLookup.data.customer.code && <span className="text-slate-400"> ({serialLookup.data.customer.code})</span>}</>
+                                        : <span className="text-slate-400">Filled from the serial number (current customer)</span>}
+                                </p>
                             </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Product</label>
+                                <p className="w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 min-h-[2.9rem]">
+                                    {serialLookup.status === 'found'
+                                        ? `${serialLookup.data.product.productCode} - ${serialLookup.data.product.productName}`
+                                        : <span className="text-slate-400">Filled from the serial number</span>}
+                                </p>
+                            </div>
+                            {serialLookup.status === 'found' && serialLookup.data.warranties.length > 0 && (
+                                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                                    <p className="mb-1 font-black uppercase tracking-widest text-[10px]">Existing warranties for this serial</p>
+                                    {serialLookup.data.warranties.map((w) => (
+                                        <p key={w._id}>
+                                            {formatDate(w.purchaseDate)} to {formatDate(w.expiryDate)} · {w.status}{w.customerName ? ` · ${w.customerName}` : ''}
+                                        </p>
+                                    ))}
+                                    <p className="mt-1 font-medium">A new warranty must start after the latest expiry date.</p>
+                                </div>
+                            )}
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Purchase Date *</label>
@@ -757,6 +823,7 @@ const WarrantyAMC = () => {
                                     <input
                                         type="date"
                                         required
+                                        min={formData.purchaseDate || undefined}
                                         value={formData.expiryDate}
                                         onChange={e => setFormData({ ...formData, expiryDate: e.target.value })}
                                         className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
@@ -766,6 +833,18 @@ const WarrantyAMC = () => {
                         </>
                     ) : (
                         <>
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Customer *</label>
+                                <SearchableSelect
+                                    value={formData.customerId}
+                                    onChange={val => setFormData({ ...formData, customerId: val })}
+                                    options={customerOptions}
+                                    placeholder="Select Customer"
+                                    noResultsText="No customers found"
+                                    inputClass="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold bg-white text-left cursor-pointer"
+                                    menuClass="max-h-56"
+                                />
+                            </div>
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Contract Number *</label>
                                 <input
@@ -823,6 +902,9 @@ const WarrantyAMC = () => {
                                 </div>
                             </div>
                         </>
+                    )}
+                    {formError && (
+                        <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{formError}</p>
                     )}
                 </form>
             </Modal>

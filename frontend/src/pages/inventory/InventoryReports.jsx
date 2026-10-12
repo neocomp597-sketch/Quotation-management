@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { formatDate } from '../../utils/helpers';
 import {
     MdAssessment,
     MdReceiptLong,
@@ -174,7 +175,7 @@ const InventoryReports = () => {
                                                     {txn.quantityDelta > 0 ? `+${txn.quantityDelta}` : txn.quantityDelta}
                                                 </td>
                                                 <td className="px-4 py-3 text-right">{formatCurrency(txn.unitCost)}</td>
-                                                <td className="px-4 py-3 text-xs text-slate-400">{new Date(txn.createdAt).toLocaleDateString('en-IN')}</td>
+                                                <td className="px-4 py-3 text-xs text-slate-400">{formatDate(txn.createdAt)}</td>
                                             </tr>
                                         ))}
                                     </tbody>

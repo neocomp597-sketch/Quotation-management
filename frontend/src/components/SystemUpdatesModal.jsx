@@ -3,6 +3,7 @@ import Modal from './Modal';
 import { MdFilterList, MdSearch, MdInfoOutline, MdRefresh, MdChevronRight, MdExpandMore, MdExpandLess, MdLaunch, MdCheckCircle, MdLayers } from 'react-icons/md';
 import { useNavigate } from 'react-router-dom';
 import { systemUpdateService } from '../services/api';
+import { formatDate } from '../utils/helpers';
 
 const modulePathMap = {
     'Reports': '/reports',
@@ -55,7 +56,7 @@ const SystemUpdatesModal = ({ isOpen, onClose }) => {
                 u.detailedChanges.forEach((item, idx) => {
                     list.push({
                         id: `${u._id || 'upd'}-${idx}`,
-                        date: item.date || new Date(u.deployedAt || Date.now()).toLocaleDateString('en-GB'),
+                        date: item.date || formatDate(u.deployedAt || Date.now()),
                         module: item.module || 'System',
                         submodule: item.submodule || 'Release',
                         changes: item.changes || u.message,
@@ -68,7 +69,7 @@ const SystemUpdatesModal = ({ isOpen, onClose }) => {
                 u.releaseNotes.forEach((note, idx) => {
                     list.push({
                         id: `${u._id || 'upd'}-${idx}`,
-                        date: new Date(u.deployedAt || Date.now()).toLocaleDateString('en-GB'),
+                        date: formatDate(u.deployedAt || Date.now()),
                         module: 'System',
                         submodule: 'Release',
                         changes: note,

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { csmService, mgrService, productService, uploadService } from '../services/api';
+import { formatDate, formatDateTime } from '../utils/helpers';
 import { toast } from 'react-toastify';
 import { 
     MdLocalShipping, MdMyLocation, MdCheckCircle, 
@@ -1353,7 +1354,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                                                         <p className="text-slate-500">{v.ticketId?.customerId?.customerName}</p>
                                                         <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-100 mt-2">
                                                             <span>Eng: {v.engineerId?.name || 'Unassigned'}</span>
-                                                            <span>{new Date(v.scheduledDate).toLocaleDateString()}</span>
+                                                            <span>{formatDate(v.scheduledDate)}</span>
                                                         </div>
                                                     </div>
                                                     <button
@@ -1403,7 +1404,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                                                                 <p className="text-[10px] text-slate-400 uppercase tracking-tight">{v.ticketId?.customerId?.customerName}</p>
                                                             </td>
                                                             <td className="px-6 py-4 text-slate-500">{v.engineerId?.name || 'Unassigned'}</td>
-                                                            <td className="px-6 py-4 text-slate-500">{new Date(v.scheduledDate).toLocaleString()}</td>
+                                                            <td className="px-6 py-4 text-slate-500">{formatDateTime(v.scheduledDate)}</td>
                                                             <td className="px-4 py-4 whitespace-nowrap">
                                                                 <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border tracking-wider ${
                                                                     v.status === 'Completed' ? 'bg-teal-50 text-teal-600 border-teal-200' :
@@ -1825,13 +1826,13 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                                         {selectedVisit.checkIn?.time && (
                                             <div className="flex justify-between text-slate-500">
                                                 <span>Check-In Time:</span>
-                                                <span className="font-bold text-slate-900">{new Date(selectedVisit.checkIn.time).toLocaleString()}</span>
+                                                <span className="font-bold text-slate-900">{formatDateTime(selectedVisit.checkIn.time)}</span>
                                             </div>
                                         )}
                                         {selectedVisit.checkOut?.time && (
                                             <div className="flex justify-between text-slate-500">
                                                 <span>Check-Out Time:</span>
-                                                <span className="font-bold text-slate-900">{new Date(selectedVisit.checkOut.time).toLocaleString()}</span>
+                                                <span className="font-bold text-slate-900">{formatDateTime(selectedVisit.checkOut.time)}</span>
                                             </div>
                                         )}
                                         {selectedVisit.checkIn?.location && (
@@ -2491,7 +2492,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                                                     {rec.employeeName || rec.engineerId?.name || 'Engineer'}
                                                 </td>
                                                 <td className="px-4 py-3 text-slate-600">
-                                                    {new Date(rec.attendanceDate).toLocaleDateString()}
+                                                    {formatDate(rec.attendanceDate)}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <div className="space-y-0.5">

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { csmService, userService } from '../services/api';
+import { formatDate } from '../utils/helpers';
 import { 
     ResponsiveContainer, PieChart, Pie, Cell, 
     BarChart, Bar, XAxis, YAxis, Tooltip, Legend,
@@ -568,7 +569,7 @@ const CSMReports = () => {
                                                         )}
                                                     </td>
                                                     <td className="py-4 text-right pr-4 text-xs font-bold text-slate-400">
-                                                        {new Date(t.resolvedAt || t.closedAt || t.updatedAt).toLocaleDateString()}
+                                                        {formatDate(t.resolvedAt || t.closedAt || t.updatedAt)}
                                                     </td>
                                                 </tr>
                                             ))
@@ -781,7 +782,7 @@ const CSMReports = () => {
                                                         <span className="text-[10px] text-slate-400 block">{t.assignedEngineerId?.name || 'Unassigned Agent'}</span>
                                                     </td>
                                                     <td className="py-4 text-right pr-4 text-xs font-bold text-slate-400">
-                                                        {new Date(t.createdAt).toLocaleDateString()}
+                                                        {formatDate(t.createdAt)}
                                                     </td>
                                                 </tr>
                                             ))
@@ -856,7 +857,7 @@ const CSMReports = () => {
                                                     </td>
                                                     <td className="py-4 font-bold">{t.assignedEngineerId?.name || 'Unassigned'}</td>
                                                     <td className="py-4 text-right pr-4 text-xs font-bold text-slate-400">
-                                                        {new Date(t.createdAt).toLocaleDateString()}
+                                                        {formatDate(t.createdAt)}
                                                     </td>
                                                 </tr>
                                             ))
@@ -1098,7 +1099,7 @@ const CSMReports = () => {
                                                         <span className="text-amber-500 font-black text-xs">{'★'.repeat(f.rating)}{'☆'.repeat(5 - f.rating)}</span>
                                                     </div>
                                                     <p className="text-xs font-medium text-slate-500">"{f.comment || 'No comment provided.'}"</p>
-                                                    <span className="text-[9px] text-slate-400 self-end mt-1">{new Date(f.submittedAt).toLocaleDateString()}</span>
+                                                    <span className="text-[9px] text-slate-400 self-end mt-1">{formatDate(f.submittedAt)}</span>
                                                 </div>
                                             ))
                                         )}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { developerService } from '../../../services/api';
+import { formatDateTime } from '../../../utils/helpers';
 import { toast } from 'react-toastify';
 import { MdListAlt, MdRefresh } from 'react-icons/md';
 
@@ -77,7 +78,7 @@ const Logs = () => {
                                 {logs.map(log => (
                                     <tr key={log.id} className="hover:bg-slate-50/70 transition-colors">
                                         <td className="py-4 px-6 text-slate-500 font-sans">
-                                            {new Date(log.createdAt).toLocaleString()}
+                                            {formatDateTime(log.createdAt)}
                                         </td>
                                         <td className="py-4 px-6 text-[#006c49] font-bold">
                                             {log.requestId}

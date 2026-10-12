@@ -61,6 +61,7 @@ const Customer = require('../models/Customer');
 const ProductAttribute = require('../models/ProductAttribute');
 const Attribute = require('../models/Attribute');
 const MGR = require('../models/MGR');
+const { parseDateText } = require('../utils/dateFormat');
 const Vendor = require('../models/Vendor');
 const Planning = require('../models/Planning');
 const PriceBook = require('../models/PriceBook');
@@ -1336,9 +1337,8 @@ const parseDateValue = (val) => {
     if (typeof val === 'number' && Number.isFinite(val)) {
         return excelSerialDateToDate(val);
     }
-    const d = new Date(val);
-    if (isNaN(d.getTime())) return null;
-    return d;
+    if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+    return parseDateText(val);
 };
 
 const importWarranties = async (req, res) => {
@@ -2116,8 +2116,8 @@ const importPriceBooks = async (req, res) => {
                     targetId: pickFirstNonEmpty(row['Target ID'], row.targetId, row['TargetValue'], row.target) || '',
                     currency: pickFirstNonEmpty(row['Currency'], row.currency) || 'INR',
                     isActive: typeof row['Active'] !== 'undefined' ? toBoolean(row['Active']) : (typeof row['IsActive'] !== 'undefined' ? toBoolean(row['IsActive']) : true),
-                    validFrom: row['Valid From'] || row.validFrom ? new Date(row['Valid From'] || row.validFrom) : null,
-                    validTo: row['Valid To'] || row.validTo ? new Date(row['Valid To'] || row.validTo) : null,
+                    validFrom: parseDateValue(row['Valid From'] || row.validFrom),
+                    validTo: parseDateValue(row['Valid To'] || row.validTo),
                     companyId: companyId
                 };
 
@@ -2475,8 +2475,9 @@ const importEmployees = async (req, res) => {
                 const employeeType = pickFirstNonEmpty(row['Employee Type'], row.employeeType) || 'ONSITE';
                 const status = pickFirstNonEmpty(row['Status'], row.status) || 'Active';
 
-                const joiningDate = joiningDateStr ? new Date(joiningDateStr) : new Date();
-                const dob = dobStr ? new Date(dobStr) : null;
+                // DD.MM.YYYY (as exported), ISO text or an Excel date.
+                const joiningDate = parseDateValue(joiningDateStr) || new Date();
+                const dob = parseDateValue(dobStr);
 
                 const basic = toSafeNumber(row['Basic Salary'] || row.basic, 0);
                 const hra = toSafeNumber(row['HRA'] || row.hra, 0);
@@ -3393,8 +3394,7 @@ const importAssets = async (req, res) => {
                     if (typeof rawSaleDate === 'number' && Number.isFinite(rawSaleDate)) {
                         saleDate = excelSerialDateToDate(rawSaleDate);
                     } else {
-                        const parsed = new Date(rawSaleDate);
-                        if (!isNaN(parsed.getTime())) saleDate = parsed;
+                        saleDate = parseDateValue(rawSaleDate);
                     }
                 }
 

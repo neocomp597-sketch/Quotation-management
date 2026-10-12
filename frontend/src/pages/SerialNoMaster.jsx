@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { csmService, productService, importService, divisionService, segmentService } from '../services/api';
-import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import {
     MdSearch, MdTag, MdInfoOutline, MdSync,
     MdLocalOffer, MdPeople, MdReceipt, MdAssignmentTurnedIn,
-    MdFileUpload, MdFileDownload, MdAdd, MdUndo, MdDelete, MdHistory, MdEdit
+    MdFileUpload, MdFileDownload, MdAdd, MdUndo, MdHistory
 } from 'react-icons/md';
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import PaginationControls from '../components/PaginationControls';
+import { formatDate } from '../utils/helpers';
 
 const PAGE_SIZE = 15;
 
@@ -91,7 +91,6 @@ const MgrLine = ({ record }) => {
 };
 
 const SerialNoMaster = () => {
-    const { user, isAdmin, isSuperAdmin } = useAuth();
     const navigate = useNavigate();
     const [assets, setAssets] = useState([]);
     const [returnHistory, setReturnHistory] = useState([]);
@@ -106,21 +105,12 @@ const SerialNoMaster = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
-    // Permission check for Delete Entry (Requirement #11, #12)
-    const canDelete = useMemo(() => {
-        if (isAdmin || isSuperAdmin || user?.role === 'admin' || user?.role === 'superadmin') return true;
-        const perms = user?.permissions || {};
-        return Boolean(perms.invoice_bulk_upload_delete || perms.master_serials_delete);
-    }, [user, isAdmin, isSuperAdmin]);
-
     const [openActionMenuAssetId, setOpenActionMenuAssetId] = useState(null);
 
     // Page View State: 'list' | 'single'
     const [pageView, setPageView] = useState('list');
     const [singleSaving, setSingleSaving] = useState(false);
     const [singleForm, setSingleForm] = useState(EMPTY_SINGLE_FORM);
-    // The record being edited; null while adding a new single entry.
-    const [editingAsset, setEditingAsset] = useState(null);
 
     // Division Master -> Division dropdown -> Segment Master -> Segment dropdown.
     const [divisions, setDivisions] = useState([]);
@@ -222,7 +212,7 @@ const SerialNoMaster = () => {
                 'Customer': custName,
                 'Customer Postal Code': asset.customerPostalCode || '',
                 'Invoice Ref': asset.invoiceNumber || '',
-                'Sale Date': sDate ? new Date(sDate).toLocaleDateString('en-IN') : '',
+                'Sale Date': formatDate(sDate, ''),
                 'Location': asset.location || '',
                 'Division_Code': asset.divisionId?.code || '',
                 'Division_Desc': asset.divisionId?.description || '',
@@ -282,50 +272,14 @@ const SerialNoMaster = () => {
         }
     };
 
-    // Delete Entry (Requirement #11, #12)
-    const handleDeleteEntry = async (asset) => {
-        if (!window.confirm(`Are you sure you want to delete entry for Serial: "${asset.serialNumber}"?`)) {
-            return;
-        }
-
-        try {
-            await csmService.deleteAsset(asset._id);
-            toast.success('Entry deleted successfully');
-            fetchData();
-        } catch (err) {
-            console.error('Delete entry error:', err);
-            toast.error(err.response?.data?.message || 'Failed to delete entry');
-        }
-    };
-
-    // Single Entry Submit (Requirement #15)
-    const openSingleEntry = (asset = null) => {
-        setEditingAsset(asset);
-        if (asset) {
-            const sDate = asset.saleDate || asset.invoiceDate;
-            setSingleForm({
-                serialNumber: asset.serialNumber || '',
-                productCode: asset.productId?.productCode || asset.productCode || '',
-                productName: asset.productId?.productName || asset.productName || '',
-                status: asset.status || 'IN_STOCK',
-                customer: asset.customerCode || asset.customerId?.externalCode || asset.customerNameStr || asset.customerId?.companyName || '',
-                customerPostalCode: asset.customerPostalCode || '',
-                invoiceNumber: asset.invoiceNumber || '',
-                saleDate: sDate ? new Date(sDate).toISOString().slice(0, 10) : '',
-                location: asset.location || '',
-                divisionId: idOf(asset.divisionId),
-                segmentId: idOf(asset.segmentId),
-                indicatorField: asset.indicatorField || ''
-            });
-        } else {
-            setSingleForm(EMPTY_SINGLE_FORM);
-        }
+    // Single Entry Submit (Requirement #15). Saved entries cannot be edited or deleted.
+    const openSingleEntry = () => {
+        setSingleForm(EMPTY_SINGLE_FORM);
         setPageView('single');
     };
 
     const closeSingleEntry = () => {
         setPageView('list');
-        setEditingAsset(null);
         setSingleForm(EMPTY_SINGLE_FORM);
     };
 
@@ -351,13 +305,8 @@ const SerialNoMaster = () => {
 
         setSingleSaving(true);
         try {
-            if (editingAsset) {
-                await csmService.updateAsset(editingAsset._id, singleForm);
-                toast.success('Entry updated successfully!');
-            } else {
-                await csmService.createSingleAsset(singleForm);
-                toast.success('Single entry created successfully!');
-            }
+            await csmService.createSingleAsset(singleForm);
+            toast.success('Single entry created successfully!');
             closeSingleEntry();
             fetchData();
         } catch (err) {
@@ -451,7 +400,7 @@ const SerialNoMaster = () => {
                                 ← Back to Invoice Bulk Upload
                             </button>
                             <h1 className="text-3xl font-black tracking-tight text-slate-900 font-outfit uppercase">
-                                {editingAsset ? 'Edit Single Entry' : 'Add Single Entry'}
+                                Add Single Entry
                             </h1>
                             <p className="text-slate-500 font-semibold text-sm">
                                 Manually enter one invoice, product, or serial record into the system without uploading an Excel file.
@@ -471,7 +420,7 @@ const SerialNoMaster = () => {
                                 disabled={singleSaving || divisionHasNoActiveSegments}
                                 className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20 active:scale-95 disabled:opacity-50 cursor-pointer"
                             >
-                                {singleSaving ? 'Saving Entry...' : (editingAsset ? 'Update Entry' : 'Save Single Entry')}
+                                {singleSaving ? 'Saving Entry...' : 'Save Single Entry'}
                             </button>
                         </div>
                     </div>
@@ -842,7 +791,7 @@ const SerialNoMaster = () => {
                                                     ) : '-'}
                                                 </td>
                                                 <td className="p-4 text-sm font-medium text-slate-600">
-                                                    {item.returnDate || item.createdAt ? new Date(item.returnDate || item.createdAt).toLocaleDateString('en-IN') : '-'}
+                                                    {formatDate(item.returnDate || item.createdAt)}
                                                 </td>
                                                 <td className="p-4 text-sm text-slate-700 max-w-xs font-semibold">
                                                     <div className="p-2 bg-amber-50/60 border border-amber-100 rounded-xl text-amber-900 text-xs">
@@ -938,7 +887,7 @@ const SerialNoMaster = () => {
                                                     </td>
                                                     <td className="p-4 text-sm font-medium text-slate-600">
                                                         {asset.saleDate || asset.invoiceDate
-                                                            ? new Date(asset.saleDate || asset.invoiceDate).toLocaleDateString('en-IN')
+                                                            ? formatDate(asset.saleDate || asset.invoiceDate)
                                                             : <span className="text-slate-300 font-normal">-</span>
                                                         }
                                                     </td>
@@ -974,16 +923,6 @@ const SerialNoMaster = () => {
                                                                         <MdInfoOutline size={16} />
                                                                         View details
                                                                     </button>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setOpenActionMenuAssetId(null);
-                                                                            openSingleEntry(asset);
-                                                                        }}
-                                                                        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                                                                    >
-                                                                        <MdEdit size={16} />
-                                                                        Edit entry
-                                                                    </button>
                                                                     {asset.status === 'SOLD' && (
                                                                         <button
                                                                             onClick={() => {
@@ -994,18 +933,6 @@ const SerialNoMaster = () => {
                                                                         >
                                                                             <MdUndo size={16} />
                                                                             Sales return
-                                                                        </button>
-                                                                    )}
-                                                                    {canDelete && (
-                                                                        <button
-                                                                            onClick={() => {
-                                                                                setOpenActionMenuAssetId(null);
-                                                                                handleDeleteEntry(asset);
-                                                                            }}
-                                                                            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50"
-                                                                        >
-                                                                            <MdDelete size={16} />
-                                                                            Delete entry
                                                                         </button>
                                                                     )}
                                                                 </div>

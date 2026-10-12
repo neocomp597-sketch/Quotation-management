@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { tenderService, customerService, userService, payrollService, importService } from '../services/api';
+import { formatDate, formatDateTime } from '../utils/helpers';
 import { 
     MdAssignment, MdAdd, MdEdit, MdDelete, MdSearch,
     MdFilterList, MdRefresh, MdClose, MdInfo, MdOutlineAccessTime,
@@ -80,8 +81,8 @@ const TenderRegister = () => {
             'Tender Title': t.title || '-',
             'Client': t.customerId?.companyName || t.customerId?.customerName || '-',
             'Value (₹)': t.value || 0,
-            'Deadline Date': t.deadlineDate ? new Date(t.deadlineDate).toLocaleDateString('en-IN') : '-',
-            'Submission Date': t.submissionDate ? new Date(t.submissionDate).toLocaleDateString('en-IN') : '-',
+            'Deadline Date': formatDate(t.deadlineDate),
+            'Submission Date': formatDate(t.submissionDate),
             'Department': t.departmentId?.name || '-',
             'Owner': t.ownerId?.name || '-',
             'Status': t.status || 'Active',
@@ -379,7 +380,7 @@ const TenderRegister = () => {
                                         </td>
                                         <td className="py-3 px-6 text-right text-slate-900 font-bold">{formatCurrency(t.value)}</td>
                                         <td className="py-3 px-6">
-                                            {t.deadlineDate ? new Date(t.deadlineDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
+                                            {formatDate(t.deadlineDate)}
                                         </td>
                                         <td className="py-3 px-6">
                                             <div className="flex items-center justify-center gap-2">
@@ -650,12 +651,12 @@ const TenderRegister = () => {
                                 <span className="text-slate-400 font-bold text-xs uppercase">Deadline Date</span>
                                 <span className="flex items-center gap-1">
                                     <MdOutlineAccessTime size={16} className="text-slate-400" />
-                                    {selectedTender.deadlineDate ? new Date(selectedTender.deadlineDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
+                                    {formatDate(selectedTender.deadlineDate)}
                                 </span>
                             </div>
                             <div className="flex justify-between py-2 border-b border-slate-100">
                                 <span className="text-slate-400 font-bold text-xs uppercase">Submission Date</span>
-                                <span>{selectedTender.submissionDate ? new Date(selectedTender.submissionDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not Submitted'}</span>
+                                <span>{formatDate(selectedTender.submissionDate, 'Not Submitted')}</span>
                             </div>
                         </div>
 
@@ -676,7 +677,7 @@ const TenderRegister = () => {
                                         <div className="absolute -left-[18px] top-1.5 w-2 h-2 rounded-full bg-teal-500 border border-white"></div>
                                         <div className="flex items-center justify-between text-xxs font-bold text-slate-400">
                                             <span>{act.userName}</span>
-                                            <span>{new Date(act.timestamp).toLocaleString()}</span>
+                                            <span>{formatDateTime(act.timestamp)}</span>
                                         </div>
                                         <p className="text-xs font-semibold text-slate-700 leading-snug">{act.action}</p>
                                     </div>

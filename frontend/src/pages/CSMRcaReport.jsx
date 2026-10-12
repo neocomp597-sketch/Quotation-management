@@ -3,7 +3,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
 import { csmService, companySettingsService, uploadService } from '../services/api';
-import { resolveImageUrl } from '../utils/helpers';
+import { resolveImageUrl, formatDate } from '../utils/helpers';
 import WhyWhySheet, { SHEET_WIDTH } from '../components/csm/WhyWhySheet';
 import { 
     MdAssessment, MdAdd, MdPrint, MdRefresh, MdDelete, 
@@ -395,7 +395,7 @@ const CSMRcaReport = () => {
                     rows.push({
                         'RCA Number': r.rcaNumber,
                         'Ticket No': r.ticketNo,
-                        'Date': r.date ? new Date(r.date).toLocaleDateString() : '',
+                        'Date': formatDate(r.date, ''),
                         'Department': r.department,
                         'Priority': r.priority,
                         'Category': r.category,
@@ -650,7 +650,7 @@ const CSMRcaReport = () => {
                                             <td className="py-4 pl-4 font-black text-slate-900 dark:text-slate-100">{report.rcaNumber}</td>
                                             <td className="py-4 font-bold text-teal-700 dark:text-teal-400">{report.ticketNo || '-'}</td>
                                             <td className="py-4 text-xs text-slate-500 dark:text-slate-400 font-bold">
-                                                {new Date(report.date).toLocaleDateString()}
+                                                {formatDate(report.date)}
                                             </td>
                                             <td className="py-4 font-bold text-slate-800 dark:text-slate-200">{report.department}</td>
                                             <td className="py-4">

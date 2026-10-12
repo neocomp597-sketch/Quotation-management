@@ -5,7 +5,7 @@ import {
     MdSearch, MdBarChart, MdPeople, MdCalendarMonth,
     MdAssignment, MdWarning, MdCheckCircle, MdAccessTime, MdFilterList
 } from 'react-icons/md';
-import { formatDate } from '../utils/helpers';
+import { formatDate, formatDateTime } from '../utils/helpers';
 import * as XLSX from 'xlsx';
 import { toast } from 'react-toastify';
 
@@ -214,7 +214,7 @@ const TenderReports = () => {
                 'Tender Title': d.title,
                 'Performed By': d.userName,
                 'Action': d.action,
-                'Timestamp': d.timestamp.toLocaleString('en-IN')
+                'Timestamp': formatDateTime(d.timestamp)
             }));
         } else {
             // General structure for lists (pipeline, win_loss, deadlines, value_rep, approvals)
@@ -227,8 +227,8 @@ const TenderReports = () => {
                 'Status': d.status,
                 'Department': d.departmentId?.name || '-',
                 'Owner': d.ownerId?.name || '-',
-                'Deadline Date': d.deadlineDate ? new Date(d.deadlineDate).toLocaleDateString('en-IN') : '-',
-                'Submission Date': d.submissionDate ? new Date(d.submissionDate).toLocaleDateString('en-IN') : '-'
+                'Deadline Date': formatDate(d.deadlineDate),
+                'Submission Date': formatDate(d.submissionDate)
             }));
         }
 
@@ -462,7 +462,7 @@ const TenderReports = () => {
                                                     <td className="py-3 px-6 max-w-xs truncate">{d.title}</td>
                                                     <td className="py-3 px-6 text-slate-900 font-bold">{d.userName}</td>
                                                     <td className="py-3 px-6 text-slate-700 leading-snug">{d.action}</td>
-                                                    <td className="py-3 px-6 text-xs text-slate-400">{d.timestamp.toLocaleString()}</td>
+                                                    <td className="py-3 px-6 text-xs text-slate-400">{formatDateTime(d.timestamp)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>

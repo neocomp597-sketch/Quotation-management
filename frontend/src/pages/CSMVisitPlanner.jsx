@@ -8,6 +8,7 @@ import {
     MdAssignment, MdClose, MdEvent
 } from 'react-icons/md';
 import Modal from '../components/Modal';
+import { formatDate, formatDateTime } from '../utils/helpers';
 
 const CSMVisitPlanner = () => {
     const [loading, setLoading] = useState(false);
@@ -401,7 +402,7 @@ const CSMVisitPlanner = () => {
                                                                 e.stopPropagation();
                                                                 handleOpenScheduleModal(day);
                                                             }}
-                                                            title={`Schedule visit for ${day.toLocaleDateString()}`}
+                                                            title={`Schedule visit for ${formatDate(day)}`}
                                                             className="hidden text-primary-600 hover:text-white transition-all"
                                                         >
                                                             <MdAdd size={14} />
@@ -466,7 +467,7 @@ const CSMVisitPlanner = () => {
                                                             e.stopPropagation();
                                                             handleOpenScheduleModal(day);
                                                         }}
-                                                        title={`Schedule visit for ${day.toLocaleDateString()}`}
+                                                        title={`Schedule visit for ${formatDate(day)}`}
                                                         className="hidden text-primary-600 hover:text-white transition-all"
                                                     >
                                                         <MdAdd size={14} />
@@ -511,7 +512,7 @@ const CSMVisitPlanner = () => {
                             <div className="space-y-4 max-w-4xl mx-auto">
                                 <div className="p-4 bg-slate-50 rounded-2xl flex justify-between items-center border border-slate-100">
                                     <span className="text-sm font-black text-slate-900 font-outfit uppercase">
-                                        Scheduled Field Visits for {currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                                        Scheduled Field Visits for {currentDate.toLocaleDateString('en-US', { weekday: 'long' })}, {formatDate(currentDate)}
                                     </span>
                                     <span className="px-3 py-1 bg-primary-600 text-white rounded-xl text-xs font-black uppercase tracking-wider">
                                         {filteredVisits.filter(v => isSameDay(new Date(v.scheduledDate), currentDate)).length} Visits Today
@@ -603,7 +604,7 @@ const CSMVisitPlanner = () => {
 
                         <div className="p-3 bg-white rounded-xl border border-slate-200 text-xs font-semibold space-y-1">
                             <span className="block text-[9px] font-black uppercase text-slate-400">Scheduled Date & Time</span>
-                            <p className="text-slate-900 font-bold">{new Date(selectedVisit.scheduledDate).toLocaleString()}</p>
+                            <p className="text-slate-900 font-bold">{formatDateTime(selectedVisit.scheduledDate)}</p>
                         </div>
 
                         {selectedVisit.ticketType && (
@@ -620,10 +621,10 @@ const CSMVisitPlanner = () => {
                                     {selectedVisit.rescheduleHistory.map((h, i) => (
                                         <div key={i} className="flex justify-between items-center bg-white p-2 rounded-lg border border-slate-100 text-[11px]">
                                             <div>
-                                                <span className="font-bold text-slate-800">{new Date(h.rescheduledDate).toLocaleDateString()}</span>
+                                                <span className="font-bold text-slate-800">{formatDate(h.rescheduledDate)}</span>
                                                 {h.ticketType && <span className="ml-2 px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[9px] font-semibold">{h.ticketType}</span>}
                                             </div>
-                                            <span className="text-slate-400 text-[10px]">{new Date(h.rescheduledAt).toLocaleDateString()}</span>
+                                            <span className="text-slate-400 text-[10px]">{formatDate(h.rescheduledAt)}</span>
                                         </div>
                                     ))}
                                 </div>

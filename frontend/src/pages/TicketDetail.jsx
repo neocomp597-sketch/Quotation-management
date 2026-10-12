@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { csmService, userService, uploadService, mgrService, productService } from '../services/api';
+import { formatDate, formatDateTime } from '../utils/helpers';
 import { toast } from 'react-toastify';
 import { jsPDF } from 'jspdf';
 import * as XLSX from 'xlsx';
@@ -929,7 +930,7 @@ const TicketDetail = () => {
                                     {entitlements.warranty.isActive ? (
                                         <div className="flex items-center gap-1 text-teal-600">
                                             <MdCheckCircleOutline size={18} />
-                                            <span>Warranty Valid (Expires: {new Date(entitlements.warranty.expiryDate).toLocaleDateString()})</span>
+                                            <span>Warranty Valid (Expires: {formatDate(entitlements.warranty.expiryDate)})</span>
                                         </div>
                                     ) : entitlements.amc.isActive ? (
                                         <div className="flex items-center gap-1 text-primary-600">
@@ -1017,7 +1018,7 @@ const TicketDetail = () => {
                                     </span>
                                     {ticket.closedAt && (
                                         <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">
-                                            {new Date(ticket.closedAt).toLocaleString()}
+                                            {formatDateTime(ticket.closedAt)}
                                         </p>
                                     )}
                                 </div>
@@ -1058,7 +1059,7 @@ const TicketDetail = () => {
                                 )}
                                 {ticket.location.updatedAt && (
                                     <p className="text-[10px] text-slate-400">
-                                        Updated: {new Date(ticket.location.updatedAt).toLocaleString()}
+                                        Updated: {formatDateTime(ticket.location.updatedAt)}
                                     </p>
                                 )}
                                 <a
@@ -1319,7 +1320,7 @@ const TicketDetail = () => {
                                         <div key={i} className="flex flex-col space-y-1 items-start bg-slate-50 rounded-2xl p-4 max-w-lg border border-slate-100">
                                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{c.authorName}</span>
                                             <p className="text-sm font-semibold text-slate-700 leading-relaxed">{c.text}</p>
-                                            <span className="text-[9px] text-slate-400 self-end mt-1">{new Date(c.createdAt).toLocaleString()}</span>
+                                            <span className="text-[9px] text-slate-400 self-end mt-1">{formatDateTime(c.createdAt)}</span>
                                         </div>
                                     ))}
                                     
@@ -1344,7 +1345,7 @@ const TicketDetail = () => {
                                                             doc.setFontSize(10);
                                                             doc.text(`Customer: ${ticket.customerId?.customerName || 'N/A'}`, 14, 28);
                                                             doc.text(`Branch: ${activeBranchName}`, 14, 34);
-                                                            doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 40);
+                                                            doc.text(`Generated: ${formatDateTime(new Date())}`, 14, 40);
 
                                                             let y = 50;
                                                             doc.setFontSize(11);
@@ -1353,7 +1354,7 @@ const TicketDetail = () => {
 
                                                             doc.setFontSize(9);
                                                             ticket.timeline.forEach((t, idx) => {
-                                                                const dateStr = new Date(t.createdAt).toLocaleString();
+                                                                const dateStr = formatDateTime(t.createdAt);
                                                                 const text = `${idx + 1}. [${dateStr}] ${t.activityType}: ${t.description || ''}`;
                                                                 const lines = doc.splitTextToSize(text, 180);
                                                                 if (y + lines.length * 6 > 280) {
@@ -1388,7 +1389,7 @@ const TicketDetail = () => {
                                                             const data = ticket.timeline.map((t, idx) => ({
                                                                 'S.No': idx + 1,
                                                                 'Ticket No': ticket.ticketNo,
-                                                                'Date & Time': new Date(t.createdAt).toLocaleString(),
+                                                                'Date & Time': formatDateTime(t.createdAt),
                                                                 'Activity Type': t.activityType,
                                                                 'Description': t.description || '',
                                                                 'Active Branch': activeBranchName
@@ -1428,19 +1429,7 @@ const TicketDetail = () => {
                                                     if (dateMatch) {
                                                         dateStr = dateMatch[0];
                                                     } else if (t.createdAt) {
-                                                        const d = new Date(t.createdAt);
-                                                        if (!isNaN(d.getTime())) {
-                                                            const day = String(d.getDate()).padStart(2, '0');
-                                                            const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-                                                            const month = monthNames[d.getMonth()];
-                                                            const year = d.getFullYear();
-                                                            let hours = d.getHours();
-                                                            const minutes = String(d.getMinutes()).padStart(2, '0');
-                                                            const seconds = String(d.getSeconds()).padStart(2, '0');
-                                                            const ampm = hours >= 12 ? 'PM' : 'AM';
-                                                            hours = hours % 12 || 12;
-                                                            dateStr = `${day}/${month}/${year}, ${hours}:${minutes}:${seconds} ${ampm}`;
-                                                        }
+                                                        dateStr = formatDateTime(t.createdAt, '');
                                                     }
 
                                                     const parts = ['Engineer checked-in'];
@@ -1460,7 +1449,7 @@ const TicketDetail = () => {
                                                 const lat = coordMatch ? coordMatch[1] : null;
                                                 const lng = coordMatch ? coordMatch[2] : null;
                                                 const mapUrl = (lat && lng) ? `https://www.google.com/maps?q=${lat},${lng}` : null;
-                                                const timestampStr = new Date(t.createdAt).toLocaleString();
+                                                const timestampStr = formatDateTime(t.createdAt);
 
                                                 return (
                                                     <div key={idx} className="relative pb-2.5">
@@ -1552,7 +1541,7 @@ const TicketDetail = () => {
                                             <div className="grid grid-cols-2 gap-2 text-xs font-semibold text-slate-600">
                                                 <div>
                                                     <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Scheduled Date</span>
-                                                    <span>{new Date(activeVisit.scheduledDate).toLocaleString()}</span>
+                                                    <span>{formatDateTime(activeVisit.scheduledDate)}</span>
                                                 </div>
                                                 <div>
                                                     <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Service Engineer</span>
@@ -1637,7 +1626,7 @@ const TicketDetail = () => {
                                                              <tr key={v._id} className="hover:bg-slate-50/50 transition-colors">
                                                                  <td className="py-3.5 px-4 font-black text-slate-900 whitespace-nowrap">{v.visitNo}</td>
                                                                  <td className="py-3.5 px-4 font-bold text-slate-700 whitespace-nowrap">{v.engineerId?.name || 'Unassigned'}</td>
-                                                                 <td className="py-3.5 px-4 text-slate-500 font-medium whitespace-nowrap">{new Date(v.scheduledDate).toLocaleString()}</td>
+                                                                 <td className="py-3.5 px-4 text-slate-500 font-medium whitespace-nowrap">{formatDateTime(v.scheduledDate)}</td>
                                                                  <td className="py-3.5 px-4 text-slate-600 font-medium min-w-[200px]">
                                                                      {v.visitReport ? (
                                                                          <span className="inline-block bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-slate-800">
@@ -1687,7 +1676,7 @@ const TicketDetail = () => {
                                         </div>
                                         <p className="font-black text-base">CSAT Feedback Logged</p>
                                         <p className="text-xs font-medium text-teal-700">"{ticket.feedback.comment || 'No comment provided.'}"</p>
-                                        <span className="text-[10px] text-teal-600 block">{new Date(ticket.feedback.submittedAt).toLocaleDateString()}</span>
+                                        <span className="text-[10px] text-teal-600 block">{formatDate(ticket.feedback.submittedAt)}</span>
                                     </div>
                                 ) : (
                                     <form onSubmit={handleSubmitFeedback} className="space-y-4">

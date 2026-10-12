@@ -6,6 +6,7 @@ const Quotation = require('../models/Quotation');
 const User = require('../models/User');
 const AuditLog = require('../models/AuditLog');
 const { createCompanyNotifications } = require('./notificationHelper');
+const { formatDate, formatDateTime } = require('./dateFormat');
 const { runWithTenant } = require('../middlewares/tenantContext');
 const { closeBullMq, createWorker, getQueue, getQueueEvents } = require('../config/bullmq');
 
@@ -32,7 +33,7 @@ const checkFollowUps = async () => {
 
             if (followUpDate < todayStart) {
                 type = 'Overdue';
-                message = `Follow-up for Enquiry ${enquiry.enquiryNo} is overdue! Was due on ${followUpDate.toLocaleDateString()}`;
+                message = `Follow-up for Enquiry ${enquiry.enquiryNo} is overdue! Was due on ${formatDate(followUpDate)}`;
             } else if (followUpDate >= todayStart && followUpDate <= todayEnd) {
                 type = 'Reminder';
                 message = `Follow-up for Enquiry ${enquiry.enquiryNo} is today!`;
@@ -90,7 +91,7 @@ const checkMeetingReminders = async () => {
                 await Notification.create({
                     userId,
                     title: 'Meeting Reminder (1 Day)',
-                    message: `Reminder: Meeting "${meeting.title}" starts in less than 24 hours (on ${new Date(meeting.startDateTime).toLocaleString()}).`,
+                    message: `Reminder: Meeting "${meeting.title}" starts in less than 24 hours (on ${formatDateTime(meeting.startDateTime)}).`,
                     type: 'MEETING_REMINDER_1_DAY',
                     dueDate: meeting.startDateTime,
                     companyId: meeting.companyId

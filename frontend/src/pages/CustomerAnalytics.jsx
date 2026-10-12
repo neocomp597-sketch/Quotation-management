@@ -44,7 +44,7 @@ import {
 } from 'recharts';
 import * as XLSX from 'xlsx';
 import { customerAnalyticsService, salespersonService, territoryService } from '../services/api';
-import { resolveImageUrl } from '../utils/helpers';
+import { resolveImageUrl, formatDate } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
 
 const TABS = [
@@ -788,7 +788,7 @@ const CustomerAnalytics = () => {
                                             </span>
                                         </td>
                                         <td className="px-6 py-5 text-right text-slate-400 text-xs font-semibold">
-                                            {c.lastPurchaseDate ? new Date(c.lastPurchaseDate).toLocaleDateString() : 'N/A'}
+                                            {formatDate(c.lastPurchaseDate, 'N/A')}
                                         </td>
                                     </tr>
                                 ))}

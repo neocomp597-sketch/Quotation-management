@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const XLSX = require('xlsx');
+const ExcelJS = require('exceljs');
 const BOMMaster = require('../models/BOMMaster');
 const BOMItem = require('../models/BOMItem');
 const Ticket = require('../models/Ticket');
@@ -787,10 +787,12 @@ exports.renumberComponents = async (req, res) => {
     }
 };
 
+const EXPORT_HEADERS = ['FG Serial Number', 'Item Code', 'Item Description', 'Qty', 'Batch Number', 'Component Serial Number'];
+
 /**
- * Exports a BOM to Excel in the BOM relationship layout (Parent Item Code, Item Code, Item
- * Name, UOM, Quantity): its own lines followed by the lines of every sub-assembly below it,
- * so the file can be uploaded again unchanged.
+ * Exports a BOM to Excel, one block per finished good: the BOM itself, then every sub-assembly
+ * below it (each once). A block is a row with the FG Code and FG Name (Product Master name, else
+ * the BOM's FG description), a header row, then the component lines in line order.
  */
 exports.exportBOM = async (req, res) => {
     try {
@@ -801,28 +803,51 @@ exports.exportBOM = async (req, res) => {
         if (!bom) return res.status(404).json({ message: 'BOM not found' });
 
         const subBoms = await loadSubBOMs(bom, new Set([String(bom._id)]));
-        // "#" is the same hierarchical number as the screen and the PDF (1, 1.3, 1.3.2). Lines are
-        // grouped under their parent assembly. On re-upload the number's last part is kept as the line's number.
-        const linesOf = (entry) => (entry.items || []).map((item) => [
-            item.seqNo || String(item.lineNo || ''),
-            entry.fgItemCode || '',
-            item.itemCode || '',
-            item.itemDescription || '',
-            item.uom || '',
-            item.qty ?? ''
-        ]);
-        const rows = [bom, ...subBoms.map((sub) => sub.bom).filter(Boolean)].flatMap(linesOf);
+        const blocks = [bom, ...subBoms.map((sub) => sub.bom).filter(Boolean)];
 
-        const headers = ['#', 'Parent Item Code', 'Item Code', 'Item Name', 'UOM', 'Quantity'];
-        const sheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-        sheet['!cols'] = [{ wch: 12 }, { wch: 18 }, { wch: 16 }, { wch: 70 }, { wch: 10 }, { wch: 10 }];
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, sheet, 'BOM Relationships');
+        const productIds = blocks.map((entry) => entry.fgProductId?._id || entry.fgProductId).filter(Boolean);
+        const products = await Product.find({
+            $or: [{ _id: { $in: productIds } }, { productCode: { $in: blocks.map((entry) => entry.fgItemCode).filter(Boolean) } }]
+        }).select('productCode productName').lean();
+        const productById = new Map(products.map((p) => [String(p._id), p]));
+        const productByCode = new Map(products.map((p) => [toKey(p.productCode), p]));
+        const fgNameOf = (entry) => {
+            const product = productById.get(String(entry.fgProductId?._id || entry.fgProductId)) || productByCode.get(toKey(entry.fgItemCode));
+            return cleanText(product?.productName) || cleanText(entry.fgItemDescription);
+        };
+
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet('BOM');
+        // Codes, serial and batch numbers are text so Excel keeps leading zeros and long digits.
+        [18, 16, 70, 10, 18, 24].forEach((width, index) => {
+            const column = sheet.getColumn(index + 1);
+            column.width = width;
+            if (index !== 3) column.numFmt = '@';
+        });
+
+        blocks.forEach((entry, index) => {
+            if (index > 0) sheet.addRow([]);
+            const fgRow = sheet.addRow(['FG Code:', entry.fgItemCode || '', 'FG Name:', fgNameOf(entry)]);
+            fgRow.font = { bold: true };
+            const headerRow = sheet.addRow(EXPORT_HEADERS);
+            headerRow.font = { bold: true };
+            headerRow.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } }; });
+            (entry.items || []).forEach((item) => {
+                sheet.addRow([
+                    entry.fgSerialNumber || '',
+                    item.itemCode || '',
+                    item.itemDescription || '',
+                    item.qty ?? '',
+                    item.batchNumber || '',
+                    item.componentSerialNumber || ''
+                ]);
+            });
+        });
 
         const safeName = String(bom.fgSerialNumber || bom.fgItemCode || 'bom').replace(/[^A-Za-z0-9._-]+/g, '-');
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename=BOM_${safeName}.xlsx`);
-        return res.send(XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
+        return res.send(Buffer.from(await workbook.xlsx.writeBuffer()));
     } catch (error) {
         return res.status(500).json({ message: 'Failed to export BOM', error: error.message });
     }

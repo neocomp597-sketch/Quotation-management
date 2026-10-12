@@ -1,4 +1,5 @@
 const ServiceVisit = require('../models/ServiceVisit');
+const { formatDateTime } = require('../utils/dateFormat');
 const Ticket = require('../models/Ticket');
 const Counter = require('../models/Counter');
 const AMC = require('../models/AMC');
@@ -366,7 +367,7 @@ exports.rescheduleVisit = async (req, res) => {
 
             ticket.timeline.push({
                 activityType: 'StatusChange',
-                description: `Field Service Visit ${isReopen ? 're-opened and rescheduled' : 'rescheduled'} (${visit.visitNo}) to ${new Date(visit.scheduledDate).toLocaleString()} with engineer ${engineerName}${typeText}`,
+                description: `Field Service Visit ${isReopen ? 're-opened and rescheduled' : 'rescheduled'} (${visit.visitNo}) to ${formatDateTime(visit.scheduledDate)} with engineer ${engineerName}${typeText}`,
                 performedBy: req.user?.id
             });
 

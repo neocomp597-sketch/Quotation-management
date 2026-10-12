@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { payrollService, branchService } from '../services/api';
+import { formatDate } from '../utils/helpers';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 import { useAuth } from '../context/AuthContext';
@@ -1310,7 +1311,7 @@ const OrgChart = () => {
                                 <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
                                     <span className="text-xs text-slate-400 block font-bold">Joining Date</span>
                                     <span className="text-slate-900 dark:text-white">
-                                        {selectedEmp.joiningDate ? new Date(selectedEmp.joiningDate).toLocaleDateString() : 'N/A'}
+                                        {formatDate(selectedEmp.joiningDate, 'N/A')}
                                     </span>
                                 </div>
                                 <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">

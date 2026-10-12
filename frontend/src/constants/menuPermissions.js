@@ -19,7 +19,6 @@ export const MENU_PERMISSION_GROUPS = [
             { key: 'city_master', label: 'City Master', description: 'City master management', defaultRoute: '/city-master' },
             { key: 'master_contacts', label: 'Contacts', description: 'Contact management records', defaultRoute: '/contacts' },
             { key: 'master_customers', label: 'Customers', description: 'Customer master records', defaultRoute: '/customers' },
-            { key: 'invoice_bulk_upload_delete', label: 'Delete Invoice Bulk Upload Entry', description: 'Permission to delete invoice bulk upload entries', defaultRoute: '/serial-no-master' },
             { key: 'payroll_employees', label: 'Employees & Master', description: 'Employee directory and profile management', defaultRoute: '/payroll/employees' },
             { key: 'csm_masters', label: 'Engineers Master', description: 'Field service engineers master', defaultRoute: '/csm/masters?tab=engineers' },
             { key: 'flowchart_view', label: 'Flowchart Builder', description: 'Visual process flowchart builder', defaultRoute: '/flowcharts' },

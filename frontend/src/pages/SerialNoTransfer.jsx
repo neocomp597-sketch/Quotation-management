@@ -1,19 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { MdSearch, MdSwapHoriz, MdVisibility, MdArrowBack, MdPersonAdd, MdHistory, MdCheckCircle } from 'react-icons/md';
+import { MdSearch, MdSwapHoriz, MdVisibility, MdArrowBack, MdPersonAdd, MdHistory, MdCheckCircle, MdFileDownload } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { serialTransferService, customerService, csmService } from '../services/api';
 import AssetActivityLog from '../components/AssetActivityLog';
 import PaginationControls from '../components/PaginationControls';
 import Customers from './Customers';
+import { formatDate } from '../utils/helpers';
 
 const PAGE_SIZE = 20;
 const TABS = [
     { key: 'serials', label: 'Serial No List' },
     { key: 'history', label: 'Transfer History' },
+    { key: 'activity', label: 'Customer Activity Log' },
 ];
 
-const formatDate = (value) => (value ? new Date(value).toLocaleDateString('en-IN') : '-');
 const todayInput = () => {
     const now = new Date();
     return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -30,10 +31,13 @@ const FlagBadge = ({ active }) => (
 );
 
 const TYPE_STYLES = { Transferred: 'bg-amber-50 text-amber-600', 'Past Entry': 'bg-violet-50 text-violet-600' };
+// How a customer came to hold the serial. "Sold" is the invoice sale; the ownership status itself
+// is the Active/Inactive flag.
+const TYPE_LABELS = { Sold: 'Original Sale' };
 
 const TypeBadge = ({ type }) => (
     <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest whitespace-nowrap ${TYPE_STYLES[type] || 'bg-sky-50 text-sky-600'}`}>
-        {type}
+        {TYPE_LABELS[type] || type}
     </span>
 );
 
@@ -46,12 +50,16 @@ const CustomerCell = ({ entry }) => (
     </div>
 );
 
-// Debounced list loader shared by both tabs: rows are "loading" until they belong to the current request.
-const useList = (load, params) => {
+const EMPTY_PAGINATION = { page: 1, limit: PAGE_SIZE, total: 0, pages: 1 };
+
+// Debounced list loader shared by the tabs: rows are "loading" until they belong to the current
+// request. Nothing is requested while `enabled` is false (e.g. an invalid date range).
+const useList = (load, params, enabled = true) => {
     const requestKey = JSON.stringify(params);
-    const [state, setState] = useState({ key: null, rows: [], pagination: { page: 1, limit: PAGE_SIZE, total: 0, pages: 1 } });
+    const [state, setState] = useState({ key: null, rows: [], pagination: EMPTY_PAGINATION });
 
     useEffect(() => {
+        if (!enabled) return undefined;
         let cancelled = false;
         load(JSON.parse(requestKey))
             .then((res) => {
@@ -64,8 +72,9 @@ const useList = (load, params) => {
             });
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [requestKey]);
+    }, [requestKey, enabled]);
 
+    if (!enabled) return { rows: [], pagination: EMPTY_PAGINATION, loading: false };
     return { ...state, loading: state.key !== requestKey };
 };
 
@@ -95,16 +104,58 @@ const useDebounced = (value, delay = 300) => {
     return debounced;
 };
 
+// From Date / To Date filter of one tab (both inclusive, either may be left empty). `params` is
+// what the request sends; an inverted range is reported and not sent.
+const useDateRange = (prefix) => {
+    const [fromDate, setFromDate] = useStoredState(`${prefix}.fromDate`, '');
+    const [toDate, setToDate] = useStoredState(`${prefix}.toDate`, '');
+    const invalid = Boolean(fromDate && toDate && fromDate > toDate);
+    return {
+        fromDate, toDate, setFromDate, setToDate, invalid,
+        params: { fromDate: fromDate || undefined, toDate: toDate || undefined },
+    };
+};
+
+const DateRangeFilter = ({ range, field, onChange }) => {
+    const set = (setter) => (e) => { setter(e.target.value); onChange(); };
+    const dateClass = `${inputClass} w-auto py-2.5`;
+    return (
+        <div className="flex flex-wrap items-end gap-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                From Date <span className="normal-case tracking-normal font-semibold">({field})</span>
+                <input type="date" value={range.fromDate} onChange={set(range.setFromDate)} className={`${dateClass} mt-1 block`} />
+            </label>
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                To Date
+                <input type="date" value={range.toDate} min={range.fromDate || undefined} onChange={set(range.setToDate)} className={`${dateClass} mt-1 block`} />
+            </label>
+            {(range.fromDate || range.toDate) && (
+                <button
+                    type="button"
+                    onClick={() => { range.setFromDate(''); range.setToDate(''); onChange(); }}
+                    className="px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-slate-500 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50"
+                >
+                    Clear Dates
+                </button>
+            )}
+            {range.invalid && (
+                <p className="w-full text-xs font-semibold text-rose-600">From Date cannot be later than To Date.</p>
+            )}
+        </div>
+    );
+};
+
 const SerialListTab = ({ onOpen, onTransfer }) => {
     const [search, setSearch] = useStoredState('list.search', '');
     const [field, setField] = useStoredState('list.field', '');
     const [status, setStatus] = useStoredState('list.status', '');
     const [page, setPage] = useStoredState('list.page', 1);
+    const range = useDateRange('list');
     const debouncedSearch = useDebounced(search.trim());
 
     const { rows, pagination, loading } = useList(serialTransferService.listSerials, {
-        page, limit: PAGE_SIZE, search: debouncedSearch || undefined, field: field || undefined, status: status || undefined,
-    });
+        page, limit: PAGE_SIZE, search: debouncedSearch || undefined, field: field || undefined, status: status || undefined, ...range.params,
+    }, !range.invalid);
     const offset = (pagination.page - 1) * pagination.limit;
 
     return (
@@ -127,10 +178,11 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                     <option value="customer">Customer</option>
                 </select>
                 <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className={`${inputClass} w-auto font-semibold`}>
-                    <option value="">All statuses</option>
-                    <option value="Sold">Sold (with first customer)</option>
+                    <option value="">All serials</option>
+                    <option value="Sold">With original customer</option>
                     <option value="Transferred">Transferred</option>
                 </select>
+                <DateRangeFilter range={range} field="Sale Date" onChange={() => setPage(1)} />
             </div>
             <div className="p-6">
                 {loading ? <Spinner /> : (
@@ -160,7 +212,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                                             </td>
                                             <td className="p-4 text-slate-500 whitespace-nowrap">{formatDate(row.saleDate)}</td>
                                             <td className="p-4 font-bold text-slate-700">{row.transfers}</td>
-                                            <td className="p-4"><TypeBadge type={row.status} /></td>
+                                            <td className="p-4"><FlagBadge active={row.status === 'Active'} /></td>
                                             <td className="p-4 text-right whitespace-nowrap">
                                                 <button type="button" title="View history" onClick={(e) => { e.stopPropagation(); onOpen(row._id); }} className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all">
                                                     <MdVisibility size={18} />
@@ -172,7 +224,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                                         </tr>
                                     ))}
                                     {!rows.length && (
-                                        <tr><td colSpan={8} className="p-8 text-center text-slate-400 text-sm font-medium">No sold serial numbers match.</td></tr>
+                                        <tr><td colSpan={8} className="p-8 text-center text-slate-400 text-sm font-medium">{range.invalid ? 'Correct the date range to see results.' : 'No sold serial numbers match.'}</td></tr>
                                     )}
                                 </tbody>
                             </table>
@@ -190,11 +242,12 @@ const HistoryTab = ({ onOpen }) => {
     const [flag, setFlag] = useStoredState('history.flag', '');
     const [entryType, setEntryType] = useStoredState('history.entryType', '');
     const [page, setPage] = useStoredState('history.page', 1);
+    const range = useDateRange('history');
     const debouncedSearch = useDebounced(search.trim());
 
     const { rows, pagination, loading } = useList(serialTransferService.listHistory, {
-        page, limit: PAGE_SIZE, search: debouncedSearch || undefined, flag: flag || undefined, entryType: entryType || undefined,
-    });
+        page, limit: PAGE_SIZE, search: debouncedSearch || undefined, flag: flag || undefined, entryType: entryType || undefined, ...range.params,
+    }, !range.invalid);
 
     return (
         <>
@@ -211,7 +264,7 @@ const HistoryTab = ({ onOpen }) => {
                 </div>
                 <select value={entryType} onChange={(e) => { setEntryType(e.target.value); setPage(1); }} className={`${inputClass} w-auto font-semibold`}>
                     <option value="">All entries</option>
-                    <option value="Sold">Sold</option>
+                    <option value="Sold">Original Sale</option>
                     <option value="Transferred">Transferred</option>
                     <option value="Past Entry">Past Entry</option>
                 </select>
@@ -220,6 +273,7 @@ const HistoryTab = ({ onOpen }) => {
                     <option value="Active">Active (current customer)</option>
                     <option value="Inactive">Inactive (previous customers)</option>
                 </select>
+                <DateRangeFilter range={range} field="Transfer Date" onChange={() => setPage(1)} />
             </div>
             <div className="p-6">
                 {loading ? <Spinner /> : (
@@ -228,7 +282,7 @@ const HistoryTab = ({ onOpen }) => {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50">
-                                        {['Date', 'Serial No', 'Product', 'Customer', 'Status', 'Flag', 'Remarks', 'Recorded By'].map((label) => (
+                                        {['Date', 'Serial No', 'Product', 'Customer', 'Status', 'Entry', 'Remarks', 'Recorded By'].map((label) => (
                                             <th key={label} className={thClass}>{label}</th>
                                         ))}
                                     </tr>
@@ -243,8 +297,8 @@ const HistoryTab = ({ onOpen }) => {
                                                 {entry.productName && <span className="block text-xs text-slate-500">{entry.productName}</span>}
                                             </td>
                                             <td className="p-4"><CustomerCell entry={entry} /></td>
-                                            <td className="p-4"><TypeBadge type={entry.entryType} /></td>
                                             <td className="p-4"><FlagBadge active={entry.isActive} /></td>
+                                            <td className="p-4"><TypeBadge type={entry.entryType} /></td>
                                             <td className="p-4 text-slate-500 min-w-[10rem]">{entry.remarks || (entry.entryType === 'Sold' && entry.invoiceNumber ? `Invoice ${entry.invoiceNumber}` : '-')}</td>
                                             <td className="p-4 text-slate-500 whitespace-nowrap">
                                                 {entry.createdByName || '-'}
@@ -255,7 +309,173 @@ const HistoryTab = ({ onOpen }) => {
                                     {!rows.length && (
                                         <tr>
                                             <td colSpan={8} className="p-8 text-center text-slate-400 text-sm font-medium">
-                                                {debouncedSearch || flag || entryType ? 'No history records match.' : 'No transfers recorded yet. Transfer a serial number from the Serial No List.'}
+                                                {range.invalid ? 'Correct the date range to see results.'
+                                                    : debouncedSearch || flag || entryType || range.fromDate || range.toDate ? 'No history records match.'
+                                                        : 'No transfers recorded yet. Transfer a serial number from the Serial No List.'}
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                        <PaginationControls pagination={pagination} onPageChange={setPage} />
+                    </>
+                )}
+            </div>
+        </>
+    );
+};
+
+const OWNERSHIP_OPTIONS = [
+    { value: 'Active', label: 'Active Customer Log', hint: 'Current customer of each sold serial number' },
+    { value: 'Inactive', label: 'Inactive Customer Log', hint: 'Earlier customers, before a transfer' },
+];
+
+const saveBlob = (blob, fileName) => {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+};
+
+// A failed blob request carries its JSON error message inside the blob.
+const blobErrorMessage = async (err, fallback) => {
+    const data = err.response?.data;
+    if (data instanceof Blob) {
+        try { return JSON.parse(await data.text()).message || fallback; } catch { return fallback; }
+    }
+    return err.response ? (data?.message || fallback) : 'The server could not be reached. Check that the backend is running and try again.';
+};
+
+// Customer Activity Log: Active (current owners) or Inactive (earlier owners) of sold serials,
+// with search and a Customer Since date range; Download Excel exports every matching row.
+const ActivityTab = ({ onOpen }) => {
+    const [ownership, setOwnership] = useStoredState('activity.ownership', 'Active');
+    const [search, setSearch] = useStoredState('activity.search', '');
+    const [page, setPage] = useStoredState('activity.page', 1);
+    const range = useDateRange('activity');
+    const debouncedSearch = useDebounced(search.trim());
+    const [downloading, setDownloading] = useState(false);
+
+    const filters = { ownership, search: debouncedSearch || undefined, ...range.params };
+    const { rows, pagination, loading } = useList(serialTransferService.listActivity, { ...filters, page, limit: PAGE_SIZE }, !range.invalid);
+    const offset = (pagination.page - 1) * pagination.limit;
+    const inactive = ownership === 'Inactive';
+
+    const download = async () => {
+        setDownloading(true);
+        try {
+            const res = await serialTransferService.exportActivity(filters);
+            const fileName = /filename="([^"]+)"/.exec(res.headers?.['content-disposition'] || '')?.[1]
+                || `Customer_Activity_${ownership}_${todayInput().replace(/-/g, '')}.xlsx`;
+            saveBlob(res.data, fileName);
+            const count = res.headers?.['x-total-count'];
+            toast.success(`${fileName} downloaded${count ? ` (${count} records)` : ''}`);
+        } catch (err) {
+            toast.error(await blobErrorMessage(err, 'Could not download the Excel file.'));
+        } finally {
+            setDownloading(false);
+        }
+    };
+
+    return (
+        <>
+            <div className="p-4 border-b border-slate-100 bg-slate-50 space-y-3">
+                <div className="flex flex-wrap items-center gap-3" role="radiogroup" aria-label="Customer activity log">
+                    {OWNERSHIP_OPTIONS.map((option) => (
+                        <label
+                            key={option.value}
+                            className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 transition-all ${ownership === option.value ? 'border-primary-500 bg-primary-50/60' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+                        >
+                            <input
+                                type="radio"
+                                name="activityOwnership"
+                                value={option.value}
+                                checked={ownership === option.value}
+                                onChange={() => { setOwnership(option.value); setPage(1); }}
+                                className="h-4 w-4 accent-primary-600"
+                            />
+                            <span>
+                                <span className="block text-xs font-black uppercase tracking-widest text-slate-700">{option.label}</span>
+                                <span className="block text-xs text-slate-500">{option.hint}</span>
+                            </span>
+                        </label>
+                    ))}
+                    <button
+                        type="button"
+                        onClick={download}
+                        disabled={downloading || loading || range.invalid || !pagination.total}
+                        className="ml-auto flex items-center gap-2 px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-xs tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <MdFileDownload size={18} /> {downloading ? 'Preparing…' : 'Download Excel'}
+                    </button>
+                </div>
+                <div className="flex flex-wrap items-end gap-3">
+                    <div className="relative w-full max-w-md">
+                        <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                            placeholder="Search serial no, product or customer"
+                            className={`${inputClass} pl-11`}
+                        />
+                    </div>
+                    <DateRangeFilter range={range} field="Customer Since" onChange={() => setPage(1)} />
+                </div>
+            </div>
+            <div className="p-6">
+                {loading ? <Spinner /> : (
+                    <>
+                        <p className="mb-3 text-xs font-bold text-slate-500">
+                            {pagination.total} {inactive ? 'inactive (earlier)' : 'active (current)'} customer record{pagination.total === 1 ? '' : 's'}
+                        </p>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50">
+                                        {['Sr No', 'Serial No', 'Product', 'Customer', 'Email', 'Pincode', 'Invoice', inactive ? 'Customer Period' : 'Customer Since', 'Status'].map((label) => (
+                                            <th key={label} className={thClass}>{label}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rows.map((row, index) => (
+                                        <tr key={row._id} onClick={() => onOpen(row.assetId)} className="cursor-pointer border-b last:border-0 border-slate-50 hover:bg-slate-50/50 transition-colors text-sm">
+                                            <td className="p-4 font-bold text-slate-400">{offset + index + 1}</td>
+                                            <td className="p-4 font-bold text-slate-800 whitespace-nowrap">{row.serialNumber}</td>
+                                            <td className="p-4 text-slate-600 min-w-[14rem]">
+                                                <span className="font-bold text-slate-700">{row.productCode}</span>
+                                                {row.productName && <span className="block text-xs text-slate-500">{row.productName}</span>}
+                                                {row.mgr1 && <span className="block text-[10px] font-semibold text-emerald-600">{[row.mgr1, row.mgr2, row.mgr3, row.mgr4, row.mgr5].filter(Boolean).join(' · ')}</span>}
+                                            </td>
+                                            <td className="p-4">
+                                                <span className="font-bold text-slate-700">{row.customerName || '-'}</span>
+                                                {row.customerCode && <span className="block text-xs text-slate-500">{row.customerCode}</span>}
+                                            </td>
+                                            <td className="p-4 text-slate-500">{row.email || '-'}</td>
+                                            <td className="p-4 text-slate-500">{row.pincode || '-'}</td>
+                                            <td className="p-4 text-slate-600 whitespace-nowrap">
+                                                {row.invoiceNumber || '-'}
+                                                {row.invoiceDate && <span className="block text-xs text-slate-500">{formatDate(row.invoiceDate)}</span>}
+                                            </td>
+                                            <td className="p-4 text-slate-500 whitespace-nowrap">
+                                                {formatDate(row.ownerSince)}
+                                                {inactive && row.ownerUntil && <span className="block text-xs">to {formatDate(row.ownerUntil)}</span>}
+                                            </td>
+                                            <td className="p-4"><FlagBadge active={row.ownership === 'Active'} /></td>
+                                        </tr>
+                                    ))}
+                                    {!rows.length && (
+                                        <tr>
+                                            <td colSpan={9} className="p-8 text-center text-slate-400 text-sm font-medium">
+                                                {range.invalid ? 'Correct the date range to see results.'
+                                                    : inactive && !debouncedSearch && !range.fromDate && !range.toDate ? 'No earlier customers yet. A customer becomes inactive when the serial is transferred.'
+                                                        : 'No customer records match.'}
                                             </td>
                                         </tr>
                                     )}
@@ -403,7 +623,7 @@ export const SerialNoDetails = ({ transfer = false }) => {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50">
-                                        {['Product', 'Date', 'Customer', 'Status', 'Flag', 'Remarks', 'Recorded By'].map((text) => (
+                                        {['Product', 'Date', 'Customer', 'Status', 'Entry', 'Remarks', 'Recorded By'].map((text) => (
                                             <th key={text} className={thClass}>{text}</th>
                                         ))}
                                     </tr>
@@ -417,8 +637,8 @@ export const SerialNoDetails = ({ transfer = false }) => {
                                             </td>
                                             <td className="p-4 text-slate-600 whitespace-nowrap">{formatDate(entry.transferDate)}</td>
                                             <td className="p-4"><CustomerCell entry={entry} /></td>
-                                            <td className="p-4"><TypeBadge type={entry.entryType} /></td>
                                             <td className="p-4"><FlagBadge active={entry.isActive} /></td>
+                                            <td className="p-4"><TypeBadge type={entry.entryType} /></td>
                                             <td className="p-4 text-slate-500">{entry.remarks || (entry.invoiceNumber && entry.entryType === 'Sold' ? `Invoice ${entry.invoiceNumber}` : '-')}</td>
                                             <td className="p-4 text-slate-500 whitespace-nowrap">{entry.pending ? 'Invoice Bulk Upload' : (entry.createdByName || '-')}</td>
                                         </tr>
@@ -650,7 +870,7 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
 
 const SerialNoTransfer = () => {
     const [searchParams, setSearchParams] = useSearchParams();
-    const tab = searchParams.get('tab') === 'history' ? 'history' : 'serials';
+    const tab = TABS.some((item) => item.key === searchParams.get('tab')) ? searchParams.get('tab') : 'serials';
     const navigate = useNavigate();
     const openSerial = (assetId) => navigate(`/serial-no-transfer/${assetId}`);
 
@@ -667,18 +887,18 @@ const SerialNoTransfer = () => {
                         <button
                             key={item.key}
                             type="button"
-                            onClick={() => setSearchParams(item.key === 'history' ? { tab: 'history' } : {})}
+                            onClick={() => setSearchParams(item.key === 'serials' ? {} : { tab: item.key })}
                             className={`px-5 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${tab === item.key ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-400 hover:text-slate-700'}`}
                         >
                             {item.label}
                         </button>
                     ))}
                 </div>
-                {tab === 'serials' ? (
+                {tab === 'serials' && (
                     <SerialListTab onOpen={openSerial} onTransfer={(assetId) => navigate(`/serial-no-transfer/${assetId}/transfer`)} />
-                ) : (
-                    <HistoryTab onOpen={openSerial} />
                 )}
+                {tab === 'history' && <HistoryTab onOpen={openSerial} />}
+                {tab === 'activity' && <ActivityTab onOpen={openSerial} />}
             </div>
         </div>
     );

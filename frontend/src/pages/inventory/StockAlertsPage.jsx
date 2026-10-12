@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { formatDate } from '../../utils/helpers';
 import {
     MdNotificationsActive,
     MdWarning,
@@ -98,7 +99,7 @@ const StockAlertsPage = () => {
                                 <div className="flex items-center justify-between">
                                     {getSeverityBadge(alert.severity)}
                                     <span className="text-xs text-slate-400 font-mono">
-                                        {new Date(alert.createdAt).toLocaleDateString('en-IN')}
+                                        {formatDate(alert.createdAt)}
                                     </span>
                                 </div>
                                 <h3 className="text-base font-bold text-slate-900 dark:text-white mt-3">

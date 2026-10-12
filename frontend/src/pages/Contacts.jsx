@@ -9,6 +9,7 @@ import PaginationControls from '../components/PaginationControls';
 import { contactService, customerService, csmService, importService } from '../services/api';
 import SearchableSelect from '../components/SearchableSelect';
 import { BLOOD_GROUP_OPTIONS, isValidGSTIN, isValidMobile, isValidPincode } from '../utils/validation';
+import { formatDate } from '../utils/helpers';
 
 const LIST_PAGE_SIZE = 20;
 
@@ -44,13 +45,6 @@ const defaultForm = {
     addressLine2: '',
     lastInteractionDate: '',
     notes: ''
-};
-
-const formatDate = (dateStr) => {
-    if (!dateStr) return '-';
-    const d = new Date(dateStr);
-    if (isNaN(d)) return dateStr;
-    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
 const customerTypeBadge = (type) => {

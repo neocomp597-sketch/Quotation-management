@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { developerService } from '../../../services/api';
+import { formatDate } from '../../../utils/helpers';
 import { toast } from 'react-toastify';
 import { MdAdd, MdVpnKey, MdBlock, MdContentCopy, MdCheck, MdShield, MdRefresh } from 'react-icons/md';
 
@@ -235,9 +236,9 @@ const ApiKeys = () => {
                                             </span>
                                         </td>
                                         <td className="py-4 px-6 text-slate-500 space-y-0.5">
-                                            <div>{new Date(key.createdAt).toLocaleDateString()}</div>
+                                            <div>{formatDate(key.createdAt)}</div>
                                             <div className="text-[10px] text-slate-400">
-                                                {key.lastUsedAt ? `Used: ${new Date(key.lastUsedAt).toLocaleDateString()}` : 'Never used'}
+                                                {key.lastUsedAt ? `Used: ${formatDate(key.lastUsedAt)}` : 'Never used'}
                                             </div>
                                         </td>
                                         <td className="py-4 px-6 text-center">

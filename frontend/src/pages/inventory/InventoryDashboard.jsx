@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { formatDateTime } from '../../utils/helpers';
 import {
     MdInventory,
     MdStorefront,
@@ -258,7 +259,7 @@ const InventoryDashboard = () => {
                                             {txn.quantityDelta > 0 ? `+${txn.quantityDelta}` : txn.quantityDelta}
                                         </td>
                                         <td className="px-4 py-3 text-xs text-slate-400">
-                                            {new Date(txn.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                            {formatDateTime(txn.createdAt)}
                                         </td>
                                     </tr>
                                 ))}

@@ -11,6 +11,7 @@ import {
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import * as XLSX from 'xlsx';
+import { formatDate, formatDateTime } from '../utils/helpers';
 
 const Contracts = ({ mode = 'dashboard' }) => {
     // Current CLM view selection: 'dashboard' | 'contracts' | 'templates' | 'clauses' | 'approvals' | 'renewals' | 'reports' | 'settings'
@@ -205,8 +206,8 @@ const Contracts = ({ mode = 'dashboard' }) => {
             'Contract Number': c.contractNumber,
             'Title': c.title,
             'Customer Partner': c.customerId?.companyName || c.customerId?.customerName || '-',
-            'Start Date': c.startDate ? new Date(c.startDate).toISOString().substring(0, 10) : '',
-            'End Date': c.endDate ? new Date(c.endDate).toISOString().substring(0, 10) : '',
+            'Start Date': formatDate(c.startDate, ''),
+            'End Date': formatDate(c.endDate, ''),
             'Remaining Days': c.remainingDays || 0,
             'Category': c.category || 'Sales Agreement',
             'Value (INR)': c.value || 0,
@@ -240,7 +241,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                         c.title,
                         c.customerId?.companyName || c.customerId?.customerName || '-',
                         `₹${(c.value || 0).toLocaleString()}`,
-                        c.endDate ? new Date(c.endDate).toLocaleDateString() : '-',
+                        formatDate(c.endDate),
                         c.owner?.name || 'Sales Rep'
                     ]),
                     exportData: list.map(c => ({
@@ -248,7 +249,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                         'Title': c.title,
                         'Customer': c.customerId?.companyName || c.customerId?.customerName || '-',
                         'Value (INR)': c.value || 0,
-                        'End Date': c.endDate ? new Date(c.endDate).toISOString().substring(0, 10) : '',
+                        'End Date': formatDate(c.endDate, ''),
                         'Owner': c.owner?.name || 'Sales Rep'
                     })),
                     fileName: 'Active_Contracts_Report'
@@ -270,7 +271,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                         c.title,
                         c.customerId?.companyName || c.customerId?.customerName || '-',
                         `₹${(c.value || 0).toLocaleString()}`,
-                        c.endDate ? new Date(c.endDate).toLocaleDateString() : '-',
+                        formatDate(c.endDate),
                         c.owner?.name || 'Sales Rep'
                     ]),
                     exportData: list.map(c => ({
@@ -278,7 +279,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                         'Title': c.title,
                         'Customer': c.customerId?.companyName || c.customerId?.customerName || '-',
                         'Value (INR)': c.value || 0,
-                        'Expired Date': c.endDate ? new Date(c.endDate).toISOString().substring(0, 10) : '',
+                        'Expired Date': formatDate(c.endDate, ''),
                         'Owner': c.owner?.name || 'Sales Rep'
                     })),
                     fileName: 'Expired_Contracts_Report'
@@ -304,7 +305,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                         c.customerId?.companyName || c.customerId?.customerName || '-',
                         `₹${(c.value || 0).toLocaleString()}`,
                         `${c.remainingDays} Days`,
-                        c.endDate ? new Date(c.endDate).toLocaleDateString() : '-'
+                        formatDate(c.endDate)
                     ]),
                     exportData: list.map(c => ({
                         'Contract Number': c.contractNumber,
@@ -312,7 +313,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                         'Customer': c.customerId?.companyName || c.customerId?.customerName || '-',
                         'Value (INR)': c.value || 0,
                         'Remaining Days': c.remainingDays || 0,
-                        'End Date': c.endDate ? new Date(c.endDate).toISOString().substring(0, 10) : ''
+                        'End Date': formatDate(c.endDate, '')
                     })),
                     fileName: 'Expiring_Contracts_Report'
                 };
@@ -549,7 +550,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                         c.customerId?.companyName || c.customerId?.customerName || '-',
                         `₹${(c.value || 0).toLocaleString()}`,
                         `${c.remainingDays} Days`,
-                        c.endDate ? new Date(c.endDate).toLocaleDateString() : '-'
+                        formatDate(c.endDate)
                     ]),
                     exportData: list.map(c => ({
                         'Contract Number': c.contractNumber,
@@ -557,7 +558,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                         'Customer': c.customerId?.companyName || c.customerId?.customerName || '-',
                         'Value (INR)': c.value || 0,
                         'Days Remaining': c.remainingDays,
-                        'End Date': c.endDate ? new Date(c.endDate).toISOString().substring(0, 10) : ''
+                        'End Date': formatDate(c.endDate, '')
                     })),
                     fileName: 'Upcoming_Renewals_Report'
                 };
@@ -954,7 +955,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                         <div>
                                             <div className="text-[10px] text-slate-400 uppercase font-black tracking-wider">Duration</div>
                                             <div className="text-slate-800 mt-1">
-                                                {new Date(activeWorkspaceContract.startDate).toLocaleDateString()} - {new Date(activeWorkspaceContract.endDate).toLocaleDateString()}
+                                                {formatDate(activeWorkspaceContract.startDate)} - {formatDate(activeWorkspaceContract.endDate)}
                                             </div>
                                         </div>
                                         <div>
@@ -1254,7 +1255,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                             >
                                                 <div>
                                                     <div className="text-xs font-black text-slate-900">Version {v.version}</div>
-                                                    <div className="text-[10px] text-slate-400 mt-1">Compiled: {new Date(v.createdAt).toLocaleString()}</div>
+                                                    <div className="text-[10px] text-slate-400 mt-1">Compiled: {formatDateTime(v.createdAt)}</div>
                                                 </div>
                                                 <span className="text-[10px] font-bold text-indigo-600 uppercase">View Snapshot</span>
                                             </button>

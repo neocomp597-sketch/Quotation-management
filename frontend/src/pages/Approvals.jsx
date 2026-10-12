@@ -3,6 +3,7 @@ import { quotationService } from '../services/api';
 import { toast } from 'react-toastify';
 import { MdCheck, MdClose, MdLockOpen, MdLock } from 'react-icons/md';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
+import { formatDate } from '../utils/helpers';
 
 const Approvals = () => {
     const [pendingQuotes, setPendingQuotes] = useState([]);
@@ -77,7 +78,7 @@ const Approvals = () => {
                                         </div>
                                         <div>
                                             <span className="block text-[9px] uppercase tracking-widest text-slate-400">Date Logged</span>
-                                            <span className="text-slate-600 font-semibold">{new Date(quote.quotationDate).toLocaleDateString()}</span>
+                                            <span className="text-slate-600 font-semibold">{formatDate(quote.quotationDate)}</span>
                                         </div>
                                         <div>
                                             <span className="block text-[9px] uppercase tracking-widest text-slate-400">Representative</span>

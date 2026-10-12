@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { csmService, customerService, productService, voucherService, userService, importService, uploadService, branchService } from '../services/api';
+import { formatDate, formatDateTime } from '../utils/helpers';
 import { toast } from 'react-toastify';
 import { MdAdd, MdSearch, MdFilterList, MdArrowForward, MdEdit, MdDelete, MdPublish, MdFileDownload, MdWarning, MdInfoOutline, MdPhotoCamera, MdCloudUpload, MdPeople, MdAccountTree, MdCorporateFare } from 'react-icons/md';
 import PaginationControls from '../components/PaginationControls';
@@ -1624,8 +1625,8 @@ const CSMTickets = () => {
                 'Priority': t.priorityId?.name || '',
                 'Status': t.status || '',
                 'Source': t.source || '',
-                'Issue Date': t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-IN') : '',
-                'Resolved Date': t.resolvedAt ? new Date(t.resolvedAt).toLocaleDateString('en-IN') : '',
+                'Issue Date': formatDate(t.createdAt, ''),
+                'Resolved Date': formatDate(t.resolvedAt, ''),
                 'Assigned Engineer': t.assignedEngineerId?.name || 'Unassigned'
             }));
 
@@ -1699,7 +1700,7 @@ const CSMTickets = () => {
 
     const downloadErrorReport = () => {
         if (!importResult || !importResult.errors || importResult.errors.length === 0) return;
-        const blobContent = `Import Error Report for Tickets\nGenerated on: ${new Date().toLocaleString()}\n\nFailed rows details:\n` + importResult.errors.join('\n');
+        const blobContent = `Import Error Report for Tickets\nGenerated on: ${formatDateTime(new Date())}\n\nFailed rows details:\n` + importResult.errors.join('\n');
         const url = window.URL.createObjectURL(new Blob([blobContent], { type: 'text/plain' }));
         const link = document.createElement('a');
         link.href = url;
@@ -2791,7 +2792,7 @@ const CSMTickets = () => {
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold disabled:bg-slate-50 disabled:text-slate-400"
                             >
                                 <option value="">{formData.customerId ? `Select Invoice (${invoices.length} available)` : 'Select Customer First'}</option>
-                                {invoices.map(i => <option key={i._id} value={i._id}>{i.voucherNumber} ({new Date(i.date).toLocaleDateString()})</option>)}
+                                {invoices.map(i => <option key={i._id} value={i._id}>{i.voucherNumber} ({formatDate(i.date)})</option>)}
                             </select>
                         </div>
                         <div>
@@ -2852,18 +2853,18 @@ const CSMTickets = () => {
                                         <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Date of Sale</span>
                                         <span className="text-slate-900">
                                             {assetSummary.asset?.saleDate || assetSummary.asset?.invoiceDate
-                                                ? new Date(assetSummary.asset.saleDate || assetSummary.asset.invoiceDate).toLocaleDateString('en-IN')
+                                                ? formatDate(assetSummary.asset.saleDate || assetSummary.asset.invoiceDate)
                                                 : 'N/A'}
                                         </span>
                                     </div>
                                     <div>
                                         <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Installation Date</span>
-                                        <span className="text-slate-900">{assetSummary.asset?.installationDate ? new Date(assetSummary.asset.installationDate).toLocaleDateString() : 'N/A'}</span>
+                                        <span className="text-slate-900">{formatDate(assetSummary.asset?.installationDate, 'N/A')}</span>
                                     </div>
                                     <div>
                                         <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Warranty Status</span>
                                         <span className={assetSummary.warranty?.status === 'Active' ? 'text-teal-600 font-bold' : 'text-slate-500'}>
-                                            {assetSummary.warranty?.status === 'Active' ? `✅ Active (Expires ${new Date(assetSummary.warranty.expiryDate).toLocaleDateString()})` : '❌ Inactive / Expired'}
+                                            {assetSummary.warranty?.status === 'Active' ? `✅ Active (Expires ${formatDate(assetSummary.warranty.expiryDate)})` : '❌ Inactive / Expired'}
                                         </span>
                                     </div>
                                     <div>
@@ -2874,7 +2875,7 @@ const CSMTickets = () => {
                                     </div>
                                     <div>
                                         <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Last Service Date</span>
-                                        <span className="text-slate-900">{assetSummary.lastServiceDate ? new Date(assetSummary.lastServiceDate).toLocaleDateString() : 'No service record'}</span>
+                                        <span className="text-slate-900">{formatDate(assetSummary.lastServiceDate, 'No service record')}</span>
                                     </div>
                                     <div>
                                         <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Open Tickets</span>
@@ -4236,7 +4237,7 @@ const CSMTickets = () => {
                                     </p>
                                     {selectedManualTicket.manualInvoiceDate && (
                                         <p className="text-xs text-slate-500 font-semibold">
-                                            Date: {new Date(selectedManualTicket.manualInvoiceDate).toLocaleDateString()}
+                                            Date: {formatDate(selectedManualTicket.manualInvoiceDate)}
                                         </p>
                                     )}
                                 </div>

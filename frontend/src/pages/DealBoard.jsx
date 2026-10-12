@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
 import PortalDropdown from '../components/PortalDropdown';
 import SearchableSelect from '../components/SearchableSelect';
+import { formatDate } from '../utils/helpers';
 
 const formatCurrency = (val) => {
     if (!val) return '₹0';
@@ -53,7 +54,7 @@ const DealCard = ({ deal, onClick }) => {
             {deal.expectedCloseDate && (
                 <div className="flex items-center gap-1 mt-2 text-xs text-slate-400">
                     <MdCalendarToday size={12} />
-                    <span>{new Date(deal.expectedCloseDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
+                    <span>{formatDate(deal.expectedCloseDate)}</span>
                 </div>
             )}
             {deal.ownerId?.name && (

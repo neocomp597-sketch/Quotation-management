@@ -1,7 +1,12 @@
 const mongoose = require('mongoose');
+const ExcelJS = require('exceljs');
 const Asset = require('../models/Asset');
 const Customer = require('../models/Customer');
+const Product = require('../models/Product');
+require('../models/MGR'); // populated through Product mgr1..mgr5
 const SerialTransfer = require('../models/SerialTransfer');
+const { MGR_KEYS, formatMgrVal } = require('../utils/productMgr');
+const { formatDate, EXCEL_DATE_FORMAT } = require('../utils/dateFormat');
 
 /**
  * Serial No Transfer: the customer-wise ownership history of sold serial numbers.
@@ -17,6 +22,49 @@ const SerialTransfer = require('../models/SerialTransfer');
 const cleanText = (value) => String(value ?? '').trim().replace(/\s+/g, ' ');
 const toKey = (value) => cleanText(value).toUpperCase();
 const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const httpError = (status, message) => Object.assign(new Error(message), { status });
+
+// From/To dates are calendar days as users see them in India (UTC+05:30); both ends are inclusive.
+// Sale dates are stored as UTC midnight of the day and transfer dates as the chosen day at the
+// time of saving, so day boundaries in this offset put both on the day the screens show.
+const BUSINESS_UTC_OFFSET_MS = 330 * 60000;
+const DAY_MS = 86400000;
+const parseDay = (value, label) => {
+    const text = cleanText(value);
+    if (!text) return null;
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+    const day = match && new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+    if (!day || day.getUTCDate() !== Number(match[3])) throw httpError(400, `${label} is not a valid date.`);
+    return day;
+};
+const dayStart = (day, addDays = 0) => new Date(day.getTime() + addDays * DAY_MS - BUSINESS_UTC_OFFSET_MS);
+
+/** A Mongo range for the fromDate/toDate query parameters, or null when neither is set. */
+const dateRange = (query) => {
+    const from = parseDay(query.fromDate, 'From Date');
+    const to = parseDay(query.toDate, 'To Date');
+    if (from && to && from > to) throw httpError(400, 'From Date cannot be later than To Date.');
+    if (!from && !to) return null;
+    const range = {};
+    if (from) range.$gte = dayStart(from);
+    if (to) range.$lt = dayStart(to, 1);
+    return range;
+};
+
+// The sale date shown in the Serial No List: saleDate, else invoiceDate, else createdAt (see saleDateOf).
+const saleDateCondition = (range) => ({
+    $or: [
+        { saleDate: range },
+        { saleDate: null, invoiceDate: range },
+        { saleDate: null, invoiceDate: null, createdAt: range }
+    ]
+});
+
+const sendError = (res, error, message) => {
+    if (error.status) return res.status(error.status).json({ message: error.message });
+    return res.status(500).json({ message, error: error.message });
+};
 
 const getPagination = (query) => {
     const page = Math.max(1, Number(query.page || 1));
@@ -80,11 +128,16 @@ const statusFilter = async (status) => {
     return status === 'Transferred' ? { $in: ids } : { $nin: ids };
 };
 
-/** Serial No List: every sold serial with its current customer. */
+/**
+ * Serial No List: every sold serial with its current customer. The current customer is the
+ * serial's Active owner, so every row is Active; `transferred` says whether it has changed hands
+ * since the sale. The asset's own status stays SOLD, which is its inventory/invoice status.
+ */
 exports.listSerials = async (req, res) => {
     try {
         const { page, limit, skip } = getPagination(req.query);
         const query = { status: 'SOLD' };
+        const and = [];
 
         const search = cleanText(req.query.search);
         if (search) {
@@ -100,8 +153,12 @@ exports.listSerials = async (req, res) => {
                     .select('_id').limit(500).lean();
                 byField.customer.push({ customerId: { $in: customers.map((c) => c._id) } });
             }
-            query.$or = byField[req.query.field] || [...byField.serial, ...byField.product, ...byField.customer];
+            and.push({ $or: byField[req.query.field] || [...byField.serial, ...byField.product, ...byField.customer] });
         }
+
+        const range = dateRange(req.query);
+        if (range) and.push(saleDateCondition(range));
+        if (and.length) query.$and = and;
 
         const assetFilter = await statusFilter(req.query.status);
         if (assetFilter) query._id = assetFilter;
@@ -146,13 +203,14 @@ exports.listSerials = async (req, res) => {
                 invoiceNumber: asset.invoiceNumber,
                 transfers,
                 lastTransferDate: transfers ? transfer.lastTransferDate : null,
-                status: transfers ? 'Transferred' : 'Sold'
+                transferred: transfers > 0,
+                status: 'Active'
             };
         });
 
         return res.json({ data, pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
     } catch (error) {
-        return res.status(500).json({ message: 'Failed to load serial numbers', error: error.message });
+        return sendError(res, error, 'Failed to load serial numbers');
     }
 };
 
@@ -193,8 +251,6 @@ exports.getSerial = async (req, res) => {
         return res.status(500).json({ message: 'Failed to load the serial number', error: error.message });
     }
 };
-
-const httpError = (status, message) => Object.assign(new Error(message), { status });
 
 // The chosen day at the time the transfer is recorded, so the history has a date and a time.
 const transferMoment = (value) => {
@@ -251,7 +307,7 @@ exports.transferSerial = async (req, res) => {
                 throw httpError(400, `${customerLabel(customer)} is already the current customer of ${asset.serialNumber}.`);
             }
             if (current && transferDate < startOfDay(current.transferDate)) {
-                throw httpError(400, `Transfer date cannot be before ${new Date(current.transferDate).toLocaleDateString('en-IN')}, when the current customer (${current.companyName || current.customerName || 'previous customer'}) received it.`);
+                throw httpError(400, `Transfer date cannot be before ${formatDate(current.transferDate)}, when the current customer (${current.companyName || current.customerName || 'previous customer'}) received it.`);
             }
 
             if (current) {
@@ -338,7 +394,7 @@ exports.addPastEntry = async (req, res) => {
                 [current] = await SerialTransfer.create([{ ...saleRecord(asset), ...user }], { session });
             }
             if (current && startOfDay(entryDate) > startOfDay(current.transferDate)) {
-                throw httpError(400, `A past entry must be dated on or before ${new Date(current.transferDate).toLocaleDateString('en-IN')}, when the current customer (${current.companyName || current.customerName || 'current customer'}) received it. Use Transfer Serial No for a newer customer.`);
+                throw httpError(400, `A past entry must be dated on or before ${formatDate(current.transferDate)}, when the current customer (${current.companyName || current.customerName || 'current customer'}) received it. Use Transfer Serial No for a newer customer.`);
             }
             await SerialTransfer.create([{
                 assetId: asset._id,
@@ -387,6 +443,8 @@ exports.listHistory = async (req, res) => {
         if (req.query.flag === 'Active') query.isActive = true;
         if (req.query.flag === 'Inactive') query.isActive = false;
         if (['Sold', 'Transferred', 'Past Entry'].includes(req.query.entryType)) query.entryType = req.query.entryType;
+        const range = dateRange(req.query);
+        if (range) query.transferDate = range;
 
         const [data, total] = await Promise.all([
             SerialTransfer.find(query).sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit).lean(),
@@ -394,6 +452,237 @@ exports.listHistory = async (req, res) => {
         ]);
         return res.json({ data, pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
     } catch (error) {
-        return res.status(500).json({ message: 'Failed to load the transfer history', error: error.message });
+        return sendError(res, error, 'Failed to load the transfer history');
+    }
+};
+
+/*
+ * Customer Activity Log: one row per customer ownership of a serial number.
+ *
+ * Active: the current owner of every sold serial. A transferred serial's owner is its active
+ * history record; a serial never transferred has no history record yet, so its owner is read from
+ * the Invoice Bulk Upload row (nothing is written for it). Inactive: every history record that is
+ * no longer current (owners before a transfer, and Past Entries). Each row is exactly one history
+ * record or one asset, so the product/customer lookups below never multiply rows.
+ *
+ * "Active"/"Inactive" here is the ownership flag of the history, not the customer's status in
+ * Customer Master. The date filter is the date the customer received the serial.
+ */
+const OWNERSHIPS = ['Active', 'Inactive'];
+
+const activeOwners = async ({ search, range, skip, limit }) => {
+    const match = { status: 'SOLD' };
+    if (search) {
+        const pattern = new RegExp(escapeRegex(search), 'i');
+        match.$or = [
+            { serialNumber: pattern }, { productCode: pattern }, { productName: pattern },
+            { customerNameStr: pattern }, { customerCode: pattern }
+        ];
+    }
+    const page = [{ $sort: { ownerSince: -1, _id: -1 } }];
+    if (skip) page.push({ $skip: skip });
+    if (limit) page.push({ $limit: limit });
+
+    const [result] = await Asset.aggregate([
+        { $match: match },
+        {
+            $lookup: {
+                from: SerialTransfer.collection.name,
+                let: { assetId: '$_id', companyId: '$companyId' },
+                pipeline: [
+                    { $match: { $expr: { $and: [{ $eq: ['$companyId', '$$companyId'] }, { $eq: ['$assetId', '$$assetId'] }] }, isActive: true } },
+                    { $limit: 1 }
+                ],
+                as: 'current'
+            }
+        },
+        { $addFields: { current: { $arrayElemAt: ['$current', 0] } } },
+        { $addFields: { ownerSince: { $ifNull: ['$current.transferDate', { $ifNull: ['$saleDate', { $ifNull: ['$invoiceDate', '$createdAt'] }] }] } } },
+        ...(range ? [{ $match: { ownerSince: range } }] : []),
+        { $facet: { rows: page, total: [{ $count: 'count' }] } }
+    ]);
+
+    const rows = (result?.rows || []).map((asset) => {
+        const current = asset.current;
+        return {
+            _id: current?._id || asset._id,
+            assetId: asset._id,
+            ownership: 'Active',
+            entryType: current?.entryType || 'Sold',
+            serialNumber: asset.serialNumber,
+            productId: current?.productId || asset.productId,
+            productCode: current?.productCode || asset.productCode,
+            productName: current?.productName || asset.productName,
+            customerId: current ? current.customerId : asset.customerId,
+            customerCode: current ? current.customerCode : asset.customerCode,
+            customerName: current ? (current.companyName || current.customerName) : asset.customerNameStr,
+            customerPincode: current ? current.customerPincode : asset.customerPostalCode,
+            invoiceNumber: asset.invoiceNumber || current?.invoiceNumber || '',
+            invoiceDate: asset.invoiceDate || asset.saleDate || null,
+            ownerSince: asset.ownerSince,
+            ownerUntil: null
+        };
+    });
+    return { rows, total: result?.total?.[0]?.count || 0 };
+};
+
+const inactiveOwners = async ({ search, range, skip, limit }) => {
+    const query = { isActive: false };
+    if (search) {
+        const pattern = new RegExp(escapeRegex(search), 'i');
+        query.$or = [
+            { serialNumber: pattern }, { productCode: pattern }, { productName: pattern },
+            { companyName: pattern }, { customerName: pattern }, { customerCode: pattern }
+        ];
+    }
+    if (range) query.transferDate = range;
+
+    let find = SerialTransfer.find(query).sort({ transferDate: -1, _id: -1 });
+    if (skip) find = find.skip(skip);
+    if (limit) find = find.limit(limit);
+    const [records, total] = await Promise.all([find.lean(), SerialTransfer.countDocuments(query)]);
+
+    const assets = records.length
+        ? await Asset.find({ _id: { $in: [...new Set(records.map((r) => String(r.assetId)))] } })
+            .select('invoiceNumber invoiceDate saleDate').lean()
+        : [];
+    const assetById = new Map(assets.map((asset) => [String(asset._id), asset]));
+
+    const rows = records.map((record) => {
+        const asset = assetById.get(String(record.assetId));
+        return {
+            _id: record._id,
+            assetId: record.assetId,
+            ownership: 'Inactive',
+            entryType: record.entryType,
+            serialNumber: record.serialNumber,
+            productId: record.productId,
+            productCode: record.productCode,
+            productName: record.productName,
+            customerId: record.customerId,
+            customerCode: record.customerCode,
+            customerName: record.companyName || record.customerName,
+            customerPincode: record.customerPincode,
+            invoiceNumber: asset?.invoiceNumber || record.invoiceNumber || '',
+            invoiceDate: asset?.invoiceDate || asset?.saleDate || null,
+            ownerSince: record.transferDate,
+            ownerUntil: record.endedAt
+        };
+    });
+    return { rows, total };
+};
+
+// Adds product description and MGR 1-5 (from Product Master) and customer email and fallback
+// code/pincode (from Customer Master) to activity rows.
+const withMasterData = async (rows) => {
+    const idsOf = (key) => [...new Set(rows.map((row) => row[key]).filter(Boolean).map(String))];
+    const [products, customers] = await Promise.all([
+        Product.find({ _id: { $in: idsOf('productId') } })
+            .select(['productName productCode description', ...MGR_KEYS].join(' '))
+            .populate(MGR_KEYS.map((key) => ({ path: key, select: 'code description', options: { bypassTenant: true } })))
+            .setOptions({ bypassTenant: true })
+            .lean(),
+        Customer.find({ _id: { $in: idsOf('customerId') } })
+            .select('customerName companyName externalCode email billingAddress')
+            .setOptions({ bypassTenant: true })
+            .lean()
+    ]);
+    const productById = new Map(products.map((p) => [String(p._id), p]));
+    const customerById = new Map(customers.map((c) => [String(c._id), c]));
+
+    return rows.map((row) => {
+        const product = productById.get(String(row.productId));
+        const customer = customerById.get(String(row.customerId));
+        const mgrs = Object.fromEntries(MGR_KEYS.map((key) => [key, product ? formatMgrVal(product[key]) : '']));
+        return {
+            ...row,
+            productName: cleanText(product?.productName) || cleanText(row.productName),
+            productCode: cleanText(product?.productCode) || cleanText(row.productCode),
+            productDescription: cleanText(product?.description),
+            ...mgrs,
+            customerName: cleanText(row.customerName) || customerLabel(customer),
+            customerCode: cleanText(row.customerCode) || cleanText(customer?.externalCode),
+            email: cleanText(customer?.email),
+            pincode: cleanText(row.customerPincode) || cleanText(customer?.billingAddress?.pincode)
+        };
+    });
+};
+
+const loadActivity = async (query, paging = {}) => {
+    const ownership = OWNERSHIPS.includes(query.ownership) ? query.ownership : 'Active';
+    const options = { search: cleanText(query.search), range: dateRange(query), ...paging };
+    const { rows, total } = await (ownership === 'Active' ? activeOwners(options) : inactiveOwners(options));
+    return { ownership, rows: await withMasterData(rows), total };
+};
+
+/** Customer Activity Log, one page (?ownership=Active|Inactive&search&fromDate&toDate). */
+exports.listActivity = async (req, res) => {
+    try {
+        const { page, limit, skip } = getPagination(req.query);
+        const { rows, total } = await loadActivity(req.query, { skip, limit });
+        return res.json({ data: rows, pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
+    } catch (error) {
+        return sendError(res, error, 'Failed to load the customer activity log');
+    }
+};
+
+// A date as the calendar day it is in India, for an Excel date cell (Excel dates have no zone).
+const excelDay = (value) => {
+    if (!value) return null;
+    const time = new Date(value).getTime();
+    if (Number.isNaN(time)) return null;
+    const local = new Date(time + BUSINESS_UTC_OFFSET_MS);
+    return new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()));
+};
+
+const ACTIVITY_COLUMNS = [
+    { header: 'Product Name', key: 'productName', width: 40 },
+    { header: 'Product Code', key: 'productCode', width: 16, text: true },
+    { header: 'Serial Number', key: 'serialNumber', width: 18, text: true },
+    { header: 'Product Description', key: 'productDescription', width: 45 },
+    { header: 'Product MGR 1', key: 'mgr1', width: 20 },
+    { header: 'Product MGR 2', key: 'mgr2', width: 20 },
+    { header: 'Product MGR 3', key: 'mgr3', width: 20 },
+    { header: 'Product MGR 4', key: 'mgr4', width: 20 },
+    { header: 'Product MGR 5', key: 'mgr5', width: 20 },
+    { header: 'Customer Name', key: 'customerName', width: 36 },
+    { header: 'Customer Code', key: 'customerCode', width: 16, text: true },
+    { header: 'Email', key: 'email', width: 30 },
+    { header: 'Pincode', key: 'pincode', width: 10, text: true },
+    { header: 'Invoice Number', key: 'invoiceNumber', width: 20, text: true },
+    { header: 'Invoice Date', key: 'invoiceDate', width: 14, date: true }
+];
+
+/** Customer Activity Log as .xlsx: every row matching the filters, not just one page. */
+exports.exportActivity = async (req, res) => {
+    try {
+        const { ownership, rows } = await loadActivity(req.query);
+
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet(`${ownership} Customers`);
+        sheet.columns = ACTIVITY_COLUMNS.map(({ header, key, width, text, date }) => ({
+            header, key, width,
+            // Codes and serial numbers stay text so Excel keeps leading zeros and long digits.
+            style: text ? { numFmt: '@' } : date ? { numFmt: EXCEL_DATE_FORMAT } : {}
+        }));
+        sheet.getRow(1).font = { bold: true };
+        sheet.views = [{ state: 'frozen', ySplit: 1 }];
+        for (const row of rows) {
+            sheet.addRow(Object.fromEntries(ACTIVITY_COLUMNS.map(({ key, date }) => [
+                key,
+                date ? excelDay(row[key]) : String(row[key] ?? '')
+            ])));
+        }
+
+        const today = excelDay(new Date()).toISOString().slice(0, 10).replace(/-/g, '');
+        const fileName = `Customer_Activity_${ownership}_${today}.xlsx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.setHeader('X-Total-Count', String(rows.length));
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, X-Total-Count');
+        await workbook.xlsx.write(res);
+        return res.end();
+    } catch (error) {
+        return sendError(res, error, 'Failed to export the customer activity log');
     }
 };

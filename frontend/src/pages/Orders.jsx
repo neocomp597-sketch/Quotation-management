@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { orderService } from '../services/api';
+import { formatDate } from '../utils/helpers';
 import { toast } from 'react-toastify';
 import { MdReceipt, MdAssignment, MdShoppingCart, MdOutlineLocalAtm } from 'react-icons/md';
 
@@ -67,7 +68,7 @@ const Orders = () => {
                                         <td className="px-6 py-4 font-black text-slate-900">{o.orderNumber}</td>
                                         <td className="px-6 py-4 text-slate-700">{o.customerName}</td>
                                         <td className="px-6 py-4 font-extrabold text-slate-900">₹ {Number(o.grandTotal).toLocaleString()}</td>
-                                        <td className="px-6 py-4 text-slate-500">{new Date(o.orderDate).toLocaleDateString()}</td>
+                                        <td className="px-6 py-4 text-slate-500">{formatDate(o.orderDate)}</td>
                                         <td className="px-6 py-4">
                                             <span className={`px-2.5 py-1 text-[10px] font-black rounded-lg uppercase ${o.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>
                                                 {o.status}

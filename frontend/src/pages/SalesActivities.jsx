@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { salesService } from '../services/api';
+import { formatDate } from '../utils/helpers';
 import { toast } from 'react-toastify';
 import { MdPhone, MdEmail, MdEvent, MdChat, MdAssignment, MdNote, MdFilterList } from 'react-icons/md';
 
@@ -80,7 +81,7 @@ const SalesActivities = () => {
                             </div>
                             <div className="text-right shrink-0">
                                 <p className="text-xs text-slate-400">
-                                    {new Date(a.activityDate || a.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                    {formatDate(a.activityDate || a.createdAt)}
                                 </p>
                                 <p className="text-xs text-slate-300">
                                     {new Date(a.activityDate || a.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}

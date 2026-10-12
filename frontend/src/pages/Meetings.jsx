@@ -768,7 +768,7 @@ const Meetings = () => {
                                     isToday ? 'bg-primary-50/10' : 'bg-slate-50/30'
                                 }`}>
                                     <span className="text-xs font-black text-slate-800 tracking-wide">
-                                        {dateObj.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                                        {dateObj.toLocaleDateString('en-US', { weekday: 'long' })}, {formatDate(dateObj)}
                                     </span>
                                     {isToday && (
                                         <span className="text-[9px] font-black bg-primary-600 text-white uppercase tracking-widest px-2 py-0.5 rounded-full">Today</span>
@@ -1046,8 +1046,8 @@ const Meetings = () => {
                             </button>
                             <h2 className="text-xs font-black uppercase text-slate-800 tracking-wider text-center min-w-[130px]">
                                 {calendarMode === 'month' && calendarDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                                {calendarMode === 'week' && `Week of ${new Date(calendarDate.getTime() - calendarDate.getDay() * 24 * 60 * 60 * 1000).getDate()} ${calendarDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`}
-                                {calendarMode === 'day' && calendarDate.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                {calendarMode === 'week' && `Week of ${formatDate(new Date(calendarDate.getTime() - calendarDate.getDay() * 24 * 60 * 60 * 1000))}`}
+                                {calendarMode === 'day' && formatDate(calendarDate)}
                                 {calendarMode === 'agenda' && 'Upcoming Agenda'}
                             </h2>
                             <button onClick={handleNext} className="p-1.5 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">

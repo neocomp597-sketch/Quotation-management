@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 import PortalDropdown from '../components/PortalDropdown';
 import SearchableSelect from '../components/SearchableSelect';
+import { formatDate, formatDateTime } from '../utils/helpers';
 import {
     MdArrowBack, MdEdit, MdSave, MdClose, MdAdd, MdPhone, MdEmail,
     MdEvent, MdChat, MdAssignment, MdNote, MdDelete, MdReplay, MdBlock,
@@ -287,7 +288,7 @@ const DealDetail = () => {
                             <div className="bg-white rounded-2xl border border-slate-100 p-4">
                                 <p className="text-xs font-bold text-slate-400 uppercase">Close Date</p>
                                 <p className="text-xl font-black text-slate-900 mt-1">
-                                    {deal.expectedCloseDate ? new Date(deal.expectedCloseDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
+                                    {deal.expectedCloseDate ? formatDate(deal.expectedCloseDate) :'—'}
                                 </p>
                             </div>
                         </div>
@@ -488,7 +489,7 @@ const DealDetail = () => {
                                             <div className="flex items-center gap-2 mt-1 text-xs text-slate-400">
                                                 <span className="font-bold">{a.performedBy?.name || 'System'}</span>
                                                 <span>•</span>
-                                                <span>{new Date(a.activityDate || a.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                                                <span>{formatDateTime(a.activityDate || a.createdAt)}</span>
                                             </div>
                                         </div>
                                     </div>

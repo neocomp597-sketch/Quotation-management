@@ -22,6 +22,9 @@ const AssetSchema = new mongoose.Schema({
     saleDate: { type: Date },
     warrantyStart: { type: Date },
     warrantyEnd: { type: Date },
+    // Bumped by every warranty registration; the write makes simultaneous registrations for one
+    // serial conflict so the duplicate check in createWarranty cannot be raced.
+    warrantyRegistrations: { type: Number, default: 0 },
     assignedAt: { type: Date },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     installationDate: { type: Date, default: Date.now },

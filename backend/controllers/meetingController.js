@@ -1,4 +1,5 @@
 const Meeting = require('../models/Meeting');
+const { formatDateTime } = require('../utils/dateFormat');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 const Customer = require('../models/Customer');
@@ -121,7 +122,7 @@ exports.createMeeting = async (req, res) => {
         // Send immediate notifications in database
         const notifyUserIds = Array.from(new Set([organizerId, ...participants].map(id => id.toString())));
         const participantNamesStr = participants.length > 0 ? ` with ${participants.length} other participant(s)` : '';
-        const startTimeStr = new Date(startDateTime).toLocaleString();
+        const startTimeStr = formatDateTime(startDateTime);
 
         for (const userId of notifyUserIds) {
             await Notification.create({
