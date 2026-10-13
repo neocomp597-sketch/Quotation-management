@@ -28,6 +28,9 @@ const ProductSchema = new mongoose.Schema({
     description: { type: String, trim: true, default: '' },
     discountPercentage: { type: Number, default: 0 },
     warrantyDetails: { type: String, trim: true, default: '' },
+    // Warranty period counted from the sale date of a serial. 36 months (3 years) unless the
+    // product needs another period; products saved before this field also count as 36.
+    warrantyMonths: { type: Number, default: 36, min: 0, max: 600 },
     specifications: { type: mongoose.Schema.Types.Mixed, default: {} },
     vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', default: null },
     status: { type: String, enum: ['Active', 'Inactive', 'Discontinued'], default: 'Active' },

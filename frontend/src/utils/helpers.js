@@ -43,28 +43,42 @@ export const generateQuotationNo = (sequence) => {
 };
 
 /**
- * ARCRM shows every date as DD.MM.YYYY (local day). `fallback` is returned for an empty or
- * invalid value. Use these instead of toLocaleDateString so the format is the same everywhere.
+ * ARCRM shows every date as DD.MMM.YY, e.g. 13.OCT.26 (local day). `fallback` is returned for an
+ * empty or invalid value. Use these instead of toLocaleDateString so the format is the same
+ * everywhere.
  */
 const pad2 = (value) => String(value).padStart(2, "0");
+const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+
+// A Date from a Date, timestamp or text. Text like "31.08.2026" or "31/08/26" is read day first
+// (new Date would read it month first or not at all).
+const toDateValue = (value) => {
+  if (value instanceof Date) return value;
+  const dayFirst = typeof value === "string" && /^(\d{1,2})[./-](\d{1,2})[./-](\d{2}|\d{4})$/.exec(value.trim());
+  if (dayFirst) {
+    const year = dayFirst[3].length === 2 ? 2000 + Number(dayFirst[3]) : Number(dayFirst[3]);
+    return new Date(year, Number(dayFirst[2]) - 1, Number(dayFirst[1]));
+  }
+  return new Date(value);
+};
 
 export const formatDate = (date, fallback = "-") => {
   if (!date) return fallback;
 
-  const parsedDate = new Date(date);
+  const parsedDate = toDateValue(date);
   if (Number.isNaN(parsedDate.getTime())) return fallback;
 
-  return `${pad2(parsedDate.getDate())}.${pad2(parsedDate.getMonth() + 1)}.${parsedDate.getFullYear()}`;
+  return `${pad2(parsedDate.getDate())}.${MONTHS[parsedDate.getMonth()]}.${pad2(parsedDate.getFullYear() % 100)}`;
 };
 
-// DD.MM.YYYY, hh:mm AM/PM
+// DD.MMM.YY, hh:mm AM/PM
 export const formatDateTime = (date, fallback = "-") => {
   if (!date) return fallback;
 
-  const parsedDate = new Date(date);
+  const parsedDate = toDateValue(date);
   if (Number.isNaN(parsedDate.getTime())) return fallback;
 
-  const time = parsedDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+  const time = parsedDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }).toUpperCase();
   return `${formatDate(parsedDate)}, ${time}`;
 };
 

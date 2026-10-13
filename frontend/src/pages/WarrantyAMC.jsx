@@ -32,6 +32,20 @@ const toInputDate = (value) => {
     return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 };
 
+// yyyy-mm-dd `months` later (31 Jan + 1 month is the last day of February); '' when not computable.
+const addMonthsToInput = (input, months) => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(input || '');
+    if (!match || !(months > 0)) return '';
+    const [year, month, day] = [Number(match[1]), Number(match[2]) - 1 + months, Number(match[3])];
+    const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    return new Date(Date.UTC(year, month, Math.min(day, lastDay))).toISOString().slice(0, 10);
+};
+
+const warrantyPeriodText = (months) => {
+    if (!(months > 0)) return 'no warranty period';
+    return months % 12 === 0 ? `${months / 12} year${months === 12 ? '' : 's'}` : `${months} months`;
+};
+
 const WarrantyAMC = () => {
     const [activeSection, setActiveSection] = useState('warranties');
     const [loading, setLoading] = useState(false);
@@ -64,10 +78,13 @@ const WarrantyAMC = () => {
     // Add Warranty: the serial number fills Customer (its current owner) and Product.
     // status: idle | loading | found | error
     const [serialLookup, setSerialLookup] = useState({ status: 'idle' });
+    // Expiry is filled from the product's warranty period until the user types their own.
+    const [expiryEdited, setExpiryEdited] = useState(false);
 
     const openForm = (section) => {
         setFormData(EMPTY_FORM);
         setSerialLookup({ status: 'idle' });
+        setExpiryEdited(false);
         setFormError('');
         setActiveSection(section);
         setShowModal(true);
@@ -81,14 +98,19 @@ const WarrantyAMC = () => {
         try {
             const { data } = await csmService.lookupWarrantySerial({ serialNumber: serial, assetId: assetId || undefined });
             setSerialLookup({ status: 'found', serial: data.serialNumber, data });
-            setFormData((prev) => ({
-                ...prev,
-                serialNumber: data.serialNumber,
-                assetId: data.assetId,
-                customerId: data.customer._id,
-                productId: data.product._id,
-                purchaseDate: prev.purchaseDate || toInputDate(data.saleDate)
-            }));
+            setFormData((prev) => {
+                const purchaseDate = prev.purchaseDate || toInputDate(data.saleDate);
+                return {
+                    ...prev,
+                    serialNumber: data.serialNumber,
+                    assetId: data.assetId,
+                    customerId: data.customer._id,
+                    productId: data.product._id,
+                    purchaseDate,
+                    // Product Master warranty period from the purchase (sale) date, unless typed in.
+                    expiryDate: expiryEdited ? prev.expiryDate : addMonthsToInput(purchaseDate, data.product.warrantyMonths)
+                };
+            });
         } catch (error) {
             setSerialLookup({
                 status: 'error',
@@ -814,7 +836,15 @@ const WarrantyAMC = () => {
                                         type="date"
                                         required
                                         value={formData.purchaseDate}
-                                        onChange={e => setFormData({ ...formData, purchaseDate: e.target.value })}
+                                        onChange={e => {
+                                            const purchaseDate = e.target.value;
+                                            const months = serialLookup.status === 'found' ? serialLookup.data.product.warrantyMonths : 0;
+                                            setFormData({
+                                                ...formData,
+                                                purchaseDate,
+                                                expiryDate: expiryEdited ? formData.expiryDate : addMonthsToInput(purchaseDate, months)
+                                            });
+                                        }}
                                         className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
                                     />
                                 </div>
@@ -825,11 +855,17 @@ const WarrantyAMC = () => {
                                         required
                                         min={formData.purchaseDate || undefined}
                                         value={formData.expiryDate}
-                                        onChange={e => setFormData({ ...formData, expiryDate: e.target.value })}
+                                        onChange={e => { setExpiryEdited(true); setFormData({ ...formData, expiryDate: e.target.value }); }}
                                         className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
                                     />
                                 </div>
                             </div>
+                            {serialLookup.status === 'found' && (
+                                <p className="text-xs font-medium text-slate-500">
+                                    Product warranty: {warrantyPeriodText(serialLookup.data.product.warrantyMonths)} from the purchase date (Product Master).
+                                    {expiryEdited && ' The expiry date was changed by hand.'}
+                                </p>
+                            )}
                         </>
                     ) : (
                         <>

@@ -21,6 +21,9 @@ const emptyVendorRow = () => ({
     isPrimary: false
 });
 
+// Product warranty, counted from the sale date of a serial; stored as warrantyMonths.
+const DEFAULT_WARRANTY_YEARS = '3';
+
 const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
     const { user } = useAuth();
@@ -100,7 +103,8 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
         pricing: { baseCost: 0, minPrice: 0, maxPrice: 0, marginPercent: 0, currency: 'INR' },
         technicalSpecificationUrl: '',
         operatingUserManualUrl: '',
-        repairTroubleshootingUrl: ''
+        repairTroubleshootingUrl: '',
+        warrantyYears: DEFAULT_WARRANTY_YEARS
     });
 
     const [uploadingPdf, setUploadingPdf] = useState({
@@ -325,7 +329,8 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                 pricing: { baseCost: 0, minPrice: 0, maxPrice: 0, marginPercent: 0, currency: 'INR' },
                 technicalSpecificationUrl: '',
                 operatingUserManualUrl: '',
-                repairTroubleshootingUrl: ''
+                repairTroubleshootingUrl: '',
+                warrantyYears: DEFAULT_WARRANTY_YEARS
             });
             setIsModalOpen(true);
         } else if (isEditPage && routeId) {
@@ -346,6 +351,8 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                     technicalSpecificationUrl: item.technicalSpecificationUrl || '',
                     operatingUserManualUrl: item.operatingUserManualUrl || '',
                     repairTroubleshootingUrl: item.repairTroubleshootingUrl || '',
+                    // Stored in months; products saved before the field count as 3 years.
+                    warrantyYears: String(Number.isFinite(item.warrantyMonths) ? item.warrantyMonths / 12 : DEFAULT_WARRANTY_YEARS),
                     attributes: (item.attributes || []).map(a => a._id || a),
                     vendors: item.vendors?.length ? item.vendors.map(v => ({
                         vendorId: v.vendorId?._id || v.vendorId,
@@ -651,10 +658,20 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
             return;
         }
 
+        const warrantyYears = formData.warrantyYears === '' || formData.warrantyYears === undefined
+            ? Number(DEFAULT_WARRANTY_YEARS)
+            : Number(formData.warrantyYears);
+        if (!Number.isFinite(warrantyYears) || warrantyYears < 0 || warrantyYears > 50) {
+            toast.error('Warranty period must be between 0 and 50 years');
+            return;
+        }
+
         try {
             // Ensure MGR and Category fields are sent as IDs, not objects
+            const { warrantyYears: _warrantyYears, ...formFields } = formData;
             const payload = {
-                ...formData,
+                ...formFields,
+                warrantyMonths: Math.round(warrantyYears * 12),
                 categoryId: formData.categoryId?._id || formData.categoryId,
                 mgr1: formData.mgr1?._id || formData.mgr1,
                 mgr2: formData.mgr2?._id || formData.mgr2,
@@ -1872,6 +1889,31 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                     </label>
                                 ))}
                             </div>
+                        </div>
+
+                        <div>
+                            <h4 className="text-[10px] font-black text-primary-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
+                                <span className="h-px flex-1 bg-primary-100"></span>
+                                Warranty
+                                <span className="h-px flex-1 bg-primary-100"></span>
+                            </h4>
+                            <label htmlFor="warrantyYears" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                                Warranty Period (Years)
+                            </label>
+                            <input
+                                id="warrantyYears"
+                                type="number"
+                                name="warrantyYears"
+                                min="0"
+                                max="50"
+                                step="0.5"
+                                value={formData.warrantyYears ?? DEFAULT_WARRANTY_YEARS}
+                                onChange={handleFormChange}
+                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold text-slate-800 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                            />
+                            <p className="mt-2 text-xs font-medium text-slate-500">
+                                Counted from the sale date of each serial number. Default 3 years; use 1.5 for 18 months.
+                            </p>
                         </div>
                     </div>
 

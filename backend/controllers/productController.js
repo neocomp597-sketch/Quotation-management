@@ -74,6 +74,18 @@ const clearProductsCache = async () => {
     await invalidateProductCaches();
 };
 
+const DEFAULT_WARRANTY_MONTHS = 36;
+
+// Warranty period in whole months (0-600); empty means the 3-year default. Throws a 400 error.
+const parseWarrantyMonths = (value) => {
+    if (value === undefined || value === null || value === '') return DEFAULT_WARRANTY_MONTHS;
+    const months = Number(value);
+    if (!Number.isFinite(months) || months < 0 || months > 600) {
+        throw Object.assign(new Error('Warranty period must be between 0 and 50 years.'), { statusCode: 400 });
+    }
+    return Math.round(months);
+};
+
 const toBoolean = (value) => {
     if (typeof value === 'boolean') return value;
     if (typeof value === 'string') return value.toLowerCase() === 'true';
@@ -82,6 +94,7 @@ const toBoolean = (value) => {
 
 const statusForProductError = (error) => {
     if (!error) return 500;
+    if (error.statusCode) return error.statusCode;
     if (error.name === 'ValidationError') return 400;
     const message = String(error.message || '').toLowerCase();
     if (
@@ -186,7 +199,7 @@ const buildProductResponse = (productDoc) => {
 
 const fetchProductByIdWithRelations = (id) => {
     return Product.findById(id)
-        .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing technicalSpecificationUrl operatingUserManualUrl repairTroubleshootingUrl createdAt updatedAt')
+        .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing technicalSpecificationUrl operatingUserManualUrl repairTroubleshootingUrl warrantyMonths createdAt updatedAt')
         .populate('categoryId', 'name status')
         .populate('mgr1', 'code description status')
         .populate('mgr2', 'code description status')
@@ -295,7 +308,8 @@ const createProduct = async (req, res) => {
             pricing,
             technicalSpecificationUrl: technicalSpecificationUrl || '',
             operatingUserManualUrl: operatingUserManualUrl || '',
-            repairTroubleshootingUrl: repairTroubleshootingUrl || ''
+            repairTroubleshootingUrl: repairTroubleshootingUrl || '',
+            warrantyMonths: parseWarrantyMonths(req.body.warrantyMonths)
         });
 
         if (preparedVendors.length) {
@@ -334,7 +348,7 @@ const getAllProducts = async (req, res) => {
         }
 
         let productsQuery = Product.find(query)
-            .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing technicalSpecificationUrl operatingUserManualUrl repairTroubleshootingUrl updatedAt')
+            .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing technicalSpecificationUrl operatingUserManualUrl repairTroubleshootingUrl warrantyMonths updatedAt')
             .populate('categoryId', 'name status')
             .populate('mgr1', 'code description status')
             .populate('mgr2', 'code description status')
@@ -493,6 +507,10 @@ const updateProduct = async (req, res) => {
             repairTroubleshootingUrl: repairTroubleshootingUrl ?? '',
             updatedAt: new Date()
         };
+        // Left out of the body: the stored warranty period is kept.
+        if (Object.prototype.hasOwnProperty.call(req.body, 'warrantyMonths')) {
+            updateData.warrantyMonths = parseWarrantyMonths(req.body.warrantyMonths);
+        }
 
         // MGR 1-5: a key sent in the body is always written, so changing an MGR stores the
         // new id and choosing "Select MGR n" (empty) clears it. A key left out of the body
@@ -525,7 +543,7 @@ const updateProduct = async (req, res) => {
             updateData,
             { new: true, runValidators: true }
         )
-            .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing technicalSpecificationUrl operatingUserManualUrl repairTroubleshootingUrl createdAt updatedAt')
+            .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing technicalSpecificationUrl operatingUserManualUrl repairTroubleshootingUrl warrantyMonths createdAt updatedAt')
             .populate('categoryId', 'name status')
             .populate('mgr1', 'code description status')
             .populate('mgr2', 'code description status')

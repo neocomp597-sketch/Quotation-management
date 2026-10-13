@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { MdSearch, MdSwapHoriz, MdVisibility, MdArrowBack, MdPersonAdd, MdHistory, MdCheckCircle, MdFileDownload } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import { serialTransferService, customerService, csmService } from '../services/api';
+import { serialTransferService, customerService, csmService, mgrService } from '../services/api';
 import AssetActivityLog from '../components/AssetActivityLog';
 import PaginationControls from '../components/PaginationControls';
 import Modal from '../components/Modal';
@@ -22,7 +22,10 @@ const todayInput = () => {
 };
 const customerTitle = (customer) => customer?.companyName || customer?.customerName || '';
 
-const inputClass = 'w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-medium';
+// Field look without a width; inputs take the full width, filter dropdowns only their content's.
+const fieldClass = 'px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-sm font-medium';
+const inputClass = `w-full ${fieldClass}`;
+const selectClass = `w-auto max-w-[16rem] ${fieldClass} font-semibold`;
 const thClass = 'p-4 text-xs font-black text-slate-400 uppercase tracking-widest whitespace-nowrap';
 
 const FlagBadge = ({ active }) => (
@@ -117,9 +120,40 @@ const useDateRange = (prefix) => {
     };
 };
 
+// MGR 4 values from MGR Master, loaded once per page visit and shared by the tabs.
+let mgr4Request = null;
+const useMgr4Options = () => {
+    const [options, setOptions] = useState([]);
+    useEffect(() => {
+        let cancelled = false;
+        mgr4Request = mgr4Request || mgrService.getAll('MGR4')
+            .then((res) => {
+                const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
+                return list.sort((a, b) => String(a.code).localeCompare(String(b.code)));
+            })
+            .catch(() => { mgr4Request = null; return []; });
+        mgr4Request.then((list) => { if (!cancelled) setOptions(list); });
+        return () => { cancelled = true; };
+    }, []);
+    return options;
+};
+
+const mgrLabel = (mgr) => (mgr.description && mgr.description !== mgr.code ? `${mgr.code} - ${mgr.description}` : mgr.code);
+
+// MGR 4 filter (Product Master MGR 4 of the serial's product); value is the MGR id.
+const Mgr4Filter = ({ value, onChange }) => {
+    const options = useMgr4Options();
+    return (
+        <select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Filter by MGR 4" className={selectClass}>
+            <option value="">All MGR 4</option>
+            {options.map((mgr) => <option key={mgr._id} value={mgr._id}>{mgrLabel(mgr)}</option>)}
+        </select>
+    );
+};
+
 const DateRangeFilter = ({ range, field, onChange }) => {
     const set = (setter) => (e) => { setter(e.target.value); onChange(); };
-    const dateClass = `${inputClass} w-auto py-2.5`;
+    const dateClass = `${fieldClass} w-auto py-2.5`;
     return (
         <div className="flex flex-wrap items-end gap-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
@@ -151,11 +185,12 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
     const [field, setField] = useStoredState('list.field', '');
     const [status, setStatus] = useStoredState('list.status', '');
     const [page, setPage] = useStoredState('list.page', 1);
+    const [mgr4, setMgr4] = useStoredState('list.mgr4', '');
     const range = useDateRange('list');
     const debouncedSearch = useDebounced(search.trim());
 
     const { rows, pagination, loading } = useList(serialTransferService.listSerials, {
-        page, limit: PAGE_SIZE, search: debouncedSearch || undefined, field: field || undefined, status: status || undefined, ...range.params,
+        page, limit: PAGE_SIZE, search: debouncedSearch || undefined, field: field || undefined, status: status || undefined, mgr4: mgr4 || undefined, ...range.params,
     }, !range.invalid);
     const offset = (pagination.page - 1) * pagination.limit;
     // The row whose Download Customer Activity Log dialog is open.
@@ -175,17 +210,18 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                         className={`${inputClass} pl-11`}
                     />
                 </div>
-                <select value={field} onChange={(e) => { setField(e.target.value); setPage(1); }} className={`${inputClass} w-auto font-semibold`}>
+                <select value={field} onChange={(e) => { setField(e.target.value); setPage(1); }} className={selectClass}>
                     <option value="">All fields</option>
                     <option value="serial">Serial No</option>
                     <option value="product">Product</option>
                     <option value="customer">Customer</option>
                 </select>
-                <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className={`${inputClass} w-auto font-semibold`}>
+                <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className={selectClass}>
                     <option value="">All serials</option>
                     <option value="Sold">With original customer</option>
                     <option value="Transferred">Transferred</option>
                 </select>
+                <Mgr4Filter value={mgr4} onChange={(value) => { setMgr4(value); setPage(1); }} />
                 <DateRangeFilter range={range} field="Sale Date" onChange={() => setPage(1)} />
             </div>
             <div className="p-6">
@@ -249,11 +285,12 @@ const HistoryTab = ({ onOpen }) => {
     const [flag, setFlag] = useStoredState('history.flag', '');
     const [entryType, setEntryType] = useStoredState('history.entryType', '');
     const [page, setPage] = useStoredState('history.page', 1);
+    const [mgr4, setMgr4] = useStoredState('history.mgr4', '');
     const range = useDateRange('history');
     const debouncedSearch = useDebounced(search.trim());
 
     const { rows, pagination, loading } = useList(serialTransferService.listHistory, {
-        page, limit: PAGE_SIZE, search: debouncedSearch || undefined, flag: flag || undefined, entryType: entryType || undefined, ...range.params,
+        page, limit: PAGE_SIZE, search: debouncedSearch || undefined, flag: flag || undefined, entryType: entryType || undefined, mgr4: mgr4 || undefined, ...range.params,
     }, !range.invalid);
 
     return (
@@ -269,17 +306,18 @@ const HistoryTab = ({ onOpen }) => {
                         className={`${inputClass} pl-11`}
                     />
                 </div>
-                <select value={entryType} onChange={(e) => { setEntryType(e.target.value); setPage(1); }} className={`${inputClass} w-auto font-semibold`}>
+                <select value={entryType} onChange={(e) => { setEntryType(e.target.value); setPage(1); }} className={selectClass}>
                     <option value="">All entries</option>
                     <option value="Sold">Original Sale</option>
                     <option value="Transferred">Transferred</option>
                     <option value="Past Entry">Past Entry</option>
                 </select>
-                <select value={flag} onChange={(e) => { setFlag(e.target.value); setPage(1); }} className={`${inputClass} w-auto font-semibold`}>
+                <select value={flag} onChange={(e) => { setFlag(e.target.value); setPage(1); }} className={selectClass}>
                     <option value="">Active and inactive</option>
                     <option value="Active">Active (current customer)</option>
                     <option value="Inactive">Inactive (previous customers)</option>
                 </select>
+                <Mgr4Filter value={mgr4} onChange={(value) => { setMgr4(value); setPage(1); }} />
                 <DateRangeFilter range={range} field="Transfer Date" onChange={() => setPage(1)} />
             </div>
             <div className="p-6">
@@ -317,7 +355,7 @@ const HistoryTab = ({ onOpen }) => {
                                         <tr>
                                             <td colSpan={8} className="p-8 text-center text-slate-400 text-sm font-medium">
                                                 {range.invalid ? 'Correct the date range to see results.'
-                                                    : debouncedSearch || flag || entryType || range.fromDate || range.toDate ? 'No history records match.'
+                                                    : debouncedSearch || flag || entryType || mgr4 || range.fromDate || range.toDate ? 'No history records match.'
                                                         : 'No transfers recorded yet. Transfer a serial number from the Serial No List.'}
                                             </td>
                                         </tr>
@@ -458,13 +496,14 @@ const ActivityTab = ({ onOpen, assetId }) => {
     const [ownership, setOwnership] = useStoredState(`${prefix}.ownership`, 'Active');
     const [search, setSearch] = useStoredState(`${prefix}.search`, '');
     const [page, setPage] = useStoredState(`${prefix}.page`, 1);
+    const [mgr4, setMgr4] = useStoredState(`${prefix}.mgr4`, '');
     const range = useDateRange(prefix);
     const debouncedSearch = useDebounced(search.trim());
     const [downloading, setDownloading] = useState(false);
 
     const filters = assetId
         ? { ownership, assetId }
-        : { ownership, search: debouncedSearch || undefined, ...range.params };
+        : { ownership, search: debouncedSearch || undefined, mgr4: mgr4 || undefined, ...range.params };
     const { rows, pagination, loading } = useList(serialTransferService.listActivity, { ...filters, page, limit: PAGE_SIZE }, !range.invalid);
     const offset = (pagination.page - 1) * pagination.limit;
     const inactive = ownership === 'Inactive';
@@ -524,6 +563,7 @@ const ActivityTab = ({ onOpen, assetId }) => {
                                 className={`${inputClass} pl-11`}
                             />
                         </div>
+                        <Mgr4Filter value={mgr4} onChange={(value) => { setMgr4(value); setPage(1); }} />
                         <DateRangeFilter range={range} field="Customer Since" onChange={() => setPage(1)} />
                     </div>
                 )}
@@ -576,7 +616,7 @@ const ActivityTab = ({ onOpen, assetId }) => {
                                                 {assetId
                                                     ? (inactive ? 'This serial number has never been transferred, so it has no inactive (earlier) customers to download.' : 'No current customer found for this serial number.')
                                                     : range.invalid ? 'Correct the date range to see results.'
-                                                        : inactive && !debouncedSearch && !range.fromDate && !range.toDate ? 'No earlier customers yet. A customer becomes inactive when the serial is transferred.'
+                                                        : inactive && !debouncedSearch && !mgr4 && !range.fromDate && !range.toDate ? 'No earlier customers yet. A customer becomes inactive when the serial is transferred.'
                                                             : 'No customer records match.'}
                                             </td>
                                         </tr>

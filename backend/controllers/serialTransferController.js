@@ -6,7 +6,7 @@ const Product = require('../models/Product');
 require('../models/MGR'); // populated through Product mgr1..mgr5
 const SerialTransfer = require('../models/SerialTransfer');
 const { MGR_KEYS, formatMgrVal } = require('../utils/productMgr');
-const { formatDate, EXCEL_DATE_FORMAT } = require('../utils/dateFormat');
+const { formatDate } = require('../utils/dateFormat');
 
 /**
  * Serial No Transfer: the customer-wise ownership history of sold serial numbers.
@@ -60,6 +60,23 @@ const saleDateCondition = (range) => ({
         { saleDate: null, invoiceDate: null, createdAt: range }
     ]
 });
+
+/**
+ * Product filter for ?mgr1..?mgr5 (an MGR id from MGR Master): `{ $in: product ids }` of the
+ * products that have that MGR in Product Master, or null when no MGR filter is set.
+ */
+const mgrProductFilter = async (query) => {
+    const conditions = {};
+    for (const key of MGR_KEYS) {
+        const value = cleanText(query[key]);
+        if (!value) continue;
+        if (!mongoose.Types.ObjectId.isValid(value)) throw httpError(400, `Invalid ${key.toUpperCase()} filter.`);
+        conditions[key] = value;
+    }
+    if (!Object.keys(conditions).length) return null;
+    const ids = await Product.find(conditions).setOptions({ bypassBranch: true }).distinct('_id');
+    return { $in: ids };
+};
 
 const sendError = (res, error, message) => {
     if (error.status) return res.status(error.status).json({ message: error.message });
@@ -159,6 +176,8 @@ exports.listSerials = async (req, res) => {
         const range = dateRange(req.query);
         if (range) and.push(saleDateCondition(range));
         if (and.length) query.$and = and;
+        const products = await mgrProductFilter(req.query);
+        if (products) query.productId = products;
 
         const assetFilter = await statusFilter(req.query.status);
         if (assetFilter) query._id = assetFilter;
@@ -445,6 +464,8 @@ exports.listHistory = async (req, res) => {
         if (['Sold', 'Transferred', 'Past Entry'].includes(req.query.entryType)) query.entryType = req.query.entryType;
         const range = dateRange(req.query);
         if (range) query.transferDate = range;
+        const products = await mgrProductFilter(req.query);
+        if (products) query.productId = products;
 
         const [data, total] = await Promise.all([
             SerialTransfer.find(query).sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit).lean(),
@@ -470,10 +491,11 @@ exports.listHistory = async (req, res) => {
  */
 const OWNERSHIPS = ['Active', 'Inactive'];
 
-const activeOwners = async ({ search, range, assetId, skip, limit }) => {
+const activeOwners = async ({ search, range, assetId, products, skip, limit }) => {
     const match = { status: 'SOLD' };
-    // Aggregation does not cast, so the id must already be an ObjectId.
+    // Aggregation does not cast, so the ids must already be ObjectIds (distinct returns ObjectIds).
     if (assetId) match._id = new mongoose.Types.ObjectId(String(assetId));
+    if (products) match.productId = products;
     if (search) {
         const pattern = new RegExp(escapeRegex(search), 'i');
         match.$or = [
@@ -519,6 +541,7 @@ const activeOwners = async ({ search, range, assetId, skip, limit }) => {
             customerCode: current ? current.customerCode : asset.customerCode,
             customerName: current ? (current.companyName || current.customerName) : asset.customerNameStr,
             customerPincode: current ? current.customerPincode : asset.customerPostalCode,
+            indicatorField: asset.indicatorField || '',
             invoiceNumber: asset.invoiceNumber || current?.invoiceNumber || '',
             invoiceDate: asset.invoiceDate || asset.saleDate || null,
             ownerSince: asset.ownerSince,
@@ -528,9 +551,10 @@ const activeOwners = async ({ search, range, assetId, skip, limit }) => {
     return { rows, total: result?.total?.[0]?.count || 0 };
 };
 
-const inactiveOwners = async ({ search, range, assetId, skip, limit }) => {
+const inactiveOwners = async ({ search, range, assetId, products, skip, limit }) => {
     const query = { isActive: false };
     if (assetId) query.assetId = assetId;
+    if (products) query.productId = products;
     if (search) {
         const pattern = new RegExp(escapeRegex(search), 'i');
         query.$or = [
@@ -547,7 +571,7 @@ const inactiveOwners = async ({ search, range, assetId, skip, limit }) => {
 
     const assets = records.length
         ? await Asset.find({ _id: { $in: [...new Set(records.map((r) => String(r.assetId)))] } })
-            .select('invoiceNumber invoiceDate saleDate').lean()
+            .select('invoiceNumber invoiceDate saleDate indicatorField').lean()
         : [];
     const assetById = new Map(assets.map((asset) => [String(asset._id), asset]));
 
@@ -568,6 +592,7 @@ const inactiveOwners = async ({ search, range, assetId, skip, limit }) => {
             customerPincode: record.customerPincode,
             invoiceNumber: asset?.invoiceNumber || record.invoiceNumber || '',
             invoiceDate: asset?.invoiceDate || asset?.saleDate || null,
+            indicatorField: asset?.indicatorField || '',
             ownerSince: record.transferDate,
             ownerUntil: record.endedAt
         };
@@ -575,13 +600,13 @@ const inactiveOwners = async ({ search, range, assetId, skip, limit }) => {
     return { rows, total };
 };
 
-// Adds product description and MGR 1-5 (from Product Master) and customer email and fallback
-// code/pincode (from Customer Master) to activity rows.
+// Adds MGR 1-5 (from Product Master) and customer email and fallback code/pincode (from
+// Customer Master) to activity rows.
 const withMasterData = async (rows) => {
     const idsOf = (key) => [...new Set(rows.map((row) => row[key]).filter(Boolean).map(String))];
     const [products, customers] = await Promise.all([
         Product.find({ _id: { $in: idsOf('productId') } })
-            .select(['productName productCode description', ...MGR_KEYS].join(' '))
+            .select(['productName productCode', ...MGR_KEYS].join(' '))
             .populate(MGR_KEYS.map((key) => ({ path: key, select: 'code description', options: { bypassTenant: true } })))
             .setOptions({ bypassTenant: true })
             .lean(),
@@ -601,7 +626,6 @@ const withMasterData = async (rows) => {
             ...row,
             productName: cleanText(product?.productName) || cleanText(row.productName),
             productCode: cleanText(product?.productCode) || cleanText(row.productCode),
-            productDescription: cleanText(product?.description),
             ...mgrs,
             customerName: cleanText(row.customerName) || customerLabel(customer),
             customerCode: cleanText(row.customerCode) || cleanText(customer?.externalCode),
@@ -623,7 +647,13 @@ const activitySerial = async (assetId) => {
 const loadActivity = async (query, paging = {}) => {
     const ownership = OWNERSHIPS.includes(query.ownership) ? query.ownership : 'Active';
     const serial = await activitySerial(query.assetId);
-    const options = { search: cleanText(query.search), range: dateRange(query), assetId: serial?._id, ...paging };
+    const options = {
+        search: cleanText(query.search),
+        range: dateRange(query),
+        assetId: serial?._id,
+        products: await mgrProductFilter(query),
+        ...paging
+    };
     const { rows, total } = await (ownership === 'Active' ? activeOwners(options) : inactiveOwners(options));
     return { ownership, serial, rows: await withMasterData(rows), total };
 };
@@ -639,7 +669,7 @@ exports.listActivity = async (req, res) => {
     }
 };
 
-// A date as the calendar day it is in India, for an Excel date cell (Excel dates have no zone).
+// A date as the calendar day it is in India (used for the export's file name).
 const excelDay = (value) => {
     if (!value) return null;
     const time = new Date(value).getTime();
@@ -652,7 +682,7 @@ const ACTIVITY_COLUMNS = [
     { header: 'Product Name', key: 'productName', width: 40 },
     { header: 'Product Code', key: 'productCode', width: 16, text: true },
     { header: 'Serial Number', key: 'serialNumber', width: 18, text: true },
-    { header: 'Product Description', key: 'productDescription', width: 45 },
+    { header: 'Indicator_Field', key: 'indicatorField', width: 16, text: true },
     { header: 'Product MGR 1', key: 'mgr1', width: 20 },
     { header: 'Product MGR 2', key: 'mgr2', width: 20 },
     { header: 'Product MGR 3', key: 'mgr3', width: 20 },
@@ -676,14 +706,15 @@ exports.exportActivity = async (req, res) => {
         sheet.columns = ACTIVITY_COLUMNS.map(({ header, key, width, text, date }) => ({
             header, key, width,
             // Codes and serial numbers stay text so Excel keeps leading zeros and long digits.
-            style: text ? { numFmt: '@' } : date ? { numFmt: EXCEL_DATE_FORMAT } : {}
+            // Dates are text in the ARCRM format (13.OCT.26); Excel date formats cannot upper-case the month.
+            style: text || date ? { numFmt: '@' } : {}
         }));
         sheet.getRow(1).font = { bold: true };
         sheet.views = [{ state: 'frozen', ySplit: 1 }];
         for (const row of rows) {
             sheet.addRow(Object.fromEntries(ACTIVITY_COLUMNS.map(({ key, date }) => [
                 key,
-                date ? excelDay(row[key]) : String(row[key] ?? '')
+                date ? formatDate(row[key], '') : String(row[key] ?? '')
             ])));
         }
 

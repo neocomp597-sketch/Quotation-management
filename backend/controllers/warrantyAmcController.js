@@ -44,6 +44,21 @@ const httpError = (status, message, extra = {}) => Object.assign(new Error(messa
 
 const ownerName = (customer, fallback = '') => customer?.companyName || customer?.customerName || fallback;
 
+// Product warranty period in months; products saved before Product Master had it count as 3 years.
+const DEFAULT_WARRANTY_MONTHS = 36;
+const warrantyMonthsOf = (product) => (Number.isFinite(product?.warrantyMonths) ? product.warrantyMonths : DEFAULT_WARRANTY_MONTHS);
+
+// Same day `months` later (UTC calendar, as date inputs are read); 31 Jan + 1 month is 28/29 Feb.
+const addMonths = (date, months) => {
+    const result = new Date(date);
+    const day = result.getUTCDate();
+    result.setUTCDate(1);
+    result.setUTCMonth(result.getUTCMonth() + months);
+    const lastDay = new Date(Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0)).getUTCDate();
+    result.setUTCDate(Math.min(day, lastDay));
+    return result;
+};
+
 /**
  * The sold serial number a warranty is registered against, with its product and current customer.
  * The current customer is the Active owner in Serial No Transfer (the asset's customer is moved
@@ -55,7 +70,7 @@ const findSoldSerial = async (companyId, serialNumber, assetId) => {
 
     const assets = await Asset.find({ companyId, serialNumber: buildExactRegex(serial) })
         .populate({ path: 'customerId', select: 'customerName companyName externalCode', options: { bypassTenant: true } })
-        .populate({ path: 'productId', select: 'productName productCode', options: { bypassTenant: true } })
+        .populate({ path: 'productId', select: 'productName productCode warrantyMonths', options: { bypassTenant: true } })
         .lean();
     if (!assets.length) throw httpError(404, `Serial number ${serial} was not found in Invoice Bulk Upload.`);
 
@@ -93,7 +108,12 @@ const findSoldSerial = async (companyId, serialNumber, assetId) => {
 
     return {
         asset: chosen,
-        product: { _id: chosen.productId._id, productCode: chosen.productId.productCode, productName: chosen.productId.productName },
+        product: {
+            _id: chosen.productId._id,
+            productCode: chosen.productId.productCode,
+            productName: chosen.productId.productName,
+            warrantyMonths: warrantyMonthsOf(chosen.productId)
+        },
         customer: { _id: customerId, name: ownerName(customer, chosen.customerNameStr), code: customer?.externalCode || chosen.customerCode || '' }
     };
 };
@@ -161,12 +181,15 @@ exports.createWarranty = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
         const purchaseDate = toDate(req.body.purchaseDate);
-        const expiryDate = toDate(req.body.expiryDate);
         if (!purchaseDate) throw httpError(400, 'Enter a valid purchase date.');
-        if (!expiryDate) throw httpError(400, 'Enter a valid expiry date.');
-        if (expiryDate <= purchaseDate) throw httpError(400, 'Expiry date must be after the purchase date.');
+        if (req.body.expiryDate && !toDate(req.body.expiryDate)) throw httpError(400, 'Enter a valid expiry date.');
 
         const { asset, product, customer } = await findSoldSerial(companyId, req.body.serialNumber, req.body.assetId);
+        // No expiry date given: the product's warranty period (Product Master) from the purchase date.
+        const expiryDate = toDate(req.body.expiryDate)
+            || (product.warrantyMonths > 0 ? addMonths(purchaseDate, product.warrantyMonths) : null);
+        if (!expiryDate) throw httpError(400, `${product.productCode} has no warranty period in Product Master. Enter the expiry date.`);
+        if (expiryDate <= purchaseDate) throw httpError(400, 'Expiry date must be after the purchase date.');
         const branchId = await resolveEntitlementBranch(customer._id, req);
 
         let created;

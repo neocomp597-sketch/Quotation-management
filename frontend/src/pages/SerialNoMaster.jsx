@@ -101,7 +101,8 @@ const SerialNoMaster = () => {
 
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedStatus, setSelectedStatus] = useState('ALL');
-    const [selectedProduct, setSelectedProduct] = useState('ALL');
+    // MGR 1-5 filters ('ALL' or the MGR's display value, as shown on the rows).
+    const [mgrFilters, setMgrFilters] = useState({ mgr1: 'ALL', mgr2: 'ALL', mgr3: 'ALL', mgr4: 'ALL', mgr5: 'ALL' });
     const [currentPage, setCurrentPage] = useState(1);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
@@ -341,10 +342,16 @@ const SerialNoMaster = () => {
                 custName.includes(query);
 
             const matchesStatus = selectedStatus === 'ALL' || asset.status === selectedStatus;
-            const matchesProduct = selectedProduct === 'ALL' || asset.productId?._id === selectedProduct;
-            return matchesQuery && matchesStatus && matchesProduct;
+            const matchesMgrs = MGR_FIELDS.every(({ key }) => mgrFilters[key] === 'ALL' || resolveAssetMgr(asset, key) === mgrFilters[key]);
+            return matchesQuery && matchesStatus && matchesMgrs;
         });
-    }, [assets, searchQuery, selectedStatus, selectedProduct]);
+    }, [assets, searchQuery, selectedStatus, mgrFilters]);
+
+    // Options of each MGR filter: the values assigned to the products of the loaded entries.
+    const mgrOptions = useMemo(() => Object.fromEntries(MGR_FIELDS.map(({ key }) => [
+        key,
+        [...new Set(assets.map((asset) => resolveAssetMgr(asset, key)).filter(Boolean))].sort((a, b) => a.localeCompare(b))
+    ])), [assets]);
 
     const filteredReturns = useMemo(() => {
         return returnHistory.filter(item => {
@@ -383,7 +390,7 @@ const SerialNoMaster = () => {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchQuery, selectedStatus, selectedProduct, activeTab]);
+    }, [searchQuery, selectedStatus, mgrFilters, activeTab]);
 
     return (
         <div className="space-y-6">
@@ -715,7 +722,7 @@ const SerialNoMaster = () => {
                         />
                     </div>
                     {activeTab === 'active' && (
-                        <div className="grid grid-cols-2 md:flex gap-3 w-full md:w-auto">
+                        <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 w-full md:w-auto">
                             <select
                                 value={selectedStatus}
                                 onChange={(e) => setSelectedStatus(e.target.value)}
@@ -728,16 +735,20 @@ const SerialNoMaster = () => {
                                 <option value="RETURN">Returned</option>
                                 <option value="SCRAPPED">Scrapped</option>
                             </select>
-                            <select
-                                value={selectedProduct}
-                                onChange={(e) => setSelectedProduct(e.target.value)}
-                                className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all max-w-[200px] truncate"
-                            >
-                                <option value="ALL">All Products</option>
-                                {products.map(p => (
-                                    <option key={p._id} value={p._id}>{p.productName}</option>
-                                ))}
-                            </select>
+                            {MGR_FIELDS.map(({ key, label }) => (
+                                <select
+                                    key={key}
+                                    value={mgrFilters[key]}
+                                    onChange={(e) => setMgrFilters((prev) => ({ ...prev, [key]: e.target.value }))}
+                                    aria-label={`Filter by ${label}`}
+                                    className={`px-4 py-3 border rounded-2xl outline-none text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all max-w-[200px] truncate ${mgrFilters[key] === 'ALL' ? 'bg-slate-50 border-slate-200' : 'bg-teal-50 border-teal-300'}`}
+                                >
+                                    <option value="ALL">All {label}</option>
+                                    {mgrOptions[key].map((value) => (
+                                        <option key={value} value={value}>{value}</option>
+                                    ))}
+                                </select>
+                            ))}
                         </div>
                     )}
                 </div>

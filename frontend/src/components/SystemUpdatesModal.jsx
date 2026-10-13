@@ -56,7 +56,7 @@ const SystemUpdatesModal = ({ isOpen, onClose }) => {
                 u.detailedChanges.forEach((item, idx) => {
                     list.push({
                         id: `${u._id || 'upd'}-${idx}`,
-                        date: item.date || formatDate(u.deployedAt || Date.now()),
+                        date: formatDate(item.date || u.deployedAt || Date.now(), item.date),
                         module: item.module || 'System',
                         submodule: item.submodule || 'Release',
                         changes: item.changes || u.message,
@@ -93,7 +93,8 @@ const SystemUpdatesModal = ({ isOpen, onClose }) => {
             }
         });
 
-        return list;
+        // Release-note dates are stored as "31.08.2026" text; shown in the DD.MMM.YY format.
+        return list.map((row) => ({ ...row, date: formatDate(row.date, row.date) }));
     }, [updates]);
 
     // Unique modules for filter dropdown
@@ -180,7 +181,7 @@ const SystemUpdatesModal = ({ isOpen, onClose }) => {
                             <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wider">Date</label>
                             <input
                                 type="text"
-                                placeholder="Search date (e.g. 17.07.2026)..."
+                                placeholder="Search date (e.g. 17.JUL.26)..."
                                 value={dateSearch}
                                 onChange={(e) => setDateSearch(e.target.value)}
                                 className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-primary-500 outline-none"

@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatDate } from '../../utils/helpers';
 
 /**
  * Stelmec "Why Why Analysis Sheet (Maintenance)" - the printed RCA report.
@@ -48,12 +49,8 @@ const ReasonRow = ({ text, chosen, style = {} }) => (
 );
 
 const WhyWhySheet = ({ data = {}, logo = null, leftLogo = null, companyName = '' }) => {
-    const sheetDate = (v) => {
-        if (!v) return '';
-        const d = new Date(v);
-        if (Number.isNaN(d.getTime())) return String(v);
-        return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
-    };
+    // ARCRM date format (DD.MMM.YY); text that is not a date is shown as typed.
+    const sheetDate = (v) => (v ? formatDate(v, String(v)) : '');
     const whys = Array.isArray(data.fiveWhys) && data.fiveWhys.length
         ? data.fiveWhys
         : [1, 2, 3, 4, 5].map((whyNo) => ({ whyNo, analysis: '' }));

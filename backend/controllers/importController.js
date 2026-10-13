@@ -2475,7 +2475,7 @@ const importEmployees = async (req, res) => {
                 const employeeType = pickFirstNonEmpty(row['Employee Type'], row.employeeType) || 'ONSITE';
                 const status = pickFirstNonEmpty(row['Status'], row.status) || 'Active';
 
-                // DD.MM.YYYY (as exported), ISO text or an Excel date.
+                // DD.MMM.YY (as exported), DD.MM.YYYY, ISO text or an Excel date.
                 const joiningDate = parseDateValue(joiningDateStr) || new Date();
                 const dob = parseDateValue(dobStr);
 

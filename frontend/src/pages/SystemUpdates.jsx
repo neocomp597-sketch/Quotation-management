@@ -122,6 +122,9 @@ const SearchableSelect = ({ label, options, value, onChange, placeholder = "Type
     );
 };
 
+// Release-note dates are stored as "31.08.2026" text; shown in the DD.MMM.YY format.
+const withDisplayDate = (row) => ({ ...row, date: formatDate(row.date, row.date) });
+
 const SystemUpdates = () => {
     const navigate = useNavigate();
     const [updates, setUpdates] = useState([]);
@@ -156,7 +159,7 @@ const SystemUpdates = () => {
                 u.detailedChanges.forEach((item, idx) => {
                     list.push({
                         id: `${u._id || 'upd'}-${idx}`,
-                        date: item.date || formatDate(u.deployedAt || Date.now()),
+                        date: formatDate(item.date || u.deployedAt || Date.now(), item.date),
                         module: item.module || 'System',
                         submodule: item.submodule || 'Release',
                         changes: item.changes || u.message,
@@ -197,10 +200,10 @@ const SystemUpdates = () => {
 
         // Sample fallback updates if none in DB yet
         if (list.length === 0) {
-            return todayFallbackList;
+            return todayFallbackList.map(withDisplayDate);
         }
 
-        return list;
+        return list.map(withDisplayDate);
     }, [updates]);
 
     // Unique modules for filter dropdown
@@ -304,7 +307,7 @@ const SystemUpdates = () => {
                         </label>
                         <input
                             type="text"
-                            placeholder="Search date (e.g. 17.07.2026)..."
+                            placeholder="Search date (e.g. 17.JUL.26)..."
                             value={dateSearch}
                             onChange={(e) => setDateSearch(e.target.value)}
                             className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-primary-500 focus:bg-white dark:focus:bg-slate-900 transition-all outline-none"

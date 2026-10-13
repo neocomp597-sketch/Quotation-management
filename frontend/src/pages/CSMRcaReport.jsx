@@ -13,13 +13,8 @@ import {
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
 
-// The paper sheet is written dd.mm.yyyy.
-const sheetDate = (value) => {
-    if (!value) return '';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return String(value);
-    return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
-};
+// The paper sheet uses the ARCRM date format (DD.MMM.YY); unreadable text is shown as typed.
+const sheetDate = (value) => (value ? formatDate(value, String(value)) : '');
 
 const INITIAL_FORM = {
     rcaNumber: '',
