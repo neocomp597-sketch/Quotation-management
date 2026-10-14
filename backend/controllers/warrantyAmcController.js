@@ -720,10 +720,12 @@ exports.getAssets = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
         if (!companyId) return res.status(401).json({ message: 'Authentication required: no company context found.' });
+        const branchId = req.user?.activeBranchId;
+        if (!branchId) return res.status(400).json({ message: 'Select an active branch before viewing invoice bulk upload data.' });
 
         const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
         const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 15));
-        const filter = { companyId };
+        const filter = { companyId, branchId };
         if (req.query.customerId) filter.customerId = req.query.customerId;
         if (req.query.productId) filter.productId = req.query.productId;
         if (req.query.status && req.query.status !== 'ALL') filter.status = req.query.status;
@@ -754,10 +756,10 @@ exports.getAssets = async (req, res) => {
                 .sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit)
                 .allowDiskUse(true).maxTimeMS(12000).lean(),
             Asset.countDocuments(filter),
-            Asset.countDocuments({ companyId }),
-            Asset.countDocuments({ companyId, status: 'IN_STOCK' }),
-            Asset.countDocuments({ companyId, status: 'SOLD' }),
-            Asset.countDocuments({ companyId, status: { $in: ['RETURN', 'RETURNED'] } })
+            Asset.countDocuments({ companyId, branchId }),
+            Asset.countDocuments({ companyId, branchId, status: 'IN_STOCK' }),
+            Asset.countDocuments({ companyId, branchId, status: 'SOLD' }),
+            Asset.countDocuments({ companyId, branchId, status: { $in: ['RETURN', 'RETURNED'] } })
         ]);
 
         res.json({

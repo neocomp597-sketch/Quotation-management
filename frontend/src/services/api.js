@@ -684,6 +684,7 @@ export const importService = {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/assets", formData, {
+      timeout: 0,
       headers: {
         "Content-Type": "multipart/form-data",
       },

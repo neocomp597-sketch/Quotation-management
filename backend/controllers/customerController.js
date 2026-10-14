@@ -46,6 +46,8 @@ const getUniqueCustomerName = async (customerName, excludeId) => {
 
 const buildCustomerQuery = async (req) => {
     const query = {};
+    // Customers belong to the selected branch; shared Product and MGR masters are unaffected.
+    if (req.user?.activeBranchId) query.branchId = req.user.activeBranchId;
     if (req.user && req.user.role !== 'admin' && req.user.role !== 'manager') {
         const Territory = require('../models/Territory');
         const userTerritories = await Territory.find({

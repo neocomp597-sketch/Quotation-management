@@ -896,6 +896,7 @@ const importPlanning = async (req, res) => {
                         filter: {
                             companyId: req.user?.companyId,
                             customerId: customer._id,
+                            branchId: activeBranchId,
                             productId: product._id,
                             monthYear: monthInfo.monthYear,
                             mgrCode: mgr1.code
@@ -1420,6 +1421,7 @@ const importWarranties = async (req, res) => {
                     asset = await Asset.create({
                         companyId,
                         customerId: customer._id,
+                        branchId: activeBranchId,
                         productId: product._id,
                         serialNumber,
                         installationDate: purchaseDate
@@ -1441,6 +1443,7 @@ const importWarranties = async (req, res) => {
                     await Warranty.create({
                         companyId,
                         customerId: customer._id,
+                        branchId: activeBranchId,
                         productId: product._id,
                         assetId: asset._id,
                         serialNumber,
@@ -1739,6 +1742,7 @@ const importTickets = async (req, res) => {
                         asset = await Asset.create({
                             companyId,
                             customerId: customer._id,
+                            branchId: activeBranchId,
                             productId: product._id,
                             serialNumber,
                             installationDate: parseDateValue(issueDateVal) || new Date()
@@ -3164,16 +3168,20 @@ const importAssets = async (req, res) => {
         const companyId = req.user?.companyId;
         const companyFilter = companyId ? { companyId } : {};
 
-        // Rows without a Location are tagged with the branch the upload is made from:
-        // the active branch selected in the header, else the user's own branch.
-        let defaultLocation = '';
-        const activeBranchRaw = req.headers?.['x-active-branch'] || req.headers?.['x-branch-id'] || req.user?.branchId || '';
-        const activeBranchId = String(activeBranchRaw || '').trim();
-        if (/^[a-f\d]{24}$/i.test(activeBranchId)) {
-            const activeBranch = await Branch.findOne({ _id: activeBranchId, ...companyFilter }).select('name').lean();
-            if (activeBranch?.name) defaultLocation = String(activeBranch.name).trim();
+        // Every Invoice Bulk Upload belongs to the branch selected in the header.
+        // Products and MGRs remain company-wide masters; assets/customers are branch-owned.
+        const activeBranchId = String(req.user?.activeBranchId || req.activeBranchId || '').trim();
+        if (!/^[a-f\d]{24}$/i.test(activeBranchId)) {
+            return res.status(400).json({ message: 'Select an active branch before importing invoice bulk upload data.' });
         }
-
+        const activeBranch = await Branch.findOne({ _id: activeBranchId, ...companyFilter })
+            .select('name')
+            .setOptions({ bypassBranch: true })
+            .lean();
+        if (!activeBranch) {
+            return res.status(400).json({ message: 'The selected active branch is not valid for this company.' });
+        }
+        const defaultLocation = String(activeBranch.name || '').trim();
         const seenSerialsInFile = new Set();
 
         // Division / Segment Master, loaded once for the whole file.
@@ -3196,7 +3204,9 @@ const importAssets = async (req, res) => {
 
                 // Check for duplicate Serial Number within the uploaded file
                 if (seenSerialsInFile.has(normSerial)) {
-                    throw new Error(`Duplicate Serial Number "${serialNumber}" found multiple times within the uploaded file.`);
+                    // Duplicate rows in a source workbook are ignored; the serial is imported once.
+                    results.skipped++;
+                    continue;
                 }
                 seenSerialsInFile.add(normSerial);
 
@@ -3330,6 +3340,7 @@ const importAssets = async (req, res) => {
                     const searchTarget = customerCodeInput || customerLookup;
                     customer = await Customer.findOne({
                         ...companyFilter,
+                        branchId: activeBranchId,
                         $or: [
                             { externalCode: buildExactRegex(searchTarget) },
                             { customerName: buildExactRegex(searchTarget) },
@@ -3338,21 +3349,12 @@ const importAssets = async (req, res) => {
                     });
 
                     if (!customer) {
-                        customer = await Customer.findOne({
-                            $or: [
-                                { externalCode: buildExactRegex(searchTarget) },
-                                { customerName: buildExactRegex(searchTarget) },
-                                { companyName: buildExactRegex(searchTarget) }
-                            ]
-                        }).setOptions({ bypassTenant: true });
-                    }
-
-                    if (!customer) {
                         try {
                             // A customer missing from the master is created from the sheet: the
                             // code becomes its external code and the sheet's name becomes its name.
                             customer = await Customer.create({
                                 ...companyFilter,
+                                branchId: activeBranchId,
                                 externalCode: searchTarget,
                                 customerName: customerNameInput || customerLookup || searchTarget,
                                 companyName: customerNameInput || customerLookup || searchTarget,
@@ -3361,12 +3363,14 @@ const importAssets = async (req, res) => {
                             });
                         } catch (custErr) {
                             customer = await Customer.findOne({
+                                ...companyFilter,
+                                branchId: activeBranchId,
                                 $or: [
                                     { externalCode: buildExactRegex(searchTarget) },
                                     { customerName: buildExactRegex(searchTarget) },
                                     { companyName: buildExactRegex(searchTarget) }
                                 ]
-                            }).setOptions({ bypassTenant: true });
+                            });
                             if (!customer) throw custErr;
                         }
                     } else if (customerMobile && !customer.mobile) {
@@ -3398,40 +3402,55 @@ const importAssets = async (req, res) => {
                     }
                 }
 
-                // --- Unique Identifier Check: Serial Number (System-wide uniqueness) ---
-                let existingAssets = await Asset.find({
+                // A serial is unique within the company. Query across branches so a user cannot
+                // accidentally create the same serial in another branch.
+                const existingAssets = await Asset.find({
                     ...companyFilter,
-                    serialNumber: buildExactRegex(serialNumber)
-                }).populate('productId');
+                    serialNumberKey: serialNumber.toUpperCase()
+                }).setOptions({ bypassBranch: true }).populate('productId');
 
-                if (!existingAssets || existingAssets.length === 0) {
-                    existingAssets = await Asset.find({
-                        serialNumber: buildExactRegex(serialNumber)
-                    }).setOptions({ bypassTenant: true }).populate('productId');
-                }
-
-                // Any existing active asset with this Serial Number is a duplicate
-                let matchedActiveAsset = existingAssets.find(a => a.status !== 'RETURN' && a.status !== 'RETURNED');
-
-                if (matchedActiveAsset) {
-                    throw new Error(`Duplicate entry: Serial Number (${serialNumber}) already exists in the system. Duplicate Serial Numbers are not allowed.`);
-                }
-
-                const isProductMatch = (a) => {
-                    if (!a.productId) return true;
-                    const sameId = a.productId._id && product._id && a.productId._id.toString() === product._id.toString();
-                    const prodCodeA = (a.productId.productCode || '').trim().toLowerCase();
-                    const prodCodeTarget = (product.productCode || productCode).trim().toLowerCase();
-                    return sameId || prodCodeA === prodCodeTarget || prodCodeA === productCode.trim().toLowerCase();
+                const matchedActiveAsset = existingAssets.find((asset) => asset.status !== 'RETURN' && asset.status !== 'RETURNED');
+                const assetPayload = {
+                    branchId: activeBranchId,
+                    productId: product._id,
+                    productCode: product.productCode || productCode || '',
+                    productName: product.productName || productName || '',
+                    status,
+                    customerId: customer ? customer._id : null,
+                    customerCode: customerCodeVal,
+                    customerNameStr: customer ? (customer.companyName || customer.customerName) : (customerLookup || ''),
+                    customerPostalCode,
+                    customerMobile: customerMobile || '',
+                    invoiceNumber: invoiceNumber || '',
+                    saleDate: saleDate || (status === 'SOLD' ? new Date() : null),
+                    location: location || '',
+                    indicatorField,
+                    ...divisionSegmentFields,
+                    projectCode,
+                    projectName
                 };
 
+                // Re-uploading the same Excel is idempotent: update the record in its own branch
+                // and do not create a second asset or history row.
+                if (matchedActiveAsset) {
+                    if (String(matchedActiveAsset.branchId || '') !== activeBranchId) {
+                        throw new Error(`Serial Number (${serialNumber}) already belongs to another branch.`);
+                    }
+                    await Asset.findByIdAndUpdate(matchedActiveAsset._id, assetPayload);
+                    results.updated++;
+                    continue;
+                }
                 const matchedReturnedAsset = existingAssets.find(a => {
                     const isReturn = a.status === 'RETURN' || a.status === 'RETURNED';
                     return isReturn;
                 });
 
                 if (matchedReturnedAsset) {
+                    if (String(matchedReturnedAsset.branchId || '') !== activeBranchId) {
+                        throw new Error(`Serial Number (${serialNumber}) already belongs to another branch.`);
+                    }
                     const updatePayload = {
+                        branchId: activeBranchId,
                         productId: product._id,
                         productCode: productCode || product.productCode || '',
                         productName: productName || product.productName || '',
@@ -3462,6 +3481,7 @@ const importAssets = async (req, res) => {
                         serialNumber,
                         productCode: product.productCode,
                         productName: product.productName,
+                        branchId: activeBranchId,
                         productId: product._id,
                         customerId: customer ? customer._id : null,
                         customerCode: customerCodeVal,
@@ -3482,6 +3502,7 @@ const importAssets = async (req, res) => {
                     // Case 1 / Case 3: Completely new combination or different product
                     const newAsset = await Asset.create({
                         ...(companyId ? { companyId } : {}),
+                        branchId: activeBranchId,
                         productId: product._id,
                         productCode: product.productCode || productCode || '',
                         productName: product.productName || productName || '',
@@ -3509,6 +3530,7 @@ const importAssets = async (req, res) => {
                         serialNumber,
                         productCode,
                         productName,
+                        branchId: activeBranchId,
                         productId: product._id,
                         customerId: customer ? customer._id : null,
                         customerCode: customerCodeVal,
@@ -3533,6 +3555,10 @@ const importAssets = async (req, res) => {
         }
 
         const successCount = results.created + results.updated;
+
+        if (successCount > 0) {
+            await Promise.all([invalidateCustomerCaches(), invalidateProductCaches()]);
+        }
 
         if (successCount > 0) {
             const { createCompanyNotifications } = require('../utils/notificationHelper');
