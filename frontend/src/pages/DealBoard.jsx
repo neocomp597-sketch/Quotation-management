@@ -11,6 +11,7 @@ import Modal from '../components/Modal';
 import PortalDropdown from '../components/PortalDropdown';
 import SearchableSelect from '../components/SearchableSelect';
 import { formatDate } from '../utils/helpers';
+import DateInput from '../components/DateInput';
 
 const formatCurrency = (val) => {
     if (!val) return '₹0';
@@ -507,7 +508,7 @@ const DealBoard = () => {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Expected Close</label>
-                            <input
+                            <DateInput
                                 type="date"
                                 value={form.expectedCloseDate}
                                 onChange={e => setForm({ ...form, expectedCloseDate: e.target.value })}

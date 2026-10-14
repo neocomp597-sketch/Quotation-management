@@ -13,6 +13,7 @@ import {
     MdCheckCircle, MdCancel, MdSearch, MdFilterList
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
+import DateInput from '../components/DateInput';
 
 const COLORS = ['#0d9488', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
 const STATUS_COLORS = {
@@ -203,7 +204,7 @@ const TenderDashboard = () => {
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Start Deadline</label>
-                        <input
+                        <DateInput
                             type="date"
                             value={startDate}
                             onChange={e => setStartDate(e.target.value)}
@@ -212,7 +213,7 @@ const TenderDashboard = () => {
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">End Deadline</label>
-                        <input
+                        <DateInput
                             type="date"
                             value={endDate}
                             onChange={e => setEndDate(e.target.value)}

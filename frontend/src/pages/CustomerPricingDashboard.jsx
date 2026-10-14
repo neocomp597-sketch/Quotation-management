@@ -5,6 +5,7 @@ import { cpqService, quotationService, customerService } from '../services/api';
 import { formatDate } from '../utils/helpers';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
+import DateInput from '../components/DateInput';
 
 const CustomerPricingDashboard = ({ customerId: propCustomerId, inlineMode = false }) => {
     const [customers, setCustomers] = useState([]);
@@ -488,7 +489,7 @@ const CustomerPricingDashboard = ({ customerId: propCustomerId, inlineMode = fal
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Effective Start Date</label>
-                            <input 
+                            <DateInput 
                                 type="date" 
                                 value={newContract.startDate}
                                 onChange={(e) => setNewContract(prev => ({ ...prev, startDate: e.target.value }))}
@@ -498,7 +499,7 @@ const CustomerPricingDashboard = ({ customerId: propCustomerId, inlineMode = fal
                         </div>
                         <div className="space-y-1">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Expiration End Date</label>
-                            <input 
+                            <DateInput 
                                 type="date" 
                                 value={newContract.endDate}
                                 onChange={(e) => setNewContract(prev => ({ ...prev, endDate: e.target.value }))}

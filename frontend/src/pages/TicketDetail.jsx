@@ -16,6 +16,7 @@ import {
 import ComplaintBOMPanel from '../components/bom/ComplaintBOMPanel';
 import Modal from '../components/Modal';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
+import DateInput from '../components/DateInput';
 
 const parseDescriptionAndImages = (rawDesc = '') => {
     if (!rawDesc) return { text: '', images: [] };
@@ -1745,7 +1746,7 @@ const TicketDetail = () => {
                 <form id="schedule-visit-form" onSubmit={handleScheduleVisit} className="space-y-4">
                     <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Appointment Date & Time *</label>
-                        <input
+                        <DateInput
                             type="datetime-local"
                             required
                             value={visitDate}

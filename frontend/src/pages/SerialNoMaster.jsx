@@ -12,6 +12,7 @@ import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import PaginationControls from '../components/PaginationControls';
 import { formatDate } from '../utils/helpers';
+import DateInput from '../components/DateInput';
 
 const PAGE_SIZE = 15;
 
@@ -151,16 +152,39 @@ const SerialNoMaster = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [assetsRes, productsRes, divisionsRes, segmentsRes] = await Promise.all([
+            const [assetsResult, productsResult, divisionsResult, segmentsResult] = await Promise.allSettled([
                 csmService.getAssets(),
                 productService.getAll(),
                 divisionService.getAll(),
                 segmentService.getAll()
             ]);
-            setAssets(assetsRes.data || []);
-            setProducts(productsRes.data || []);
-            setDivisions(divisionsRes.data || []);
-            setSegments(segmentsRes.data || []);
+
+            // Assets are the core data — if they fail, show the blocking error.
+            if (assetsResult.status === 'rejected') {
+                console.error('Error fetching Invoice Bulk Upload assets:', assetsResult.reason);
+                toast.error('Failed to load invoice bulk upload data');
+            } else {
+                setAssets(assetsResult.value?.data || []);
+            }
+
+            // Non-critical reference data: load what succeeded, warn softly for what did not.
+            if (productsResult.status === 'fulfilled') {
+                setProducts(productsResult.value?.data || []);
+            } else {
+                console.warn('Could not load products list:', productsResult.reason);
+            }
+
+            if (divisionsResult.status === 'fulfilled') {
+                setDivisions(divisionsResult.value?.data || []);
+            } else {
+                console.warn('Could not load divisions list:', divisionsResult.reason);
+            }
+
+            if (segmentsResult.status === 'fulfilled') {
+                setSegments(segmentsResult.value?.data || []);
+            } else {
+                console.warn('Could not load segments list:', segmentsResult.reason);
+            }
         } catch (err) {
             console.error('Error fetching Invoice Bulk Upload data:', err);
             toast.error('Failed to load invoice bulk upload data');
@@ -514,7 +538,7 @@ const SerialNoMaster = () => {
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Sale Date</label>
-                                    <input
+                                    <DateInput
                                         type="date"
                                         value={singleForm.saleDate}
                                         onChange={(e) => setSingleForm({ ...singleForm, saleDate: e.target.value })}

@@ -10,6 +10,7 @@ import { contactService, customerService, csmService, importService } from '../s
 import SearchableSelect from '../components/SearchableSelect';
 import { BLOOD_GROUP_OPTIONS, isValidGSTIN, isValidMobile, isValidPincode } from '../utils/validation';
 import { formatDate } from '../utils/helpers';
+import DateInput from '../components/DateInput';
 
 const LIST_PAGE_SIZE = 20;
 
@@ -724,7 +725,7 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Date of Birth (DOB)</label>
-                                            <input
+                                            <DateInput
                                                 type="date"
                                                 name="dob"
                                                 value={formData.dob ? formData.dob.split('T')[0] : ''}
@@ -734,7 +735,7 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Anniversary Date</label>
-                                            <input
+                                            <DateInput
                                                 type="date"
                                                 name="anniversaryDate"
                                                 value={formData.anniversaryDate ? formData.anniversaryDate.split('T')[0] : ''}
@@ -1038,7 +1039,7 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Last Interaction Date</label>
-                                            <input
+                                            <DateInput
                                                 type="date"
                                                 name="lastInteractionDate"
                                                 value={formData.lastInteractionDate ? formData.lastInteractionDate.split('T')[0] : ''}

@@ -15,6 +15,7 @@ import {
 import { toast } from 'react-toastify';
 import { meetingService, customerService, enquiryService, userService } from '../services/api';
 import { formatDate } from '../utils/helpers';
+import DateInput from '../components/DateInput';
 
 // Searchable dropdown component for Related Record
 const RecordSearchDropdown = ({ items, selectedId, onSelect, placeholder, labelField, subLabelField }) => {
@@ -440,7 +441,7 @@ const CreateMeeting = () => {
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div className="space-y-1.5">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">DATE</label>
-                                <input
+                                <DateInput
                                     type="date"
                                     value={meetingDate}
                                     onChange={(e) => setMeetingDate(e.target.value)}

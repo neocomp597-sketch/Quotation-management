@@ -11,6 +11,7 @@ import {
     MdEvent, MdChat, MdAssignment, MdNote, MdDelete, MdReplay, MdBlock,
     MdBusiness, MdPerson, MdCalendarToday, MdTrendingUp
 } from 'react-icons/md';
+import DateInput from '../components/DateInput';
 
 const ACTIVITY_ICONS = {
     Call: <MdPhone />, Email: <MdEmail />, Meeting: <MdEvent />,
@@ -374,7 +375,7 @@ const DealDetail = () => {
                             <div className="grid grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Expected Close</label>
-                                    <input type="date" value={form.expectedCloseDate} onChange={e => setForm({ ...form, expectedCloseDate: e.target.value })}
+                                    <DateInput type="date" value={form.expectedCloseDate} onChange={e => setForm({ ...form, expectedCloseDate: e.target.value })}
                                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
                                 </div>
                                 <div>
@@ -470,7 +471,7 @@ const DealDetail = () => {
                                         rows={2} placeholder="What happened?"
                                         className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm" />
                                     <div className="flex gap-2">
-                                        <input type="datetime-local" value={activityForm.activityDate}
+                                        <DateInput type="datetime-local" value={activityForm.activityDate}
                                             onChange={e => setActivityForm({ ...activityForm, activityDate: e.target.value })}
                                             className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm" />
                                         <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold">Add</button>

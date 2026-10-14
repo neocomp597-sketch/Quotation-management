@@ -6,6 +6,7 @@ import {
     MdPayment, MdCheckCircle, MdEdit, 
     MdSave, MdHourglassEmpty, MdVisibility
 } from 'react-icons/md';
+import DateInput from '../components/DateInput';
 
 const PayrollPayments = () => {
     const [runs, setRuns] = useState([]);
@@ -294,7 +295,7 @@ const PayrollPayments = () => {
 
                                 <div>
                                     <label className={labelClass}>Payment Date</label>
-                                    <input
+                                    <DateInput
                                         type="date"
                                         required
                                         value={payForm.paymentDate}

@@ -12,6 +12,7 @@ import {
     MdSave, MdAccountBalance, MdAssignment, MdUploadFile, MdDownload, MdBusiness, MdAccountTree, MdArrowBack, MdSettings,
     MdPhotoCamera, MdContactPhone, MdCheck, MdFormatListBulleted, MdGridView, MdLocationOn, MdHelpOutline, MdClose
 } from 'react-icons/md';
+import DateInput from '../components/DateInput';
 
 const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
@@ -1268,7 +1269,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                             </div>
                                             <div>
                                                 <label className={labelClass}>Date of Birth</label>
-                                                <input
+                                                <DateInput
                                                     type="date"
                                                     value={basicForm.dob}
                                                     onChange={(e) => {
@@ -1281,7 +1282,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                             </div>
                                             <div>
                                                 <label className={labelClass}>Joining Date</label>
-                                                <input
+                                                <DateInput
                                                     type="date"
                                                     required
                                                     value={basicForm.joiningDate}
@@ -1298,7 +1299,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                             </div>
                                             <div>
                                                 <label className={labelClass}>Last Working Date</label>
-                                                <input
+                                                <DateInput
                                                     type="date"
                                                     value={basicForm.lastWorkingDate || ''}
                                                     onChange={(e) => setBasicForm({ ...basicForm, lastWorkingDate: e.target.value })}
@@ -1735,7 +1736,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                                                 {/* Row 4: Date of Birth & Gender */}
                                                                                 <div>
                                                                                     <label className={labelClass}>Date of Birth</label>
-                                                                                    <input
+                                                                                    <DateInput
                                                                                         type="date"
                                                                                         max={new Date().toISOString().split('T')[0]}
                                                                                         value={fam.dob ? new Date(fam.dob).toISOString().split('T')[0] : ''}

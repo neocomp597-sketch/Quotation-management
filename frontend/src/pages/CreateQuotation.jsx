@@ -9,6 +9,7 @@ import Modal from '../components/Modal';
 import { clearQuotationDraft, setAutosaveStatus, setQuotationDraft } from '../store/quotationDraftSlice';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
 import { loadGoogleMaps } from '../utils/loadGoogleMaps';
+import DateInput from '../components/DateInput';
 
 // Skeleton loader for product rows
 const SkeletonRow = () => (
@@ -1162,13 +1163,13 @@ const CreateQuotation = () => {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Quotation Date</label>
-                                        <input type="date" value={header.quotationDate} disabled className="w-full px-4 py-3.5 bg-slate-100 border border-slate-200 rounded-2xl text-xs font-bold text-slate-400 cursor-not-allowed" />
+                                        <DateInput type="date" value={header.quotationDate} disabled className="w-full px-4 py-3.5 bg-slate-100 border border-slate-200 rounded-2xl text-xs font-bold text-slate-400 cursor-not-allowed" />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Valid Until</label>
                                         <div className="relative">
                                             <MdEventAvailable className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                                            <input
+                                            <DateInput
                                                 type="date"
                                                 name="validTill"
                                                 value={header.validTill}
@@ -1271,7 +1272,7 @@ const CreateQuotation = () => {
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-[9px] font-bold text-slate-400 uppercase">Ack Date</label>
-                                            <input
+                                            <DateInput
                                                 type="date"
                                                 name="ackDate"
                                                 value={header.ackDate}
@@ -1295,13 +1296,13 @@ const CreateQuotation = () => {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Quotation Date</label>
-                                        <input type="date" value={header.quotationDate} disabled className="w-full px-4 py-3.5 bg-slate-100 border border-slate-200 rounded-2xl text-xs font-bold text-slate-400 cursor-not-allowed" />
+                                        <DateInput type="date" value={header.quotationDate} disabled className="w-full px-4 py-3.5 bg-slate-100 border border-slate-200 rounded-2xl text-xs font-bold text-slate-400 cursor-not-allowed" />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Valid Until</label>
                                         <div className="relative">
                                             <MdEventAvailable className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                                            <input
+                                            <DateInput
                                                 type="date"
                                                 name="validTill"
                                                 value={header.validTill}
@@ -1404,7 +1405,7 @@ const CreateQuotation = () => {
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-[9px] font-bold text-slate-400 uppercase">Ack Date</label>
-                                            <input
+                                            <DateInput
                                                 type="date"
                                                 name="ackDate"
                                                 value={header.ackDate}

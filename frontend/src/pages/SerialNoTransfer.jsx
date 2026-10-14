@@ -8,6 +8,7 @@ import PaginationControls from '../components/PaginationControls';
 import Modal from '../components/Modal';
 import Customers from './Customers';
 import { formatDate } from '../utils/helpers';
+import DateInput from '../components/DateInput';
 
 const PAGE_SIZE = 20;
 const TABS = [
@@ -158,11 +159,11 @@ const DateRangeFilter = ({ range, field, onChange }) => {
         <div className="flex flex-wrap items-end gap-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                 From Date <span className="normal-case tracking-normal font-semibold">({field})</span>
-                <input type="date" value={range.fromDate} onChange={set(range.setFromDate)} className={`${dateClass} mt-1 block`} />
+                <DateInput type="date" value={range.fromDate} onChange={set(range.setFromDate)} className={`${dateClass} mt-1 block`} />
             </label>
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                 To Date
-                <input type="date" value={range.toDate} min={range.fromDate || undefined} onChange={set(range.setToDate)} className={`${dateClass} mt-1 block`} />
+                <DateInput type="date" value={range.toDate} min={range.fromDate || undefined} onChange={set(range.setToDate)} className={`${dateClass} mt-1 block`} />
             </label>
             {(range.fromDate || range.toDate) && (
                 <button
@@ -986,7 +987,7 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div>
                     <label className={label} htmlFor="transferDate">{past ? 'Date With This Customer' : 'Transfer Date'} <span className="text-rose-500">*</span></label>
-                    <input id="transferDate" type="date" required max={past ? latestPastDate : todayInput()} value={transferDate} onChange={(e) => setTransferDate(e.target.value)} className={inputClass} />
+                    <DateInput id="transferDate" type="date" required max={past ? latestPastDate : todayInput()} value={transferDate} onChange={(e) => setTransferDate(e.target.value)} className={inputClass} />
                 </div>
                 <div className="md:col-span-2">
                     <label className={label} htmlFor="remarks">Remarks</label>

@@ -9,6 +9,7 @@ import {
 } from 'react-icons/md';
 import Modal from '../components/Modal';
 import { formatDate, formatDateTime } from '../utils/helpers';
+import DateInput from '../components/DateInput';
 
 const CSMVisitPlanner = () => {
     const [loading, setLoading] = useState(false);
@@ -713,7 +714,7 @@ const CSMVisitPlanner = () => {
 
                         <div>
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Scheduled Date & Time *</label>
-                            <input
+                            <DateInput
                                 type="datetime-local"
                                 required
                                 value={createScheduledDate}
@@ -767,7 +768,7 @@ const CSMVisitPlanner = () => {
                     <form onSubmit={handleReschedule} className="space-y-4">
                         <div>
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">New Scheduled Date & Time *</label>
-                            <input
+                            <DateInput
                                 type="datetime-local"
                                 required
                                 value={rescheduleDate}

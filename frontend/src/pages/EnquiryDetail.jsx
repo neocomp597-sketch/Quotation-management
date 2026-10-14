@@ -12,6 +12,7 @@ import { enquiryService, userService, salespersonService, payrollService } from 
 import Modal from '../components/Modal';
 import { formatDate, formatDateTime, buildSalesExecutiveList } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
+import DateInput from '../components/DateInput';
 
 const StatusPill = ({ status }) => {
     const styles = {
@@ -1070,7 +1071,7 @@ const EnquiryDetail = () => {
                             <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
                                 Appointment Date & Time <span className="text-red-500 font-bold ml-0.5">*</span>
                             </label>
-                            <input
+                            <DateInput
                                 type="datetime-local"
                                 value={visitDate}
                                 onChange={(e) => setVisitDate(e.target.value)}

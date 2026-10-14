@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
 import CreateEnquiry from './CreateEnquiry';
 import { formatDate, buildSalesExecutiveList } from '../utils/helpers';
+import DateInput from '../components/DateInput';
 
 const StatusPill = ({ status }) => {
     const styles = {
@@ -361,7 +362,7 @@ const Enquiries = () => {
                         )}
                         <div>
                             <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Follow-up Date</label>
-                            <input 
+                            <DateInput 
                                 type="date"
                                 value={filters.followUpDate}
                                 onChange={(e) => handleFilterChange('followUpDate', e.target.value)}

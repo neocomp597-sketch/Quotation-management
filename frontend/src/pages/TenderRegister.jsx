@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import * as XLSX from 'xlsx';
+import DateInput from '../components/DateInput';
 
 const STATUS_CLASSES = {
     'Active': 'bg-blue-50 text-blue-700 border-blue-100',
@@ -502,7 +503,7 @@ const TenderRegister = () => {
                         {/* Deadline Date */}
                         <div>
                             <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Deadline Date <span className="text-rose-500">*</span></label>
-                            <input
+                            <DateInput
                                 type="date"
                                 value={formData.deadlineDate}
                                 onChange={e => setFormData({ ...formData, deadlineDate: e.target.value })}
@@ -514,7 +515,7 @@ const TenderRegister = () => {
                         {/* Submission Date */}
                         <div>
                             <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Submission Date</label>
-                            <input
+                            <DateInput
                                 type="date"
                                 value={formData.submissionDate}
                                 onChange={e => setFormData({ ...formData, submissionDate: e.target.value })}

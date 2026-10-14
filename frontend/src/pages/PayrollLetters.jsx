@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 import { MdDescription, MdAdd, MdSave, MdDelete, MdPictureAsPdf } from 'react-icons/md';
 import { formatDate, resolveImageUrl } from '../utils/helpers';
+import DateInput from '../components/DateInput';
 
 const TEMPLATE_CONTENTS = {
     offer: "Dear {name},\n\nCongratulations! We are pleased to offer you the position of {designation} at {company}. Your experience and skills impressed us, and we are excited about the value you will bring to our organization.\n\nKindly review the terms and salary details below. We look forward to welcoming you to the {company} family.",
@@ -1256,7 +1257,7 @@ const PayrollLetters = () => {
                                     </div>
                                     <div>
                                         <label className={labelClass}>Date of Joining / Revision Date</label>
-                                        <input
+                                        <DateInput
                                             type="date"
                                             value={letterForm.joiningDate}
                                             onChange={(e) => handleFormChange('joiningDate', e.target.value)}
@@ -1268,7 +1269,7 @@ const PayrollLetters = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div>
                                         <label className={labelClass}>Relieving Date</label>
-                                        <input
+                                        <DateInput
                                             type="date"
                                             value={letterForm.relievingDate}
                                             onChange={(e) => handleFormChange('relievingDate', e.target.value)}

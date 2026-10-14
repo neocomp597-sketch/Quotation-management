@@ -10,6 +10,7 @@ import {
 import Modal from '../components/Modal';
 import SearchableSelect from '../components/SearchableSelect';
 import SerialSearchInput from '../components/bom/SerialSearchInput';
+import DateInput from '../components/DateInput';
 
 const EMPTY_FORM = {
     customerId: '',
@@ -832,7 +833,7 @@ const WarrantyAMC = () => {
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Purchase Date *</label>
-                                    <input
+                                    <DateInput
                                         type="date"
                                         required
                                         value={formData.purchaseDate}
@@ -850,7 +851,7 @@ const WarrantyAMC = () => {
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Expiry Date *</label>
-                                    <input
+                                    <DateInput
                                         type="date"
                                         required
                                         min={formData.purchaseDate || undefined}
@@ -894,7 +895,7 @@ const WarrantyAMC = () => {
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Start Date *</label>
-                                    <input
+                                    <DateInput
                                         type="date"
                                         required
                                         value={formData.startDate}
@@ -904,7 +905,7 @@ const WarrantyAMC = () => {
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">End Date *</label>
-                                    <input
+                                    <DateInput
                                         type="date"
                                         required
                                         value={formData.endDate}

@@ -13,6 +13,7 @@ import {
     MdDownload, MdClear, MdStar
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
+import DateInput from '../components/DateInput';
 
 const COLORS = ['#0d9488', '#0ea5e9', '#8b5cf6', '#f59e0b', '#f43f5e', '#64748b'];
 
@@ -261,7 +262,7 @@ const CSMReports = () => {
                         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Start Date</label>
-                                <input
+                                <DateInput
                                     type="date"
                                     name="startDate"
                                     value={filters.startDate}
@@ -271,7 +272,7 @@ const CSMReports = () => {
                             </div>
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">End Date</label>
-                                <input
+                                <DateInput
                                     type="date"
                                     name="endDate"
                                     value={filters.endDate}

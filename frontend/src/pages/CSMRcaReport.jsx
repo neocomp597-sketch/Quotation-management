@@ -12,6 +12,7 @@ import {
     MdPictureAsPdf, MdDownload, MdFileDownload, MdImage, MdClose
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
+import DateInput from '../components/DateInput';
 
 // The paper sheet uses the ARCRM date format (DD.MMM.YY); unreadable text is shown as typed.
 const sheetDate = (value) => (value ? formatDate(value, String(value)) : '');
@@ -903,7 +904,7 @@ const CSMRcaReport = () => {
                                 <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
                                     Date
                                 </label>
-                                <input
+                                <DateInput
                                     type="date"
                                     value={formData.date}
                                     onChange={(e) => handleInputChange('date', e.target.value)}
@@ -962,7 +963,7 @@ const CSMRcaReport = () => {
                                 <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
                                     YYY Date
                                 </label>
-                                <input
+                                <DateInput
                                     type="date"
                                     value={formData.yyyDate}
                                     onChange={(e) => handleInputChange('yyyDate', e.target.value)}
@@ -1083,7 +1084,7 @@ const CSMRcaReport = () => {
                             </div>
                             <div>
                                 <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">Date of Breakdown</label>
-                                <input type="date" value={formData.breakdownDate} onChange={(e) => handleInputChange('breakdownDate', e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none" />
+                                <DateInput type="date" value={formData.breakdownDate} onChange={(e) => handleInputChange('breakdownDate', e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none" />
                             </div>
 
                             <div className="md:col-span-3">
@@ -1295,7 +1296,7 @@ const CSMRcaReport = () => {
                                                 />
                                             </td>
                                             <td className="p-2.5">
-                                                <input
+                                                <DateInput
                                                     type="date"
                                                     value={capa.targetDate}
                                                     onChange={(e) => handleCapaChange(idx, 'targetDate', e.target.value)}
@@ -1340,7 +1341,7 @@ const CSMRcaReport = () => {
                                 <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
                                     Verification Date
                                 </label>
-                                <input
+                                <DateInput
                                     type="date"
                                     value={formData.verificationDate}
                                     onChange={(e) => handleInputChange('verificationDate', e.target.value)}

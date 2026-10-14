@@ -8,6 +8,7 @@ import {
 import { formatDate, formatDateTime } from '../utils/helpers';
 import * as XLSX from 'xlsx';
 import { toast } from 'react-toastify';
+import DateInput from '../components/DateInput';
 
 const REPORT_TABS = [
     { key: 'pipeline', label: 'Tender Pipeline', icon: <MdTrendingUp size={18} />, desc: 'Active & Submitted tenders representing future opportunities.' },
@@ -308,7 +309,7 @@ const TenderReports = () => {
                     {/* Start Date */}
                     <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-slate-400">From</span>
-                        <input
+                        <DateInput
                             type="date"
                             value={startDate}
                             onChange={e => setStartDate(e.target.value)}
@@ -319,7 +320,7 @@ const TenderReports = () => {
                     {/* End Date */}
                     <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-slate-400">To</span>
-                        <input
+                        <DateInput
                             type="date"
                             value={endDate}
                             onChange={e => setEndDate(e.target.value)}

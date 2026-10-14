@@ -12,6 +12,7 @@ import SearchableSelect from '../components/SearchableSelect';
 import ComplaintBOMPanel from '../components/bom/ComplaintBOMPanel';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
 import { isValidMobile, isValidPincode, sanitizePhoneNumber } from '../utils/validation';
+import DateInput from '../components/DateInput';
 
 const statusStyles = {
     'Open': 'bg-emerald-50 text-emerald-600 border-emerald-200',
@@ -3826,7 +3827,7 @@ const CSMTickets = () => {
                         {/* Invoice Date */}
                         <div>
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Invoice Date</label>
-                            <input
+                            <DateInput
                                 type="date"
                                 value={manualFormData.invoiceDate}
                                 onChange={(e) => setManualFormData({ ...manualFormData, invoiceDate: e.target.value })}

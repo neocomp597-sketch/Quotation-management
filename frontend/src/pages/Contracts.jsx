@@ -12,6 +12,7 @@ import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import * as XLSX from 'xlsx';
 import { formatDate, formatDateTime } from '../utils/helpers';
+import DateInput from '../components/DateInput';
 
 const Contracts = ({ mode = 'dashboard' }) => {
     // Current CLM view selection: 'dashboard' | 'contracts' | 'templates' | 'clauses' | 'approvals' | 'renewals' | 'reports' | 'settings'
@@ -1983,7 +1984,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Start Date</label>
-                            <input 
+                            <DateInput 
                                 type="date" 
                                 required
                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-semibold"
@@ -1993,7 +1994,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                         </div>
                         <div>
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">End Date</label>
-                            <input 
+                            <DateInput 
                                 type="date" 
                                 required
                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-semibold"

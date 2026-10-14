@@ -7,6 +7,7 @@ import Modal from '../components/Modal';
 import PortalDropdown from '../components/PortalDropdown';
 import { isValidMobile, isValidGSTIN } from '../utils/validation';
 import { buildSalesExecutiveList } from '../utils/helpers';
+import DateInput from '../components/DateInput';
 
 // Reuse CustomerSearchDropdown with Teal accents
 const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect }) => {
@@ -1038,7 +1039,7 @@ const CreateEnquiry = () => {
 
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Enquiry Date</label>
-                                <input
+                                <DateInput
                                     type="date"
                                     name="enquiryDate"
                                     value={header.enquiryDate}
@@ -1049,7 +1050,7 @@ const CreateEnquiry = () => {
 
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Req. Delivery Date</label>
-                                <input
+                                <DateInput
                                     type="date"
                                     name="requiredDeliveryDate"
                                     value={header.requiredDeliveryDate}

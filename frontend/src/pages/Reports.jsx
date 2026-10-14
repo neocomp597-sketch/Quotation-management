@@ -34,6 +34,7 @@ import {
     AreaChart,
     Area
 } from 'recharts';
+import DateInput from '../components/DateInput';
 
 const TABS = [
     { key: 'quotations', label: 'Quotations', icon: <MdDescription size={18} /> },
@@ -2073,7 +2074,7 @@ const Reports = () => {
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
                             <MdCalendarMonth className="text-slate-400" size={18} />
-                            <input
+                            <DateInput
                                 type="date"
                                 value={data.date}
                                 onChange={async (e) => {

@@ -10,6 +10,7 @@ import {
 } from 'react-icons/md';
 import Modal from '../components/Modal';
 import { loadGoogleMaps } from '../utils/loadGoogleMaps';
+import DateInput from '../components/DateInput';
 
 // Client-side image compression & resizing helper before upload (max 800x800, quality 0.7)
 const compressSelfieImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.7) => {
@@ -2445,7 +2446,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                             </div>
 
                             <div className="flex flex-wrap items-center gap-3">
-                                <input
+                                <DateInput
                                     type="date"
                                     value={attendanceDateFilter}
                                     onChange={(e) => setAttendanceDateFilter(e.target.value)}
@@ -2600,7 +2601,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                 <form id="reschedule-visit-form" onSubmit={handleReschedule} className="space-y-4">
                     <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">New Date & Time *</label>
-                        <input
+                        <DateInput
                             type="datetime-local"
                             required
                             value={rescheduleDate}
@@ -2678,7 +2679,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                     </div>
                     <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Appointment Date & Time *</label>
-                        <input
+                        <DateInput
                             type="datetime-local"
                             required
                             value={createScheduledDate}

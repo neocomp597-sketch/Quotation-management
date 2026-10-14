@@ -12,6 +12,7 @@ import {
     BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
     Tooltip, ResponsiveContainer, Legend, AreaChart, Area
 } from 'recharts';
+import DateInput from '../components/DateInput';
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
 
@@ -734,7 +735,7 @@ const EnquiryAnalytics = () => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
                         <div>
                             <label className="block text-xs font-bold text-slate-600 mb-1">From Date</label>
-                            <input
+                            <DateInput
                                 type="date"
                                 value={filters.from}
                                 onChange={(e) => handleFilterChange('from', e.target.value)}
@@ -743,7 +744,7 @@ const EnquiryAnalytics = () => {
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-slate-600 mb-1">To Date</label>
-                            <input
+                            <DateInput
                                 type="date"
                                 value={filters.to}
                                 onChange={(e) => handleFilterChange('to', e.target.value)}
