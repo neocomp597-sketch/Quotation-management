@@ -97,6 +97,7 @@ const SerialNoMaster = () => {
     const [returnHistory, setReturnHistory] = useState([]);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [fetchError, setFetchError] = useState(null); // null | { message, status }
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [activeTab, setActiveTab] = useState('active'); // 'active' | 'returns'
 
@@ -151,6 +152,7 @@ const SerialNoMaster = () => {
 
     const fetchData = async () => {
         setLoading(true);
+        setFetchError(null);
         try {
             const [assetsResult, productsResult, divisionsResult, segmentsResult] = await Promise.allSettled([
                 csmService.getAssets(),
@@ -161,10 +163,17 @@ const SerialNoMaster = () => {
 
             // Assets are the core data — if they fail, show the blocking error.
             if (assetsResult.status === 'rejected') {
-                console.error('Error fetching Invoice Bulk Upload assets:', assetsResult.reason);
-                toast.error('Failed to load invoice bulk upload data');
+                const err = assetsResult.reason;
+                const status = err?.response?.status;
+                const serverMsg = err?.response?.data?.message || err?.message || 'Unknown error';
+                const detail = status ? `[HTTP ${status}] ${serverMsg}` : serverMsg;
+                console.error('Error fetching Invoice Bulk Upload assets:', err);
+                console.error('Server error detail:', { status, serverMsg, url: err?.config?.url });
+                setFetchError({ message: serverMsg, status });
+                toast.error(`Failed to load invoice bulk upload data: ${detail}`);
             } else {
                 setAssets(assetsResult.value?.data || []);
+                setFetchError(null);
             }
 
             // Non-critical reference data: load what succeeded, warn softly for what did not.
@@ -186,7 +195,9 @@ const SerialNoMaster = () => {
                 console.warn('Could not load segments list:', segmentsResult.reason);
             }
         } catch (err) {
+            const serverMsg = err?.response?.data?.message || err?.message || 'Unknown error';
             console.error('Error fetching Invoice Bulk Upload data:', err);
+            setFetchError({ message: serverMsg, status: err?.response?.status });
             toast.error('Failed to load invoice bulk upload data');
         } finally {
             setLoading(false);
@@ -706,6 +717,30 @@ const SerialNoMaster = () => {
                     <div><span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Returned</span><span className="text-2xl font-black text-amber-600">{stats.returned}</span></div>
                 </div>
             </div>
+
+            {/* Error Banner — visible when asset data failed to load */}
+            {fetchError && (
+                <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-rose-100 rounded-xl text-rose-600">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        </div>
+                        <div>
+                            <p className="text-sm font-black text-rose-700">Failed to load inventory data</p>
+                            <p className="text-[11px] font-semibold text-rose-500 mt-0.5">
+                                {fetchError.status ? `HTTP ${fetchError.status} — ` : ''}{fetchError.message}
+                            </p>
+                            <p className="text-[10px] text-rose-400 mt-0.5">Open browser console (F12) for full error details.</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={fetchData}
+                        className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                    >
+                        Retry
+                    </button>
+                </div>
+            )}
 
             {/* View Mode Header Switcher & Toolbar Filters (Requirement #10, #16) */}
             <div className="bg-white rounded-[2rem] border border-slate-200/80 p-5 shadow-sm space-y-4">

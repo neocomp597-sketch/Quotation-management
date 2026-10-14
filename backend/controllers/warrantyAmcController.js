@@ -717,9 +717,30 @@ exports.getReturnHistory = async (req, res) => {
 // List Assets with Customer Name search support (Requirement #10)
 exports.getAssets = async (req, res) => {
     try {
-        const filter = { companyId: req.user?.companyId };
+        const companyId = req.user?.companyId;
+        if (!companyId) {
+            return res.status(401).json({ message: 'Authentication required: no company context found.' });
+        }
+
+        const filter = { companyId };
         if (req.query.customerId) filter.customerId = req.query.customerId;
         if (req.query.productId) filter.productId = req.query.productId;
+
+        // Support server-side status filter to reduce payload
+        if (req.query.status && req.query.status !== 'ALL') {
+            filter.status = req.query.status;
+        }
+
+        // Optional text search for serial number or invoice number (prefix match)
+        if (req.query.q && String(req.query.q).trim()) {
+            const qClean = String(req.query.q).trim();
+            const escaped = qClean.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            filter.$or = [
+                { serialNumber: { $regex: escaped, $options: 'i' } },
+                { invoiceNumber: { $regex: escaped, $options: 'i' } },
+                { customerNameStr: { $regex: escaped, $options: 'i' } },
+            ];
+        }
 
         const docs = await Asset.find(filter)
             .populate({ path: 'customerId', select: 'customerName companyName externalCode billingAddress pincode mobile', options: { bypassTenant: true } })
@@ -727,10 +748,12 @@ exports.getAssets = async (req, res) => {
             .populate(DIVISION_POPULATE)
             .populate(SEGMENT_POPULATE)
             .sort({ createdAt: -1 })
+            .maxTimeMS(12000)
             .lean();
 
         res.json(applyProductMgrsToAll(docs));
     } catch (error) {
+        console.error('getAssets error:', error);
         res.status(500).json({ message: error.message || 'Error fetching assets' });
     }
 };
