@@ -28,12 +28,9 @@ const syncEmployeeToEngineer = async (employeeOrId) => {
         const isActiveEmployee = employee.status === 'Active';
 
         // Find existing engineer document by employeeId or email & companyId
-        let engineer = await Engineer.findOne({
-            $or: [
-                { employeeId: employee._id },
-                { email: employee.email, companyId: employee.companyId }
-            ]
-        });
+        const engineerMatch = [{ employeeId: employee._id }];
+        if (employee.email) engineerMatch.push({ email: employee.email, companyId: employee.companyId });
+        let engineer = await Engineer.findOne({ $or: engineerMatch });
 
         if (isServiceEng) {
             const targetStatus = isActiveEmployee ? 'Active' : 'Inactive';

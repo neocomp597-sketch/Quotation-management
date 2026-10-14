@@ -7,6 +7,7 @@ require('../models/MGR'); // populated through Product mgr1..mgr5
 const SerialTransfer = require('../models/SerialTransfer');
 const { MGR_KEYS, formatMgrVal } = require('../utils/productMgr');
 const { formatDate } = require('../utils/dateFormat');
+const { getActiveBranchId } = require('../middlewares/tenantContext');
 
 /**
  * Serial No Transfer: the customer-wise ownership history of sold serial numbers.
@@ -24,6 +25,18 @@ const toKey = (value) => cleanText(value).toUpperCase();
 const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const httpError = (status, message) => Object.assign(new Error(message), { status });
+
+const activeBranchFilter = () => {
+    const branchId = getActiveBranchId();
+    return branchId && mongoose.Types.ObjectId.isValid(branchId)
+        ? { branchId: new mongoose.Types.ObjectId(branchId) }
+        : null;
+};
+
+const addActiveBranchFilter = (query) => {
+    const branchFilter = activeBranchFilter();
+    return branchFilter ? { $and: [query, branchFilter] } : query;
+};
 
 // From/To dates are calendar days as users see them in India (UTC+05:30); both ends are inclusive.
 // Sale dates are stored as UTC midnight of the day and transfer dates as the chosen day at the
@@ -131,7 +144,7 @@ const saleRecord = (asset) => ({
     branchId: asset.branchId || null
 });
 
-const historyOf = (assetId) => SerialTransfer.find({ assetId })
+const historyOf = (assetId) => SerialTransfer.find(addActiveBranchFilter({ assetId }))
     .sort({ transferDate: 1, createdAt: 1 })
     .lean();
 
@@ -181,21 +194,22 @@ exports.listSerials = async (req, res) => {
 
         const assetFilter = await statusFilter(req.query.status);
         if (assetFilter) query._id = assetFilter;
+        const scopedQuery = addActiveBranchFilter(query);
 
         const [assets, total] = await Promise.all([
-            Asset.find(query)
+            Asset.find(scopedQuery)
                 .select('serialNumber productId productCode productName customerId customerCode customerNameStr saleDate invoiceDate invoiceNumber createdAt')
                 .populate(customerPopulate)
                 .sort({ saleDate: -1, createdAt: -1 })
                 .skip(skip)
                 .limit(limit)
                 .lean(),
-            Asset.countDocuments(query)
+            Asset.countDocuments(scopedQuery)
         ]);
 
         const counts = assets.length
             ? await SerialTransfer.aggregate([
-                { $match: { assetId: { $in: assets.map((asset) => asset._id) } } },
+                { $match: addActiveBranchFilter({ assetId: { $in: assets.map((asset) => asset._id) } }) },
                 {
                     $group: {
                         _id: '$assetId',
@@ -234,7 +248,7 @@ exports.listSerials = async (req, res) => {
 };
 
 const loadSerial = async (assetId) => {
-    const asset = await Asset.findOne({ _id: assetId, status: 'SOLD' }).populate(customerPopulate).lean();
+    const asset = await Asset.findOne(addActiveBranchFilter({ _id: assetId, status: 'SOLD' })).populate(customerPopulate).lean();
     if (!asset) return null;
 
     let history = await historyOf(asset._id);
@@ -309,7 +323,7 @@ exports.transferSerial = async (req, res) => {
             return res.json(await loadSerial(assetId));
         }
 
-        const asset = await Asset.findOne({ _id: assetId, status: 'SOLD' }).populate(customerPopulate).lean();
+        const asset = await Asset.findOne(addActiveBranchFilter({ _id: assetId, status: 'SOLD' })).populate(customerPopulate).lean();
         if (!asset) throw httpError(404, 'Sold serial number not found');
         const customer = await Customer.findById(customerId).select(CUSTOMER_SELECT).lean();
         if (!customer) throw httpError(404, 'Customer not found in Customer Master.');
@@ -400,7 +414,7 @@ exports.addPastEntry = async (req, res) => {
             return res.json(await loadSerial(assetId));
         }
 
-        const asset = await Asset.findOne({ _id: assetId, status: 'SOLD' }).populate(customerPopulate).lean();
+        const asset = await Asset.findOne(addActiveBranchFilter({ _id: assetId, status: 'SOLD' })).populate(customerPopulate).lean();
         if (!asset) throw httpError(404, 'Sold serial number not found');
         const customer = await Customer.findById(req.body.customerId).select(CUSTOMER_SELECT).lean();
         if (!customer) throw httpError(404, 'Customer not found in Customer Master.');
@@ -450,7 +464,7 @@ exports.addPastEntry = async (req, res) => {
 exports.listHistory = async (req, res) => {
     try {
         const { page, limit, skip } = getPagination(req.query);
-        const query = {};
+        const query = activeBranchFilter() || {};
         const search = cleanText(req.query.search);
         if (search) {
             const pattern = new RegExp(escapeRegex(search), 'i');
@@ -493,6 +507,8 @@ const OWNERSHIPS = ['Active', 'Inactive'];
 
 const activeOwners = async ({ search, range, assetId, products, skip, limit }) => {
     const match = { status: 'SOLD' };
+    const branchFilter = activeBranchFilter();
+    if (branchFilter) Object.assign(match, branchFilter);
     // Aggregation does not cast, so the ids must already be ObjectIds (distinct returns ObjectIds).
     if (assetId) match._id = new mongoose.Types.ObjectId(String(assetId));
     if (products) match.productId = products;
@@ -553,6 +569,8 @@ const activeOwners = async ({ search, range, assetId, products, skip, limit }) =
 
 const inactiveOwners = async ({ search, range, assetId, products, skip, limit }) => {
     const query = { isActive: false };
+    const branchFilter = activeBranchFilter();
+    if (branchFilter) Object.assign(query, branchFilter);
     if (assetId) query.assetId = assetId;
     if (products) query.productId = products;
     if (search) {
@@ -639,7 +657,7 @@ const withMasterData = async (rows) => {
 const activitySerial = async (assetId) => {
     if (!assetId) return null;
     if (!mongoose.Types.ObjectId.isValid(assetId)) throw httpError(400, 'Invalid serial record');
-    const asset = await Asset.findOne({ _id: assetId, status: 'SOLD' }).select('serialNumber').lean();
+    const asset = await Asset.findOne(addActiveBranchFilter({ _id: assetId, status: 'SOLD' })).select('serialNumber').lean();
     if (!asset) throw httpError(404, 'Sold serial number not found');
     return asset;
 };

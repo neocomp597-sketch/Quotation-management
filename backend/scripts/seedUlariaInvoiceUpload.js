@@ -8,13 +8,19 @@ const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const AssetHistory = require('../models/AssetHistory');
 
-const WORKBOOK = 'C:\\Users\\wagho\\Downloads\\invoice upload.xlsx';
+const WORKBOOK = process.argv.slice(2).find((arg) => arg !== '--apply') || 'C:/Users/wagho/Downloads/invoice upload.xlsx';
 const COMPANY_ID = new mongoose.Types.ObjectId('6a8bf304ac99b5d51a116954');
 const BRANCH_ID = new mongoose.Types.ObjectId('6a927734d38fc49a298a500a');
 const apply = process.argv.includes('--apply');
 const BATCH_SIZE = 1000;
 
 const clean = (value) => String(value ?? '').trim().replace(/\s+/g, ' ');
+const firstValue = (row, keys) => {
+    for (const key of keys) {
+        if (row[key] !== undefined && row[key] !== null && row[key] !== '') return row[key];
+    }
+    return '';
+};
 const serialKey = (value) => clean(value).toUpperCase();
 const statusOf = (value) => {
     const text = clean(value).toUpperCase().replace(/[\s_-]+/g, '');
@@ -53,7 +59,7 @@ async function main() {
     const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: '' });
     const recordsBySerial = new Map();
     for (const row of rows) {
-        const serialNumber = clean(row['Serial Number']);
+        const serialNumber = clean(firstValue(row, ['Serial Number', 'Serial No', 'Serial No.']));
         if (!serialNumber) continue;
         const key = serialKey(serialNumber);
         if (recordsBySerial.has(key)) continue;
@@ -65,11 +71,11 @@ async function main() {
             customerCode: clean(row['Customer Code']),
             customerName: clean(row['Customer Name']),
             customerMobile: clean(row['Mobile Number']),
-            invoiceNumber: clean(row['Invoice Ref']),
+            invoiceNumber: clean(firstValue(row, ['Invoice Ref', 'Invoice Ref No', 'Invoice Number'])),
             saleDate: dateOf(row['Sale Date']),
             status: statusOf(row.Status),
-            location: clean(row.Location) || 'ULARIA',
-            projectCode: clean(row['Project Code']),
+            location: clean(row.Location) || 'USGOAN',
+            projectCode: clean(firstValue(row, ['Project Code', 'ProjectCode'])),
             projectName: clean(row['Project Name']),
             indicatorField: clean(row['Indicator_Field']).slice(0, 20),
         });
