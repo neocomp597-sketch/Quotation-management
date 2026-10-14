@@ -193,6 +193,9 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
                             </button>
                         </div>
                     </div>
+                    <p className="mt-3 text-xs font-semibold text-slate-600">
+                        For safe import, upload a maximum of 5,000 rows per file. Split larger files into separate uploads.
+                    </p>
                 </div>
 
                 {/* Upload Section */}

@@ -3,13 +3,14 @@ const router = express.Router();
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 const { protect } = require('../middlewares/authMiddleware');
+const { enforceImportRowLimit } = require('../middlewares/importRowLimit');
 const vendorCatalogController = require('../controllers/vendorCatalogController');
 
 router.use(protect);
 
 router.get('/', vendorCatalogController.getVendorCatalog);
 router.post('/', vendorCatalogController.createVendorCatalogProduct);
-router.post('/import', upload.single('file'), vendorCatalogController.importVendorCatalog);
+router.post('/import', upload.single('file'), enforceImportRowLimit, vendorCatalogController.importVendorCatalog);
 
 router.get('/:id', vendorCatalogController.getVendorCatalogProductById);
 router.patch('/:id', vendorCatalogController.updateVendorCatalogProduct);

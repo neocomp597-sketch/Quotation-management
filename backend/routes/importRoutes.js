@@ -4,6 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { protect } = require('../middlewares/authMiddleware');
+const { enforceImportRowLimit } = require('../middlewares/importRowLimit');
 const {
     importProducts,
     importCustomers,
@@ -61,23 +62,23 @@ const upload = multer({
 });
 
 // Import routes
-router.post('/products', protect, upload.single('file'), importProducts);
-router.post('/customers', protect, upload.single('file'), importCustomers);
-router.post('/attributes', protect, upload.single('file'), importAttributes);
-router.post('/attribute-master', protect, upload.single('file'), importAttributeMaster);
-router.post('/planning', protect, upload.single('file'), importPlanning);
-router.post('/warranties', protect, upload.single('file'), importWarranties);
-router.post('/amcs', protect, upload.single('file'), importAmcs);
-router.post('/tickets', protect, upload.single('file'), importTickets);
-router.post('/vendors', protect, upload.single('file'), importVendors);
-router.post('/price-books', protect, upload.single('file'), importPriceBooks);
-router.post('/price-book-items/:priceBookId', protect, upload.single('file'), importPriceBookItems);
+router.post('/products', protect, upload.single('file'), enforceImportRowLimit, importProducts);
+router.post('/customers', protect, upload.single('file'), enforceImportRowLimit, importCustomers);
+router.post('/attributes', protect, upload.single('file'), enforceImportRowLimit, importAttributes);
+router.post('/attribute-master', protect, upload.single('file'), enforceImportRowLimit, importAttributeMaster);
+router.post('/planning', protect, upload.single('file'), enforceImportRowLimit, importPlanning);
+router.post('/warranties', protect, upload.single('file'), enforceImportRowLimit, importWarranties);
+router.post('/amcs', protect, upload.single('file'), enforceImportRowLimit, importAmcs);
+router.post('/tickets', protect, upload.single('file'), enforceImportRowLimit, importTickets);
+router.post('/vendors', protect, upload.single('file'), enforceImportRowLimit, importVendors);
+router.post('/price-books', protect, upload.single('file'), enforceImportRowLimit, importPriceBooks);
+router.post('/price-book-items/:priceBookId', protect, upload.single('file'), enforceImportRowLimit, importPriceBookItems);
 
-router.post('/employees', protect, upload.single('file'), importEmployees);
-router.post('/contacts', protect, upload.single('file'), importContacts);
-router.post('/contracts', protect, upload.single('file'), importContracts);
-router.post('/tenders', protect, upload.single('file'), importTenders);
-router.post('/assets', protect, upload.single('file'), importAssets);
+router.post('/employees', protect, upload.single('file'), enforceImportRowLimit, importEmployees);
+router.post('/contacts', protect, upload.single('file'), enforceImportRowLimit, importContacts);
+router.post('/contracts', protect, upload.single('file'), enforceImportRowLimit, importContracts);
+router.post('/tenders', protect, upload.single('file'), enforceImportRowLimit, importTenders);
+router.post('/assets', protect, upload.single('file'), enforceImportRowLimit, importAssets);
 
 router.get('/cleanup-rr-techgrove', async (req, res) => {
     const { cleanupRRTechgroveEmployees } = require('../services/cleanupRRTechgroveEmployees');

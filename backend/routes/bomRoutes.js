@@ -3,6 +3,7 @@ const multer = require('multer');
 const router = express.Router();
 const bomController = require('../controllers/bomController');
 const { protect } = require('../middlewares/authMiddleware');
+const { enforceImportRowLimit } = require('../middlewares/importRowLimit');
 const { requirePermission } = require('../middlewares/permissionMiddleware');
 
 const canManageBOM = requirePermission('master_bom');
@@ -27,12 +28,12 @@ router.get('/ticket/:ticketId', bomController.getBOMForTicket);
 router.get('/materials', canManageBOM, bomController.searchMaterials);
 router.get('/check-product', canManageBOM, bomController.checkProduct);
 router.get('/template', canManageBOM, bomController.downloadTemplate);
-router.post('/upload', canManageBOM, upload.single('file'), bomController.uploadBOM);
+router.post('/upload', canManageBOM, upload.single('file'), enforceImportRowLimit, bomController.uploadBOM);
 router.get('/', canManageBOM, bomController.listBOMs);
 router.post('/', canManageBOM, bomController.createBOM);
 router.get('/components/template', canManageBOM, bomController.downloadComponentTemplate);
 router.post('/:id/assemblies', canManageBOM, bomController.createAssembly);
-router.post('/:id/components/import', canManageBOM, upload.single('file'), bomController.importComponents);
+router.post('/:id/components/import', canManageBOM, upload.single('file'), enforceImportRowLimit, bomController.importComponents);
 // Component lines: the backend assigns every hierarchical number (1.3 -> 1.3.1, 1.3.2...).
 router.post('/:id/components', canManageBOM, bomController.addComponent);
 router.post('/:id/components/:lineId/move', canManageBOM, bomController.moveComponent);

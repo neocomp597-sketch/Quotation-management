@@ -4,9 +4,10 @@ const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 const cityMasterController = require('../controllers/cityMasterController');
 const { protect } = require('../middlewares/authMiddleware');
+const { enforceImportRowLimit } = require('../middlewares/importRowLimit');
 
 router.get('/', cityMasterController.getAllCities);
-router.post('/upload', protect, upload.single('file'), cityMasterController.uploadCityMaster);
+router.post('/upload', protect, upload.single('file'), enforceImportRowLimit, cityMasterController.uploadCityMaster);
 router.get('/:id', cityMasterController.getCityById);
 router.post('/', protect, cityMasterController.createCity);
 router.put('/:id', protect, cityMasterController.updateCity);
