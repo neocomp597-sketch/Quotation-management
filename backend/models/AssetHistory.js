@@ -37,6 +37,9 @@ const AssetHistorySchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
+AssetHistorySchema.index({ companyId: 1, returnDate: -1, createdAt: -1 });
+AssetHistorySchema.index({ companyId: 1, branchId: 1, returnDate: -1, createdAt: -1 });
+
 // Branch that owns this record; filled from the active branch on create and used for branch scoping (see tenantPlugin).
 AssetHistorySchema.add({ branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true } });
 AssetHistorySchema.plugin(tenantPlugin);

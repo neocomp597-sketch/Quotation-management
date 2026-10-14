@@ -11,6 +11,8 @@ const AssetSchema = new mongoose.Schema({
     productCode: { type: String, default: '' },
     productName: { type: String, default: '' },
     serialNumber: { type: String, required: true },
+    // Trimmed, case-insensitive key used to enforce one current record per serial/company.
+    serialNumberKey: { type: String, default: '' },
     status: {
         type: String,
         enum: ['IN_STOCK', 'ALLOCATED', 'SOLD', 'RETURNED', 'RETURN', 'SCRAPPED'],
@@ -49,6 +51,18 @@ const AssetSchema = new mongoose.Schema({
 });
 
 AssetSchema.index({ customerId: 1, serialNumber: 1 });
+AssetSchema.index({ companyId: 1, createdAt: -1, _id: -1 });
+AssetSchema.index({ companyId: 1, branchId: 1, createdAt: -1, _id: -1 });
+AssetSchema.index({ companyId: 1, status: 1, createdAt: -1, _id: -1 });
+AssetSchema.index(
+    { companyId: 1, serialNumberKey: 1 },
+    { unique: true, partialFilterExpression: { serialNumberKey: { $type: 'string', $gt: '' } } }
+);
+
+AssetSchema.pre('validate', function () {
+    this.serialNumber = String(this.serialNumber || '').trim();
+    this.serialNumberKey = this.serialNumber.toUpperCase();
+});
 // Branch that owns this record; filled from the active branch on create and used for branch scoping (see tenantPlugin).
 AssetSchema.add({ branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true } });
 AssetSchema.plugin(tenantPlugin);

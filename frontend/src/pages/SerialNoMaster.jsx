@@ -94,6 +94,8 @@ const MgrLine = ({ record }) => {
 const SerialNoMaster = () => {
     const navigate = useNavigate();
     const [assets, setAssets] = useState([]);
+    const [assetPagination, setAssetPagination] = useState({ page: 1, limit: PAGE_SIZE, total: 0, pages: 1 });
+    const [assetSummary, setAssetSummary] = useState({ total: 0, inStock: 0, sold: 0, returned: 0 });
     const [returnHistory, setReturnHistory] = useState([]);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -150,59 +152,59 @@ const SerialNoMaster = () => {
         fetchData();
     }, []);
 
+    const loadReferenceData = async () => {
+        const [productsResult, divisionsResult, segmentsResult] = await Promise.allSettled([
+            productService.getAll(),
+            divisionService.getAll(),
+            segmentService.getAll()
+        ]);
+        if (productsResult.status === 'fulfilled') setProducts(productsResult.value?.data || []);
+        else console.warn('Could not load products list:', productsResult.reason);
+        if (divisionsResult.status === 'fulfilled') setDivisions(divisionsResult.value?.data || []);
+        else console.warn('Could not load divisions list:', divisionsResult.reason);
+        if (segmentsResult.status === 'fulfilled') setSegments(segmentsResult.value?.data || []);
+        else console.warn('Could not load segments list:', segmentsResult.reason);
+    };
+
     const fetchData = async () => {
         setLoading(true);
         setFetchError(null);
         try {
-            const [assetsResult, productsResult, divisionsResult, segmentsResult] = await Promise.allSettled([
-                csmService.getAssets(),
-                productService.getAll(),
-                divisionService.getAll(),
-                segmentService.getAll()
-            ]);
+            const params = {
+                page: currentPage,
+                limit: PAGE_SIZE,
+                q: searchQuery.trim() || undefined,
+                status: selectedStatus !== 'ALL' ? selectedStatus : undefined
+            };
+            MGR_FIELDS.forEach(({ key }) => {
+                if (mgrFilters[key] === 'ALL') return;
+                const matchingProduct = products.find((product) => formatMgrVal(product[key]) === mgrFilters[key]);
+                const mgrId = idOf(matchingProduct?.[key]);
+                if (mgrId) params[key] = mgrId;
+            });
 
-            // Assets are the core data — if they fail, show the blocking error.
-            if (assetsResult.status === 'rejected') {
-                const err = assetsResult.reason;
-                const status = err?.response?.status;
-                const serverMsg = err?.response?.data?.message || err?.message || 'Unknown error';
-                const detail = status ? `[HTTP ${status}] ${serverMsg}` : serverMsg;
-                console.error('Error fetching Invoice Bulk Upload assets:', err);
-                console.error('Server error detail:', { status, serverMsg, url: err?.config?.url });
-                setFetchError({ message: serverMsg, status });
-                toast.error(`Failed to load invoice bulk upload data: ${detail}`);
-            } else {
-                setAssets(assetsResult.value?.data || []);
-                setFetchError(null);
-            }
-
-            // Non-critical reference data: load what succeeded, warn softly for what did not.
-            if (productsResult.status === 'fulfilled') {
-                setProducts(productsResult.value?.data || []);
-            } else {
-                console.warn('Could not load products list:', productsResult.reason);
-            }
-
-            if (divisionsResult.status === 'fulfilled') {
-                setDivisions(divisionsResult.value?.data || []);
-            } else {
-                console.warn('Could not load divisions list:', divisionsResult.reason);
-            }
-
-            if (segmentsResult.status === 'fulfilled') {
-                setSegments(segmentsResult.value?.data || []);
-            } else {
-                console.warn('Could not load segments list:', segmentsResult.reason);
-            }
+            const result = await csmService.getAssets(params);
+            const payload = result.data || {};
+            setAssets(payload.data || []);
+            setAssetPagination(payload.pagination || { page: currentPage, limit: PAGE_SIZE, total: 0, pages: 1 });
+            setAssetSummary(payload.summary || { total: 0, inStock: 0, sold: 0, returned: 0 });
         } catch (err) {
+            const status = err?.response?.status;
             const serverMsg = err?.response?.data?.message || err?.message || 'Unknown error';
-            console.error('Error fetching Invoice Bulk Upload data:', err);
-            setFetchError({ message: serverMsg, status: err?.response?.status });
-            toast.error('Failed to load invoice bulk upload data');
+            const detail = status ? `[HTTP ${status}] ${serverMsg}` : serverMsg;
+            console.error('Error fetching Invoice Bulk Upload assets:', err);
+            setFetchError({ message: serverMsg, status });
+            toast.error(`Failed to load invoice bulk upload data: ${detail}`);
         } finally {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        if (activeTab !== 'active') return undefined;
+        const timer = setTimeout(fetchData, searchQuery.trim() ? 300 : 0);
+        return () => clearTimeout(timer);
+    }, [activeTab, currentPage, searchQuery, selectedStatus, mgrFilters, products]);
 
     const fetchReturnHistory = async () => {
         setLoadingHistory(true);
@@ -353,40 +355,14 @@ const SerialNoMaster = () => {
         }
     };
 
-    // Customer Name Search + Product Code + Product Name + Serial No + Invoice Ref (Requirement #10)
-    const filteredAssets = useMemo(() => {
-        return assets.filter(asset => {
-            const custName = (
-                asset.customerId?.companyName ||
-                asset.customerId?.customerName ||
-                asset.customerNameStr ||
-                ''
-            ).toLowerCase();
-
-            const prodName = (asset.productId?.productName || '').toLowerCase();
-            const prodCode = (asset.productId?.productCode || '').toLowerCase();
-            const serialNo = (asset.serialNumber || '').toLowerCase();
-            const invNo = (asset.invoiceNumber || '').toLowerCase();
-            const query = searchQuery.trim().toLowerCase();
-
-            const matchesQuery = !query ||
-                serialNo.includes(query) ||
-                prodName.includes(query) ||
-                prodCode.includes(query) ||
-                invNo.includes(query) ||
-                custName.includes(query);
-
-            const matchesStatus = selectedStatus === 'ALL' || asset.status === selectedStatus;
-            const matchesMgrs = MGR_FIELDS.every(({ key }) => mgrFilters[key] === 'ALL' || resolveAssetMgr(asset, key) === mgrFilters[key]);
-            return matchesQuery && matchesStatus && matchesMgrs;
-        });
-    }, [assets, searchQuery, selectedStatus, mgrFilters]);
+    // Asset filtering is performed by the paginated backend endpoint.
+    const filteredAssets = assets;
 
     // Options of each MGR filter: the values assigned to the products of the loaded entries.
     const mgrOptions = useMemo(() => Object.fromEntries(MGR_FIELDS.map(({ key }) => [
         key,
-        [...new Set(assets.map((asset) => resolveAssetMgr(asset, key)).filter(Boolean))].sort((a, b) => a.localeCompare(b))
-    ])), [assets]);
+        [...new Set(products.map((product) => formatMgrVal(product[key])).filter(Boolean))].sort((a, b) => a.localeCompare(b))
+    ])), [products]);
 
     const filteredReturns = useMemo(() => {
         return returnHistory.filter(item => {
@@ -408,20 +384,15 @@ const SerialNoMaster = () => {
         });
     }, [returnHistory, searchQuery]);
 
-    const stats = useMemo(() => {
-        const total = assets.length;
-        const inStock = assets.filter(a => a.status === 'IN_STOCK').length;
-        const sold = assets.filter(a => a.status === 'SOLD').length;
-        const returned = assets.filter(a => a.status === 'RETURN' || a.status === 'RETURNED').length;
-        return { total, inStock, sold, returned };
-    }, [assets]);
+    const stats = assetSummary;
 
     const activeList = activeTab === 'returns' ? filteredReturns : filteredAssets;
-    const totalPages = Math.ceil(activeList.length / PAGE_SIZE) || 1;
+    const totalPages = activeTab === 'returns' ? Math.ceil(activeList.length / PAGE_SIZE) || 1 : assetPagination.pages || 1;
     const paginatedAssets = useMemo(() => {
+        if (activeTab === 'active') return assets;
         const startIndex = (currentPage - 1) * PAGE_SIZE;
         return activeList.slice(startIndex, startIndex + PAGE_SIZE);
-    }, [activeList, currentPage]);
+    }, [activeTab, activeList, assets, currentPage]);
 
     useEffect(() => {
         setCurrentPage(1);
@@ -1022,7 +993,7 @@ const SerialNoMaster = () => {
                                     </tbody>
                                 </table>
                             </div>
-                            <PaginationControls pagination={{ page: currentPage, limit: PAGE_SIZE, total: filteredAssets.length, pages: totalPages }} onPageChange={setCurrentPage} />
+                            <PaginationControls pagination={assetPagination} onPageChange={setCurrentPage} />
                         </>
                     )}
                 </div>

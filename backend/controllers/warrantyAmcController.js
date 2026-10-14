@@ -705,6 +705,7 @@ exports.getReturnHistory = async (req, res) => {
         .populate({ path: 'customerId', select: 'customerName companyName externalCode pincode mobile', options: { bypassTenant: true } })
         .populate(productMgrPopulate())
         .sort({ returnDate: -1, createdAt: -1 })
+        .allowDiskUse(true)
         .lean();
 
         res.json(applyProductMgrsToAll(historyDocs));
@@ -718,46 +719,57 @@ exports.getReturnHistory = async (req, res) => {
 exports.getAssets = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
-        if (!companyId) {
-            return res.status(401).json({ message: 'Authentication required: no company context found.' });
-        }
+        if (!companyId) return res.status(401).json({ message: 'Authentication required: no company context found.' });
 
+        const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+        const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 15));
         const filter = { companyId };
         if (req.query.customerId) filter.customerId = req.query.customerId;
         if (req.query.productId) filter.productId = req.query.productId;
+        if (req.query.status && req.query.status !== 'ALL') filter.status = req.query.status;
 
-        // Support server-side status filter to reduce payload
-        if (req.query.status && req.query.status !== 'ALL') {
-            filter.status = req.query.status;
+        const mgrFilters = ['mgr1', 'mgr2', 'mgr3', 'mgr4', 'mgr5']
+            .filter((field) => req.query[field] && mongoose.Types.ObjectId.isValid(req.query[field]));
+        if (mgrFilters.length) {
+            const productIds = await Product.find({ companyId, $and: mgrFilters.map((field) => ({ [field]: req.query[field] })) }).distinct('_id');
+            if (!productIds.length) return res.json({ data: [], pagination: { page, limit, total: 0, pages: 1 }, summary: { total: 0, inStock: 0, sold: 0, returned: 0 } });
+            filter.productId = { $in: productIds };
         }
 
-        // Optional text search for serial number or invoice number (prefix match)
         if (req.query.q && String(req.query.q).trim()) {
-            const qClean = String(req.query.q).trim();
-            const escaped = qClean.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            const escaped = String(req.query.q).trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
             filter.$or = [
                 { serialNumber: { $regex: escaped, $options: 'i' } },
+                { productCode: { $regex: escaped, $options: 'i' } },
+                { productName: { $regex: escaped, $options: 'i' } },
                 { invoiceNumber: { $regex: escaped, $options: 'i' } },
-                { customerNameStr: { $regex: escaped, $options: 'i' } },
+                { customerNameStr: { $regex: escaped, $options: 'i' } }
             ];
         }
 
-        const docs = await Asset.find(filter)
-            .populate({ path: 'customerId', select: 'customerName companyName externalCode billingAddress pincode mobile', options: { bypassTenant: true } })
-            .populate(productMgrPopulate())
-            .populate(DIVISION_POPULATE)
-            .populate(SEGMENT_POPULATE)
-            .sort({ createdAt: -1 })
-            .maxTimeMS(12000)
-            .lean();
+        const [docs, total, allAssets, inStock, sold, returned] = await Promise.all([
+            Asset.find(filter).select('-serialNumberKey')
+                .populate({ path: 'customerId', select: 'customerName companyName externalCode billingAddress pincode mobile', options: { bypassTenant: true } })
+                .populate(productMgrPopulate()).populate(DIVISION_POPULATE).populate(SEGMENT_POPULATE)
+                .sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit)
+                .allowDiskUse(true).maxTimeMS(12000).lean(),
+            Asset.countDocuments(filter),
+            Asset.countDocuments({ companyId }),
+            Asset.countDocuments({ companyId, status: 'IN_STOCK' }),
+            Asset.countDocuments({ companyId, status: 'SOLD' }),
+            Asset.countDocuments({ companyId, status: { $in: ['RETURN', 'RETURNED'] } })
+        ]);
 
-        res.json(applyProductMgrsToAll(docs));
+        res.json({
+            data: applyProductMgrsToAll(docs),
+            pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
+            summary: { total: allAssets, inStock, sold, returned }
+        });
     } catch (error) {
         console.error('getAssets error:', error);
         res.status(500).json({ message: error.message || 'Error fetching assets' });
     }
 };
-
 exports.getAssetSummary = async (req, res) => {
     try {
         const { assetId, serialNumber } = req.query;
