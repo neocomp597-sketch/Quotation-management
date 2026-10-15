@@ -569,20 +569,28 @@ const CSMTickets = () => {
             const productsRes = valueOf(prodRes);
             const sourcesRes = valueOf(srcRes);
             const branchesRes = valueOf(branchRes);
-            if (branchesRes?.data) setBranches(branchesRes.data);
             const designationsRes = valueOf(desRes);
             const assetsRes = valueOf(assetRes);
             const problemsRes = valueOf(probRes);
 
-            setCustomers(customersRes?.data?.data || customersRes?.data || []);
-            setPriorities(prioritiesRes?.data || []);
-            setCategories(categoriesRes?.data || []);
-            setTypes(typesRes?.data || []);
-            setProducts(productsRes?.data?.data || productsRes?.data || []);
-            setSources(sourcesRes?.data || []);
-            setDesignations(designationsRes?.data || []);
-            setAssets(assetsRes?.data || []);
-            setProblems(problemsRes?.data || []);
+            const extractArray = (res) => {
+                if (!res) return [];
+                const d = res.data;
+                if (Array.isArray(d)) return d;
+                if (Array.isArray(d?.data)) return d.data;
+                return [];
+            };
+
+            setCustomers(extractArray(customersRes));
+            setPriorities(extractArray(prioritiesRes));
+            setCategories(extractArray(categoriesRes));
+            setTypes(extractArray(typesRes));
+            setProducts(extractArray(productsRes));
+            setSources(extractArray(sourcesRes));
+            setDesignations(extractArray(designationsRes));
+            setAssets(extractArray(assetsRes));
+            setProblems(extractArray(problemsRes));
+            if (branchesRes) setBranches(extractArray(branchesRes));
 
             const failed = [custRes, priRes, catRes, typRes, prodRes, srcRes, desRes, assetRes].some(result => result.status === 'rejected');
             if (failed) {
@@ -647,8 +655,16 @@ const CSMTickets = () => {
                 csmService.getAssets({ customerId })
             ]);
 
-            const voucherList = voucherRes.status === 'fulfilled' ? (voucherRes.value?.data?.data || voucherRes.value?.data || []) : [];
-            const assetList = assetRes.status === 'fulfilled' ? (assetRes.value?.data || []) : [];
+            const extractArray = (result) => {
+                if (result?.status !== 'fulfilled' || !result?.value) return [];
+                const d = result.value.data;
+                if (Array.isArray(d)) return d;
+                if (Array.isArray(d?.data)) return d.data;
+                return [];
+            };
+
+            const voucherList = extractArray(voucherRes);
+            const assetList = extractArray(assetRes);
 
             const combinedInvoices = [...voucherList];
             const existingVoucherNums = new Set(voucherList.map(v => String(v.voucherNumber || v.invoiceNumber || '').trim().toLowerCase()));
@@ -697,7 +713,7 @@ const CSMTickets = () => {
         if (formData.customerId) {
             fetchCustomerInvoicesAndSalesInvoices(formData.customerId);
             csmService.getCustomerContacts({ customerId: formData.customerId })
-                .then(res => setCustomerContacts(res.data || []))
+                .then(res => setCustomerContacts(Array.isArray(res?.data) ? res.data : (res?.data?.data || [])))
                 .catch(err => {
                     console.error('Error fetching customer contacts:', err);
                     setCustomerContacts([]);
@@ -713,11 +729,12 @@ const CSMTickets = () => {
         if (formData.customerId && formData.productId) {
             csmService.getAssets({ customerId: formData.customerId, productId: formData.productId })
                 .then(res => {
-                    const fetchedAssets = res.data || [];
+                    const fetchedAssets = Array.isArray(res?.data) ? res.data : (Array.isArray(res?.data?.data) ? res.data.data : []);
                     setAssets(prev => {
-                        const existingIds = new Set(prev.map(a => a._id));
+                        const safePrev = Array.isArray(prev) ? prev : [];
+                        const existingIds = new Set(safePrev.map(a => a._id));
                         const newAssets = fetchedAssets.filter(a => !existingIds.has(a._id));
-                        return [...prev, ...newAssets];
+                        return [...safePrev, ...newAssets];
                     });
                     
                     if (fetchedAssets.length > 0) {
@@ -825,7 +842,8 @@ const CSMTickets = () => {
             return;
         }
 
-        const selectedAsset = assets.find(a => a._id === assetId);
+        const safeAssets = Array.isArray(assets) ? assets : [];
+        const selectedAsset = safeAssets.find(a => a._id === assetId);
         if (!selectedAsset) return;
 
         setFormData(prev => ({
@@ -886,7 +904,8 @@ const CSMTickets = () => {
         }
 
         // Find if there is any matching asset for this product & customer
-        const matchingAssets = assets.filter(a => 
+        const safeAssets = Array.isArray(assets) ? assets : [];
+        const matchingAssets = safeAssets.filter(a => 
             a.customerId?._id === formData.customerId && 
             a.productId?._id === productId
         );
@@ -1034,7 +1053,7 @@ const CSMTickets = () => {
                     location: 'Auto Generated'
                 });
                 assetIdToSubmit = assetRes.data._id;
-                setAssets(prev => [...prev, assetRes.data]);
+                setAssets(prev => [...(Array.isArray(prev) ? prev : []), assetRes.data]);
             } catch (err) {
                 console.error('Error creating dynamic asset:', err);
                 toast.error('Failed to register auto-generated serial number.');
@@ -1042,7 +1061,7 @@ const CSMTickets = () => {
             }
         }
 
-        const selectedInvObj = invoices.find(i => String(i._id) === String(formData.invoiceId) || String(i.voucherNumber) === String(formData.invoiceId));
+        const selectedInvObj = (Array.isArray(invoices) ? invoices : []).find(i => String(i._id) === String(formData.invoiceId) || String(i.voucherNumber) === String(formData.invoiceId));
         let finalInvoiceId = formData.invoiceId;
         let manualInvoiceNoToSubmit = formData.manualInvoiceNo || '';
 
@@ -1224,7 +1243,8 @@ const CSMTickets = () => {
             let assetId = null;
             const cleanSerial = (manualFormData.serialNumber || '').trim();
             if (cleanSerial) {
-                const existingAsset = assets.find(a => (a.serialNumber || '').toLowerCase() === cleanSerial.toLowerCase());
+                const safeAssets = Array.isArray(assets) ? assets : [];
+                const existingAsset = safeAssets.find(a => (a.serialNumber || '').toLowerCase() === cleanSerial.toLowerCase());
                 if (existingAsset) {
                     assetId = existingAsset._id;
                 } else if (productId) {
@@ -1235,7 +1255,7 @@ const CSMTickets = () => {
                         location: 'Manual Register'
                     });
                     assetId = newAssetRes.data._id;
-                    setAssets(prev => [...prev, newAssetRes.data]);
+                    setAssets(prev => [...(Array.isArray(prev) ? prev : []), newAssetRes.data]);
                 }
             }
 
@@ -1887,7 +1907,7 @@ const CSMTickets = () => {
             });
 
             const contactsRes = await csmService.getCustomerContacts({ customerId: targetCustId });
-            let fetchedList = contactsRes.data || [];
+            let fetchedList = Array.isArray(contactsRes.data) ? contactsRes.data : (contactsRes.data?.data || []);
             if (res.data && res.data._id && !fetchedList.some(c => c._id === res.data._id)) {
                 fetchedList = [res.data, ...fetchedList];
             }
@@ -2718,7 +2738,7 @@ const CSMTickets = () => {
                         <div>
                             <div className="flex justify-between items-center mb-1">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Link Product *</label>
-                                {formData.customerId && assets.some(a => getObjId(a.customerId) === String(formData.customerId)) && (
+                                {formData.customerId && Array.isArray(assets) && assets.some(a => getObjId(a.customerId) === String(formData.customerId)) && (
                                     <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 cursor-pointer">
                                         <input
                                             type="checkbox"
@@ -2733,9 +2753,12 @@ const CSMTickets = () => {
                             <SearchableSelect
                                 options={
                                     (() => {
-                                        let filteredProds = products;
+                                        let filteredProds = Array.isArray(products) ? products : [];
+                                        const safeInvoices = Array.isArray(invoices) ? invoices : [];
+                                        const safeAssets = Array.isArray(assets) ? assets : [];
+
                                         if (formData.invoiceId) {
-                                            const selectedInvoice = invoices.find(i => String(i._id) === String(formData.invoiceId) || String(i.voucherNumber) === String(formData.invoiceId));
+                                            const selectedInvoice = safeInvoices.find(i => String(i._id) === String(formData.invoiceId) || String(i.voucherNumber) === String(formData.invoiceId));
                                             if (selectedInvoice && selectedInvoice.items && selectedInvoice.items.length > 0) {
                                                 filteredProds = selectedInvoice.items.map(item => ({
                                                     _id: item.productId?._id || item.productId || item._id,
@@ -2744,14 +2767,14 @@ const CSMTickets = () => {
                                                 }));
                                             }
                                         } else if (formData.customerId) {
-                                            const customerHasAssets = assets.some(a => getObjId(a.customerId) === String(formData.customerId));
+                                            const customerHasAssets = safeAssets.some(a => getObjId(a.customerId) === String(formData.customerId));
                                             if (customerHasAssets && !showAllProducts) {
-                                                filteredProds = products.filter(p => assets.some(a => getObjId(a.customerId) === String(formData.customerId) && getObjId(a.productId) === String(p._id)));
+                                                filteredProds = filteredProds.filter(p => safeAssets.some(a => getObjId(a.customerId) === String(formData.customerId) && getObjId(a.productId) === String(p._id)));
                                             }
                                         }
 
                                         if (formData.productId && !filteredProds.some(p => String(p._id || p.value) === String(formData.productId))) {
-                                            const selectedP = products.find(p => String(p._id) === String(formData.productId));
+                                            const selectedP = (Array.isArray(products) ? products : []).find(p => String(p._id) === String(formData.productId));
                                             if (selectedP) {
                                                 filteredProds = [selectedP, ...filteredProds];
                                             }
@@ -2770,7 +2793,7 @@ const CSMTickets = () => {
                         </div>
                         <div>
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                                Link Invoice {formData.customerId ? `(${invoices.length})` : ''}
+                                Link Invoice {formData.customerId ? `(${(Array.isArray(invoices) ? invoices : []).length})` : ''}
                             </label>
                             <select
                                 value={formData.invoiceId}
@@ -2780,7 +2803,8 @@ const CSMTickets = () => {
                                     setFormData(prev => {
                                         const nextData = { ...prev, invoiceId: nextInvoiceId };
                                         if (nextInvoiceId) {
-                                            const selectedInvoice = invoices.find(i => i._id === nextInvoiceId);
+                                            const safeInvoices = Array.isArray(invoices) ? invoices : [];
+                                            const selectedInvoice = safeInvoices.find(i => i._id === nextInvoiceId);
                                             const invoiceProductIds = selectedInvoice ? selectedInvoice.items.map(item => item.productId?.toString()).filter(Boolean) : [];
                                             if (prev.productId && !invoiceProductIds.includes(prev.productId.toString())) {
                                                 nextData.productId = '';
@@ -2792,8 +2816,8 @@ const CSMTickets = () => {
                                 }}
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold disabled:bg-slate-50 disabled:text-slate-400"
                             >
-                                <option value="">{formData.customerId ? `Select Invoice (${invoices.length} available)` : 'Select Customer First'}</option>
-                                {invoices.map(i => <option key={i._id} value={i._id}>{i.voucherNumber} ({formatDate(i.date)})</option>)}
+                                <option value="">{formData.customerId ? `Select Invoice (${(Array.isArray(invoices) ? invoices : []).length} available)` : 'Select Customer First'}</option>
+                                {(Array.isArray(invoices) ? invoices : []).map(i => <option key={i._id} value={i._id}>{i.voucherNumber} ({formatDate(i.date)})</option>)}
                             </select>
                         </div>
                         <div>

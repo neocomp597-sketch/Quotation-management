@@ -1164,7 +1164,7 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
                                     if (viewCustomer?._id && customerAssets.length === 0) {
                                         setAssetsLoading(true);
                                         csmService.getAssets({ customerId: viewCustomer._id })
-                                            .then(res => setCustomerAssets(res.data || []))
+                                            .then(res => setCustomerAssets(Array.isArray(res?.data) ? res.data : (Array.isArray(res?.data?.data) ? res.data.data : [])))
                                             .catch(() => setCustomerAssets([]))
                                             .finally(() => setAssetsLoading(false));
                                     }
