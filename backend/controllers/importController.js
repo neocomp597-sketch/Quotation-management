@@ -72,7 +72,7 @@ const Contact = require('../models/Contact');
 const Contract = require('../models/Contract');
 const Asset = require('../models/Asset');
 const { deriveBasePriceFromVendors } = require('../utils/vendorSelection');
-const { invalidateCustomerCaches, invalidateProductCaches } = require('../utils/cacheInvalidation');
+const { invalidateCustomerCaches, invalidateProductCaches, invalidateAssetCaches } = require('../utils/cacheInvalidation');
 
 const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const toBoolean = (value) => {
@@ -3558,7 +3558,11 @@ const importAssets = async (req, res) => {
         const successCount = results.created + results.updated;
 
         if (successCount > 0) {
-            await Promise.all([invalidateCustomerCaches(), invalidateProductCaches()]);
+            await Promise.all([
+                invalidateCustomerCaches(),
+                invalidateProductCaches(),
+                invalidateAssetCaches(req.user?.companyId)
+            ]);
         }
 
         if (successCount > 0) {

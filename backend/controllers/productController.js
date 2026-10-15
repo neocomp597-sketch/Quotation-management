@@ -7,7 +7,7 @@ const {
     deriveBasePriceFromVendors,
     isVendorActive
 } = require('../utils/vendorSelection');
-const { invalidateProductCaches } = require('../utils/cacheInvalidation');
+const { invalidateProductCaches, invalidateAssetCaches } = require('../utils/cacheInvalidation');
 const { getCachedJson, makeCacheKey, setCachedJson } = require('../utils/apiCache');
 
 const PRODUCTS_CACHE_KEY = 'products:all';
@@ -563,6 +563,9 @@ const updateProduct = async (req, res) => {
         }
 
         await clearProductsCache();
+        // MGR assignments on the product changed — asset/serial caches must be
+        // flushed so Invoice Bulk Upload reflects the new values immediately.
+        await invalidateAssetCaches(req.user?.companyId);
         res.json(buildProductResponse(updatedProduct));
     } catch (error) {
         console.error(error);
@@ -712,6 +715,8 @@ const bulkUpdateProducts = async (req, res) => {
             { $set: { ...updateData, updatedAt: new Date() } }
         );
         await clearProductsCache();
+        // Bulk MGR update: flush asset caches so Invoice Bulk Upload shows live values.
+        await invalidateAssetCaches(req.user?.companyId);
 
         res.json({
             message: `${result.modifiedCount} products updated successfully`,
