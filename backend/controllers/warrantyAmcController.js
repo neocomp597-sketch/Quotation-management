@@ -724,7 +724,10 @@ exports.getAssets = async (req, res) => {
         if (!branchId) return res.status(400).json({ message: 'Select an active branch before viewing invoice bulk upload data.' });
 
         const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
-        const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 15));
+        const isExport = req.query.export === 'true';
+        const limit = isExport
+            ? Math.min(50000, Math.max(1, Number.parseInt(req.query.limit, 10) || 50000))
+            : Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 15));
         const filter = { companyId, branchId };
         if (req.query.customerId) filter.customerId = req.query.customerId;
         if (req.query.productId) filter.productId = req.query.productId;

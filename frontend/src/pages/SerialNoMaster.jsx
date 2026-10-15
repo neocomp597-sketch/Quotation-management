@@ -227,51 +227,119 @@ const SerialNoMaster = () => {
         }
     };
 
-    // Standardized 15-Column Export (Requirement #2)
-    const handleExport = () => {
-        const dataToExport = activeTab === 'returns' ? returnHistory : filteredAssets;
-        if (!dataToExport || dataToExport.length === 0) {
-            toast.error('No records to export');
+    // Standardized Export — fetches ALL matching records from the backend (not just the current page)
+    const handleExport = async () => {
+        if (activeTab === 'returns') {
+            const dataToExport = filteredReturns;
+            if (!dataToExport || dataToExport.length === 0) {
+                toast.error('No return history records to export');
+                return;
+            }
+            const buildRow = (asset) => {
+                const prodName = asset.productId?.productName || asset.productName || '';
+                const prodCode = asset.productId?.productCode || asset.productCode || '';
+                const custName = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || asset.customerName || (asset.customerId ? 'Customer' : 'Stock (Unsold)');
+                const sDate = asset.saleDate || asset.invoiceDate;
+                return {
+                    'Serial Number': asset.serialNumber || '',
+                    'Product Name': prodName,
+                    'Product Code': prodCode,
+                    'Status': asset.status || 'IN_STOCK',
+                    'Customer Code': asset.customerCode || asset.customerId?.externalCode || '',
+                    'Customer': custName,
+                    'Customer Postal Code': asset.customerPostalCode || '',
+                    'Invoice Ref': asset.invoiceNumber || '',
+                    'Sale Date': formatDate(sDate, ''),
+                    'Location': asset.location || '',
+                    'Division_Code': asset.divisionId?.code || '',
+                    'Division_Desc': asset.divisionId?.description || '',
+                    'Segment_Code': asset.segmentId?.code || '',
+                    'Segment_Desc': asset.segmentId?.description || '',
+                    'Mgr 1': resolveAssetMgr(asset, 'mgr1'),
+                    'Mgr 2': resolveAssetMgr(asset, 'mgr2'),
+                    'Mgr 3': resolveAssetMgr(asset, 'mgr3'),
+                    'Mgr 4': resolveAssetMgr(asset, 'mgr4'),
+                    'Mgr 5': resolveAssetMgr(asset, 'mgr5'),
+                    'Indicator_Field': asset.indicatorField || '',
+                    'Project Code': asset.projectCode || '',
+                    'Project Name': asset.projectName || ''
+                };
+            };
+            const exportData = dataToExport.map(buildRow);
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Return History');
+            XLSX.writeFile(wb, `Invoice_Bulk_Upload_Returns_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            toast.success(`Exported ${exportData.length} return records`);
             return;
         }
 
-        const exportData = dataToExport.map(asset => {
-            const prodName = asset.productId?.productName || asset.productName || '';
-            const prodCode = asset.productId?.productCode || asset.productCode || '';
-            const custName = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || asset.customerName || (asset.customerId ? 'Customer' : 'Stock (Unsold)');
-            const sDate = asset.saleDate || asset.invoiceDate;
-
-            return {
-                'Serial Number': asset.serialNumber || '',
-                'Product Name': prodName,
-                'Product Code': prodCode,
-                'Status': asset.status || 'IN_STOCK',
-                'Customer Code': asset.customerCode || asset.customerId?.externalCode || '',
-                'Customer': custName,
-                'Customer Postal Code': asset.customerPostalCode || '',
-                'Invoice Ref': asset.invoiceNumber || '',
-                'Sale Date': formatDate(sDate, ''),
-                'Location': asset.location || '',
-                'Division_Code': asset.divisionId?.code || '',
-                'Division_Desc': asset.divisionId?.description || '',
-                'Segment_Code': asset.segmentId?.code || '',
-                'Segment_Desc': asset.segmentId?.description || '',
-                'Mgr 1': resolveAssetMgr(asset, 'mgr1'),
-                'Mgr 2': resolveAssetMgr(asset, 'mgr2'),
-                'Mgr 3': resolveAssetMgr(asset, 'mgr3'),
-                'Mgr 4': resolveAssetMgr(asset, 'mgr4'),
-                'Mgr 5': resolveAssetMgr(asset, 'mgr5'),
-                'Indicator_Field': asset.indicatorField || '',
-                'Project Code': asset.projectCode || '',
-                'Project Name': asset.projectName || ''
+        // Active inventory: fetch ALL records from backend (bypassing page-size cap)
+        setLoading(true);
+        try {
+            const params = {
+                export: 'true',
+                limit: 50000,
+                q: searchQuery.trim() || undefined,
+                status: selectedStatus !== 'ALL' ? selectedStatus : undefined
             };
-        });
+            MGR_FIELDS.forEach(({ key }) => {
+                if (mgrFilters[key] === 'ALL') return;
+                const matchingProduct = products.find((product) => formatMgrVal(product[key]) === mgrFilters[key]);
+                const mgrId = idOf(matchingProduct?.[key]);
+                if (mgrId) params[key] = mgrId;
+            });
 
-        const ws = XLSX.utils.json_to_sheet(exportData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, activeTab === 'returns' ? 'Return History' : 'Invoice Bulk Upload');
-        XLSX.writeFile(wb, `Invoice_Bulk_Upload_${new Date().toISOString().slice(0, 10)}.xlsx`);
-        toast.success(`Exported ${exportData.length} records`);
+            const result = await csmService.getAssets(params);
+            const allAssets = result.data?.data || [];
+
+            if (!allAssets.length) {
+                toast.error('No records to export');
+                return;
+            }
+
+            const exportData = allAssets.map(asset => {
+                const prodName = asset.productId?.productName || asset.productName || '';
+                const prodCode = asset.productId?.productCode || asset.productCode || '';
+                const custName = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || asset.customerName || (asset.customerId ? 'Customer' : 'Stock (Unsold)');
+                const sDate = asset.saleDate || asset.invoiceDate;
+                return {
+                    'Serial Number': asset.serialNumber || '',
+                    'Product Name': prodName,
+                    'Product Code': prodCode,
+                    'Status': asset.status || 'IN_STOCK',
+                    'Customer Code': asset.customerCode || asset.customerId?.externalCode || '',
+                    'Customer': custName,
+                    'Customer Postal Code': asset.customerPostalCode || '',
+                    'Invoice Ref': asset.invoiceNumber || '',
+                    'Sale Date': formatDate(sDate, ''),
+                    'Location': asset.location || '',
+                    'Division_Code': asset.divisionId?.code || '',
+                    'Division_Desc': asset.divisionId?.description || '',
+                    'Segment_Code': asset.segmentId?.code || '',
+                    'Segment_Desc': asset.segmentId?.description || '',
+                    'Mgr 1': resolveAssetMgr(asset, 'mgr1'),
+                    'Mgr 2': resolveAssetMgr(asset, 'mgr2'),
+                    'Mgr 3': resolveAssetMgr(asset, 'mgr3'),
+                    'Mgr 4': resolveAssetMgr(asset, 'mgr4'),
+                    'Mgr 5': resolveAssetMgr(asset, 'mgr5'),
+                    'Indicator_Field': asset.indicatorField || '',
+                    'Project Code': asset.projectCode || '',
+                    'Project Name': asset.projectName || ''
+                };
+            });
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Invoice Bulk Upload');
+            XLSX.writeFile(wb, `Invoice_Bulk_Upload_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            toast.success(`Exported ${exportData.length} records`);
+        } catch (err) {
+            console.error('Export error:', err);
+            toast.error('Failed to export records');
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Asset Lifecycle Detail is a full page with the serial's activity log and exports.

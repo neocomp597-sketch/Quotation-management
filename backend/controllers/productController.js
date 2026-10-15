@@ -22,7 +22,11 @@ const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 const getPagination = (query) => {
     const page = Math.max(1, Number(query.page || 1));
-    const limit = Math.min(100, Math.max(1, Number(query.limit || 25)));
+    // When exporting, allow up to 50,000 records; otherwise cap at 100
+    const isExport = query.export === 'true';
+    const limit = isExport
+        ? Math.min(50000, Math.max(1, Number(query.limit || 10000)))
+        : Math.min(100, Math.max(1, Number(query.limit || 25)));
     return { page, limit, skip: (page - 1) * limit };
 };
 

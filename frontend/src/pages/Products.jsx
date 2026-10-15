@@ -911,6 +911,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
             const typeParam = catalogTypeMap[activeTab] || 'Product';
 
             const res = await productService.getAll({
+                export: 'true',
                 limit: 10000,
                 search: debouncedSearch || undefined,
                 catalogType: typeParam,
