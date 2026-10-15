@@ -1,0 +1,1290 @@
+{
+  "operation": "GRANT_ALL_ACCESS",
+  "branch": {
+    "_id": "6a927734d38fc49a298a500a",
+    "name": "USGOAN",
+    "code": "SBU-II"
+  },
+  "timestamp": "2026-10-15T18:35:56.542Z",
+  "totalUsers": 212,
+  "successCount": 212,
+  "failedCount": 0,
+  "verifyNgCount": 0,
+  "permissionsGranted": 97,
+  "successUsers": [
+    {
+      "id": "6a8bf304ac99b5d51a116956",
+      "name": "super Admin",
+      "email": "super@gmail.com",
+      "role": "admin"
+    },
+    {
+      "id": "6aaac79d692b7aba27a9342a",
+      "name": "Deepnarayan Kshatriya",
+      "email": "erp.ahd@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79d692b7aba27a933dc",
+      "name": "Kailas Parashuram Bhongale",
+      "email": "kailas.bhongale@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79d692b7aba27a93321",
+      "name": "Mangesh Ladaku Jadhav",
+      "email": "admin.stel2@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79d692b7aba27a93422",
+      "name": "Pankaj Kumar",
+      "email": "pkmtr1020@gmail.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79d692b7aba27a933a1",
+      "name": "Shubham Singh",
+      "email": "shubham.singh@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79d692b7aba27a93518",
+      "name": "Nivrutti Ganpat Bhoir",
+      "email": "production.stel2@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9356f",
+      "name": "Akash K J",
+      "email": "sbuii424@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93577",
+      "name": "Ankit Kumar Vishwakarma",
+      "email": "sbuii437@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93583",
+      "name": "Jayesh Jagan Harnya",
+      "email": "jayesh.harnya@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93585",
+      "name": "Siddheshvar Balkrishna Ghogale",
+      "email": "sbuii451@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93586",
+      "name": "Vykundaraja Senthivel",
+      "email": "sbuii453@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93589",
+      "name": "Vijay Bajirao Bhawale",
+      "email": "sbuii458@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93593",
+      "name": "Bhalchandra Narayan Varade",
+      "email": "bhalchandra.varade@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935a7",
+      "name": "Bhargavkumar Chandrakantbhai Shukla",
+      "email": "bhargavkumar.shukla@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935c3",
+      "name": "Vedant Pradeep Gawande",
+      "email": "sbuii523@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935c4",
+      "name": "Simrankaur Gurmitsingh Chavan",
+      "email": "sbuii524@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935d4",
+      "name": "Pradyuman Vindhayanchal Yadav",
+      "email": "sbuii540@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9351e",
+      "name": "Saurabh Ashok Pugaliya",
+      "email": "sbuii178@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93523",
+      "name": "Praful Krishna Shetty",
+      "email": "excise@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93526",
+      "name": "Ranajeet Suryamani Yadav",
+      "email": "sbuii201@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93535",
+      "name": "Ajit Patil",
+      "email": "sbuii274@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9353a",
+      "name": "Sandeep Idala",
+      "email": "sandeep.idala@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93558",
+      "name": "Rakesh Kumar",
+      "email": "sbuii391@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9356e",
+      "name": "Akshay Sudam Pawar",
+      "email": "sbuii422@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9357c",
+      "name": "Pawan Kumar",
+      "email": "sbuii441@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9358e",
+      "name": "Prathamesh Anil Potdar",
+      "email": "sbuii465@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935a4",
+      "name": "Tejas Arjun Kale",
+      "email": "sbuii492@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935bf",
+      "name": "Pragati Kamlakar Sonone",
+      "email": "sbuii518@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935c2",
+      "name": "Gaurav Sanjay Zade",
+      "email": "sbuii522@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79d692b7aba27a93512",
+      "name": "Swapan Ganguly",
+      "email": "s.ganguly@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93530",
+      "name": "Vishwanath Rajaram Ayare",
+      "email": "v.ayare@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93532",
+      "name": "Jagruti Khandagale",
+      "email": "jagruti.khandagale@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9353b",
+      "name": "Rapaka Gowtham",
+      "email": "sbuii314@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93545",
+      "name": "Mayuresh Devhare",
+      "email": "sbuii345@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93553",
+      "name": "Pratham Jitendra Bari",
+      "email": "sbuii371@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9358b",
+      "name": "Dhanay Santosh Patil",
+      "email": "sbuii460@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93594",
+      "name": "Anjani Rajendra Pandey",
+      "email": "anjani.pandey@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9359d",
+      "name": "Jagannath Budhya Wagh",
+      "email": "sbuii483@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935a3",
+      "name": "Pranay Vikas More",
+      "email": "sbuii491@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935a5",
+      "name": "Nandkishor Shrikant Gupta",
+      "email": "sbuii493@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935ad",
+      "name": "SK Masidur Rahaman",
+      "email": "sbuii501@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935b0",
+      "name": "Sumit Ganesh Jumde",
+      "email": "sbuii504@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935bc",
+      "name": "Dhawal Jagdishrao Lokhande",
+      "email": "sbuii515@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935c6",
+      "name": "Sharvari Sharad Deshmukh",
+      "email": "sbuii526@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935ca",
+      "name": "Minal Purushottam Chaudhari",
+      "email": "sbuii530@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935d3",
+      "name": "Krishnakumar",
+      "email": "sbuii539@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79d692b7aba27a93514",
+      "name": "Sugathavel Maharaja Pillai",
+      "email": "sugathavel@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9352f",
+      "name": "Sunil Subhash Gawad",
+      "email": "engg.stel2@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93540",
+      "name": "Sanjay Bhau Gorhekar",
+      "email": "sbuii33@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93580",
+      "name": "Santosh Ashok Naphade",
+      "email": "sbuii446@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93595",
+      "name": "Nilesh Kumbhare",
+      "email": "nilesh.kumbhare@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9359a",
+      "name": "Akshay Jayram Karande",
+      "email": "sbuii480@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935c7",
+      "name": "Surjit Singh",
+      "email": "surjit.singh@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935d1",
+      "name": "Dinesh Yashwant Pawar",
+      "email": "sbuii537@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79d692b7aba27a93516",
+      "name": "Suresh Arumugam",
+      "email": "sbuii148@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9352d",
+      "name": "Divan Sukhram Singh",
+      "email": "raj.service@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93590",
+      "name": "Dipak Agrawal",
+      "email": "sbuii467@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935a9",
+      "name": "Shubham Singh",
+      "email": "sbuii497@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935b4",
+      "name": "Kshitija Prashant Deshmukh",
+      "email": "sbuii508@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935b9",
+      "name": "Om Ashok Bhedurkar",
+      "email": "sbuii512@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935c9",
+      "name": "Sayali Rajaram Narkar",
+      "email": "sbuii529@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935cd",
+      "name": "Dileep Kumar Shukla",
+      "email": "dileep.shukla@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935d5",
+      "name": "Rajesh Vijaykumar Vijayan",
+      "email": "rajesh.vijayan@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935d6",
+      "name": "Ashok Dattatrey Warghade",
+      "email": "sbuii6@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93521",
+      "name": "Pranit Sukhadev Jondhale",
+      "email": "pranit.jondhale@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93534",
+      "name": "Ayush Kumar",
+      "email": "neservice.stel2@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93538",
+      "name": "Mahesh Palkar",
+      "email": "mahesh.palkar@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9353e",
+      "name": "Pradip Kumar Panda",
+      "email": "sbuii324@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9354a",
+      "name": "Rishu Kumar",
+      "email": "sbuii356@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93555",
+      "name": "Ved Prakash Tiwari",
+      "email": "sbuii381@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9355a",
+      "name": "Suvidha Ashish Chaudhari",
+      "email": "suvidha.chaudhari@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9355e",
+      "name": "Snehal Subhash Pashte",
+      "email": "sbuii404@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93561",
+      "name": "Aftab Alam",
+      "email": "sbuii408@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93566",
+      "name": "Pratik Ramesh Patil",
+      "email": "sbuii413@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93570",
+      "name": "Lalit Govind Joshi",
+      "email": "safety.stel2@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93582",
+      "name": "Prabin S.",
+      "email": "sbuii449@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935af",
+      "name": "Aman Rameshwar Ramagade",
+      "email": "sbuii503@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935b7",
+      "name": "Ayush Pravin Harne",
+      "email": "sbuii510@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935c0",
+      "name": "Yash Sanjay Kalyankar",
+      "email": "sbuii519@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935cb",
+      "name": "Brahmankar Sachin Madhukar",
+      "email": "sachin.brahmankar@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935f7",
+      "name": "Monali Dilip Patil",
+      "email": "reception.stel2@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79d692b7aba27a93515",
+      "name": "Bidhubhusan Biswal",
+      "email": "service.stel2@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93527",
+      "name": "Kalpesh Bhoir",
+      "email": "sbuii217@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93551",
+      "name": "Harshala Kudu",
+      "email": "sbuii366@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9356b",
+      "name": "Rupesh Gajanan Bhoir",
+      "email": "rupesh.bhoir@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9357a",
+      "name": "Prashant Kumar Shrutisagar Rai",
+      "email": "prashant.rai@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93584",
+      "name": "Chetan Nana Jadhav",
+      "email": "sbuii450@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9359f",
+      "name": "Amisha Dnyaneshwar Bhoir",
+      "email": "sbuii486@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935a2",
+      "name": "Gautam Kumar",
+      "email": "sbuii490@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935ab",
+      "name": "Gaurav Arun Gawai",
+      "email": "sbuii499@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935be",
+      "name": "Sanika Vivek Deshmukh",
+      "email": "sbuii517@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935c1",
+      "name": "Himanshu Vijay Karale",
+      "email": "sbuii520@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935d7",
+      "name": "Ranjeet Ramdhari Saroj",
+      "email": "ranjeet.saroj@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79d692b7aba27a93517",
+      "name": "Vishnu Devendra Singhal",
+      "email": "vishnu.singhal@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93528",
+      "name": "Nilesh Manohar Ayare",
+      "email": "accounts.usgaon@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9355c",
+      "name": "Sejal Subhash Pashte",
+      "email": "sbuii399@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93568",
+      "name": "Pradeep Uday Narayan Pandey",
+      "email": "pradeep.pandey@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935b5",
+      "name": "Prachi Ashok Itnare",
+      "email": "sbuii509@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935ba",
+      "name": "Vijay Gajanan Sonune",
+      "email": "sbuii513@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935bd",
+      "name": "Adinath Girish Udgikar",
+      "email": "sbuii516@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935ce",
+      "name": "Sarvesh Mahendra Patil",
+      "email": "sbuii534@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935d2",
+      "name": "Saksham Singh",
+      "email": "sbuii538@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93522",
+      "name": "Atul Gopal Bhoir",
+      "email": "sbuii19@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9352c",
+      "name": "Pankaj Sharma",
+      "email": "sbuii236@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9353c",
+      "name": "Rajesh Kumar Singh",
+      "email": "sbuii318@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93554",
+      "name": "TEJAS SHIVAJI PAWAR",
+      "email": "sbuii372@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93557",
+      "name": "Prashant Baban Shinde",
+      "email": "prashant.shinde@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93567",
+      "name": "Tanay Mahendra Gotarane",
+      "email": "sbuii414@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9356c",
+      "name": "Saurabh Narendra Patil",
+      "email": "saurabh.patil@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93572",
+      "name": "Yogesh Dadarao Solunke",
+      "email": "yogesh.solunke@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9358c",
+      "name": "Sandeepkumar Brijmohan Rajak",
+      "email": "sbuii461@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93592",
+      "name": "Nadim Akhtar",
+      "email": "sbuii47@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935a0",
+      "name": "Nitin Bhaskarrao Magar",
+      "email": "sbuii489@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935b1",
+      "name": "Abhinay Avdhut Chapake",
+      "email": "sbuii505@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935d9",
+      "name": "Manoj Kumar Vishwanath Chaudhary",
+      "email": "mkchoudhary@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79d692b7aba27a9350f",
+      "name": "Amol Shashikant Dalvi",
+      "email": "qc.stel2@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79d692b7aba27a93510",
+      "name": "Sandeepkumar Shantilal Parekh",
+      "email": "sandeep.parekh@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79d692b7aba27a93519",
+      "name": "Sushil Sonu Parab",
+      "email": "purchase.stel2@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9351b",
+      "name": "Milan Kumar Poria",
+      "email": "sbuii168@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93531",
+      "name": "Jitendra Dwarkanath Godade",
+      "email": "edp.stel2@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93536",
+      "name": "Saravanan M. R",
+      "email": "saravanan.mr@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93543",
+      "name": "Ganesh Shinde",
+      "email": "sbuii339@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9355b",
+      "name": "Deepak Shivaji Nagam",
+      "email": "sbuii396@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9355d",
+      "name": "Sandesh Shashikant Tare",
+      "email": "sandesh.tare@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93562",
+      "name": "Deepak Kumar",
+      "email": "deepak.kumar@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9357f",
+      "name": "Nivrutti Sudhakar Patil",
+      "email": "sbuii445@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93587",
+      "name": "Yash Nivrutti Patil",
+      "email": "sbuii456@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9359c",
+      "name": "Kanagajeyanthi M.",
+      "email": "sbuii482@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9351f",
+      "name": "Rajesh Trilokinath Gupta",
+      "email": "sbuii183@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9352b",
+      "name": "Lalit Yadav",
+      "email": "sbuii235@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93533",
+      "name": "Vikas Pujare",
+      "email": "stores.stel2@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9353f",
+      "name": "Vivek Nagmote",
+      "email": "vivek.nagmote@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93544",
+      "name": "Kanchan Monde",
+      "email": "sbuii340@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93548",
+      "name": "Yogesh Naresh Mhatre",
+      "email": "sbuii354@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9354f",
+      "name": "Vishnu D",
+      "email": "sbuii362@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93559",
+      "name": "Noorul Haque Ansari",
+      "email": "sbuii392@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93560",
+      "name": "Saurabh Shrivastava",
+      "email": "saurabh.srivastava@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93564",
+      "name": "Siddhant Sunil Parulekar",
+      "email": "sbuii411@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93579",
+      "name": "Vishal Prakash Sawant",
+      "email": "sbuii439@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935ac",
+      "name": "Abhay Singh",
+      "email": "sbuii500@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935c5",
+      "name": "Sakshi Vishnudas Bhosle",
+      "email": "sbuii525@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935d8",
+      "name": "Neeraj kumar Singh",
+      "email": "sbuii70@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79d692b7aba27a93511",
+      "name": "Manoj Gajanan Jadhav",
+      "email": "sbuii12@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9351c",
+      "name": "Radhakrishnan Padmanabha Pillai",
+      "email": "sbuii17@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93525",
+      "name": "Ramakrishnan Easwaramoorthy Pillai",
+      "email": "eramakrishnan@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93529",
+      "name": "Saichandredy Kasam",
+      "email": "sbuii231@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9352e",
+      "name": "Mustakeem Khan",
+      "email": "rnd.stel2@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9353d",
+      "name": "Sivathanu Mathevan Pillai",
+      "email": "sbuii32@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9354b",
+      "name": "Aditya Eknath Kapsikar",
+      "email": "sbuii357@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9354d",
+      "name": "Viraj Moreshwar Naik",
+      "email": "sbuii36@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93550",
+      "name": "Harshad Suresh Bhat",
+      "email": "sbuii364@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93569",
+      "name": "Yash Tanaji Jadhav",
+      "email": "yash.jadhav@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93574",
+      "name": "Vibhav Kumar Mishra",
+      "email": "sbuii434@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9357d",
+      "name": "Shaikh Taher Ahmed Zahoor Ahmed",
+      "email": "taher.shaikh@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93597",
+      "name": "Swapnil Vishnu Jadhav",
+      "email": "swapnil.jadhav@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935aa",
+      "name": "Anil Yuvraj Ahire",
+      "email": "sbuii498@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935cc",
+      "name": "Aman Anand Maurya",
+      "email": "sbuii532@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9352a",
+      "name": "Manas Ranjan Khandayatray",
+      "email": "sbuii232@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93542",
+      "name": "Hitesh Dinesh Gharat",
+      "email": "sbuii337@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9354e",
+      "name": "Vivek Shukla",
+      "email": "vivek.shukla@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93573",
+      "name": "Ajay Naresh Jadhav",
+      "email": "sbuii432@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93581",
+      "name": "Prashant Kumar Brijesh Nayak",
+      "email": "project.stel2@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93591",
+      "name": "Sanket Mondal",
+      "email": "sbuii469@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9359e",
+      "name": "Shashank Rajesh Waghela",
+      "email": "sbuii485@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935d0",
+      "name": "Ravikant Bhaskar Haral",
+      "email": "sbuii536@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935da",
+      "name": "Ramakant Tukaram Ubale",
+      "email": "sbuii79@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93549",
+      "name": "Rajaram Bhagoji Mundekar",
+      "email": "rajaram.mundekar@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9355f",
+      "name": "Abhinav Himen Sarmah",
+      "email": "abhinav.sarmah@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93563",
+      "name": "Prashant Prakash Kanade",
+      "email": "sbuii41@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93571",
+      "name": "Swapnil Sadanand Salvi",
+      "email": "swapnil.salvi@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93578",
+      "name": "Anirban Dhiren Mahato",
+      "email": "sbuii438@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93588",
+      "name": "Akshay Bhausaheb Amale",
+      "email": "sbuii457@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9358a",
+      "name": "Kiran Bhaskar Karale",
+      "email": "sbuii459@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9358f",
+      "name": "Manish Kumar Singh",
+      "email": "sbuii466@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935a6",
+      "name": "Uttam Ashok Raut",
+      "email": "sbuii494@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935b8",
+      "name": "Vedant Gajanan Hiwale",
+      "email": "sbuii511@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935bb",
+      "name": "Gaurav Tukaram Pande",
+      "email": "sbuii514@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79d692b7aba27a93513",
+      "name": "Pratik Ramesh Bhoi",
+      "email": "testing.stel2@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9351a",
+      "name": "Sainath Ramesh Patil",
+      "email": "sbuii167@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93520",
+      "name": "Ajay Kumar",
+      "email": "sbuii184@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93537",
+      "name": "Senthilkumar Balakrishnan",
+      "email": "senthil@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93541",
+      "name": "Sudhan Kannan",
+      "email": "sbuii336@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93547",
+      "name": "Nalini Suryaprakash Shukla",
+      "email": "sales.usgaon@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9354c",
+      "name": "Dhiraj Patil",
+      "email": "sbuii359@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93565",
+      "name": "Ashish Mahendra Pawar",
+      "email": "sbuii412@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9356a",
+      "name": "Amit Prakash Modale",
+      "email": "amit.modale@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93575",
+      "name": "Anushka Sachin Warishe",
+      "email": "sbuii435@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9359b",
+      "name": "Satish Gangadhar Sankhe",
+      "email": "satish.sankhe@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935a1",
+      "name": "Harish Kumar Saraswat",
+      "email": "sbuii49@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935a8",
+      "name": "Abhishek Singh Chauhan",
+      "email": "sbuii496@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935ae",
+      "name": "Kalpak Kiranrao Waghmare",
+      "email": "sbuii502@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935b2",
+      "name": "Harshal Mahendra Malik",
+      "email": "sbuii506@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935b6",
+      "name": "Rasmi Ranjan Jenamani",
+      "email": "rasmi.ranjan@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935f0",
+      "name": "Manoj Patil",
+      "email": "sbuiii435@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9351d",
+      "name": "Akhilesh Pandagre",
+      "email": "sbuii171@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93524",
+      "name": "Govind Ramashankar Gupta",
+      "email": "sbuii198@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93539",
+      "name": "Soubhagya Moharana",
+      "email": "sbuii304@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93546",
+      "name": "Dayanand Balu Jadhav",
+      "email": "sbuii349@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93552",
+      "name": "Mayur Ramchandra Amritkar",
+      "email": "sbuii370@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93556",
+      "name": "Mukund Shriram Khonde",
+      "email": "mukund.khonde@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9356d",
+      "name": "Bhartendu Vasudeo Chaudhary",
+      "email": "bhartendu.chaudhary@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93576",
+      "name": "Priyanka Mahesh Hegde",
+      "email": "sbuii436@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9357b",
+      "name": "Rambabu Kumar Yadav",
+      "email": "sbuii440@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9357e",
+      "name": "Navaj Najir Shaikh",
+      "email": "sbuii444@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a9358d",
+      "name": "Balram Kumar",
+      "email": "sbuii464@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93596",
+      "name": "Rahul Damodar Palkar",
+      "email": "sbuii476@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93598",
+      "name": "Sanjay Kumar Barik",
+      "email": "sanjay.barik@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a93599",
+      "name": "Subrat Kumar Narasingha Acharaya",
+      "email": "subratacharya@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935b3",
+      "name": "Abhijeet Dinesh Nanotkar",
+      "email": "sbuii507@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935c8",
+      "name": "Mizba Abidali Shaikh",
+      "email": "mizba.shaikh@stelmec.com",
+      "role": "employee"
+    },
+    {
+      "id": "6aaac79e692b7aba27a935cf",
+      "name": "Sagar Balasaheb Bhakare",
+      "email": "sbuii535@stelmec.com",
+      "role": "employee"
+    }
+  ],
+  "failedUsers": [],
+  "verifyMismatch": []
+}

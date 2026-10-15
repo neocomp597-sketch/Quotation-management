@@ -680,14 +680,14 @@ export const importService = {
   },
   getTenderTemplate: () =>
     api.get("/import/template/tenders", { responseType: "blob" }),
-  importAssets: (file) => {
+  importAssets: (file, onUploadProgress, signal) => {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/assets", formData, {
       timeout: 0,
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress,
+      signal,
     });
   },
   getAssetTemplate: () =>

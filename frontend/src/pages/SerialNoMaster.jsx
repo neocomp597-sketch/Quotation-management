@@ -150,6 +150,7 @@ const SerialNoMaster = () => {
 
     useEffect(() => {
         fetchData();
+        loadReferenceData();
     }, []);
 
     const loadReferenceData = async () => {

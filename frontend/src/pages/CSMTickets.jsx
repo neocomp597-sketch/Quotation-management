@@ -430,7 +430,7 @@ const CSMTickets = () => {
                         }
                     } catch (e) {}
                 }
-                toast.success(`SR. No. "${asset.serialNumber || cleanSN}" found! Auto-filled details from Invoice Bulk Upload.`);
+                toast.success(`SR. No. "${asset.serialNumber || cleanSN}" found! Auto-filled details from Invoice Bulk Upload.`, { toastId: 'serial-autofill' });
             } else {
                 toast.info('No matching serial number found in Invoice Bulk Upload. Continuing with manual entry.');
             }
@@ -1585,8 +1585,7 @@ const CSMTickets = () => {
 
                 fetchProblems({ productId: targetProdId || '', mgr4Category: mgr4Val || '' });
                 
-                toast.success(`Asset found! Auto-filled details for Serial No: ${asset.serialNumber || cleanSN}`);
-                
+                toast.success(`Asset found! Auto-filled details for Serial No: ${asset.serialNumber || cleanSN}`, { toastId: 'serial-autofill' });
                 if (res.data) {
                     const hasCoverage = res.data.warranty?.status === 'Active' || res.data.amc?.status === 'Active';
                     if (!hasCoverage) {

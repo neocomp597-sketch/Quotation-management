@@ -3207,6 +3207,7 @@ const importAssets = async (req, res) => {
                 if (seenSerialsInFile.has(normSerial)) {
                     // Duplicate rows in a source workbook are ignored; the serial is imported once.
                     results.skipped++;
+                    results.errors.push({ row: i + 2, serialNo: serialNumber, reason: 'Duplicate Serial Number within the uploaded file — only the first occurrence is imported.' });
                     continue;
                 }
                 seenSerialsInFile.add(normSerial);
@@ -3551,7 +3552,10 @@ const importAssets = async (req, res) => {
                 }
             } catch (err) {
                 results.failed++;
-                results.errors.push(`Row ${i + 2}: ${err.message}`);
+                const rawSN = pickFirstNonEmpty(
+                    row['Serial Number'], row.serialNumber, row['Serial No'], row.serialNo, row.Serial, row.serial, row.SN, row.sn, ''
+                );
+                results.errors.push({ row: i + 2, serialNo: String(rawSN || '').trim() || '—', reason: err.message });
             }
         }
 
@@ -3586,6 +3590,7 @@ const importAssets = async (req, res) => {
         }
 
         res.status(200).json({
+            status: successCount === results.failed + successCount && results.failed === 0 ? 'completed' : (successCount === 0 ? 'failed' : 'partial'),
             message: `Import completed. Created: ${results.created}, Updated: ${results.updated}, Skipped: ${results.skipped}, Failed: ${results.failed}.`,
             success: successCount,
             ...results
