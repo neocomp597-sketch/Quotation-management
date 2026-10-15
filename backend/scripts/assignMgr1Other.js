@@ -1,21 +1,21 @@
 /**
- * One-time migration: assign MGR 1 = OTHER to Product Master records.
+ * One-time migration: assign MGR 4 = OTHER to Product Master records.
  *
- * For each company it uses the existing "other" MGR1 entry (code OTH / OTHER / OTHERS,
+ * For each company it uses the existing "other" MGR4 entry (code OTH / OTHER / OTHERS,
  * or description Other), creating "OTHER - Other" only when none exists, then sets
- * products' mgr1 to it.
+ * products' mgr4 to it.
  *
- * By default only products WITHOUT an MGR 1 (null / missing / pointing at a deleted
+ * By default only products WITHOUT an MGR 4 (null / missing / pointing at a deleted
  * MGR) are changed, so legitimate assignments are kept. Pass --overwrite to set
- * MGR 1 = OTHER on every product of the company, replacing what is there.
+ * MGR 4 = OTHER on every product of the company, replacing what is there.
  *
  * The run is a dry run unless --apply is given.
  *
  * Usage (from backend/):
- *   node scripts/assignMgr1Other.js --company=<companyId>                 # report only
- *   node scripts/assignMgr1Other.js --company=<companyId> --apply         # fill blanks
- *   node scripts/assignMgr1Other.js --company=<companyId> --apply --overwrite
- *   node scripts/assignMgr1Other.js --all-companies --apply               # every company
+ *   node scripts/assignMgr4Other.js --company=<companyId>                 # report only
+ *   node scripts/assignMgr4Other.js --company=<companyId> --apply         # fill blanks
+ *   node scripts/assignMgr4Other.js --company=<companyId> --apply --overwrite
+ *   node scripts/assignMgr4Other.js --all-companies --apply               # every company
  */
 require('dotenv').config();
 const mongoose = require('mongoose');
@@ -52,14 +52,14 @@ const run = async () => {
         ? [new mongoose.Types.ObjectId(companyArg)]
         : (await products.distinct('companyId')).filter(Boolean);
 
-    console.log(`${APPLY ? 'APPLY' : 'DRY RUN'} | mode: ${OVERWRITE ? 'overwrite every product' : 'only products without MGR 1'}`);
+    console.log(`${APPLY ? 'APPLY' : 'DRY RUN'} | mode: ${OVERWRITE ? 'overwrite every product' : 'only products without MGR 4'}`);
 
     for (const companyId of companyIds) {
-        // Reuse the company's existing "other" MGR1 (Stelmec keeps OTH - OTHER) before
-        // creating one, so a re-run never adds a duplicate.
+        // Reuse the company's existing "other" MGR4 before creating one,
+        // so a re-run never adds a duplicate.
         let other = await mgrs.findOne({
             companyId,
-            mgrType: 'MGR1',
+            mgrType: 'MGR4',
             $or: [
                 { code: { $regex: '^(OTH|OTHER|OTHERS)$', $options: 'i' } },
                 { description: { $regex: '^others?$', $options: 'i' } }
@@ -67,11 +67,11 @@ const run = async () => {
         }, { sort: { createdAt: 1 } });
 
         if (!other) {
-            console.log(`[${companyId}] MGR1 "${OTHER_CODE}" does not exist${APPLY ? ' - creating it' : ' - would be created'}`);
+            console.log(`[${companyId}] MGR4 "${OTHER_CODE}" does not exist${APPLY ? ' - creating it' : ' - would be created'}`);
             if (APPLY) {
                 const doc = {
                     companyId,
-                    mgrType: 'MGR1',
+                    mgrType: 'MGR4',
                     code: OTHER_CODE,
                     description: OTHER_DESCRIPTION,
                     problemList: [],
@@ -82,26 +82,26 @@ const run = async () => {
                 other = { ...doc, _id: insertedId };
             }
         } else if (other.status !== 'Active') {
-            console.log(`[${companyId}] MGR1 "${other.code}" is ${other.status}${APPLY ? ' - activating it' : ' - would be activated'}`);
+            console.log(`[${companyId}] MGR4 "${other.code}" is ${other.status}${APPLY ? ' - activating it' : ' - would be activated'}`);
             if (APPLY) await mgrs.updateOne({ _id: other._id }, { $set: { status: 'Active' } });
         }
 
         let filter = { companyId };
         if (!OVERWRITE) {
-            // "Without MGR 1" also covers a reference to an MGR that no longer exists.
-            const validMgr1Ids = await mgrs.distinct('_id', { companyId, mgrType: 'MGR1' });
-            filter = { companyId, $or: [{ mgr1: null }, { mgr1: { $exists: false } }, { mgr1: { $nin: validMgr1Ids } }] };
+            // "Without MGR 4" also covers a reference to an MGR that no longer exists.
+            const validMgr4Ids = await mgrs.distinct('_id', { companyId, mgrType: 'MGR4' });
+            filter = { companyId, $or: [{ mgr4: null }, { mgr4: { $exists: false } }, { mgr4: { $nin: validMgr4Ids } }] };
         }
         if (other) {
-            filter = { $and: [filter, { mgr1: { $ne: other._id } }] };
+            filter = { $and: [filter, { mgr4: { $ne: other._id } }] };
         }
 
         const total = await products.countDocuments({ companyId });
         const toChange = await products.countDocuments(filter);
-        console.log(`[${companyId}] products: ${total}, to set MGR 1 = ${OTHER_CODE}: ${toChange}`);
+        console.log(`[${companyId}] products: ${total}, to set MGR 4 = ${OTHER_CODE}: ${toChange}`);
 
         if (APPLY && other && toChange > 0) {
-            const result = await products.updateMany(filter, { $set: { mgr1: other._id, updatedAt: new Date() } });
+            const result = await products.updateMany(filter, { $set: { mgr4: other._id, updatedAt: new Date() } });
             console.log(`[${companyId}] updated: ${result.modifiedCount}`);
         }
     }
