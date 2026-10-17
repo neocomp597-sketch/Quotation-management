@@ -66,7 +66,22 @@ const getManualImagesForTicket = (ticket) => {
 
 const CSMTickets = () => {
     const navigate = useNavigate();
-    const { user, isAdmin, isSuperAdmin } = useAuth();
+    const { user, isAdmin, isSuperAdmin, activeBranchId } = useAuth();
+    // Branch the new ticket is raised under ('all' = All Branches). Options and whether
+    // "All Branches" is offered come from the server's branch-access rules.
+    const [ticketBranchOptions, setTicketBranchOptions] = useState({ branches: [], allowAllBranches: false });
+    const [ticketBranch, setTicketBranch] = useState('');
+    useEffect(() => {
+        csmService.getTicketBranchOptions()
+            .then(res => setTicketBranchOptions({
+                branches: Array.isArray(res.data?.branches) ? res.data.branches : [],
+                allowAllBranches: Boolean(res.data?.allowAllBranches),
+            }))
+            .catch(err => console.error('Error loading ticket branches:', err));
+    }, []);
+    useEffect(() => {
+        if (activeBranchId) setTicketBranch(prev => prev || String(activeBranchId));
+    }, [activeBranchId]);
     const isManagerOrAdmin = useMemo(() => {
         if (!user) return false;
         const role = String(user.role || '').toLowerCase();
@@ -1016,16 +1031,16 @@ const CSMTickets = () => {
             toast.error('Product is required');
             return;
         }
-        if (!formData.contactId) {
-            toast.error('Contact Person is required');
-            return;
-        }
         if (formData.contactPhone && !isValidMobile(formData.contactPhone)) {
             toast.error('Invalid Mobile Number. Please enter a valid 10-digit mobile number');
             return;
         }
         if (!formData.issueTitle.trim()) {
             toast.error('Subject is required');
+            return;
+        }
+        if (!ticketBranch) {
+            toast.error('Branch is required');
             return;
         }
         if (!formData.priorityId) {
@@ -1081,7 +1096,8 @@ const CSMTickets = () => {
             ...formData, 
             assetId: assetIdToSubmit,
             invoiceId: finalInvoiceId,
-            manualInvoiceNo: manualInvoiceNoToSubmit
+            manualInvoiceNo: manualInvoiceNoToSubmit,
+            branchId: ticketBranch
         };
         const optionalObjectIdFields = ['contactId', 'contactDesignationId', 'productId', 'assetId', 'invoiceId', 'categoryId', 'typeId', 'problemId'];
         optionalObjectIdFields.forEach(field => {
@@ -2499,11 +2515,9 @@ const CSMTickets = () => {
                                                         }`}>
                                                             {isManual ? 'Manual' : 'System'}
                                                         </span>
-                                                        {t.branchId?.name && (
-                                                            <span className="inline-block text-[9px] px-2 py-0.5 rounded-full font-black tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
-                                                                📍 {t.branchId.name}
-                                                            </span>
-                                                        )}
+                                                        <span className="inline-block text-[9px] px-2 py-0.5 rounded-full font-black tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
+                                                            📍 {t.branchId?.name || 'All Branches'}
+                                                        </span>
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-3">
@@ -2913,6 +2927,19 @@ const CSMTickets = () => {
                             </div>
                         )}
                         <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Branch *</label>
+                            <SearchableSelect
+                                options={[
+                                    ...(ticketBranchOptions.allowAllBranches ? [{ value: 'all', label: 'All Branches' }] : []),
+                                    ...ticketBranchOptions.branches.map(b => ({ value: String(b._id), label: b.code ? `${b.name} (${b.code})` : b.name })),
+                                ]}
+                                value={ticketBranch}
+                                onChange={(val) => setTicketBranch(val || '')}
+                                placeholder="Search & Select Branch..."
+                                noResultsText="No branches available"
+                            />
+                        </div>
+                        <div>
                             <div className="flex justify-between items-center mb-1">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Ticket Source</label>
                                 <button 
@@ -2933,7 +2960,7 @@ const CSMTickets = () => {
                         </div>
                         <div>
                             <div className="flex justify-between items-center mb-1">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Contact Person Name *</label>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Contact Person Name <span className="normal-case font-semibold">(optional)</span></label>
                                 <button
                                     type="button"
                                     onClick={() => setShowContactModal(true)}
@@ -2950,7 +2977,7 @@ const CSMTickets = () => {
                                 }))}
                                 value={formData.contactId}
                                 onChange={handleContactSelect}
-                                placeholder={formData.customerId ? "Search & Select Contact..." : "Select Customer First"}
+                                placeholder={formData.customerId ? "Search & Select Contact (optional)..." : "Select Customer First"}
                             />
                             {formData.customerId && customerContacts.length === 0 && (
                                 <p className="text-[10px] font-bold text-amber-600 mt-1">No contacts saved for this customer yet.</p>

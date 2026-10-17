@@ -938,6 +938,7 @@ export const csmService = {
   getTicketById: (id) => api.get(`/csm/tickets/${id}`),
   createTicket: (data) => api.post("/csm/tickets", data),
   updateTicket: (id, data) => api.put(`/csm/tickets/${id}`, data),
+  getTicketBranchOptions: () => api.get('/csm/tickets/branch-options', { cache: false }),
   assignTicket: (id, data) => api.patch(`/csm/tickets/${id}/assign`, data),
   updateTicketStatus: (id, status, isFirstCallResolved) => api.patch(`/csm/tickets/${id}/status`, { status, isFirstCallResolved }),
   getReportData: (params = {}) => api.get("/csm/reports", { params }),
@@ -1148,6 +1149,19 @@ export const tenderService = {
   updateTender: (id, data) => api.put(`/tenders/${id}`, data),
   deleteTender: (id) => api.delete(`/tenders/${id}`),
   getDashboard: (params) => api.get("/tenders/dashboard/data", { params }),
+};
+
+export const typeTestService = {
+  getAll: (params) => api.get("/type-tests", { params }),
+  getById: (id) => api.get(`/type-tests/${id}`),
+  getSummary: () => api.get("/type-tests/summary/data"),
+  create: (data) => api.post("/type-tests", data),
+  update: (id, data) => api.put(`/type-tests/${id}`, data),
+  delete: (id) => api.delete(`/type-tests/${id}`),
+  recordCertificate: (id, data) => api.post(`/type-tests/${id}/certificate`, data),
+  startRenewal: (id, data) => api.post(`/type-tests/${id}/renewal/start`, data),
+  recordProgress: (id, data) => api.post(`/type-tests/${id}/progress`, data),
+  setActive: (id, isActive, reason) => api.post(`/type-tests/${id}/active`, { isActive, reason }),
 };
 
 export const stateMasterService = {

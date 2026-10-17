@@ -9,6 +9,7 @@ const {
 } = require('../utils/vendorSelection');
 const { invalidateProductCaches, invalidateAssetCaches } = require('../utils/cacheInvalidation');
 const { getCachedJson, makeCacheKey, setCachedJson } = require('../utils/apiCache');
+const { assertProductUnique } = require('../utils/productUniqueness');
 
 const PRODUCTS_CACHE_KEY = 'products:all';
 const PRODUCTS_CACHE_TTL_SECONDS = 10 * 60;
@@ -32,12 +33,26 @@ const getPagination = (query) => {
 
 const hasListParams = (query) => Boolean(query.page || query.limit || query.search || query.mgr1 || query.mgr2 || query.mgr3 || query.mgr4 || query.mgr5 || query.catalogType);
 
+// Names copied from other screens (e.g. Invoice Bulk Upload) can carry doubled or
+// non-breaking spaces, so any run of whitespace in the term matches any run in the field.
+const normalizeSearch = (value = '') => String(value).replace(/[\s ]+/g, ' ').trim();
+// The NBSP is embedded as a literal character: MongoDB's PCRE2 rejects the \u escape.
+const WS_CLASS = '[\\s ]';
+const toWhitespaceTolerantPattern = (search) => search.split(' ').map(escapeRegex).join(`${WS_CLASS}+`);
+
+// Product names are not unique (only productCode is), so an exact name/code match
+// is ranked ahead of partial matches rather than replacing them.
+const buildExactMatchClause = (search) => {
+    const regex = new RegExp(`^${WS_CLASS}*${toWhitespaceTolerantPattern(search)}${WS_CLASS}*$`, 'i');
+    return { $or: [{ productName: regex }, { productCode: regex }] };
+};
+
 const buildProductQuery = (queryParams = {}, user = null) => {
     const query = {};
-    const search = String(queryParams.search || '').trim();
+    const search = normalizeSearch(queryParams.search);
 
     if (search) {
-        const regex = new RegExp(escapeRegex(search), 'i');
+        const regex = new RegExp(toWhitespaceTolerantPattern(search), 'i');
         query.$or = [
             { productName: regex },
             { productCode: regex },
@@ -253,18 +268,11 @@ const createProduct = async (req, res) => {
         const cleanProductCode = String(productCode).trim();
         const cleanProductName = String(productName).trim();
 
-        // Pre-check for duplicate product code within company
-        if (cleanProductCode) {
-            const existingCode = await Product.findOne({
-                companyId: req.user?.companyId,
-                productCode: new RegExp(`^${cleanProductCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
-            });
-            if (existingCode) {
-                return res.status(400).json({
-                    message: `Product Code "${cleanProductCode}" already exists. Please enter a unique Product Code.`
-                });
-            }
-        }
+        await assertProductUnique({
+            productCode: cleanProductCode,
+            productName: cleanProductName,
+            companyId: req.user?.companyId
+        });
 
         if (catalogType === 'Product' && Object.prototype.hasOwnProperty.call(req.body, 'vendors') && Array.isArray(vendors) && vendors.length === 0) {
             return res.status(400).json({ message: 'At least one vendor is required when vendor mapping is provided' });
@@ -351,7 +359,7 @@ const getAllProducts = async (req, res) => {
             return res.json(cachedProducts);
         }
 
-        let productsQuery = Product.find(query)
+        const findProducts = (filter) => Product.find(filter)
             .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing technicalSpecificationUrl operatingUserManualUrl repairTroubleshootingUrl warrantyMonths updatedAt')
             .populate('categoryId', 'name status')
             .populate('mgr1', 'code description status')
@@ -362,6 +370,45 @@ const getAllProducts = async (req, res) => {
             .populate('attributes', 'code description status')
             .populate('vendors.vendorId', 'name isActive')
             .sort({ updatedAt: -1 });
+        let productsQuery = findProducts(query);
+
+        const search = normalizeSearch(req.query.search);
+        if (listParams && search) {
+            // Exact name/code matches come first across all pages, then partial matches.
+            const { page, limit, skip } = getPagination(req.query);
+            const exactClause = buildExactMatchClause(search);
+            const exactRegex = exactClause.$or[0].productName;
+            const exactQuery = { $and: [query, exactClause] };
+            const partialQuery = { $and: [query, { productName: { $not: exactRegex } }, { productCode: { $not: exactRegex } }] };
+
+            const [exactTotal, total] = await Promise.all([
+                Product.countDocuments(exactQuery),
+                Product.countDocuments(query),
+            ]);
+            const exactOnPage = skip < exactTotal
+                ? await findProducts(exactQuery).skip(skip).limit(limit).lean()
+                : [];
+            const remaining = limit - exactOnPage.length;
+            const partialOnPage = remaining > 0
+                ? await findProducts(partialQuery).skip(Math.max(0, skip - exactTotal)).limit(remaining).lean()
+                : [];
+
+            const response = {
+                data: [
+                    ...exactOnPage.map((p) => ({ ...buildProductResponse(p), isExactMatch: true })),
+                    ...partialOnPage.map((p) => ({ ...buildProductResponse(p), isExactMatch: false })),
+                ].filter((p) => p && p._id),
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    exactTotal,
+                    pages: Math.ceil(total / limit) || 1,
+                },
+            };
+            await setCachedJson(redis, cacheKey, response, PRODUCTS_LIST_CACHE_TTL_SECONDS, PRODUCT_CACHE_OPTIONS);
+            return res.json(response);
+        }
 
         if (listParams) {
             const { page, limit, skip } = getPagination(req.query);
@@ -541,6 +588,20 @@ const updateProduct = async (req, res) => {
                 updateData.basePrice = deriveBasePriceFromVendors({ vendors: preparedVendors, basePrice });
             }
         }
+
+        const stored = await Product.findById(req.params.id).select('productCode productName').lean();
+        if (!stored) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+        if (typeof productCode === 'string') updateData.productCode = productCode.trim();
+        if (typeof productName === 'string') updateData.productName = productName.trim();
+        await assertProductUnique({
+            productCode: updateData.productCode,
+            productName: updateData.productName,
+            companyId: req.user?.companyId,
+            excludeId: req.params.id,
+            previous: stored
+        });
 
         const updatedProduct = await Product.findByIdAndUpdate(
             req.params.id,

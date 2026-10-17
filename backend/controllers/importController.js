@@ -73,6 +73,7 @@ const Contract = require('../models/Contract');
 const Asset = require('../models/Asset');
 const { deriveBasePriceFromVendors } = require('../utils/vendorSelection');
 const { invalidateCustomerCaches, invalidateProductCaches, invalidateAssetCaches } = require('../utils/cacheInvalidation');
+const { assertProductUnique, findDuplicate, createBatchTracker } = require('../utils/productUniqueness');
 
 const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const toBoolean = (value) => {
@@ -329,6 +330,7 @@ const importProducts = async (req, res) => {
             errors: []
         };
 
+        const importBatch = createBatchTracker();
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
             try {
@@ -346,6 +348,7 @@ const importProducts = async (req, res) => {
                     productName = productCode;
                 }
 
+                const codeSupplied = Boolean(productCode);
                 if (!productCode) {
                     if (productName) {
                         productCode = productName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30);
@@ -355,15 +358,37 @@ const importProducts = async (req, res) => {
                     }
                 }
 
+                const batchError = importBatch.check({ productCode, productName });
+                if (batchError) throw new Error(batchError);
+                importBatch.add({ productCode, productName }, i + 2);
+
                 let existing = null;
                 if (productCode) {
                     existing = await Product.findOne({ productCode: buildExactRegex(productCode) });
                 }
-                
+
+                // A row without a code updates the product with that name. A row with a code
+                // that is new but a name that is taken is a duplicate: updating the named
+                // product would silently change its code under existing invoices.
                 if (!existing && productName) {
-                    existing = await Product.findOne({ productName: buildExactRegex(productName) });
+                    const sameName = await findDuplicate('productName', productName, { companyId: req.user?.companyId });
+                    if (sameName && codeSupplied) {
+                        throw new Error(`Product Name "${productName}" already exists under code ${sameName.productCode}. Product names must be unique.`);
+                    }
+                    if (sameName) {
+                        existing = sameName;
+                        productCode = sameName.productCode;
+                    }
                 }
-                
+
+                await assertProductUnique({
+                    productCode,
+                    productName,
+                    companyId: req.user?.companyId,
+                    excludeId: existing?._id,
+                    previous: existing
+                });
+
                 const productData = {
                     productCode,
                     productName,
@@ -757,6 +782,13 @@ const importPlanning = async (req, res) => {
 
         if (missingProductCodes.length > 0) {
             for (const code of missingProductCodes) {
+                // Reuse a product whose code or name only differs in case / spacing.
+                const dup = await findDuplicate('productCode', code, { companyId: req.user?.companyId })
+                    || await findDuplicate('productName', code, { companyId: req.user?.companyId });
+                if (dup) {
+                    productMap.set(normalizeKey(code), await Product.findById(dup._id));
+                    continue;
+                }
                 const newProduct = new Product({
                     companyId: req.user?.companyId,
                     productCode: code,
@@ -3294,6 +3326,13 @@ const importAssets = async (req, res) => {
                 }
 
                 if (!product) {
+                    // Product names are unique: a new code whose description already belongs
+                    // to another code is rejected instead of creating a same-name product.
+                    const newName = productName || productCode;
+                    const sameName = newName ? await findDuplicate('productName', newName, { companyId }) : null;
+                    if (sameName) {
+                        throw new Error(`Product Code "${productCode}" is not in Product Master and its name "${newName}" already belongs to code ${sameName.productCode}. Product names must be unique - use code ${sameName.productCode} or add the product with a distinct name first.`);
+                    }
                     try {
                         product = await Product.create({
                             ...companyFilter,
@@ -3318,8 +3357,12 @@ const importAssets = async (req, res) => {
                 if (product) {
                     if (productName && productName.trim() !== '') {
                         if (!product.productName || product.productName === product.productCode || product.productName === 'General Product' || product.productName.trim().toLowerCase() !== productName.trim().toLowerCase()) {
-                            product.productName = productName;
-                            await Product.findByIdAndUpdate(product._id, { productName }).setOptions({ bypassTenant: true });
+                            // Keep the stored name when the sheet's name is already used by another product.
+                            const nameTaken = await findDuplicate('productName', productName, { companyId, excludeId: product._id });
+                            if (!nameTaken) {
+                                product.productName = productName;
+                                await Product.findByIdAndUpdate(product._id, { productName }).setOptions({ bypassTenant: true });
+                            }
                         }
                     } else {
                         productName = product.productName || product.productCode || '';

@@ -547,6 +547,8 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                 else navigate('/quotations');
             } else if (n.type === 'Planning') {
                 navigate('/planning');
+            } else if (n.type === 'TypeTest') {
+                navigate(n.relatedId ? `/type-tests?open=${n.relatedId}` : '/type-tests');
             } else if (n.type.startsWith('MEETING_')) {
                 navigate('/meetings');
             } else {

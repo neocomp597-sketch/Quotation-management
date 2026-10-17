@@ -127,6 +127,7 @@ exports.seedMhData = async (req, res) => {
 
         const Customer = require('../models/Customer');
         const Product = require('../models/Product');
+        const { findDuplicate } = require('../utils/productUniqueness');
         const User = require('../models/User');
         const Ticket = require('../models/Ticket');
         const ServiceVisit = require('../models/ServiceVisit');
@@ -210,6 +211,10 @@ exports.seedMhData = async (req, res) => {
         const products = [];
         for (const p of productsData) {
             let dbProd = await Product.findOne({ productCode: p.productCode, companyId });
+            if (!dbProd) {
+                const sameName = await findDuplicate('productName', p.productName, { companyId });
+                if (sameName) dbProd = await Product.findById(sameName._id);
+            }
             if (!dbProd) {
                 dbProd = await Product.create({ ...p, companyId });
             }
@@ -1004,16 +1009,36 @@ exports.engineers = {
                 .sort({ createdAt: -1 })
                 .lean();
 
+            // PIN codes each engineer covers, by the same rules ticket auto-assignment uses:
+            // the engineer's own PINs, their territory's PINs, and PINs of any territory that
+            // names them as its Assigned Engineer in Territory Master.
+            const Territory = require('../models/Territory');
+            const assignedTerritories = await Territory.find({ companyId, engineerId: { $ne: null } })
+                .select('engineerId rules.pincodes')
+                .lean();
+            const territoryPinsByEngineer = new Map();
+            assignedTerritories.forEach(t => {
+                const key = String(t.engineerId);
+                const pins = territoryPinsByEngineer.get(key) || [];
+                territoryPinsByEngineer.set(key, pins.concat(t.rules?.pincodes || []));
+            });
+
             const mapped = docs.map(doc => {
+                const coveredPincodes = [...new Set([
+                    ...(doc.pincodes || []),
+                    ...(doc.territoryId?.rules?.pincodes || []),
+                    ...(territoryPinsByEngineer.get(String(doc._id)) || []),
+                ].map(p => String(p).trim()).filter(Boolean))];
                 if (doc.employeeId) {
                     return {
                         ...doc,
+                        coveredPincodes,
                         name: doc.employeeId.name,
                         email: doc.employeeId.email,
                         mobile: doc.employeeId.mobile || ''
                     };
                 }
-                return doc;
+                return { ...doc, coveredPincodes };
             });
 
             res.json(mapped);

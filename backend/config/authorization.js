@@ -19,6 +19,7 @@ const MENU_GROUPS = [
             { key: 'master_vendors', label: 'Vendors', description: 'Vendor master records' },
             { key: 'master_products', label: 'Product Master', description: 'Product master records' },
             { key: 'master_bom', label: 'Product BOM Master', description: 'Create, edit and view serial-number-wise BOMs' },
+            { key: 'master_type_tests', label: 'Type Test Register', description: 'Product type test certificates, validity and renewal tracking' },
             { key: 'master_contacts', label: 'Contacts', description: 'Contact management records' },
             { key: 'master_mgrs', label: 'Product MGR Master', description: 'MGR master hierarchy' },
             { key: 'master_divisions', label: 'Division Master', description: 'Division codes used by segments and invoice records' },
@@ -257,6 +258,7 @@ const FULL_ACCESS_KEYS = getAllPermissionKeys();
 const LEGACY_PERMISSION_FALLBACKS = {
     csm_rca: 'csm_dashboard',
     master_bom: 'master_products',
+    master_type_tests: 'master_products',
     master_divisions: 'master_mgrs',
     master_segments: 'master_mgrs'
 };

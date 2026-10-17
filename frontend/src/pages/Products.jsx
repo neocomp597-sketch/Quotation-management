@@ -780,11 +780,15 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
         }
     };
 
+    // Same normalisation as the backend: copied names may carry extra or non-breaking spaces.
+    const normalizeText = (value) => String(value ?? '').replace(/[\s ]+/g, ' ').trim().toLowerCase();
+    const exactMatchCount = debouncedSearch ? (pagination.exactTotal ?? products.filter(p => p.isExactMatch).length) : 0;
+
     const filteredProducts = products.filter(p => {
-        const searchLower = searchTerm.toLowerCase();
+        const searchLower = normalizeText(searchTerm);
 
         // Search in basic info
-        const matchesBasic = p.productName?.toLowerCase().includes(searchLower) ||
+        const matchesBasic = p.isExactMatch || normalizeText(p.productName).includes(searchLower) ||
             p.productCode?.toLowerCase().includes(searchLower) ||
             p.hsnCode?.toLowerCase().includes(searchLower) ||
             p.uom?.toLowerCase().includes(searchLower);
@@ -1157,6 +1161,21 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                     </div>
                 </div>
 
+                {debouncedSearch && !loading && (
+                    <div className="px-6 py-3 border-b border-slate-100 bg-white text-xs text-slate-600 font-medium">
+                        {exactMatchCount > 0 ? (
+                            <>
+                                <span className="font-bold text-emerald-700">{exactMatchCount} exact match{exactMatchCount === 1 ? '' : 'es'}</span>
+                                {' '}for "{debouncedSearch}" shown first
+                                {pagination.total > exactMatchCount && <>, followed by {pagination.total - exactMatchCount} partial match{pagination.total - exactMatchCount === 1 ? '' : 'es'}</>}.
+                                {exactMatchCount > 1 && <> Several products share this name. Use the Product Code to tell them apart.</>}
+                            </>
+                        ) : (
+                            <>No exact match for "{debouncedSearch}". Showing {pagination.total || 0} partial match{pagination.total === 1 ? '' : 'es'}.</>
+                        )}
+                    </div>
+                )}
+
                 <div>
                     {loading ? (
                         <div className="p-20 text-center text-slate-400 font-medium">
@@ -1184,6 +1203,9 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                                 <div className="flex justify-between items-start">
                                                     <div>
                                                         <h3 className="font-bold text-slate-900 truncate pr-2 text-sm">{p.productName}</h3>
+                                                        {p.isExactMatch && (
+                                                            <span className="inline-block px-1.5 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] font-black uppercase tracking-widest rounded border border-emerald-200">Exact match</span>
+                                                        )}
                                                         <div className="flex flex-wrap items-center gap-2 mt-0.5">
                                                             <p className="text-xs text-slate-500 font-mono">{p.productCode}</p>
                                                             {p.attributes && p.attributes.length > 0 && (
@@ -1306,7 +1328,12 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                                                     />
                                                                 </div>
                                                                 <div>
-                                                                    <div className="font-bold text-slate-900">{p.productName}</div>
+                                                                    <div className="font-bold text-slate-900">
+                                                                        {p.productName}
+                                                                        {p.isExactMatch && (
+                                                                            <span className="ml-2 align-middle px-1.5 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] font-black uppercase tracking-widest rounded border border-emerald-200">Exact match</span>
+                                                                        )}
+                                                                    </div>
                                                                     <div className="flex flex-wrap items-center gap-1.5 mt-1">
                                                                         <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{p.uom}</span>
                                                                         {p.attributes && p.attributes.length > 0 && (
@@ -1447,6 +1474,9 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                                     <div className="mb-4 flex-1">
                                                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{p.productCode}</div>
                                                         <h3 className="font-bold text-slate-900 leading-tight mb-2 line-clamp-2">{p.productName}</h3>
+                                                        {p.isExactMatch && (
+                                                            <span className="inline-block mb-2 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] font-black uppercase tracking-widest rounded border border-emerald-200">Exact match</span>
+                                                        )}
                                                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">HSN: {p.hsnCode}</p>
                                                     </div>
                                                     <div className="flex items-end justify-between border-t border-slate-50 pt-4 mt-auto">

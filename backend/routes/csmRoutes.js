@@ -20,6 +20,7 @@ router.get('/reports', protect, csmDashboardController.getReportData);
 router.post('/tickets', protect, ticketController.createTicket);
 router.get('/tickets/debug-auto-assign', ticketController.debugAutoAssign);
 router.get('/tickets/customers', protect, ticketController.getTicketCustomers);
+router.get('/tickets/branch-options', protect, ticketController.getTicketBranchOptions);
 router.get('/tickets', protect, ticketController.getTickets);
 router.get('/tickets/:id', protect, ticketController.getTicketById);
 router.put('/tickets/:id', protect, ticketController.updateTicket);

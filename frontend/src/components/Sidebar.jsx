@@ -148,6 +148,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'master_branches', name: 'State Master', icon: <MdMap size={18} />, path: '/state-master' },
                 { key: 'master_statuses', name: 'Status Master', icon: <MdBarChart size={18} />, path: '/status-master', adminOnly: true },
                 { key: 'master_terms', name: 'Terms & Conditions', icon: <MdDescription size={18} />, path: '/terms' },
+                { key: 'master_type_tests', name: 'Type Test Register', icon: <MdFactCheck size={18} />, path: '/type-tests' },
                 { key: 'master_territories', name: 'Territory Master', icon: <MdMap size={18} />, path: '/territory-master' },
                 { key: 'master_vendors', name: 'Vendors', icon: <MdStorefront size={18} />, path: '/vendors' },
             ]

@@ -98,6 +98,7 @@ const SalesAnalytics = lazy(() => import('./pages/SalesAnalytics'));
 const TenderDashboard = lazy(() => import('./pages/TenderDashboard'));
 const TenderRegister = lazy(() => import('./pages/TenderRegister'));
 const TenderReports = lazy(() => import('./pages/TenderReports'));
+const TypeTestRegister = lazy(() => import('./pages/TypeTestRegister'));
 const InventoryDashboard = lazy(() => import('./pages/inventory/InventoryDashboard'));
 const StockMatrix = lazy(() => import('./pages/inventory/StockMatrix'));
 const ProductStockDetail = lazy(() => import('./pages/inventory/ProductStockDetail'));
@@ -391,6 +392,9 @@ function App() {
             <Route path="/tender/dashboard" element={<PermissionRoute permissionKey="tender_dashboard"><Layout><TenderDashboard /></Layout></PermissionRoute>} />
             <Route path="/tender/register" element={<PermissionRoute permissionKey="tender_register"><Layout><TenderRegister /></Layout></PermissionRoute>} />
             <Route path="/tender/reports" element={<PermissionRoute permissionKey="tender_reports"><Layout><TenderReports /></Layout></PermissionRoute>} />
+
+            {/* Type Test Routes */}
+            <Route path="/type-tests" element={<PermissionRoute permissionKey="master_type_tests"><Layout><TypeTestRegister /></Layout></PermissionRoute>} />
 
             {/* Inventory Routes */}
             <Route path="/inventory/dashboard" element={<PermissionRoute permissionKey="inventory_dashboard"><Layout><InventoryDashboard /></Layout></PermissionRoute>} />

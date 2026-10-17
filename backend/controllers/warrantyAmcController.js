@@ -3,6 +3,7 @@ const AMC = require('../models/AMC');
 const Asset = require('../models/Asset');
 const AssetHistory = require('../models/AssetHistory');
 const Product = require('../models/Product');
+const { findDuplicate } = require('../utils/productUniqueness');
 const Customer = require('../models/Customer');
 const SerialTransfer = require('../models/SerialTransfer');
 const { formatDate } = require('../utils/dateFormat');
@@ -427,6 +428,12 @@ exports.createSingleAsset = async (req, res) => {
         if (!product && productName) {
             product = await Product.findOne({ productName: buildExactRegex(productName) })
                 .setOptions({ bypassTenant: true });
+        }
+
+        if (!product) {
+            // Names are unique: reuse a product whose name differs only in case / spacing.
+            const sameName = await findDuplicate('productName', productName || cleanProductCode, { companyId });
+            if (sameName) product = await Product.findById(sameName._id);
         }
 
         if (!product) {
