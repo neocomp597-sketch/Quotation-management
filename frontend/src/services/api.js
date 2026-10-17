@@ -184,11 +184,17 @@ api.interceptors.response.use(
         await refreshAccessToken();
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return api(originalRequest);
-      } catch {
-        setAccessToken(null);
-        localStorage.removeItem("user");
-        if (window.location.pathname !== "/login") {
-          window.location.assign("/login");
+      } catch (refreshError) {
+        // Only a definite "session is no longer valid" signs the user out. A timeout,
+        // network drop or server error leaves the session alone so the next request
+        // can refresh again.
+        const refreshStatus = refreshError?.response?.status;
+        if (refreshStatus === 401 || refreshStatus === 403) {
+          setAccessToken(null);
+          localStorage.removeItem("user");
+          if (window.location.pathname !== "/login") {
+            window.location.assign("/login");
+          }
         }
       }
     }

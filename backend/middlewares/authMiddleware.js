@@ -82,7 +82,8 @@ exports.protect = async (req, res, next) => {
                 return res.status(401).json({ message: 'Not authorized, user not found' });
             }
 
-            if (typeof decoded.tokenVersion === 'number' && decoded.tokenVersion !== user.tokenVersion) {
+            // Lean reads skip schema defaults, so a user saved without tokenVersion counts as 0.
+            if (typeof decoded.tokenVersion === 'number' && decoded.tokenVersion !== (user.tokenVersion || 0)) {
                 return res.status(401).json({ message: 'Not authorized, token revoked' });
             }
 

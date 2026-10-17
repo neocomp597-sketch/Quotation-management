@@ -186,11 +186,11 @@ const CSMDashboard = () => {
 
     // Requirement 3: Unassigned Tickets block added & clickable card links
     const metricCards = [
-        { label: 'Open Tickets', value: metrics.open, icon: <MdAssignment size={24} />, color: 'from-teal-500 to-emerald-600', link: '/csm/tickets?status=open_tickets&tab=all' },
-        { label: 'Unassigned Tickets', value: metrics.unassigned || 0, icon: <MdAssignmentInd size={24} />, color: 'from-purple-500 to-indigo-600', link: '/csm/tickets?unassigned=true&tab=all' },
-        { label: 'Pending Customer', value: metrics.pending, icon: <MdHourglassEmpty size={24} />, color: 'from-amber-400 to-orange-500', link: '/csm/tickets?status=Pending Customer&tab=all' },
-        { label: 'Overdue SLA', value: metrics.overdue, icon: <MdWarning size={24} />, color: 'from-rose-500 to-red-600', link: '/csm/tickets?slaBreached=true&tab=all' },
-        { label: 'Resolved Today', value: metrics.resolvedToday, icon: <MdCheckCircle size={24} />, color: 'from-sky-500 to-cyan-600', link: '/csm/tickets?status=Resolved&tab=all' }
+        { label: 'Open', value: metrics.open, icon: <MdAssignment size={20} />, color: 'from-teal-500 to-emerald-600', link: '/csm/tickets?status=open_tickets&tab=all' },
+        { label: 'Unassigned', value: metrics.unassigned || 0, icon: <MdAssignmentInd size={20} />, color: 'from-purple-500 to-indigo-600', link: '/csm/tickets?unassigned=true&tab=all' },
+        { label: 'Pending', value: metrics.pending, icon: <MdHourglassEmpty size={20} />, color: 'from-amber-400 to-orange-500', link: '/csm/tickets?status=Pending Customer&tab=all' },
+        { label: 'Overdue SLA', value: metrics.overdue, icon: <MdWarning size={20} />, color: 'from-rose-500 to-red-600', link: '/csm/tickets?slaBreached=true&tab=all' },
+        { label: 'Resolved Today', value: metrics.resolvedToday, icon: <MdCheckCircle size={20} />, color: 'from-sky-500 to-cyan-600', link: '/csm/tickets?status=Resolved&tab=all' }
     ];
 
     // Compute SLA compliance percentage
@@ -491,13 +491,14 @@ const CSMDashboard = () => {
                             <div 
                                 key={i}
                                 onClick={() => card.link && navigate(card.link)}
-                                className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex items-center justify-between cursor-pointer hover:scale-[1.02] hover:shadow-md transition-all active:scale-95 group"
+                                className="relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl px-4 py-3.5 shadow-sm flex items-center justify-between gap-3 cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all active:scale-[0.98] group"
                             >
-                                <div className="space-y-0.5">
-                                    <span className="text-[11px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider group-hover:text-teal-600 transition-colors">{card.label}</span>
-                                    <h2 className="text-3xl font-black text-slate-900 dark:text-slate-100 font-outfit">{card.value}</h2>
+                                <span className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${card.color}`} />
+                                <div className="min-w-0">
+                                    <span className="block whitespace-nowrap truncate text-[11px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">{card.label}</span>
+                                    <h2 className="text-3xl font-black text-slate-900 dark:text-slate-100 font-outfit leading-tight tabular-nums">{card.value ?? 0}</h2>
                                 </div>
-                                <div className={`w-12 h-12 bg-gradient-to-br ${card.color} rounded-xl flex items-center justify-center text-white shadow-sm group-hover:rotate-6 transition-transform`}>
+                                <div className={`flex-shrink-0 w-10 h-10 bg-gradient-to-br ${card.color} rounded-xl flex items-center justify-center text-white shadow-sm group-hover:scale-110 transition-transform`}>
                                     {card.icon}
                                 </div>
                             </div>
