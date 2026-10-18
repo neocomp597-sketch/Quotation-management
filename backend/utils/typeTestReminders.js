@@ -102,7 +102,7 @@ const checkTypeTestReminders = async () => {
 
                 if (validUntil < today) {
                     if (record.status === 'Valid') record.status = 'Expired';
-                    if (record.renewalStatus === 'Not Due') record.renewalStatus = 'Due';
+                    if (!['In Progress', 'Submitted'].includes(record.renewalStatus)) record.renewalStatus = 'Overdue';
                     record.reminders.forEach(r => { if (!r.sentAt) r.sentAt = now; });
                     record.expiryNotifiedAt = now;
                     record.activities.push({ userName: 'System Scheduler', action: `Certificate${certNo} expired on ${formatDate(validUntil)}` });
@@ -117,7 +117,7 @@ const checkTypeTestReminders = async () => {
                     if (!due.length) return;
                     const daysLeft = Math.ceil((validUntil - today) / DAY_MS);
                     due.forEach(r => { r.sentAt = now; });
-                    if (record.renewalStatus === 'Not Due') record.renewalStatus = 'Due';
+                    if (['Not Due', 'Renewed'].includes(record.renewalStatus)) record.renewalStatus = 'Upcoming';
                     record.activities.push({ userName: 'System Scheduler', action: `Renewal reminder sent (${daysLeft} days to expiry)` });
                     await notifyOwners(record, {
                         title: `Type Test Renewal Due in ${daysLeft} Days`,

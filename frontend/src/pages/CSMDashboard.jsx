@@ -170,7 +170,7 @@ const CSMDashboard = () => {
         );
     }
 
-    const metrics = stats?.metrics || { open: 0, unassigned: 0, pending: 0, overdue: 0, resolvedToday: 0 };
+    const metrics = stats?.metrics || { open: 0, unassigned: 0, pending: 0, overdue: 0, resolvedToday: 0, resolvedYesterday: 0 };
     const statusData = stats?.statusBreakdown || [];
     const categoryData = stats?.categoryBreakdown || [];
     const complianceData = stats?.slaCompliance || [];
@@ -180,7 +180,7 @@ const CSMDashboard = () => {
         metrics.open === 0 && 
         metrics.unassigned === 0 &&
         metrics.pending === 0 && 
-        metrics.overdue === 0 && 
+        (metrics.resolvedYesterday || 0) === 0 && 
         metrics.resolvedToday === 0 && 
         visits.length === 0;
 
@@ -189,7 +189,7 @@ const CSMDashboard = () => {
         { label: 'Open', value: metrics.open, icon: <MdAssignment size={20} />, color: 'from-teal-500 to-emerald-600', link: '/csm/tickets?status=open_tickets&tab=all' },
         { label: 'Unassigned', value: metrics.unassigned || 0, icon: <MdAssignmentInd size={20} />, color: 'from-purple-500 to-indigo-600', link: '/csm/tickets?unassigned=true&tab=all' },
         { label: 'Pending', value: metrics.pending, icon: <MdHourglassEmpty size={20} />, color: 'from-amber-400 to-orange-500', link: '/csm/tickets?status=Pending Customer&tab=all' },
-        { label: 'Overdue SLA', value: metrics.overdue, icon: <MdWarning size={20} />, color: 'from-rose-500 to-red-600', link: '/csm/tickets?slaBreached=true&tab=all' },
+        { label: 'Resolved Yesterday', value: metrics.resolvedYesterday || 0, icon: <MdCheckCircle size={20} />, color: 'from-emerald-500 to-green-600', link: '/csm/tickets?resolvedOn=yesterday&tab=all' },
         { label: 'Resolved Today', value: metrics.resolvedToday, icon: <MdCheckCircle size={20} />, color: 'from-sky-500 to-cyan-600', link: '/csm/tickets?status=Resolved&tab=all' }
     ];
 

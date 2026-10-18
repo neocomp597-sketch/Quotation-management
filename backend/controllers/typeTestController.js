@@ -9,6 +9,9 @@ const POPULATE = [
     { path: 'backupOwnerId', select: 'name email' }
 ];
 
+const CERT_FIELDS = ['certificateNo', 'documentUrl', 'issueDate', 'testCompletionDate', 'validUntil'];
+const DUPLICATE_MESSAGE = 'This test is already recorded for this product / model.';
+
 const activity = (req, action, note = '') => ({
     userId: req.user?.id,
     userName: req.user?.name || 'System',
@@ -22,7 +25,9 @@ const toDate = (value) => {
     return Number.isNaN(d.getTime()) ? null : d;
 };
 
+const sameDay = (a, b) => (a ? startOfDay(a).getTime() : null) === (b ? startOfDay(b).getTime() : null);
 const optionalId = (value) => (value && mongoose.Types.ObjectId.isValid(value) ? value : null);
+const text = (value) => String(value ?? '').trim();
 
 const daysToExpiry = (record) => {
     const validUntil = record.currentCertificate?.validUntil;
@@ -30,12 +35,37 @@ const daysToExpiry = (record) => {
     return Math.ceil((startOfDay(validUntil) - startOfDay(new Date())) / DAY_MS);
 };
 
+// Status as it should read today, even before the scheduler has caught up.
+const displayStatus = (r, days) => {
+    if (!r.isActive) return 'Inactive';
+    if (['Not Started', 'In Progress', 'Renewal In Progress'].includes(r.status)) return r.status;
+    if (days !== null && days < 0) return 'Expired';
+    if (days !== null) return 'Valid';
+    return r.status;
+};
+
+const renewalState = (r, days) => {
+    if (!r.isActive) return 'Inactive';
+    if (['In Progress', 'Submitted'].includes(r.renewalStatus)) return r.renewalStatus;
+    if (days !== null && days < 0) return 'Overdue';
+    if (r.renewalStatus === 'Renewed') return 'Renewed';
+    if (days !== null && days <= 90) return 'Upcoming';
+    return r.renewalStatus || 'Not Due';
+};
+
 const withComputed = (record) => {
     const obj = record.toObject ? record.toObject() : record;
-    const nextReminder = (obj.reminders || [])
+    const days = daysToExpiry(obj);
+    const pending = (obj.reminders || [])
         .filter(r => !r.sentAt)
         .sort((a, b) => new Date(a.remindOn) - new Date(b.remindOn))[0];
-    return { ...obj, daysToExpiry: daysToExpiry(obj), nextReminderOn: nextReminder?.remindOn || null };
+    return {
+        ...obj,
+        daysToExpiry: days,
+        nextReminder: pending ? { leadDays: pending.leadDays, remindOn: pending.remindOn } : null,
+        displayStatus: displayStatus(obj, days),
+        renewalState: renewalState(obj, days)
+    };
 };
 
 const loadRecord = (id) => TypeTest.findById(id).populate(POPULATE);
@@ -48,12 +78,13 @@ const sendRecord = async (res, id, status = 200) => {
 const certificateFromBody = (req) => {
     const body = req.body || {};
     return {
-        certificateNo: String(body.certificateNo || '').trim(),
-        documentUrl: String(body.documentUrl || '').trim(),
-        testingAgency: String(body.testingAgency || '').trim(),
+        certificateNo: text(body.certificateNo),
+        documentUrl: text(body.documentUrl),
+        testingAgency: text(body.testingAgency),
+        issueDate: toDate(body.issueDate),
         testCompletionDate: toDate(body.testCompletionDate),
         validUntil: toDate(body.validUntil),
-        remarks: String(body.certificateRemarks || body.remarks || '').trim(),
+        remarks: text(body.certificateRemarks || body.remarks),
         uploadedBy: req.user?.id,
         uploadedAt: new Date()
     };
@@ -61,85 +92,94 @@ const certificateFromBody = (req) => {
 
 const validateCertificate = (cert) => {
     if (!cert.certificateNo) return 'Certificate number is required.';
-    if (!cert.testCompletionDate) return 'Test completion date is required.';
     if (!cert.validUntil) return 'Valid until date is required.';
-    if (cert.validUntil <= cert.testCompletionDate) return 'Valid until date must be after the test completion date.';
+    const from = cert.issueDate || cert.testCompletionDate;
+    if (from && cert.validUntil <= from) return 'Valid until date must be after the issue / completion date.';
     return null;
 };
 
+const statusForValidity = (validUntil) => (startOfDay(validUntil) < startOfDay(new Date()) ? 'Expired' : 'Valid');
+
 /**
  * Makes `cert` the current certificate. Any previous certificate is closed and kept in the
- * history, reminders are recalculated from the new validity date, and the record goes back
- * to Valid with the renewal cycle reset.
+ * history, reminders are recalculated from the new validity date and the renewal cycle resets.
  */
 const applyCertificate = (record, cert, req, closeReason) => {
     if (record.currentCertificate?.certificateNo || record.currentCertificate?.validUntil) {
         const old = record.currentCertificate.toObject ? record.currentCertificate.toObject() : record.currentCertificate;
         record.certificateHistory.push({ ...old, closedAt: new Date(), closedBy: req.user?.id, closeReason });
-        record.activities.push(activity(req, `Old certificate ${old.certificateNo || ''} closed`.replace(/\s+/g, ' '), closeReason));
+        record.activities.push(activity(req, `Old certificate ${old.certificateNo || ''} closed`.replace(/\s+/g, ' ').trim(), closeReason));
     }
 
     record.currentCertificate = cert;
     if (cert.testingAgency) record.testingAgency = cert.testingAgency;
     record.reminders = buildReminders(cert.validUntil, record.reminderLeadDays);
     record.expiryNotifiedAt = null;
-
-    const expired = startOfDay(cert.validUntil) < startOfDay(new Date());
-    record.status = expired ? 'Expired' : 'Valid';
-    record.renewalStatus = expired ? 'Due' : 'Not Due';
-    record.nextAction = '';
-    record.nextActionDate = null;
+    record.status = statusForValidity(cert.validUntil);
+    record.renewalStatus = record.status === 'Expired' ? 'Overdue' : 'Not Due';
     record.activities.push(activity(
         req,
-        `Certificate ${cert.certificateNo} recorded (tested ${formatDate(cert.testCompletionDate)}, valid until ${formatDate(cert.validUntil)})`,
+        `Certificate ${cert.certificateNo} recorded (valid until ${formatDate(cert.validUntil)})`,
         cert.remarks
     ));
 };
+
+const applyCommonFields = (record, body) => {
+    ['modelName', 'testName', 'testStandard', 'testingAgency', 'nextAction', 'remarks'].forEach(field => {
+        if (body[field] !== undefined) record[field] = text(body[field]);
+    });
+    if (record.testName === '') record.testName = 'Type Test';
+    if (body.testResult !== undefined && TypeTest.TEST_RESULTS.includes(body.testResult)) record.testResult = body.testResult;
+    if (body.testStartDate !== undefined) record.testStartDate = toDate(body.testStartDate);
+    if (body.nextActionDate !== undefined) record.nextActionDate = toDate(body.nextActionDate);
+};
+
+const isDuplicateKey = (err) => err?.code === 11000;
 
 // Create a type test record for a product / model
 exports.createTypeTest = async (req, res) => {
     try {
         const body = req.body || {};
         if (!body.productId) return res.status(400).json({ message: 'Product is required.' });
-
-        const modelName = String(body.modelName || '').trim();
-        const exists = await TypeTest.findOne({ productId: body.productId, modelName });
-        if (exists) {
-            return res.status(400).json({ message: 'A type test record already exists for this product / model.' });
-        }
+        if (!optionalId(body.ownerId) && !req.user?.id) return res.status(400).json({ message: 'Renewal owner is required.' });
 
         const record = new TypeTest({
             productId: body.productId,
-            modelName,
-            testName: String(body.testName || '').trim() || 'Type Test',
-            testStandard: body.testStandard,
-            testingAgency: body.testingAgency,
-            status: body.status && body.status !== 'Valid' ? body.status : 'Not Started',
             ownerId: optionalId(body.ownerId) || req.user?.id,
             backupOwnerId: optionalId(body.backupOwnerId),
             reminderLeadDays: normalizeLeadDays(body.reminderLeadDays),
-            nextAction: body.nextAction,
-            nextActionDate: toDate(body.nextActionDate),
-            remarks: body.remarks,
             createdBy: req.user?.id,
             activities: [activity(req, 'Type test record created')]
         });
+        applyCommonFields(record, body);
+        if (body.status && TypeTest.TYPE_TEST_STATUSES.includes(body.status) && !['Valid', 'Expired'].includes(body.status)) {
+            record.status = body.status;
+        }
+        if (body.renewalStatus && TypeTest.RENEWAL_STATUSES.includes(body.renewalStatus)) {
+            record.renewalStatus = body.renewalStatus;
+        }
+
+        const exists = await TypeTest.findOne({ productId: record.productId, modelName: record.modelName, testName: record.testName });
+        if (exists) return res.status(400).json({ message: DUPLICATE_MESSAGE });
 
         // A certificate can be recorded straight away when the product was already tested.
-        if (body.certificateNo || body.validUntil) {
+        if (text(body.certificateNo) || body.validUntil) {
             const cert = certificateFromBody(req);
             const error = validateCertificate(cert);
             if (error) return res.status(400).json({ message: error });
+            const keepRenewal = record.renewalStatus;
+            const keepStatus = record.status;
             applyCertificate(record, cert, req);
+            // An explicit in-progress choice on the form wins over the derived values.
+            if (['In Progress', 'Submitted'].includes(keepRenewal)) record.renewalStatus = keepRenewal;
+            if (keepStatus === 'Renewal In Progress') record.status = keepStatus;
         }
 
         await record.save();
         await sendRecord(res, record._id, 201);
     } catch (err) {
         console.error('[TypeTest Create Error]', err);
-        if (err.code === 11000) {
-            return res.status(400).json({ message: 'A type test record already exists for this product / model.' });
-        }
+        if (isDuplicateKey(err)) return res.status(400).json({ message: DUPLICATE_MESSAGE });
         res.status(400).json({ message: err.message });
     }
 };
@@ -147,36 +187,18 @@ exports.createTypeTest = async (req, res) => {
 // List type test records
 exports.getTypeTests = async (req, res) => {
     try {
-        const { search, status, renewalStatus, ownerId, productId, active, expiringWithin } = req.query;
+        const { status, ownerId, productId, active } = req.query;
         const query = {};
-
         if (status) query.status = status;
-        if (renewalStatus) query.renewalStatus = renewalStatus;
         if (productId) query.productId = productId;
         if (ownerId) query.$or = [{ ownerId }, { backupOwnerId: ownerId }];
         if (active === 'true') query.isActive = true;
         if (active === 'false') query.isActive = false;
 
-        if (expiringWithin) {
-            const days = Number(expiringWithin);
-            if (Number.isFinite(days) && days > 0) {
-                const today = startOfDay(new Date());
-                query['currentCertificate.validUntil'] = { $gte: today, $lte: new Date(today.getTime() + days * DAY_MS) };
-            }
-        }
-
-        let records = await TypeTest.find(query)
+        const records = await TypeTest.find(query)
             .populate(POPULATE)
-            .sort({ isActive: -1, 'currentCertificate.validUntil': 1, createdAt: -1 })
+            .sort({ 'currentCertificate.validUntil': 1, createdAt: -1 })
             .lean();
-
-        if (search) {
-            const needle = String(search).trim().toLowerCase();
-            records = records.filter(r => [
-                r.productId?.productName, r.productId?.productCode, r.modelName, r.testName,
-                r.testStandard, r.testingAgency, r.currentCertificate?.certificateNo
-            ].some(v => String(v || '').toLowerCase().includes(needle)));
-        }
 
         res.json(records.map(withComputed));
     } catch (err) {
@@ -189,9 +211,7 @@ exports.getTypeTestById = async (req, res) => {
     try {
         const record = await TypeTest.findById(req.params.id)
             .populate(POPULATE)
-            .populate('certificateHistory.uploadedBy', 'name')
             .populate('certificateHistory.closedBy', 'name')
-            .populate('currentCertificate.uploadedBy', 'name')
             .lean();
         if (!record) return res.status(404).json({ message: 'Type test record not found' });
         res.json(withComputed(record));
@@ -201,7 +221,8 @@ exports.getTypeTestById = async (req, res) => {
     }
 };
 
-// Update general details: owners, lead times, status, next action
+// Edit a record. Certificate fields edited here correct the current certificate in place;
+// a renewal (new certificate replacing the old one) goes through recordCertificate.
 exports.updateTypeTest = async (req, res) => {
     try {
         const record = await loadRecord(req.params.id);
@@ -209,11 +230,8 @@ exports.updateTypeTest = async (req, res) => {
         const body = req.body || {};
         const logs = [];
 
-        ['modelName', 'testName', 'testStandard', 'testingAgency', 'nextAction', 'remarks'].forEach(field => {
-            if (body[field] !== undefined) record[field] = String(body[field] || '').trim();
-        });
         if (body.productId) record.productId = body.productId;
-        if (body.nextActionDate !== undefined) record.nextActionDate = toDate(body.nextActionDate);
+        applyCommonFields(record, body);
 
         if (body.ownerId && String(body.ownerId) !== String(record.ownerId?._id || record.ownerId)) {
             record.ownerId = body.ownerId;
@@ -232,7 +250,43 @@ exports.updateTypeTest = async (req, res) => {
             if (leadDays.join(',') !== (record.reminderLeadDays || []).join(',')) {
                 record.reminderLeadDays = leadDays;
                 record.reminders = buildReminders(record.currentCertificate?.validUntil, leadDays, record.reminders);
-                logs.push(`Renewal lead times set to ${leadDays.join(' / ')} days`);
+                logs.push(`Reminder lead times set to ${leadDays.join(' / ')} days`);
+            }
+        }
+
+        // Certificate details
+        const certTouched = CERT_FIELDS.some(f => body[f] !== undefined);
+        if (certTouched) {
+            const incoming = certificateFromBody(req);
+            const current = record.currentCertificate;
+            if (!current?.validUntil) {
+                if (incoming.certificateNo || incoming.validUntil) {
+                    const error = validateCertificate(incoming);
+                    if (error) return res.status(400).json({ message: error });
+                    applyCertificate(record, incoming, req);
+                }
+            } else {
+                const changed = incoming.certificateNo !== (current.certificateNo || '')
+                    || incoming.documentUrl !== (current.documentUrl || '')
+                    || !sameDay(incoming.issueDate, current.issueDate)
+                    || !sameDay(incoming.testCompletionDate, current.testCompletionDate)
+                    || !sameDay(incoming.validUntil, current.validUntil);
+                if (changed) {
+                    const error = validateCertificate(incoming);
+                    if (error) return res.status(400).json({ message: error });
+                    const validityChanged = !sameDay(incoming.validUntil, current.validUntil);
+                    current.certificateNo = incoming.certificateNo;
+                    current.documentUrl = incoming.documentUrl;
+                    current.issueDate = incoming.issueDate;
+                    current.testCompletionDate = incoming.testCompletionDate;
+                    current.validUntil = incoming.validUntil;
+                    if (validityChanged) {
+                        record.reminders = buildReminders(incoming.validUntil, record.reminderLeadDays, record.reminders);
+                        record.expiryNotifiedAt = null;
+                        if (['Valid', 'Expired'].includes(record.status)) record.status = statusForValidity(incoming.validUntil);
+                    }
+                    logs.push('Certificate details corrected');
+                }
             }
         }
 
@@ -241,9 +295,9 @@ exports.updateTypeTest = async (req, res) => {
                 return res.status(400).json({ message: `Invalid status "${body.status}"` });
             }
             if (body.status === 'Valid' && !record.currentCertificate?.validUntil) {
-                return res.status(400).json({ message: 'Record a certificate before marking the type test as Valid.' });
+                return res.status(400).json({ message: 'Record a certificate before marking the test as Valid.' });
             }
-            logs.push(`Status changed from "${record.status}" to "${body.status}"`);
+            logs.push(`Test status changed from "${record.status}" to "${body.status}"`);
             record.status = body.status;
         }
 
@@ -260,14 +314,12 @@ exports.updateTypeTest = async (req, res) => {
         await sendRecord(res, record._id);
     } catch (err) {
         console.error('[TypeTest Update Error]', err);
-        if (err.code === 11000) {
-            return res.status(400).json({ message: 'A type test record already exists for this product / model.' });
-        }
+        if (isDuplicateKey(err)) return res.status(400).json({ message: DUPLICATE_MESSAGE });
         res.status(400).json({ message: err.message });
     }
 };
 
-// Step 1 / 4: record a completed test with its certificate. Closes the previous certificate.
+// Record a completed test / renewed certificate. Closes the previous certificate.
 exports.recordCertificate = async (req, res) => {
     try {
         const record = await loadRecord(req.params.id);
@@ -279,7 +331,8 @@ exports.recordCertificate = async (req, res) => {
 
         const isRenewal = Boolean(record.currentCertificate?.validUntil);
         applyCertificate(record, cert, req, isRenewal ? `Superseded by certificate ${cert.certificateNo}` : '');
-        if (isRenewal) record.renewalStatus = 'Completed';
+        if (isRenewal && record.status === 'Valid') record.renewalStatus = 'Renewed';
+        if (req.body?.testResult && TypeTest.TEST_RESULTS.includes(req.body.testResult)) record.testResult = req.body.testResult;
 
         await record.save();
         await sendRecord(res, record._id);
@@ -289,7 +342,7 @@ exports.recordCertificate = async (req, res) => {
     }
 };
 
-// Step 3: owner starts the renewal
+// Owner starts the renewal (or the first test)
 exports.startRenewal = async (req, res) => {
     try {
         const record = await loadRecord(req.params.id);
@@ -297,11 +350,12 @@ exports.startRenewal = async (req, res) => {
         if (!record.isActive) return res.status(400).json({ message: 'Reactivate this record before starting a renewal.' });
 
         const body = req.body || {};
-        record.status = record.currentCertificate?.validUntil ? 'Renewal In Progress' : 'In Progress';
-        record.renewalStatus = 'Initiated';
-        if (body.nextAction !== undefined) record.nextAction = String(body.nextAction || '').trim();
+        const hasCert = Boolean(record.currentCertificate?.validUntil);
+        record.status = hasCert ? 'Renewal In Progress' : 'In Progress';
+        record.renewalStatus = 'In Progress';
+        if (body.nextAction !== undefined) record.nextAction = text(body.nextAction);
         if (body.nextActionDate !== undefined) record.nextActionDate = toDate(body.nextActionDate);
-        record.activities.push(activity(req, record.currentCertificate?.validUntil ? 'Renewal started' : 'Testing started', body.note));
+        record.activities.push(activity(req, hasCert ? 'Renewal started' : 'Testing started', body.note));
 
         await record.save();
         await sendRecord(res, record._id);
@@ -311,36 +365,42 @@ exports.startRenewal = async (req, res) => {
     }
 };
 
-// Step 3: record renewal progress
+// Renewal progress: status, next action and notes
 exports.recordProgress = async (req, res) => {
     try {
         const record = await loadRecord(req.params.id);
         if (!record) return res.status(404).json({ message: 'Type test record not found' });
 
         const body = req.body || {};
-        const note = String(body.note || '').trim();
-        if (!note && !body.renewalStatus && body.nextAction === undefined) {
-            return res.status(400).json({ message: 'Add a progress note, renewal status or next action.' });
-        }
-
+        const note = text(body.note);
         const parts = [];
+
         if (body.renewalStatus && body.renewalStatus !== record.renewalStatus) {
             if (!TypeTest.RENEWAL_STATUSES.includes(body.renewalStatus)) {
                 return res.status(400).json({ message: `Invalid renewal status "${body.renewalStatus}"` });
             }
+            if (body.renewalStatus === 'Renewed') {
+                return res.status(400).json({ message: 'Enter the new certificate number and valid-until date to mark the renewal complete.' });
+            }
             parts.push(`Renewal status: ${body.renewalStatus}`);
             record.renewalStatus = body.renewalStatus;
-            if (['Initiated', 'Testing Scheduled', 'Testing In Progress', 'Awaiting Certificate'].includes(body.renewalStatus)
-                && !['In Progress', 'Renewal In Progress'].includes(record.status)) {
+            if (['In Progress', 'Submitted'].includes(body.renewalStatus) && !['In Progress', 'Renewal In Progress'].includes(record.status)) {
                 record.status = record.currentCertificate?.validUntil ? 'Renewal In Progress' : 'In Progress';
             }
         }
-        if (body.nextAction !== undefined) {
-            record.nextAction = String(body.nextAction || '').trim();
+        if (body.nextAction !== undefined && text(body.nextAction) !== (record.nextAction || '')) {
+            record.nextAction = text(body.nextAction);
             if (record.nextAction) parts.push(`Next action: ${record.nextAction}`);
         }
         if (body.nextActionDate !== undefined) record.nextActionDate = toDate(body.nextActionDate);
+        if (body.documentUrl && record.currentCertificate) {
+            record.currentCertificate.documentUrl = text(body.documentUrl);
+            parts.push('Certificate document replaced');
+        }
 
+        if (!note && !parts.length && body.nextActionDate === undefined) {
+            return res.status(400).json({ message: 'Nothing to update.' });
+        }
         record.activities.push(activity(req, parts.length ? parts.join(' | ') : 'Progress update', note));
         await record.save();
         await sendRecord(res, record._id);
@@ -350,14 +410,14 @@ exports.recordProgress = async (req, res) => {
     }
 };
 
-// Step 5: discontinued products stop generating reminders
+// Discontinued products stop generating reminders
 exports.setActive = async (req, res) => {
     try {
         const record = await loadRecord(req.params.id);
         if (!record) return res.status(404).json({ message: 'Type test record not found' });
 
         const isActive = Boolean(req.body?.isActive);
-        const reason = String(req.body?.reason || '').trim();
+        const reason = text(req.body?.reason);
         if (record.isActive === isActive) return sendRecord(res, record._id);
 
         record.isActive = isActive;
@@ -391,35 +451,22 @@ exports.deleteTypeTest = async (req, res) => {
     }
 };
 
-// KPI summary for the register header
+// Dashboard counts (inactive products excluded, as on the portal dashboard)
 exports.getTypeTestSummary = async (req, res) => {
     try {
-        const records = await TypeTest.find({})
+        const records = (await TypeTest.find({})
             .select('status isActive renewalStatus currentCertificate.validUntil')
-            .lean();
-        const today = startOfDay(new Date());
-        const within = (r, days) => {
-            const v = r.currentCertificate?.validUntil;
-            if (!v) return false;
-            const d = startOfDay(v);
-            return d >= today && d <= new Date(today.getTime() + days * DAY_MS);
-        };
-
+            .lean()).map(withComputed);
         const active = records.filter(r => r.isActive);
-        const byStatus = TypeTest.TYPE_TEST_STATUSES.reduce((acc, s) => {
-            acc[s] = active.filter(r => r.status === s).length;
-            return acc;
-        }, {});
 
         res.json({
             total: records.length,
             active: active.length,
             inactive: records.length - active.length,
-            byStatus,
-            expiringIn30: active.filter(r => within(r, 30)).length,
-            expiringIn90: active.filter(r => within(r, 90)).length,
-            expiringIn180: active.filter(r => within(r, 180)).length,
-            pastExpiry: active.filter(r => r.currentCertificate?.validUntil && startOfDay(r.currentCertificate.validUntil) < today).length
+            valid: active.filter(r => r.displayStatus === 'Valid').length,
+            dueIn90: active.filter(r => r.daysToExpiry !== null && r.daysToExpiry <= 90).length,
+            expired: active.filter(r => r.displayStatus === 'Expired').length,
+            pipeline: TypeTest.TYPE_TEST_STATUSES.map(s => ({ status: s, count: active.filter(r => r.displayStatus === s).length }))
         });
     } catch (err) {
         console.error('[TypeTest Summary Error]', err);

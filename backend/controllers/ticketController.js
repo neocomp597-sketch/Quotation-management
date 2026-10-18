@@ -477,6 +477,16 @@ exports.getTickets = async (req, res) => {
                 filter.status = { $nin: ['Closed', 'Cancelled'] };
             }
         }
+        if (req.query.resolvedOn === 'yesterday') {
+            const startOfToday = new Date();
+            startOfToday.setHours(0, 0, 0, 0);
+            const startOfYesterday = new Date(startOfToday);
+            startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+            filter.resolvedAt = { $gte: startOfYesterday, $lt: startOfToday };
+            if (!filter.status) {
+                filter.status = { $in: ['Resolved', 'Closed'] };
+            }
+        }
 
         // Support Tickets are a company-wide register: a ticket raised in any branch is
         // listed from every branch. Visibility is still limited by the my/team/all

@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 const tenantPlugin = require('./plugins/tenantPlugin');
 
 const TYPE_TEST_STATUSES = ['Not Started', 'In Progress', 'Valid', 'Expired', 'Renewal In Progress'];
-const RENEWAL_STATUSES = ['Not Due', 'Due', 'Initiated', 'Testing Scheduled', 'Testing In Progress', 'Awaiting Certificate', 'Completed'];
+const RENEWAL_STATUSES = ['Not Due', 'Upcoming', 'In Progress', 'Submitted', 'Renewed', 'Overdue'];
+const TEST_RESULTS = ['Pending', 'Pass', 'Fail', 'Not Applicable'];
 const DEFAULT_LEAD_DAYS = [180, 90, 30];
 
 // One certificate issued by the external testing agency. The current one lives on the
@@ -11,6 +12,7 @@ const CertificateSchema = new mongoose.Schema({
     certificateNo: { type: String, trim: true, default: '' },
     documentUrl: { type: String, trim: true, default: '' },
     testingAgency: { type: String, trim: true, default: '' },
+    issueDate: { type: Date },
     testCompletionDate: { type: Date },
     validUntil: { type: Date },
     remarks: { type: String, trim: true, default: '' },
@@ -35,6 +37,8 @@ const TypeTestSchema = new mongoose.Schema({
     testName: { type: String, trim: true, default: 'Type Test' },
     testStandard: { type: String, trim: true, default: '' },
     testingAgency: { type: String, trim: true, default: '' },
+    testResult: { type: String, enum: TEST_RESULTS, default: 'Pending' },
+    testStartDate: { type: Date },
 
     status: { type: String, enum: TYPE_TEST_STATUSES, default: 'Not Started', index: true },
 
@@ -69,7 +73,8 @@ const TypeTestSchema = new mongoose.Schema({
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
-TypeTestSchema.index({ companyId: 1, productId: 1, modelName: 1 }, { unique: true });
+// A product / model can carry several type tests (e.g. temperature rise, short circuit).
+TypeTestSchema.index({ companyId: 1, productId: 1, modelName: 1, testName: 1 }, { unique: true });
 TypeTestSchema.index({ companyId: 1, 'currentCertificate.validUntil': 1 });
 TypeTestSchema.index({ companyId: 1, ownerId: 1 });
 TypeTestSchema.index({ isActive: 1, 'reminders.remindOn': 1 });
@@ -79,6 +84,7 @@ TypeTestSchema.plugin(tenantPlugin);
 const TypeTest = mongoose.model('TypeTest', TypeTestSchema);
 TypeTest.TYPE_TEST_STATUSES = TYPE_TEST_STATUSES;
 TypeTest.RENEWAL_STATUSES = RENEWAL_STATUSES;
+TypeTest.TEST_RESULTS = TEST_RESULTS;
 TypeTest.DEFAULT_LEAD_DAYS = DEFAULT_LEAD_DAYS;
 
 module.exports = TypeTest;

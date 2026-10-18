@@ -1,10 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { typeTestService, productService, userService, uploadService } from '../services/api';
 import { formatDate, formatDateTime, resolveImageUrl } from '../utils/helpers';
 import {
-    MdFactCheck, MdAdd, MdEdit, MdDelete, MdSearch, MdClose, MdInfo, MdDownload,
-    MdCloudUpload, MdPictureAsPdf, MdAutorenew, MdNotes, MdBlock, MdRestore, MdNotificationsActive
+    MdDashboard, MdListAlt, MdInventory2, MdSchedule, MdFactCheck, MdAdd, MdDownload,
+    MdCloudUpload, MdAssignment, MdVerified, MdUpdate, MdErrorOutline, MdInfoOutline
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
@@ -12,59 +12,63 @@ import Modal from '../components/Modal';
 import DateInput from '../components/DateInput';
 import * as XLSX from 'xlsx';
 
-const STATUS_CLASSES = {
-    'Not Started': 'bg-slate-50 text-slate-600 border-slate-200',
-    'In Progress': 'bg-blue-50 text-blue-700 border-blue-100',
-    'Valid': 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    'Expired': 'bg-rose-50 text-rose-700 border-rose-100',
-    'Renewal In Progress': 'bg-amber-50 text-amber-700 border-amber-100'
-};
+const TEST_STATUSES = ['Not Started', 'In Progress', 'Valid', 'Expired', 'Renewal In Progress'];
+const TEST_RESULTS = ['Pending', 'Pass', 'Fail', 'Not Applicable'];
+const RENEWAL_STATUSES = ['Not Due', 'Upcoming', 'In Progress', 'Submitted', 'Renewed', 'Overdue'];
 
-const RENEWAL_STATUSES = ['Not Due', 'Due', 'Initiated', 'Testing Scheduled', 'Testing In Progress', 'Awaiting Certificate', 'Completed'];
-const LEAD_DAY_PRESETS = [180, 90, 60, 30, 15, 7];
+const PAGES = [
+    { key: 'dashboard', label: 'Dashboard', icon: MdDashboard },
+    { key: 'tests', label: 'Type Test Records', icon: MdListAlt },
+    { key: 'products', label: 'Product & Model Master', icon: MdInventory2 },
+    { key: 'renewals', label: 'Renewal Worklist', icon: MdSchedule }
+];
 
-const INPUT = 'w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm text-slate-700 font-semibold rounded-xl focus:outline-none focus:border-teal-500';
-const FILTER = 'px-3 py-2 bg-slate-50 border border-slate-200 text-sm text-slate-700 font-semibold rounded-xl focus:outline-none focus:border-teal-500';
+const INPUT = 'w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm text-slate-700 font-semibold rounded-xl focus:outline-none focus:border-teal-500 focus:bg-white';
 const LABEL = 'block text-xs font-bold text-slate-500 mb-1 uppercase';
+const PANEL = 'min-w-0 bg-white border border-slate-100 rounded-2xl p-5 shadow-sm';
+const TH = 'py-3.5 px-4 text-left text-xs font-bold text-slate-400 uppercase bg-slate-50/50 border-b border-slate-100 whitespace-nowrap';
+const TD = 'py-3 px-4 align-top border-b border-slate-50 text-sm font-semibold text-slate-600';
+const TDN = `${TD} whitespace-nowrap`;
+const PRIMARY = 'flex items-center justify-center gap-1.5 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-sm font-black rounded-xl shadow-md hover:shadow-lg transition-all';
+const SECONDARY = 'flex items-center justify-center gap-1.5 px-4 py-2.5 bg-teal-50 hover:bg-teal-100 border border-teal-200 text-teal-700 text-sm font-black rounded-xl transition-all';
+const SMALL = 'whitespace-nowrap px-2.5 py-1.5 border border-slate-200 bg-white hover:bg-teal-50 hover:border-teal-200 hover:text-teal-700 rounded-lg text-xs font-bold text-slate-600 transition';
+const NOTICE = 'flex items-start gap-2 px-4 py-3 rounded-xl bg-teal-50 border border-teal-100 text-teal-800 text-[13px] font-semibold';
+
+const badgeTone = (s) => {
+    if (['Valid', 'Renewed', 'Active'].includes(s)) return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+    if (['Expired', 'Overdue', 'Inactive'].includes(s)) return 'bg-rose-50 text-rose-700 border-rose-100';
+    if (['Upcoming', 'In Progress', 'Renewal In Progress', 'Submitted'].includes(s)) return 'bg-amber-50 text-amber-700 border-amber-100';
+    if (s === 'Not Started') return 'bg-slate-50 text-slate-600 border-slate-200';
+    return 'bg-sky-50 text-sky-700 border-sky-100';
+};
+const Badge = ({ value }) => (
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-bold whitespace-nowrap ${badgeTone(value)}`}>{value || 'Not set'}</span>
+);
 
 const toInputDate = (d) => (d ? new Date(d).toISOString().split('T')[0] : '');
-const productText = (p) => (p ? `${p.productName || ''}${p.productCode ? ` (${p.productCode})` : ''}` : '-');
+const productText = (p) => (p ? `${p.productCode ? `${p.productCode} — ` : ''}${p.productName || ''}` : '');
+const fmt = (d) => (d ? formatDate(d) : '—');
+const muted = 'text-xs text-slate-500';
+const expiryNote = (r) => {
+    if (r.daysToExpiry === null || r.daysToExpiry === undefined) return 'No expiry';
+    return r.daysToExpiry < 0 ? `${Math.abs(r.daysToExpiry)} days overdue` : `${r.daysToExpiry} days left`;
+};
+const nextReminderText = (r) => {
+    if (!r.currentCertificate?.validUntil) return 'No expiry date';
+    if (!r.nextReminder) return 'All reminders sent';
+    // A milestone already reached is picked up by the next scheduler run (every 15 minutes).
+    if (new Date(r.nextReminder.remindOn) <= new Date()) return `${r.nextReminder.leadDays} day milestone (sending now)`;
+    return `${r.nextReminder.leadDays} day milestone (${fmt(r.nextReminder.remindOn)})`;
+};
 
 const EMPTY_FORM = {
-    productId: '', productLabel: '', modelName: '', testName: 'Type Test', testStandard: '', testingAgency: '',
-    ownerId: '', backupOwnerId: '', reminderLeadDays: [180, 90, 30], status: 'Not Started',
-    nextAction: '', nextActionDate: '', remarks: '',
-    certificateNo: '', documentUrl: '', testCompletionDate: '', validUntil: ''
+    productId: '', productLabel: '', modelName: '', testName: '', testStandard: '', testingAgency: '',
+    status: 'Not Started', testResult: 'Pending', testStartDate: '', testCompletionDate: '',
+    certificateNo: '', issueDate: '', validUntil: '', documentUrl: '',
+    ownerId: '', backupOwnerId: '', reminderLeadDays: '180,90,30', renewalStatus: 'Not Due',
+    nextAction: '', nextActionDate: '', remarks: ''
 };
-
-const EMPTY_CERT = { certificateNo: '', testingAgency: '', testCompletionDate: '', validUntil: '', documentUrl: '', remarks: '' };
-const EMPTY_PROGRESS = { renewalStatus: '', nextAction: '', nextActionDate: '', note: '' };
-
-const ExpiryBadge = ({ record }) => {
-    const days = record.daysToExpiry;
-    if (days === null || days === undefined) return <span className="text-slate-400">-</span>;
-    let cls = 'bg-emerald-50 text-emerald-700 border-emerald-100';
-    let text = `${days} days left`;
-    if (days < 0) { cls = 'bg-rose-50 text-rose-700 border-rose-100'; text = `Expired ${Math.abs(days)}d ago`; }
-    else if (days <= 30) cls = 'bg-rose-50 text-rose-700 border-rose-100';
-    else if (days <= 90) cls = 'bg-orange-50 text-orange-700 border-orange-100';
-    else if (days <= 180) cls = 'bg-amber-50 text-amber-700 border-amber-100';
-    return <span className={`inline-flex px-2 py-0.5 rounded-full border text-[11px] font-bold whitespace-nowrap ${cls}`}>{text}</span>;
-};
-
-const DocumentLink = ({ url, label = 'View' }) => {
-    if (!url) return null;
-    return (
-        <a
-            href={resolveImageUrl(url)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-black uppercase rounded border border-rose-200"
-        >
-            <MdPictureAsPdf size={12} /> {label}
-        </a>
-    );
-};
+const EMPTY_RENEWAL = { renewalStatus: 'Not Due', nextAction: '', nextActionDate: '', certificateNo: '', validUntil: '', documentUrl: '', note: '' };
 
 // Server-side product search, since the catalog is too large for a plain dropdown.
 // The parent owns the text (label) so it can prefill it when editing.
@@ -100,19 +104,19 @@ const ProductPicker = ({ label, onChange }) => {
                 value={query}
                 onFocus={() => setOpen(true)}
                 onChange={e => { setOpen(true); onChange('', e.target.value); }}
-                placeholder="Search product by name or code"
+                placeholder="Search product code or name"
                 className={INPUT}
             />
             {open && (
-                <div className="absolute z-50 mt-1 w-full max-h-60 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg">
+                <div className="absolute z-50 mt-1 w-full max-h-60 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg">
                     {results.length === 0 ? (
-                        <div className="px-3 py-2 text-xs font-semibold text-slate-400">No products found</div>
+                        <div className="px-3 py-2 text-xs text-slate-400">No products found</div>
                     ) : results.map(p => (
                         <button
                             type="button"
                             key={p._id}
                             onClick={() => { onChange(p._id, productText(p)); setOpen(false); }}
-                            className="block w-full text-left px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-teal-50"
+                            className="block w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-teal-50"
                         >
                             {productText(p)}
                         </button>
@@ -123,50 +127,13 @@ const ProductPicker = ({ label, onChange }) => {
     );
 };
 
-const LeadDaysInput = ({ value, onChange }) => {
-    const [custom, setCustom] = useState('');
-    const toggle = (d) => {
-        const next = value.includes(d) ? value.filter(v => v !== d) : [...value, d];
-        onChange(next.sort((a, b) => b - a));
-    };
-    const addCustom = () => {
-        const d = Math.round(Number(custom));
-        if (d > 0 && !value.includes(d)) onChange([...value, d].sort((a, b) => b - a));
-        setCustom('');
-    };
-    const options = [...new Set([...LEAD_DAY_PRESETS, ...value])].sort((a, b) => b - a);
-    return (
-        <div className="flex flex-wrap items-center gap-2">
-            {options.map(d => (
-                <button
-                    type="button"
-                    key={d}
-                    onClick={() => toggle(d)}
-                    className={`px-2.5 py-1 rounded-lg border text-xs font-bold transition ${value.includes(d) ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white border-slate-200 text-slate-500 hover:border-teal-400'}`}
-                >
-                    {d} days
-                </button>
-            ))}
-            <input
-                type="number"
-                min="1"
-                value={custom}
-                onChange={e => setCustom(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustom(); } }}
-                placeholder="Other"
-                className="w-20 px-2 py-1 bg-slate-50 border border-slate-200 text-xs font-semibold rounded-lg focus:outline-none focus:border-teal-500"
-            />
-        </div>
-    );
-};
-
-const PdfUploadField = ({ value, onChange }) => {
+const FileField = ({ id, value, onChange }) => {
     const [uploading, setUploading] = useState(false);
     const handleFile = async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
         if (file.size > 10 * 1024 * 1024) {
-            toast.error('Certificate PDF must be 10 MB or smaller.');
+            toast.error('Certificate file must be 10 MB or smaller.');
             e.target.value = '';
             return;
         }
@@ -186,329 +153,341 @@ const PdfUploadField = ({ value, onChange }) => {
         }
     };
     return (
-        <div className="flex items-center gap-3 flex-wrap">
-            <label className={`inline-flex items-center gap-1.5 px-3 py-2 border border-dashed border-teal-300 bg-teal-50 text-teal-700 text-xs font-bold rounded-xl cursor-pointer hover:bg-teal-100 ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
-                <MdCloudUpload size={16} />
-                {uploading ? 'Uploading...' : value ? 'Replace PDF' : 'Upload Certificate PDF'}
-                <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={handleFile} />
+        <div>
+            <label htmlFor={id} className={`inline-flex items-center gap-1.5 px-3 py-2 border border-dashed border-teal-300 bg-teal-50 text-teal-700 text-xs font-bold rounded-xl cursor-pointer hover:bg-teal-100 ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
+                <MdCloudUpload size={16} /> {uploading ? 'Uploading...' : value ? 'Replace certificate PDF' : 'Upload certificate PDF'}
             </label>
-            {value && (
-                <>
-                    <DocumentLink url={value} label="Uploaded" />
-                    <button type="button" onClick={() => onChange('')} className="text-xs font-bold text-rose-500 hover:text-rose-700">Remove</button>
-                </>
-            )}
+            <input id={id} type="file" accept=".pdf,application/pdf" onChange={handleFile} disabled={uploading} className="hidden" />
+            <div className={`${muted} mt-1.5`}>
+                {uploading ? 'Uploading...' : value ? (
+                    <>Current file: <a href={resolveImageUrl(value)} target="_blank" rel="noopener noreferrer" className="text-teal-700 font-bold hover:underline">View certificate</a>
+                        {' '}<button type="button" onClick={() => onChange('')} className="text-red-600 font-semibold ml-1">Remove</button></>
+                ) : 'No certificate file uploaded. PDF, up to 10 MB.'}
+            </div>
         </div>
     );
 };
 
+const Field = ({ label, htmlFor, full, children }) => (
+    <div className={`min-w-0 ${full ? 'sm:col-span-2 lg:col-span-3' : ''}`}>
+        <label htmlFor={htmlFor} className={LABEL}>{label}</label>
+        {children}
+    </div>
+);
+
 const TypeTestRegister = () => {
     const { user: currentUser } = useAuth();
+    const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
+    const page = PAGES.some(p => p.key === searchParams.get('tab')) ? searchParams.get('tab') : 'dashboard';
 
     const [records, setRecords] = useState([]);
-    const [summary, setSummary] = useState(null);
     const [loading, setLoading] = useState(true);
     const [users, setUsers] = useState([]);
 
-    // Filters
-    const [search, setSearch] = useState('');
-    const [status, setStatus] = useState('');
-    const [ownerId, setOwnerId] = useState('');
-    const [active, setActive] = useState('true');
-    const [expiringWithin, setExpiringWithin] = useState('');
+    // Filters per section
+    const [testSearch, setTestSearch] = useState('');
+    const [testStatus, setTestStatus] = useState('');
+    const [activeFilter, setActiveFilter] = useState('active');
+    const [productSearch, setProductSearch] = useState('');
+    const [productStatus, setProductStatus] = useState('');
+    const [renewalSearch, setRenewalSearch] = useState('');
+    const [renewalFilter, setRenewalFilter] = useState('');
 
-    // Create / edit
-    const [showForm, setShowForm] = useState(false);
+    // Dialogs
+    const [formOpen, setFormOpen] = useState(false);
     const [editingId, setEditingId] = useState(null);
-    const [formData, setFormData] = useState(EMPTY_FORM);
-    const [submitting, setSubmitting] = useState(false);
+    const [form, setForm] = useState(EMPTY_FORM);
+    const [renewalRecord, setRenewalRecord] = useState(null);
+    const [renewal, setRenewal] = useState(EMPTY_RENEWAL);
+    const [historyRecord, setHistoryRecord] = useState(null);
+    const [saving, setSaving] = useState(false);
 
-    // Detail and workflow modals
-    const [selected, setSelected] = useState(null);
-    const [certModal, setCertModal] = useState(false);
-    const [certData, setCertData] = useState(EMPTY_CERT);
-    const [progressModal, setProgressModal] = useState(false);
-    const [progressData, setProgressData] = useState(EMPTY_PROGRESS);
+    const showPage = (key) => setSearchParams({ tab: key });
+    const setField = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
 
-    const setField = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
-
-    const loadUsers = async () => {
+    const loadRecords = async () => {
         try {
-            const res = await userService.getAll({ limit: 1000 });
-            setUsers(res.data?.data || res.data?.docs || res.data || []);
-        } catch (err) {
-            console.error('Failed to load users:', err);
-        }
-    };
-
-    const loadSummary = async () => {
-        try {
-            const res = await typeTestService.getSummary();
-            setSummary(res.data);
-        } catch (err) {
-            console.error('Failed to load type test summary:', err);
-        }
-    };
-
-    const loadRecords = async (showSpinner = true) => {
-        if (showSpinner) setLoading(true);
-        try {
-            const res = await typeTestService.getAll({
-                search: search || undefined,
-                status: status || undefined,
-                ownerId: ownerId || undefined,
-                active: active || undefined,
-                expiringWithin: expiringWithin || undefined
-            });
+            const res = await typeTestService.getAll();
             setRecords(res.data || []);
         } catch (err) {
-            console.error('Failed to fetch type tests:', err);
-            toast.error('Failed to load type test register.');
+            console.error('Failed to load type tests:', err);
+            toast.error('Failed to load type test records.');
         } finally {
-            if (showSpinner) setLoading(false);
+            setLoading(false);
         }
     };
-
-    const refresh = () => { loadRecords(false); loadSummary(); };
-
-    const openDetail = async (id) => {
-        try {
-            const res = await typeTestService.getById(id);
-            setSelected(res.data);
-        } catch (err) {
-            console.error('Failed to load type test:', err);
-            toast.error('Failed to load type test details.');
-        }
-    };
-
-    // Keep the open detail view and the list in step after a workflow action.
-    const afterAction = (record, message) => {
-        toast.success(message);
-        if (selected && record?._id === selected._id) openDetail(record._id);
-        refresh();
-    };
-
-    useEffect(() => { loadUsers(); loadSummary(); }, []);
 
     useEffect(() => {
-        const timer = setTimeout(() => loadRecords(true), search ? 300 : 0);
-        return () => clearTimeout(timer);
-    }, [search, status, ownerId, active, expiringWithin]);
+        loadRecords();
+        userService.getAll({ limit: 1000 })
+            .then(res => setUsers(res.data?.data || res.data?.docs || res.data || []))
+            .catch(err => console.error('Failed to load users:', err));
+    }, []);
 
-    // Notification links open a record directly: /type-tests?open=<id>
+    // Notification links open a record's history: /type-tests?open=<id>
     useEffect(() => {
         const openId = searchParams.get('open');
-        if (openId) {
-            openDetail(openId);
-            setSearchParams({}, { replace: true });
-        }
+        if (!openId) return;
+        typeTestService.getById(openId)
+            .then(res => setHistoryRecord(res.data))
+            .catch(() => toast.error('Could not open that type test record.'));
+        setSearchParams({ tab: 'renewals' }, { replace: true });
     }, [searchParams]);
 
-    const applyQuickFilter = (next) => {
-        setStatus(next.status || '');
-        setExpiringWithin(next.expiringWithin || '');
-        setActive(next.active ?? 'true');
+    const activeRecords = useMemo(() => records.filter(r => r.isActive), [records]);
+
+    const replaceRecord = (updated) => {
+        setRecords(prev => prev.map(r => (r._id === updated._id ? updated : r)));
+        if (historyRecord?._id === updated._id) {
+            typeTestService.getById(updated._id).then(res => setHistoryRecord(res.data)).catch(() => {});
+        }
     };
 
-    const clearFilters = () => {
-        setSearch('');
-        setStatus('');
-        setOwnerId('');
-        setActive('true');
-        setExpiringWithin('');
+    /* ---------------- Create / edit ---------------- */
+
+    const openTestModal = (record = null, preset = {}) => {
+        if (record) {
+            const c = record.currentCertificate || {};
+            setEditingId(record._id);
+            setForm({
+                productId: record.productId?._id || record.productId || '',
+                productLabel: productText(record.productId),
+                modelName: record.modelName || '',
+                testName: record.testName || '',
+                testStandard: record.testStandard || '',
+                testingAgency: record.testingAgency || '',
+                status: record.status,
+                testResult: record.testResult || 'Pending',
+                testStartDate: toInputDate(record.testStartDate),
+                testCompletionDate: toInputDate(c.testCompletionDate),
+                certificateNo: c.certificateNo || '',
+                issueDate: toInputDate(c.issueDate),
+                validUntil: toInputDate(c.validUntil),
+                documentUrl: c.documentUrl || '',
+                ownerId: record.ownerId?._id || record.ownerId || '',
+                backupOwnerId: record.backupOwnerId?._id || record.backupOwnerId || '',
+                reminderLeadDays: (record.reminderLeadDays || [180, 90, 30]).join(','),
+                renewalStatus: record.renewalStatus || 'Not Due',
+                nextAction: record.nextAction || '',
+                nextActionDate: toInputDate(record.nextActionDate),
+                remarks: record.remarks || ''
+            });
+        } else {
+            setEditingId(null);
+            setForm({ ...EMPTY_FORM, ownerId: currentUser?.id || '', ...preset });
+        }
+        setFormOpen(true);
     };
 
-    const openCreate = () => {
-        setEditingId(null);
-        setFormData({ ...EMPTY_FORM, ownerId: currentUser?.id || '' });
-        setShowForm(true);
-    };
-
-    const openEdit = (r) => {
-        setEditingId(r._id);
-        setFormData({
-            ...EMPTY_FORM,
-            productId: r.productId?._id || r.productId || '',
-            productLabel: productText(r.productId),
-            modelName: r.modelName || '',
-            testName: r.testName || '',
-            testStandard: r.testStandard || '',
-            testingAgency: r.testingAgency || '',
-            ownerId: r.ownerId?._id || r.ownerId || '',
-            backupOwnerId: r.backupOwnerId?._id || r.backupOwnerId || '',
-            reminderLeadDays: r.reminderLeadDays?.length ? r.reminderLeadDays : [180, 90, 30],
-            status: r.status,
-            nextAction: r.nextAction || '',
-            nextActionDate: toInputDate(r.nextActionDate),
-            remarks: r.remarks || ''
-        });
-        setShowForm(true);
-    };
-
-    const handleFormSubmit = async (e) => {
+    const saveTest = async (e) => {
         e.preventDefault();
-        if (!formData.productId) return toast.warning('Select a product.');
-        if (!formData.ownerId) return toast.warning('Select the owner responsible for renewal.');
-        if (formData.backupOwnerId && formData.backupOwnerId === formData.ownerId) {
-            return toast.warning('Backup owner must be different from the owner.');
+        if (!form.productId) return toast.warning('Select a product.');
+        if (!form.testName.trim()) return toast.warning('Enter the test name.');
+        if (!form.ownerId) return toast.warning('Select the renewal owner.');
+        if (form.backupOwnerId && form.backupOwnerId === form.ownerId) return toast.warning('Backup owner must be a different person.');
+        if ((form.certificateNo || form.validUntil) && !(form.certificateNo && form.validUntil)) {
+            return toast.warning('Enter both the certificate number and the valid until date.');
         }
-        if (!editingId && (formData.certificateNo || formData.validUntil)
-            && !(formData.certificateNo && formData.testCompletionDate && formData.validUntil)) {
-            return toast.warning('To record a certificate now, fill certificate number, completion date and valid until date.');
-        }
+        if (form.status === 'Valid' && !form.validUntil) return toast.warning('A Valid test needs a certificate and valid until date.');
 
-        const { productLabel: _productLabel, ...payload } = formData;
-        setSubmitting(true);
+        const { productLabel: _productLabel, ...payload } = form;
+        setSaving(true);
         try {
             if (editingId) {
                 const res = await typeTestService.update(editingId, payload);
-                afterAction(res.data, 'Type test record updated.');
+                replaceRecord(res.data);
+                toast.success('Type test record updated.');
             } else {
-                await typeTestService.create(payload);
+                const res = await typeTestService.create(payload);
+                setRecords(prev => [res.data, ...prev]);
                 toast.success('Type test record created.');
-                refresh();
             }
-            setShowForm(false);
+            setFormOpen(false);
         } catch (err) {
-            console.error('Save type test error:', err);
-            toast.error(err.response?.data?.message || 'Error saving type test record.');
+            toast.error(err.response?.data?.message || 'Could not save the record.');
         } finally {
-            setSubmitting(false);
+            setSaving(false);
         }
     };
 
-    const openCertificate = () => {
-        setCertData({ ...EMPTY_CERT, testingAgency: selected?.testingAgency || '' });
-        setCertModal(true);
-    };
+    /* ---------------- Renewal ---------------- */
 
-    const submitCertificate = async (e) => {
-        e.preventDefault();
-        if (!certData.certificateNo || !certData.testCompletionDate || !certData.validUntil) {
-            return toast.warning('Certificate number, completion date and valid until date are required.');
-        }
-        if (!certData.documentUrl && !window.confirm('No certificate PDF uploaded. Save without the document?')) return;
-        setSubmitting(true);
-        try {
-            const res = await typeTestService.recordCertificate(selected._id, certData);
-            setCertModal(false);
-            afterAction(res.data, 'Certificate recorded. Reminder dates recalculated.');
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to record certificate.');
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const handleStartRenewal = async () => {
-        const note = window.prompt('Renewal note (optional), e.g. "Requested quotation from testing agency":', '');
-        if (note === null) return;
-        try {
-            const res = await typeTestService.startRenewal(selected._id, { note });
-            afterAction(res.data, selected.currentCertificate?.validUntil ? 'Renewal started.' : 'Testing started.');
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to start renewal.');
-        }
-    };
-
-    const openProgress = () => {
-        setProgressData({
-            renewalStatus: selected?.renewalStatus || '',
-            nextAction: selected?.nextAction || '',
-            nextActionDate: toInputDate(selected?.nextActionDate),
-            note: ''
+    const openRenewalModal = (record) => {
+        setRenewalRecord(record);
+        setRenewal({
+            ...EMPTY_RENEWAL,
+            renewalStatus: record.renewalState === 'Overdue' ? 'Overdue' : (record.renewalStatus || 'Not Due'),
+            nextAction: record.nextAction || '',
+            nextActionDate: toInputDate(record.nextActionDate)
         });
-        setProgressModal(true);
     };
 
-    const submitProgress = async (e) => {
+    const saveRenewal = async (e) => {
         e.preventDefault();
-        setSubmitting(true);
+        const id = renewalRecord._id;
+        setSaving(true);
         try {
-            const res = await typeTestService.recordProgress(selected._id, progressData);
-            setProgressModal(false);
-            afterAction(res.data, 'Progress recorded.');
+            let res;
+            if (renewal.renewalStatus === 'Renewed') {
+                if (!renewal.certificateNo || !renewal.validUntil) {
+                    setSaving(false);
+                    return toast.warning('Enter the new certificate number and valid-until date to mark the renewal complete.');
+                }
+                res = await typeTestService.recordCertificate(id, {
+                    certificateNo: renewal.certificateNo,
+                    validUntil: renewal.validUntil,
+                    issueDate: toInputDate(new Date()),
+                    documentUrl: renewal.documentUrl,
+                    testingAgency: renewalRecord.testingAgency,
+                    remarks: renewal.note
+                });
+            } else {
+                res = await typeTestService.recordProgress(id, {
+                    renewalStatus: renewal.renewalStatus,
+                    nextAction: renewal.nextAction,
+                    nextActionDate: renewal.nextActionDate,
+                    documentUrl: renewal.documentUrl || undefined,
+                    note: renewal.note
+                });
+            }
+            replaceRecord(res.data);
+            setRenewalRecord(null);
+            toast.success(renewal.renewalStatus === 'Renewed' ? 'Renewal recorded. Old certificate closed.' : 'Renewal progress saved.');
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to record progress.');
+            toast.error(err.response?.data?.message || 'Could not save the renewal.');
         } finally {
-            setSubmitting(false);
+            setSaving(false);
         }
     };
 
-    const handleToggleActive = async () => {
-        const deactivate = selected.isActive;
-        const reason = window.prompt(
-            deactivate ? 'Reason for marking inactive (e.g. product discontinued):' : 'Reason for reactivating (optional):',
-            deactivate ? 'Product discontinued' : ''
-        );
-        if (reason === null) return;
+    /* ---------------- Active / delete ---------------- */
+
+    const setGroupActive = async (group, isActive) => {
+        if (!isActive && !window.confirm('Mark this product inactive? Its history will be retained and future renewal reminders will be excluded.')) return;
         try {
-            const res = await typeTestService.setActive(selected._id, !deactivate, reason);
-            afterAction(res.data, deactivate ? 'Marked inactive. Reminders stopped.' : 'Record reactivated.');
+            const results = await Promise.all(group.records
+                .filter(r => r.isActive !== isActive)
+                .map(r => typeTestService.setActive(r._id, isActive, isActive ? '' : 'Product discontinued')));
+            results.forEach(res => replaceRecord(res.data));
+            toast.success(isActive ? 'Product reactivated.' : 'Product marked inactive. Reminders stopped.');
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to update record.');
+            toast.error(err.response?.data?.message || 'Could not update the product.');
         }
     };
 
-    const handleDelete = async (id) => {
+    const toggleRecordActive = async (record) => {
+        if (record.isActive && !window.confirm('Mark this test record inactive? Reminders will stop.')) return;
+        try {
+            const res = await typeTestService.setActive(record._id, !record.isActive, record.isActive ? 'Product discontinued' : '');
+            replaceRecord(res.data);
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Could not update the record.');
+        }
+    };
+
+    const deleteRecord = async (record) => {
         if (!window.confirm('Delete this type test record and its certificate history? This cannot be undone.')) return;
         try {
-            await typeTestService.delete(id);
+            await typeTestService.delete(record._id);
+            setRecords(prev => prev.filter(r => r._id !== record._id));
+            setHistoryRecord(null);
             toast.success('Type test record deleted.');
-            if (selected?._id === id) setSelected(null);
-            refresh();
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to delete record.');
+            toast.error(err.response?.data?.message || 'Could not delete the record.');
         }
     };
 
-    const handleExport = () => {
-        if (records.length === 0) return toast.warning('No records to export.');
-        const rows = records.map((r, i) => ({
-            'Sr. No.': i + 1,
-            'Product Code': r.productId?.productCode || '-',
-            'Product': r.productId?.productName || '-',
-            'Model': r.modelName || '-',
-            'Test': r.testName || '-',
-            'Standard': r.testStandard || '-',
-            'Testing Agency': r.currentCertificate?.testingAgency || r.testingAgency || '-',
-            'Status': r.status,
-            'Certificate No': r.currentCertificate?.certificateNo || '-',
-            'Test Completion Date': formatDate(r.currentCertificate?.testCompletionDate),
-            'Valid Until': formatDate(r.currentCertificate?.validUntil),
-            'Days To Expiry': r.daysToExpiry ?? '-',
-            'Owner': r.ownerId?.name || '-',
-            'Backup Owner': r.backupOwnerId?.name || '-',
-            'Renewal Lead Days': (r.reminderLeadDays || []).join(' / '),
-            'Next Reminder': formatDate(r.nextReminderOn),
-            'Renewal Status': r.renewalStatus,
-            'Next Action': r.nextAction || '-',
-            'Next Action Date': formatDate(r.nextActionDate),
-            'Active': r.isActive ? 'Yes' : 'No'
+    /* ---------------- Export ---------------- */
+
+    const exportCSV = () => {
+        const rows = records.map(r => ({
+            'Product Code': r.productId?.productCode || '',
+            'Product Name': r.productId?.productName || '',
+            'Model': r.modelName || '',
+            'Test Name': r.testName || '',
+            'Standard': r.testStandard || '',
+            'Testing Laboratory': r.testingAgency || '',
+            'Test Status': r.displayStatus,
+            'Test Result': r.testResult || '',
+            'Certificate Number': r.currentCertificate?.certificateNo || '',
+            'Issue Date': toInputDate(r.currentCertificate?.issueDate),
+            'Completion Date': toInputDate(r.currentCertificate?.testCompletionDate),
+            'Valid Until': toInputDate(r.currentCertificate?.validUntil),
+            'Owner': r.ownerId?.name || '',
+            'Backup': r.backupOwnerId?.name || '',
+            'Renewal Status': r.renewalState,
+            'Next Action': r.nextAction || '',
+            'Action Due Date': toInputDate(r.nextActionDate),
+            'Document': r.currentCertificate?.documentUrl ? resolveImageUrl(r.currentCertificate.documentUrl) : ''
         }));
+        if (!rows.length) return toast.warning('No records to export.');
         const ws = XLSX.utils.json_to_sheet(rows);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Type Tests');
-        XLSX.writeFile(wb, `Type_Test_Register_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        XLSX.writeFile(wb, 'type-test-records.csv', { bookType: 'csv' });
     };
 
-    const kpis = summary ? [
-        { label: 'Valid', value: summary.byStatus?.Valid || 0, cls: 'text-emerald-600', filter: { status: 'Valid' } },
-        { label: 'Expiring ≤ 30d', value: summary.expiringIn30, cls: 'text-rose-600', filter: { expiringWithin: '30' } },
-        { label: 'Expiring ≤ 90d', value: summary.expiringIn90, cls: 'text-orange-600', filter: { expiringWithin: '90' } },
-        { label: 'Expiring ≤ 180d', value: summary.expiringIn180, cls: 'text-amber-600', filter: { expiringWithin: '180' } },
-        { label: 'Expired', value: summary.byStatus?.Expired || 0, cls: 'text-rose-700', filter: { status: 'Expired' } },
-        { label: 'Renewal In Progress', value: summary.byStatus?.['Renewal In Progress'] || 0, cls: 'text-amber-700', filter: { status: 'Renewal In Progress' } },
-        { label: 'Not Started', value: (summary.byStatus?.['Not Started'] || 0) + (summary.byStatus?.['In Progress'] || 0), cls: 'text-slate-700', filter: { status: 'Not Started' }, hint: `${summary.byStatus?.['In Progress'] || 0} in progress` },
-        { label: 'Inactive', value: summary.inactive, cls: 'text-slate-400', filter: { active: 'false' } }
-    ] : [];
+    /* ---------------- Derived lists ---------------- */
 
-    const hasFilters = search || status || ownerId || active !== 'true' || expiringWithin;
-    const cert = selected?.currentCertificate;
+    const productName = (r) => r.productId?.productName || 'Unknown product';
+    const byExpiry = (a, b) => (toInputDate(a.currentCertificate?.validUntil) || '9999').localeCompare(toInputDate(b.currentCertificate?.validUntil) || '9999');
+
+    const metrics = {
+        total: records.length,
+        valid: activeRecords.filter(r => r.displayStatus === 'Valid').length,
+        due: activeRecords.filter(r => r.daysToExpiry !== null && r.daysToExpiry <= 90).length,
+        expired: activeRecords.filter(r => r.displayStatus === 'Expired').length
+    };
+    const upcoming = activeRecords.filter(r => r.daysToExpiry !== null && r.daysToExpiry <= 180).sort(byExpiry).slice(0, 8);
+
+    const testList = records.filter(r => {
+        const hay = [r.productId?.productCode, r.productId?.productName, r.modelName, r.testName, r.testStandard, r.currentCertificate?.certificateNo, r.ownerId?.name].join(' ').toLowerCase();
+        return hay.includes(testSearch.toLowerCase())
+            && (!testStatus || r.displayStatus === testStatus)
+            && (activeFilter === 'all' || (activeFilter === 'active' ? r.isActive : !r.isActive));
+    }).sort(byExpiry);
+
+    const productGroups = useMemo(() => {
+        const map = new Map();
+        records.forEach(r => {
+            const key = `${r.productId?._id || r.productId}|${r.modelName || ''}`;
+            if (!map.has(key)) map.set(key, { key, product: r.productId || {}, modelName: r.modelName || '', records: [] });
+            map.get(key).records.push(r);
+        });
+        return [...map.values()].map(g => ({
+            ...g,
+            status: g.records.some(r => r.isActive) ? 'Active' : 'Inactive',
+            owners: [...new Set(g.records.map(r => r.ownerId?.name).filter(Boolean))].join(', ')
+        }));
+    }, [records]);
+    const productList = productGroups.filter(g => {
+        const hay = [g.product.productCode, g.product.productName, g.modelName, g.owners].join(' ').toLowerCase();
+        return hay.includes(productSearch.toLowerCase()) && (!productStatus || g.status === productStatus);
+    });
+
+    const renewalList = activeRecords.filter(r => {
+        const hay = [r.productId?.productName, r.productId?.productCode, r.modelName, r.ownerId?.name, r.backupOwnerId?.name, r.currentCertificate?.certificateNo, r.testName].join(' ').toLowerCase();
+        return hay.includes(renewalSearch.toLowerCase()) && (!renewalFilter || r.renewalState === renewalFilter);
+    }).sort(byExpiry);
+
+    const Empty = ({ cols, children }) => <tr><td colSpan={cols} className="text-center py-6 text-sm text-slate-500">{children}</td></tr>;
+    const ProductCell = ({ r, sub }) => (
+        <td className={TD}><b className="text-slate-900">{productName(r)}</b><br /><span className={muted}>{sub}</span></td>
+    );
+
+    const headingRow = (title, subtitle, action) => (
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+            <div>
+                <h2 className="text-lg font-black text-slate-900 tracking-tight">{title}</h2>
+                <div className="text-xs text-slate-500 font-semibold">{subtitle}</div>
+            </div>
+            {action}
+        </div>
+    );
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 min-w-0">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
@@ -516,409 +495,423 @@ const TypeTestRegister = () => {
                         <MdFactCheck size={24} />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-black text-slate-900 tracking-tight">Type Test Register</h1>
-                        <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Certificates, Validity &amp; Renewal Tracking</p>
+                        <h1 className="text-2xl font-black text-slate-900 tracking-tight">Type Test Management</h1>
+                        <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Product compliance · Certificate control · Renewal tracking</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                    <button onClick={handleExport} className="flex items-center gap-1.5 px-4 py-2.5 bg-teal-50 hover:bg-teal-100 border border-teal-200 text-teal-700 text-sm font-black rounded-xl transition-all">
-                        <MdDownload size={18} /> Export
-                    </button>
-                    <button onClick={openCreate} className="flex items-center gap-1.5 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-black rounded-xl shadow-lg transition-all">
-                        <MdAdd size={20} /> New Type Test
-                    </button>
+                    <button className={SECONDARY} onClick={exportCSV}><MdDownload size={18} /> Export CSV</button>
+                    <button className={PRIMARY} onClick={() => openTestModal()}><MdAdd size={20} /> New Test Record</button>
                 </div>
             </div>
 
-            {/* KPI cards double as quick filters */}
-            {summary && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
-                    {kpis.map(k => (
-                        <button
-                            key={k.label}
-                            onClick={() => applyQuickFilter(k.filter)}
-                            className="text-left bg-white rounded-2xl border border-slate-100 p-4 shadow-sm hover:border-teal-300 hover:shadow transition"
-                        >
-                            <span className="block text-[10px] font-bold text-slate-400 uppercase">{k.label}</span>
-                            <span className={`block text-2xl font-black ${k.cls}`}>{k.value}</span>
-                            {k.hint && <span className="block text-[10px] font-semibold text-slate-400">{k.hint}</span>}
-                        </button>
-                    ))}
-                </div>
-            )}
+            {/* Section tabs */}
+            <div className="flex border-b border-slate-200 gap-2 overflow-x-auto" role="tablist">
+                {PAGES.map(p => (
+                    <button
+                        key={p.key}
+                        role="tab"
+                        aria-selected={page === p.key}
+                        onClick={() => showPage(p.key)}
+                        className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm whitespace-nowrap transition-all ${page === p.key ? 'border-teal-600 text-teal-700 font-black' : 'border-transparent text-slate-500 font-bold hover:text-slate-700'}`}
+                    >
+                        <p.icon size={18} /> {p.label}
+                    </button>
+                ))}
+            </div>
 
-            {/* Filters */}
-            <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-                <div className="flex flex-wrap gap-4 items-center">
-                    <div className="flex-1 min-w-[200px] relative">
-                        <input
-                            type="text"
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            placeholder="Search product, model, certificate no, agency..."
-                            className={`${FILTER} w-full pl-10`}
-                        />
-                        <MdSearch size={20} className="absolute left-3.5 top-2.5 text-slate-400" />
-                    </div>
-                    <select value={status} onChange={e => setStatus(e.target.value)} className={FILTER}>
-                        <option value="">All Statuses</option>
-                        {Object.keys(STATUS_CLASSES).map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                    <select value={expiringWithin} onChange={e => setExpiringWithin(e.target.value)} className={FILTER}>
-                        <option value="">Any Validity</option>
-                        <option value="30">Expiring in 30 days</option>
-                        <option value="90">Expiring in 90 days</option>
-                        <option value="180">Expiring in 180 days</option>
-                    </select>
-                    <select value={ownerId} onChange={e => setOwnerId(e.target.value)} className={FILTER}>
-                        <option value="">All Owners</option>
-                        {users.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
-                    </select>
-                    <select value={active} onChange={e => setActive(e.target.value)} className={FILTER}>
-                        <option value="true">Active Only</option>
-                        <option value="false">Inactive Only</option>
-                        <option value="">Active &amp; Inactive</option>
-                    </select>
-                    {hasFilters && (
-                        <button onClick={clearFilters} className="flex items-center gap-1 text-xs font-bold text-rose-500 hover:text-rose-700 px-2">
-                            <MdClose size={16} /> Clear Filters
-                        </button>
+                <div className="min-w-0">
+                    {loading ? (
+                        <div className="py-20 text-center text-sm text-slate-500">Loading type test records...</div>
+                    ) : (
+                        <>
+                            {page === 'dashboard' && (
+                                <section>
+                                    {headingRow('Overview', 'Product testing and certificate validity at a glance')}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+                                        {[
+                                            { label: 'Total Test Records', value: metrics.total, hint: 'All recorded tests', icon: <MdAssignment size={20} />, color: 'from-teal-500 to-emerald-600', go: () => { setTestStatus(''); setActiveFilter('all'); showPage('tests'); } },
+                                            { label: 'Valid Certificates', value: metrics.valid, hint: 'Currently within validity', icon: <MdVerified size={20} />, color: 'from-sky-500 to-cyan-600', go: () => { setTestStatus('Valid'); setActiveFilter('active'); showPage('tests'); } },
+                                            { label: 'Renewals Due ≤ 90 Days', value: metrics.due, hint: 'Including already overdue', icon: <MdUpdate size={20} />, color: 'from-amber-400 to-orange-500', go: () => { setRenewalFilter(''); showPage('renewals'); } },
+                                            { label: 'Expired Certificates', value: metrics.expired, hint: 'Requires review', icon: <MdErrorOutline size={20} />, color: 'from-rose-500 to-red-600', go: () => { setTestStatus('Expired'); setActiveFilter('active'); showPage('tests'); } }
+                                        ].map(m => (
+                                            <button
+                                                key={m.label}
+                                                type="button"
+                                                onClick={m.go}
+                                                className="relative overflow-hidden text-left bg-white border border-slate-200/80 rounded-2xl px-4 py-3.5 shadow-sm flex items-center justify-between gap-3 hover:-translate-y-0.5 hover:shadow-md transition-all active:scale-[0.98] group"
+                                            >
+                                                <span className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${m.color}`} />
+                                                <div className="min-w-0">
+                                                    <span className="block whitespace-nowrap truncate text-[11px] font-black uppercase text-slate-500 tracking-wider group-hover:text-slate-700">{m.label}</span>
+                                                    <span className="block text-3xl font-black text-slate-900 leading-tight tabular-nums">{m.value}</span>
+                                                    <span className="block text-[11px] font-semibold text-slate-400">{m.hint}</span>
+                                                </div>
+                                                <div className={`flex-shrink-0 w-10 h-10 bg-gradient-to-br ${m.color} rounded-xl flex items-center justify-center text-white shadow-sm group-hover:scale-110 transition-transform`}>
+                                                    {m.icon}
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <div className="grid grid-cols-1 xl:grid-cols-[1.35fr_1fr] gap-4">
+                                        <div className={PANEL}>
+                                            <h2 className="text-sm font-black text-slate-800 uppercase tracking-wide mb-4">Upcoming renewals</h2>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full min-w-[640px] border-collapse">
+                                                    <thead><tr><th className={TH}>Product / Model</th><th className={TH}>Certificate</th><th className={TH}>Valid until</th><th className={TH}>Owner</th><th className={TH}>Status</th></tr></thead>
+                                                    <tbody>
+                                                        {upcoming.length ? upcoming.map(r => (
+                                                            <tr key={r._id}>
+                                                                <ProductCell r={r} sub={`${r.modelName || '—'} · ${r.testName}`} />
+                                                                <td className={TDN}>{r.currentCertificate?.certificateNo || '—'}</td>
+                                                                <td className={TDN}>{fmt(r.currentCertificate?.validUntil)}</td>
+                                                                <td className={TDN}>{r.ownerId?.name || '—'}</td>
+                                                                <td className={TDN}><Badge value={r.renewalState} /></td>
+                                                            </tr>
+                                                        )) : <Empty cols={5}>No upcoming renewals.</Empty>}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        <div className={PANEL}>
+                                            <h2 className="text-sm font-black text-slate-800 uppercase tracking-wide mb-2">Testing pipeline</h2>
+                                            {TEST_STATUSES.map(s => {
+                                                const n = activeRecords.filter(r => r.displayStatus === s).length;
+                                                const width = activeRecords.length ? Math.min(100, (n / activeRecords.length) * 100) : 0;
+                                                const color = s === 'Valid' ? 'bg-emerald-500' : s === 'Expired' ? 'bg-rose-500' : s === 'In Progress' ? 'bg-sky-500' : s === 'Not Started' ? 'bg-slate-400' : 'bg-amber-500';
+                                                return (
+                                                    <div key={s} className="my-3.5">
+                                                        <div className="flex justify-between text-[13px] mb-1.5"><span>{s}</span><b>{n}</b></div>
+                                                        <div className="h-[7px] bg-slate-100 rounded-full overflow-hidden"><div className={`h-full ${color}`} style={{ width: `${width}%` }} /></div>
+                                                    </div>
+                                                );
+                                            })}
+                                            <p className={muted}>Counts exclude inactive products.</p>
+                                        </div>
+                                    </div>
+
+                                    <div className={`${PANEL} mt-4`}>
+                                        <h2 className="text-sm font-black text-slate-800 uppercase tracking-wide mb-4">Quick actions</h2>
+                                        <div className="flex flex-wrap gap-2">
+                                            <button className={PRIMARY} onClick={() => openTestModal()}>Create test record</button>
+                                            <button className={SECONDARY} onClick={() => showPage('renewals')}>Review renewal worklist</button>
+                                            <button className={SECONDARY} onClick={exportCSV}>Export records (CSV)</button>
+                                        </div>
+                                    </div>
+                                </section>
+                            )}
+
+                            {page === 'tests' && (
+                                <section>
+                                    {headingRow('Type Test Records', 'Maintain testing status, test results and certificates')}
+                                    <div className={PANEL}>
+                                        <div className="flex flex-wrap gap-2.5 mb-4">
+                                            <input value={testSearch} onChange={e => setTestSearch(e.target.value)} placeholder="Search product, model, test or certificate..." className={`${INPUT} flex-1 min-w-[160px]`} />
+                                            <select value={testStatus} onChange={e => setTestStatus(e.target.value)} className={`${INPUT} flex-1 min-w-[160px]`}>
+                                                <option value="">All statuses</option>
+                                                {TEST_STATUSES.map(s => <option key={s}>{s}</option>)}
+                                            </select>
+                                            <select value={activeFilter} onChange={e => setActiveFilter(e.target.value)} className={`${INPUT} flex-1 min-w-[160px]`}>
+                                                <option value="active">Active products</option>
+                                                <option value="all">All products</option>
+                                                <option value="inactive">Inactive products</option>
+                                            </select>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full min-w-[720px] border-collapse">
+                                                <thead><tr><th className={TH}>Product / Model</th><th className={TH}>Test / Standard</th><th className={TH}>Test status</th><th className={TH}>Certificate</th><th className={TH}>Valid until</th><th className={TH}>Owner</th><th className={TH}>Actions</th></tr></thead>
+                                                <tbody>
+                                                    {testList.length ? testList.map(r => (
+                                                        <tr key={r._id}>
+                                                            <ProductCell r={r} sub={`${r.productId?.productCode || ''} / ${r.modelName || '—'}`} />
+                                                            <td className={TD}>{r.testName}<br /><span className={muted}>{r.testStandard || 'No standard'}</span></td>
+                                                            <td className={TDN}><Badge value={r.displayStatus} /></td>
+                                                            <td className={TD}>
+                                                                {r.currentCertificate?.certificateNo || '—'}<br />
+                                                                {r.currentCertificate?.documentUrl
+                                                                    ? <a href={resolveImageUrl(r.currentCertificate.documentUrl)} target="_blank" rel="noopener noreferrer" className="text-teal-700 font-bold hover:underline">View file</a>
+                                                                    : <span className={muted}>No document</span>}
+                                                            </td>
+                                                            <td className={TDN}>{fmt(r.currentCertificate?.validUntil)}</td>
+                                                            <td className={TDN}>{r.ownerId?.name || '—'}<br /><span className={muted}>Backup: {r.backupOwnerId?.name || '—'}</span></td>
+                                                            <td className={TD}>
+                                                                <div className="flex flex-nowrap gap-1.5">
+                                                                    <button className={SMALL} onClick={() => openTestModal(r)}>Edit</button>
+                                                                    <button className={SMALL} onClick={() => openRenewalModal(r)}>Renewal</button>
+                                                                    <button className={SMALL} onClick={() => setHistoryRecord(r)}>History</button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )) : <Empty cols={7}>No matching test records.</Empty>}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </section>
+                            )}
+
+                            {page === 'products' && (
+                                <section>
+                                    {headingRow(
+                                        'Product & Model Master',
+                                        'Products and models with type tests. Mark discontinued products inactive to stop their reminders.',
+                                        <button className={SECONDARY} onClick={() => navigate('/products/new')}><MdAdd size={18} /> Add Product</button>
+                                    )}
+                                    <div className={`${NOTICE} mb-4`}><MdInfoOutline size={18} className="flex-shrink-0 mt-0.5" />
+                                        Products are created in Product Master. Use "Add test" to record a type test against an existing product and model.
+                                    </div>
+                                    <div className={PANEL}>
+                                        <div className="flex flex-wrap gap-2.5 mb-4">
+                                            <input value={productSearch} onChange={e => setProductSearch(e.target.value)} placeholder="Search product code, name or model..." className={`${INPUT} flex-1 min-w-[160px]`} />
+                                            <select value={productStatus} onChange={e => setProductStatus(e.target.value)} className={`${INPUT} flex-1 min-w-[160px]`}>
+                                                <option value="">All products</option>
+                                                <option value="Active">Active</option>
+                                                <option value="Inactive">Inactive</option>
+                                            </select>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full min-w-[720px] border-collapse">
+                                                <thead><tr><th className={TH}>Product code</th><th className={TH}>Product name</th><th className={TH}>Model</th><th className={TH}>Type tests</th><th className={TH}>Owner</th><th className={TH}>Status</th><th className={TH}>Actions</th></tr></thead>
+                                                <tbody>
+                                                    {productList.length ? productList.map(g => (
+                                                        <tr key={g.key}>
+                                                            <td className={TDN}>{g.product.productCode || '—'}</td>
+                                                            <td className={TD}><b>{g.product.productName || 'Unknown product'}</b></td>
+                                                            <td className={TDN}>{g.modelName || '—'}</td>
+                                                            <td className={TD}>{g.records.map(r => r.testName).join(', ')}</td>
+                                                            <td className={TDN}>{g.owners || '—'}</td>
+                                                            <td className={TDN}><Badge value={g.status} /></td>
+                                                            <td className={TD}>
+                                                                <div className="flex flex-nowrap gap-1.5">
+                                                                    <button
+                                                                        className={SMALL}
+                                                                        onClick={() => openTestModal(null, { productId: g.product._id, productLabel: productText(g.product), modelName: g.modelName })}
+                                                                    >Add test</button>
+                                                                    <button className={SMALL} onClick={() => setGroupActive(g, g.status !== 'Active')}>
+                                                                        {g.status === 'Active' ? 'Mark inactive' : 'Reactivate'}
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )) : <Empty cols={7}>No products found.</Empty>}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </section>
+                            )}
+
+                            {page === 'renewals' && (
+                                <section>
+                                    {headingRow('Renewal Worklist', 'Track upcoming, in-progress and overdue certificate renewals')}
+                                    <div className={`${NOTICE} mb-4`}><MdInfoOutline size={18} className="flex-shrink-0 mt-0.5" />
+                                        Reminder dates are calculated from the certificate expiry date. The owner and backup receive a portal notification at each reminder milestone.
+                                    </div>
+                                    <div className={PANEL}>
+                                        <div className="flex flex-wrap gap-2.5 mb-4">
+                                            <input value={renewalSearch} onChange={e => setRenewalSearch(e.target.value)} placeholder="Search product, model or owner..." className={`${INPUT} flex-1 min-w-[160px]`} />
+                                            <select value={renewalFilter} onChange={e => setRenewalFilter(e.target.value)} className={`${INPUT} flex-1 min-w-[160px]`}>
+                                                <option value="">All renewal states</option>
+                                                {RENEWAL_STATUSES.map(s => <option key={s}>{s}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full min-w-[900px] border-collapse">
+                                                <thead><tr><th className={TH}>Product / Model</th><th className={TH}>Certificate</th><th className={TH}>Expiry</th><th className={TH}>Next reminder</th><th className={TH}>Owner / Backup</th><th className={TH}>Renewal status</th><th className={TH}>Next action / due date</th><th className={TH}>Update</th></tr></thead>
+                                                <tbody>
+                                                    {renewalList.length ? renewalList.map(r => (
+                                                        <tr key={r._id}>
+                                                            <ProductCell r={r} sub={`${r.modelName || '—'} · ${r.testName}`} />
+                                                            <td className={TDN}>{r.currentCertificate?.certificateNo || '—'}</td>
+                                                            <td className={TDN}>{fmt(r.currentCertificate?.validUntil)}<br /><span className={muted}>{expiryNote(r)}</span></td>
+                                                            <td className={TD}>{nextReminderText(r)}</td>
+                                                            <td className={TDN}>{r.ownerId?.name || '—'}<br /><span className={muted}>Backup: {r.backupOwnerId?.name || '—'}</span></td>
+                                                            <td className={TDN}><Badge value={r.renewalState} /></td>
+                                                            <td className={TD}>{r.nextAction || 'No action set'}<br /><span className={muted}>{fmt(r.nextActionDate)}</span></td>
+                                                            <td className={TD}><button className={SMALL} onClick={() => openRenewalModal(r)}>Update</button></td>
+                                                        </tr>
+                                                    )) : <Empty cols={8}>No renewal records match this filter.</Empty>}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </section>
+                            )}
+                        </>
                     )}
                 </div>
-            </div>
 
-            {/* Register table */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                {loading ? (
-                    <div className="flex flex-col items-center justify-center py-20 space-y-3">
-                        <div className="w-12 h-12 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin"></div>
-                        <p className="text-slate-400 font-bold uppercase text-[10px] tracking-wider animate-pulse">Loading Register...</p>
-                    </div>
-                ) : records.length > 0 ? (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-slate-50/50 border-b border-slate-100 text-xs font-bold text-slate-400 uppercase">
-                                    <th className="py-3.5 px-4">Product / Model</th>
-                                    <th className="py-3.5 px-4">Status</th>
-                                    <th className="py-3.5 px-4">Certificate</th>
-                                    <th className="py-3.5 px-4">Tested On</th>
-                                    <th className="py-3.5 px-4">Valid Until</th>
-                                    <th className="py-3.5 px-4">Owner</th>
-                                    <th className="py-3.5 px-4">Renewal / Next Action</th>
-                                    <th className="py-3.5 px-4 text-center">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50 text-sm font-semibold text-slate-600">
-                                {records.map(r => (
-                                    <tr key={r._id} className={`hover:bg-slate-50/40 transition ${r.isActive ? '' : 'opacity-60'}`}>
-                                        <td className="py-3 px-4">
-                                            <div className="text-slate-900 font-bold">{r.productId?.productName || '-'}</div>
-                                            <div className="text-xs text-slate-400">
-                                                {r.productId?.productCode}{r.modelName ? ` · ${r.modelName}` : ''}{r.testStandard ? ` · ${r.testStandard}` : ''}
-                                            </div>
-                                        </td>
-                                        <td className="py-3 px-4">
-                                            <span className={`inline-flex px-2 py-0.5 rounded-full border text-xs font-bold whitespace-nowrap ${STATUS_CLASSES[r.status]}`}>{r.status}</span>
-                                            {!r.isActive && <div className="text-[10px] font-bold text-slate-400 uppercase mt-1">Inactive</div>}
-                                        </td>
-                                        <td className="py-3 px-4">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-teal-700 font-bold">{r.currentCertificate?.certificateNo || '-'}</span>
-                                                <DocumentLink url={r.currentCertificate?.documentUrl} label="PDF" />
-                                            </div>
-                                        </td>
-                                        <td className="py-3 px-4 whitespace-nowrap">{formatDate(r.currentCertificate?.testCompletionDate)}</td>
-                                        <td className="py-3 px-4">
-                                            <div className="whitespace-nowrap">{formatDate(r.currentCertificate?.validUntil)}</div>
-                                            {r.isActive && <ExpiryBadge record={r} />}
-                                        </td>
-                                        <td className="py-3 px-4">
-                                            <div>{r.ownerId?.name || '-'}</div>
-                                            {r.backupOwnerId && <div className="text-xs text-slate-400">Backup: {r.backupOwnerId.name}</div>}
-                                        </td>
-                                        <td className="py-3 px-4 max-w-[220px]">
-                                            <div className="text-xs font-bold text-slate-700">{r.renewalStatus}</div>
-                                            {r.nextAction && <div className="text-xs text-slate-500 truncate" title={r.nextAction}>{r.nextAction}{r.nextActionDate ? ` (${formatDate(r.nextActionDate)})` : ''}</div>}
-                                        </td>
-                                        <td className="py-3 px-4">
-                                            <div className="flex items-center justify-center gap-2">
-                                                <button onClick={() => openDetail(r._id)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500" title="View / Manage">
-                                                    <MdInfo size={18} />
-                                                </button>
-                                                <button onClick={() => openEdit(r)} className="p-1.5 rounded-lg hover:bg-teal-50 text-teal-600" title="Edit">
-                                                    <MdEdit size={18} />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                ) : (
-                    <div className="py-20 text-center text-slate-400 font-bold text-sm">No type test records found.</div>
-                )}
-            </div>
-
-            {/* Create / Edit */}
+            {/* New / edit test record */}
             <Modal
-                isOpen={showForm}
-                onClose={() => setShowForm(false)}
-                title={editingId ? 'Edit Type Test' : 'New Type Test Record'}
+                isOpen={formOpen}
+                onClose={() => setFormOpen(false)}
+                title={editingId ? 'Edit Type Test Record' : 'New Type Test Record'}
+                maxWidth="max-w-4xl"
                 footer={
                     <>
-                        <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 border border-slate-200 text-slate-500 text-sm font-bold rounded-xl hover:bg-slate-50">Cancel</button>
-                        <button type="submit" form="type-test-form" disabled={submitting} className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-sm font-black rounded-xl shadow-md">
-                            {submitting ? 'Saving...' : 'Save'}
-                        </button>
+                        <button type="button" className={SECONDARY} onClick={() => setFormOpen(false)}>Cancel</button>
+                        <button type="submit" form="type-test-form" disabled={saving} className={PRIMARY}>{saving ? 'Saving...' : 'Save record'}</button>
                     </>
                 }
             >
-                <form id="type-test-form" onSubmit={handleFormSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="md:col-span-2">
-                            <label className={LABEL}>Product <span className="text-rose-500">*</span></label>
-                            <ProductPicker
-                                label={formData.productLabel}
-                                onChange={(id, label) => setFormData(prev => ({ ...prev, productId: id, productLabel: label }))}
-                            />
-                        </div>
-                        <div>
-                            <label className={LABEL}>Model / Variant</label>
-                            <input type="text" value={formData.modelName} onChange={e => setField('modelName', e.target.value)} placeholder="Leave blank if the whole product" className={INPUT} />
-                        </div>
-                        <div>
-                            <label className={LABEL}>Test Name</label>
-                            <input type="text" value={formData.testName} onChange={e => setField('testName', e.target.value)} placeholder="e.g. Type Test, Short Circuit Test" className={INPUT} />
-                        </div>
-                        <div>
-                            <label className={LABEL}>Test Standard</label>
-                            <input type="text" value={formData.testStandard} onChange={e => setField('testStandard', e.target.value)} placeholder="e.g. IEC 61439-1" className={INPUT} />
-                        </div>
-                        <div>
-                            <label className={LABEL}>Testing Agency</label>
-                            <input type="text" value={formData.testingAgency} onChange={e => setField('testingAgency', e.target.value)} placeholder="External testing company" className={INPUT} />
-                        </div>
-                        <div>
-                            <label className={LABEL}>Owner (Renewal) <span className="text-rose-500">*</span></label>
-                            <select value={formData.ownerId} onChange={e => setField('ownerId', e.target.value)} className={INPUT}>
-                                <option value="">Select Owner</option>
+                <p className={`${muted} mb-4`}>Fields marked * are required.</p>
+                <form id="type-test-form" onSubmit={saveTest}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                        <Field label="Product *">
+                            <ProductPicker label={form.productLabel} onChange={(id, label) => setForm(prev => ({ ...prev, productId: id, productLabel: label }))} />
+                        </Field>
+                        <Field label="Model" htmlFor="tModel"><input id="tModel" className={INPUT} value={form.modelName} onChange={e => setField('modelName', e.target.value)} placeholder="Model number" /></Field>
+                        <Field label="Test name *" htmlFor="tTestName"><input id="tTestName" className={INPUT} value={form.testName} onChange={e => setField('testName', e.target.value)} placeholder="e.g. Temperature rise test" /></Field>
+                        <Field label="Applicable standard" htmlFor="tStandard"><input id="tStandard" className={INPUT} value={form.testStandard} onChange={e => setField('testStandard', e.target.value)} placeholder="Standard and revision" /></Field>
+                        <Field label="Testing laboratory" htmlFor="tLab"><input id="tLab" className={INPUT} value={form.testingAgency} onChange={e => setField('testingAgency', e.target.value)} placeholder="Laboratory name" /></Field>
+                        <Field label="Test status *" htmlFor="tStatus">
+                            <select id="tStatus" className={INPUT} value={form.status} onChange={e => setField('status', e.target.value)}>
+                                {TEST_STATUSES.map(s => <option key={s}>{s}</option>)}
+                            </select>
+                        </Field>
+                        <Field label="Test result" htmlFor="tResult">
+                            <select id="tResult" className={INPUT} value={form.testResult} onChange={e => setField('testResult', e.target.value)}>
+                                {TEST_RESULTS.map(s => <option key={s}>{s}</option>)}
+                            </select>
+                        </Field>
+                        <Field label="Test start date"><DateInput type="date" className={INPUT} value={form.testStartDate} onChange={e => setField('testStartDate', e.target.value)} /></Field>
+                        <Field label="Test completion date"><DateInput type="date" className={INPUT} value={form.testCompletionDate} onChange={e => setField('testCompletionDate', e.target.value)} /></Field>
+                        <Field label="Certificate number" htmlFor="tCert"><input id="tCert" className={INPUT} value={form.certificateNo} onChange={e => setField('certificateNo', e.target.value)} placeholder="Certificate reference" /></Field>
+                        <Field label="Certificate issue date"><DateInput type="date" className={INPUT} value={form.issueDate} onChange={e => setField('issueDate', e.target.value)} /></Field>
+                        <Field label="Valid until date"><DateInput type="date" className={INPUT} value={form.validUntil} onChange={e => setField('validUntil', e.target.value)} /></Field>
+                        <Field label="Renewal owner *" htmlFor="tOwner">
+                            <select id="tOwner" className={INPUT} value={form.ownerId} onChange={e => setField('ownerId', e.target.value)}>
+                                <option value="">Responsible person</option>
                                 {users.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
                             </select>
-                        </div>
-                        <div>
-                            <label className={LABEL}>Backup Owner</label>
-                            <select value={formData.backupOwnerId} onChange={e => setField('backupOwnerId', e.target.value)} className={INPUT}>
-                                <option value="">None</option>
+                        </Field>
+                        <Field label="Backup owner" htmlFor="tBackup">
+                            <select id="tBackup" className={INPUT} value={form.backupOwnerId} onChange={e => setField('backupOwnerId', e.target.value)}>
+                                <option value="">Backup person</option>
                                 {users.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
                             </select>
-                        </div>
-                        <div className="md:col-span-2">
-                            <label className={LABEL}>Renewal Reminder Lead Times</label>
-                            <LeadDaysInput value={formData.reminderLeadDays} onChange={v => setField('reminderLeadDays', v)} />
-                            <p className="text-[11px] text-slate-400 font-semibold mt-1">Owner and backup are notified this many days before the certificate expires.</p>
-                        </div>
-                        {editingId && (
-                            <div>
-                                <label className={LABEL}>Type Test Status</label>
-                                <select value={formData.status} onChange={e => setField('status', e.target.value)} className={INPUT}>
-                                    {Object.keys(STATUS_CLASSES).map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
-                            </div>
-                        )}
-                        <div>
-                            <label className={LABEL}>Next Action</label>
-                            <input type="text" value={formData.nextAction} onChange={e => setField('nextAction', e.target.value)} placeholder="e.g. Send samples to lab" className={INPUT} />
-                        </div>
-                        <div>
-                            <label className={LABEL}>Next Action Date</label>
-                            <DateInput type="date" value={formData.nextActionDate} onChange={e => setField('nextActionDate', e.target.value)} className={INPUT} />
-                        </div>
-                    </div>
-
-                    {!editingId && (
-                        <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 space-y-3">
-                            <div>
-                                <h4 className="text-xs font-black text-slate-700 uppercase">Already tested? Record the certificate (optional)</h4>
-                                <p className="text-[11px] text-slate-400 font-semibold">Leave blank if testing has not been done yet. You can add it later from the record.</p>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                <div>
-                                    <label className={LABEL}>Certificate No</label>
-                                    <input type="text" value={formData.certificateNo} onChange={e => setField('certificateNo', e.target.value)} className={INPUT} />
-                                </div>
-                                <div>
-                                    <label className={LABEL}>Test Completion Date</label>
-                                    <DateInput type="date" value={formData.testCompletionDate} onChange={e => setField('testCompletionDate', e.target.value)} className={INPUT} />
-                                </div>
-                                <div>
-                                    <label className={LABEL}>Valid Until</label>
-                                    <DateInput type="date" value={formData.validUntil} onChange={e => setField('validUntil', e.target.value)} className={INPUT} />
-                                </div>
-                            </div>
-                            <PdfUploadField value={formData.documentUrl} onChange={url => setField('documentUrl', url)} />
-                        </div>
-                    )}
-
-                    <div>
-                        <label className={LABEL}>Remarks</label>
-                        <textarea rows="2" value={formData.remarks} onChange={e => setField('remarks', e.target.value)} className={INPUT}></textarea>
+                        </Field>
+                        <Field label="Reminder lead times (days)" htmlFor="tLead"><input id="tLead" className={INPUT} value={form.reminderLeadDays} onChange={e => setField('reminderLeadDays', e.target.value)} placeholder="180,90,30" /></Field>
+                        <Field label="Renewal status" htmlFor="tRenewal">
+                            <select id="tRenewal" className={INPUT} value={form.renewalStatus} onChange={e => setField('renewalStatus', e.target.value)}>
+                                {RENEWAL_STATUSES.map(s => <option key={s}>{s}</option>)}
+                            </select>
+                        </Field>
+                        <Field label="Next action" htmlFor="tNextAction"><input id="tNextAction" className={INPUT} value={form.nextAction} onChange={e => setField('nextAction', e.target.value)} placeholder="e.g. Contact laboratory" /></Field>
+                        <Field label="Next action due date"><DateInput type="date" className={INPUT} value={form.nextActionDate} onChange={e => setField('nextActionDate', e.target.value)} /></Field>
+                        <Field label="Remarks" htmlFor="tNotes" full><textarea id="tNotes" rows="2" className={INPUT} value={form.remarks} onChange={e => setField('remarks', e.target.value)} placeholder="Notes and follow-up details" /></Field>
+                        <Field label="Certificate document (PDF)" htmlFor="tFile" full><FileField id="tFile" value={form.documentUrl} onChange={url => setField('documentUrl', url)} /></Field>
                     </div>
                 </form>
             </Modal>
 
-            {/* Detail / manage */}
+            {/* Renewal progress */}
             <Modal
-                isOpen={!!selected}
-                onClose={() => setSelected(null)}
-                title={selected ? `Type Test - ${selected.productId?.productName || ''}` : ''}
-                maxWidth="max-w-3xl"
-                footer={selected && (
-                    <div className="flex flex-wrap gap-2 w-full justify-end">
-                        {selected.isActive && (
-                            <>
-                                <button onClick={openCertificate} className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold rounded-xl">
-                                    <MdCloudUpload size={18} /> {cert?.validUntil ? 'Upload Renewed Certificate' : 'Record Certificate'}
-                                </button>
-                                {!['Renewal In Progress', 'In Progress'].includes(selected.status) && (
-                                    <button onClick={handleStartRenewal} className="flex items-center gap-1.5 px-4 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 text-sm font-bold rounded-xl">
-                                        <MdAutorenew size={18} /> {cert?.validUntil ? 'Start Renewal' : 'Start Testing'}
-                                    </button>
-                                )}
-                                <button onClick={openProgress} className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-bold rounded-xl">
-                                    <MdNotes size={18} /> Record Progress
-                                </button>
-                            </>
-                        )}
-                        <button onClick={() => { const r = selected; setSelected(null); openEdit(r); }} className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-bold rounded-xl">
-                            <MdEdit size={18} /> Edit
-                        </button>
-                        <button onClick={handleToggleActive} className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-600 text-sm font-bold rounded-xl">
-                            {selected.isActive ? <><MdBlock size={18} /> Mark Inactive</> : <><MdRestore size={18} /> Reactivate</>}
-                        </button>
-                        <button onClick={() => handleDelete(selected._id)} className="flex items-center gap-1.5 px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-bold rounded-xl">
-                            <MdDelete size={18} /> Delete
-                        </button>
+                isOpen={!!renewalRecord}
+                onClose={() => setRenewalRecord(null)}
+                title="Update Renewal Progress"
+                maxWidth="max-w-4xl"
+                footer={
+                    <>
+                        <button type="button" className={SECONDARY} onClick={() => setRenewalRecord(null)}>Cancel</button>
+                        <button type="submit" form="type-test-renewal-form" disabled={saving} className={PRIMARY}>{saving ? 'Saving...' : 'Save renewal'}</button>
+                    </>
+                }
+            >
+                {renewalRecord && (
+                    <p className={`${muted} mb-4`}>
+                        {productName(renewalRecord)} · {renewalRecord.modelName || '—'} · {renewalRecord.testName} — current certificate {renewalRecord.currentCertificate?.certificateNo || 'none'}, valid until {fmt(renewalRecord.currentCertificate?.validUntil)}
+                    </p>
+                )}
+                <form id="type-test-renewal-form" onSubmit={saveRenewal}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                        <Field label="Renewal status" htmlFor="rStatus">
+                            <select id="rStatus" className={INPUT} value={renewal.renewalStatus} onChange={e => setRenewal({ ...renewal, renewalStatus: e.target.value })}>
+                                {RENEWAL_STATUSES.map(s => <option key={s}>{s}</option>)}
+                            </select>
+                        </Field>
+                        <Field label="Next action" htmlFor="rAction"><input id="rAction" className={INPUT} value={renewal.nextAction} onChange={e => setRenewal({ ...renewal, nextAction: e.target.value })} /></Field>
+                        <Field label="Next action due date"><DateInput type="date" className={INPUT} value={renewal.nextActionDate} onChange={e => setRenewal({ ...renewal, nextActionDate: e.target.value })} /></Field>
+                        <Field label="New certificate number" htmlFor="rNewCert"><input id="rNewCert" className={INPUT} value={renewal.certificateNo} onChange={e => setRenewal({ ...renewal, certificateNo: e.target.value })} /></Field>
+                        <Field label="New valid until date"><DateInput type="date" className={INPUT} value={renewal.validUntil} onChange={e => setRenewal({ ...renewal, validUntil: e.target.value })} /></Field>
+                        <Field label="New certificate document" htmlFor="rNewFile"><FileField id="rNewFile" value={renewal.documentUrl} onChange={url => setRenewal(prev => ({ ...prev, documentUrl: url }))} /></Field>
+                        <Field label="Progress notes" htmlFor="rNotes" full><textarea id="rNotes" rows="3" className={INPUT} value={renewal.note} onChange={e => setRenewal({ ...renewal, note: e.target.value })} /></Field>
                     </div>
+                    <p className={`${muted} mt-3`}>Choose "Renewed" with the new certificate number and valid until date to close the old certificate and restart reminders.</p>
+                </form>
+            </Modal>
+
+            {/* History */}
+            <Modal
+                isOpen={!!historyRecord}
+                onClose={() => setHistoryRecord(null)}
+                title="Type Test History"
+                maxWidth="max-w-3xl"
+                footer={historyRecord && (
+                    <>
+                        <button className={SECONDARY} onClick={() => toggleRecordActive(historyRecord)}>{historyRecord.isActive ? 'Mark inactive' : 'Reactivate'}</button>
+                        <button className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-black rounded-xl" onClick={() => deleteRecord(historyRecord)}>Delete</button>
+                        <button className={PRIMARY} onClick={() => { const r = historyRecord; setHistoryRecord(null); openRenewalModal(r); }}>Update renewal</button>
+                    </>
                 )}
             >
-                {selected && (
-                    <div className="space-y-6">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
+                {historyRecord && (
+                    <div className="space-y-5 text-sm">
+                        <div className="flex flex-wrap justify-between gap-2">
                             <div>
-                                <h3 className="text-xl font-black text-slate-900 leading-tight">{productText(selected.productId)}</h3>
-                                <p className="text-sm font-semibold text-slate-500">
-                                    {[selected.modelName, selected.testName, selected.testStandard, selected.testingAgency].filter(Boolean).join(' · ') || 'No model / standard specified'}
-                                </p>
+                                <div className="text-base font-bold text-slate-900">{productName(historyRecord)}</div>
+                                <div className={muted}>{historyRecord.productId?.productCode} / {historyRecord.modelName || '—'} · {historyRecord.testName}{historyRecord.testStandard ? ` · ${historyRecord.testStandard}` : ''}</div>
                             </div>
-                            <div className="flex flex-col items-end gap-1">
-                                <span className={`inline-flex px-2.5 py-0.5 rounded-full border text-xs font-bold ${STATUS_CLASSES[selected.status]}`}>{selected.status}</span>
-                                {selected.isActive ? <ExpiryBadge record={selected} /> : (
-                                    <span className="text-[11px] font-bold text-slate-500 uppercase">Inactive{selected.inactiveReason ? ` - ${selected.inactiveReason}` : ''}</span>
-                                )}
-                            </div>
+                            <div className="flex gap-1.5 items-start"><Badge value={historyRecord.displayStatus} /><Badge value={historyRecord.renewalState} /></div>
                         </div>
 
-                        {/* Current certificate */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                            <div>
-                                <span className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Certificate No</span>
-                                <span className="text-sm font-black text-slate-800">{cert?.certificateNo || 'Not recorded'}</span>
-                                <div className="mt-1"><DocumentLink url={cert?.documentUrl} label="Open PDF" /></div>
-                            </div>
-                            <div>
-                                <span className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Test Completed</span>
-                                <span className="text-sm font-black text-slate-800">{formatDate(cert?.testCompletionDate)}</span>
-                            </div>
-                            <div>
-                                <span className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Valid Until</span>
-                                <span className="text-sm font-black text-slate-800">{formatDate(cert?.validUntil)}</span>
-                            </div>
-                            <div>
-                                <span className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Renewal Status</span>
-                                <span className="text-sm font-black text-slate-800">{selected.renewalStatus}</span>
-                            </div>
+                        <div>
+                            <h3 className="text-xs font-bold uppercase text-slate-500 mb-2">Reminders ({(historyRecord.reminderLeadDays || []).join(', ')} days before expiry)</h3>
+                            {historyRecord.reminders?.length ? historyRecord.reminders.map(rem => (
+                                <div key={rem.leadDays} className="flex justify-between py-1 border-b border-slate-100">
+                                    <span>{rem.leadDays} day milestone · {fmt(rem.remindOn)}</span>
+                                    <span className={rem.sentAt ? 'text-green-700' : 'text-slate-500'}>{rem.sentAt ? `Sent ${fmt(rem.sentAt)}` : historyRecord.isActive ? 'Scheduled' : 'Paused'}</span>
+                                </div>
+                            )) : <p className={muted}>Reminders start once a certificate with a valid until date is recorded.</p>}
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-semibold text-slate-700">
-                            <div className="space-y-2">
-                                <div className="flex justify-between py-1.5 border-b border-slate-100">
-                                    <span className="text-slate-400 font-bold text-xs uppercase">Owner</span>
-                                    <span>{selected.ownerId?.name || '-'}</span>
-                                </div>
-                                <div className="flex justify-between py-1.5 border-b border-slate-100">
-                                    <span className="text-slate-400 font-bold text-xs uppercase">Backup Owner</span>
-                                    <span>{selected.backupOwnerId?.name || '-'}</span>
-                                </div>
-                                <div className="flex justify-between py-1.5 border-b border-slate-100">
-                                    <span className="text-slate-400 font-bold text-xs uppercase">Next Action</span>
-                                    <span className="text-right">{selected.nextAction || '-'}{selected.nextActionDate ? ` (${formatDate(selected.nextActionDate)})` : ''}</span>
-                                </div>
-                            </div>
-                            <div>
-                                <h4 className="text-xs font-bold text-slate-400 uppercase mb-2 flex items-center gap-1">
-                                    <MdNotificationsActive size={14} /> Renewal Reminders ({(selected.reminderLeadDays || []).join(' / ')} days)
-                                </h4>
-                                {selected.reminders?.length ? (
-                                    <ul className="space-y-1">
-                                        {selected.reminders.map(rem => (
-                                            <li key={rem.leadDays} className="flex justify-between text-xs">
-                                                <span>{rem.leadDays} days before · {formatDate(rem.remindOn)}</span>
-                                                <span className={rem.sentAt ? 'text-emerald-600' : 'text-slate-400'}>
-                                                    {rem.sentAt ? `Sent ${formatDate(rem.sentAt)}` : selected.isActive ? 'Scheduled' : 'Paused'}
-                                                </span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <p className="text-xs text-slate-400">Reminders are scheduled once a certificate with a valid-until date is recorded.</p>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Certificate history */}
-                        {selected.certificateHistory?.length > 0 && (
-                            <div className="space-y-2">
-                                <h4 className="text-xs font-bold text-slate-400 uppercase">Closed Certificates</h4>
-                                <div className="overflow-x-auto border border-slate-100 rounded-xl">
-                                    <table className="w-full text-xs">
-                                        <thead>
-                                            <tr className="bg-slate-50 text-slate-400 uppercase font-bold text-left">
-                                                <th className="py-2 px-3">Certificate</th>
-                                                <th className="py-2 px-3">Tested</th>
-                                                <th className="py-2 px-3">Valid Until</th>
-                                                <th className="py-2 px-3">Closed</th>
+                        <div>
+                            <h3 className="text-xs font-bold uppercase text-slate-500 mb-2">Certificates</h3>
+                            <div className="overflow-x-auto">
+                                <table className="w-full min-w-[520px] border-collapse">
+                                    <thead><tr><th className={TH}>Certificate</th><th className={TH}>Issued</th><th className={TH}>Valid until</th><th className={TH}>State</th></tr></thead>
+                                    <tbody>
+                                        {historyRecord.currentCertificate?.certificateNo && (
+                                            <tr>
+                                                <td className={TD}>{historyRecord.currentCertificate.certificateNo}{historyRecord.currentCertificate.documentUrl && <> · <a href={resolveImageUrl(historyRecord.currentCertificate.documentUrl)} target="_blank" rel="noopener noreferrer" className="text-teal-700 font-bold hover:underline">View file</a></>}</td>
+                                                <td className={TD}>{fmt(historyRecord.currentCertificate.issueDate || historyRecord.currentCertificate.testCompletionDate)}</td>
+                                                <td className={TD}>{fmt(historyRecord.currentCertificate.validUntil)}</td>
+                                                <td className={TD}><Badge value="Active" /></td>
                                             </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-50 font-semibold text-slate-600">
-                                            {[...selected.certificateHistory].reverse().map(h => (
-                                                <tr key={h._id}>
-                                                    <td className="py-2 px-3"><span className="mr-2">{h.certificateNo || '-'}</span><DocumentLink url={h.documentUrl} label="PDF" /></td>
-                                                    <td className="py-2 px-3">{formatDate(h.testCompletionDate)}</td>
-                                                    <td className="py-2 px-3">{formatDate(h.validUntil)}</td>
-                                                    <td className="py-2 px-3">{formatDate(h.closedAt)}{h.closedBy?.name ? ` by ${h.closedBy.name}` : ''}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                        )}
+                                        {[...(historyRecord.certificateHistory || [])].reverse().map(h => (
+                                            <tr key={h._id}>
+                                                <td className={TD}>{h.certificateNo || '—'}{h.documentUrl && <> · <a href={resolveImageUrl(h.documentUrl)} target="_blank" rel="noopener noreferrer" className="text-teal-700 font-bold hover:underline">View file</a></>}</td>
+                                                <td className={TD}>{fmt(h.issueDate || h.testCompletionDate)}</td>
+                                                <td className={TD}>{fmt(h.validUntil)}</td>
+                                                <td className={TD}><span className="text-slate-500">Closed {fmt(h.closedAt)}{h.closedBy?.name ? ` by ${h.closedBy.name}` : ''}</span></td>
+                                            </tr>
+                                        ))}
+                                        {!historyRecord.currentCertificate?.certificateNo && !historyRecord.certificateHistory?.length && <Empty cols={4}>No certificates recorded yet.</Empty>}
+                                    </tbody>
+                                </table>
                             </div>
-                        )}
+                        </div>
 
-                        {/* Activity log */}
-                        <div className="space-y-3">
-                            <h4 className="text-xs font-bold text-slate-400 uppercase">Progress Log</h4>
-                            <div className="space-y-4 pl-3 border-l-2 border-teal-100 max-h-72 overflow-y-auto">
-                                {[...(selected.activities || [])].reverse().map((act, i) => (
-                                    <div key={i} className="relative space-y-0.5">
-                                        <div className="absolute -left-[18px] top-1.5 w-2 h-2 rounded-full bg-teal-500 border border-white"></div>
-                                        <div className="flex items-center justify-between text-[11px] font-bold text-slate-400">
-                                            <span>{act.userName}</span>
-                                            <span>{formatDateTime(act.timestamp)}</span>
-                                        </div>
-                                        <p className="text-xs font-semibold text-slate-700 leading-snug">{act.action}</p>
-                                        {act.note && <p className="text-xs text-slate-500 whitespace-pre-line">{act.note}</p>}
+                        <div>
+                            <h3 className="text-xs font-bold uppercase text-slate-500 mb-2">Progress log</h3>
+                            <div className="space-y-3 pl-3 border-l-2 border-teal-100 max-h-64 overflow-y-auto">
+                                {[...(historyRecord.activities || [])].reverse().map((a, i) => (
+                                    <div key={i}>
+                                        <div className="flex justify-between text-[11px] font-semibold text-slate-400"><span>{a.userName}</span><span>{formatDateTime(a.timestamp)}</span></div>
+                                        <div className="text-slate-800">{a.action}</div>
+                                        {a.note && <div className="text-slate-500 whitespace-pre-line">{a.note}</div>}
                                     </div>
                                 ))}
                             </div>
@@ -927,94 +920,6 @@ const TypeTestRegister = () => {
                 )}
             </Modal>
 
-            {/* Record / renew certificate */}
-            <Modal
-                isOpen={certModal}
-                onClose={() => setCertModal(false)}
-                title={cert?.validUntil ? 'Upload Renewed Certificate' : 'Record Test Certificate'}
-                maxWidth="max-w-xl"
-                footer={
-                    <>
-                        <button type="button" onClick={() => setCertModal(false)} className="px-4 py-2 border border-slate-200 text-slate-500 text-sm font-bold rounded-xl hover:bg-slate-50">Cancel</button>
-                        <button type="submit" form="type-test-cert-form" disabled={submitting} className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-sm font-black rounded-xl shadow-md">
-                            {submitting ? 'Saving...' : 'Save Certificate'}
-                        </button>
-                    </>
-                }
-            >
-                <form id="type-test-cert-form" onSubmit={submitCertificate} className="space-y-4">
-                    {cert?.validUntil && (
-                        <p className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-xl p-3">
-                            Current certificate {cert.certificateNo} (valid until {formatDate(cert.validUntil)}) will be closed and moved to history.
-                        </p>
-                    )}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className={LABEL}>Certificate No <span className="text-rose-500">*</span></label>
-                            <input type="text" value={certData.certificateNo} onChange={e => setCertData({ ...certData, certificateNo: e.target.value })} className={INPUT} />
-                        </div>
-                        <div>
-                            <label className={LABEL}>Testing Agency</label>
-                            <input type="text" value={certData.testingAgency} onChange={e => setCertData({ ...certData, testingAgency: e.target.value })} className={INPUT} />
-                        </div>
-                        <div>
-                            <label className={LABEL}>Test Completion Date <span className="text-rose-500">*</span></label>
-                            <DateInput type="date" value={certData.testCompletionDate} onChange={e => setCertData({ ...certData, testCompletionDate: e.target.value })} className={INPUT} />
-                        </div>
-                        <div>
-                            <label className={LABEL}>Valid Until <span className="text-rose-500">*</span></label>
-                            <DateInput type="date" value={certData.validUntil} onChange={e => setCertData({ ...certData, validUntil: e.target.value })} className={INPUT} />
-                        </div>
-                    </div>
-                    <div>
-                        <label className={LABEL}>Certificate Document</label>
-                        <PdfUploadField value={certData.documentUrl} onChange={url => setCertData(prev => ({ ...prev, documentUrl: url }))} />
-                    </div>
-                    <div>
-                        <label className={LABEL}>Remarks</label>
-                        <textarea rows="2" value={certData.remarks} onChange={e => setCertData({ ...certData, remarks: e.target.value })} className={INPUT}></textarea>
-                    </div>
-                </form>
-            </Modal>
-
-            {/* Progress */}
-            <Modal
-                isOpen={progressModal}
-                onClose={() => setProgressModal(false)}
-                title="Record Renewal Progress"
-                maxWidth="max-w-xl"
-                footer={
-                    <>
-                        <button type="button" onClick={() => setProgressModal(false)} className="px-4 py-2 border border-slate-200 text-slate-500 text-sm font-bold rounded-xl hover:bg-slate-50">Cancel</button>
-                        <button type="submit" form="type-test-progress-form" disabled={submitting} className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-sm font-black rounded-xl shadow-md">
-                            {submitting ? 'Saving...' : 'Save Progress'}
-                        </button>
-                    </>
-                }
-            >
-                <form id="type-test-progress-form" onSubmit={submitProgress} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className={LABEL}>Renewal Status</label>
-                            <select value={progressData.renewalStatus} onChange={e => setProgressData({ ...progressData, renewalStatus: e.target.value })} className={INPUT}>
-                                {RENEWAL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className={LABEL}>Next Action Date</label>
-                            <DateInput type="date" value={progressData.nextActionDate} onChange={e => setProgressData({ ...progressData, nextActionDate: e.target.value })} className={INPUT} />
-                        </div>
-                        <div className="md:col-span-2">
-                            <label className={LABEL}>Next Action</label>
-                            <input type="text" value={progressData.nextAction} onChange={e => setProgressData({ ...progressData, nextAction: e.target.value })} placeholder="e.g. Await lab slot confirmation" className={INPUT} />
-                        </div>
-                    </div>
-                    <div>
-                        <label className={LABEL}>Progress Note</label>
-                        <textarea rows="3" value={progressData.note} onChange={e => setProgressData({ ...progressData, note: e.target.value })} placeholder="What happened?" className={INPUT}></textarea>
-                    </div>
-                </form>
-            </Modal>
         </div>
     );
 };
