@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { typeTestService, productService, userService, uploadService } from '../services/api';
 import { formatDate, formatDateTime, resolveImageUrl } from '../utils/helpers';
@@ -75,6 +76,43 @@ const EMPTY_FORM = {
 };
 const EMPTY_RENEWAL = { renewalStatus: 'Not Due', nextAction: '', nextActionDate: '', certificateNo: '', validUntil: '', documentUrl: '', note: '' };
 
+// Styled hover/focus tooltip. Rendered into <body> with fixed positioning so it is not
+// clipped by the scrolling product dropdown; it flips below the target near the screen top.
+const Tooltip = ({ content, children, className = '' }) => {
+    const [pos, setPos] = useState(null);
+    const show = (e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        const below = r.top < 80;
+        setPos({ left: r.left + r.width / 2, top: below ? r.bottom + 8 : r.top - 8, below });
+    };
+    const hide = () => setPos(null);
+    return (
+        <span className={className} onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}>
+            {children}
+            {pos && content && createPortal(
+                <div
+                    role="tooltip"
+                    style={{ position: 'fixed', left: pos.left, top: pos.top, transform: `translate(-50%, ${pos.below ? '0' : '-100%'})` }}
+                    className="z-[10000] pointer-events-none max-w-xs px-3 py-2 rounded-lg bg-slate-900 text-white shadow-xl"
+                >
+                    {content}
+                    <span
+                        className={`absolute left-1/2 -translate-x-1/2 border-[6px] border-transparent ${pos.below ? 'bottom-full border-b-slate-900' : 'top-full border-t-slate-900'}`}
+                    />
+                </div>,
+                document.body
+            )}
+        </span>
+    );
+};
+
+const Mgr4Tip = ({ value }) => (
+    <>
+        <div className="text-[10px] font-black uppercase tracking-wider text-teal-300">MGR4 FG</div>
+        <div className="text-xs font-semibold">{value || 'Not set'}</div>
+    </>
+);
+
 // Server-side product search, since the catalog is too large for a plain dropdown.
 // The parent owns the text (label) so it can prefill it when editing.
 // Lists only products marked "Applicable for Test Type" in Product Master.
@@ -105,29 +143,30 @@ const ProductPicker = ({ label, tooltip, onChange }) => {
 
     return (
         <div className="relative" ref={boxRef}>
-            <input
-                type="text"
-                value={query}
-                onFocus={() => setOpen(true)}
-                onChange={e => { setOpen(true); onChange('', e.target.value, ''); }}
-                title={tooltip || undefined}
-                placeholder="Search product code or name"
-                className={INPUT}
-            />
+            <Tooltip content={!open && tooltip ? <Mgr4Tip value={tooltip} /> : null} className="block">
+                <input
+                    type="text"
+                    value={query}
+                    onFocus={() => setOpen(true)}
+                    onChange={e => { setOpen(true); onChange('', e.target.value, ''); }}
+                    placeholder="Search product code or name"
+                    className={INPUT}
+                />
+            </Tooltip>
             {open && (
                 <div className="absolute z-50 mt-1 w-full max-h-60 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg">
                     {results.length === 0 ? (
                         <div className="px-3 py-2 text-xs text-slate-400">No products found. Set "Applicable for Test Type" to Yes in Product Master.</div>
                     ) : results.map(p => (
-                        <button
-                            type="button"
-                            key={p._id}
-                            title={`MGR4 FG: ${mgr4Text(p)}`}
-                            onClick={() => { onChange(p._id, productText(p), mgr4Text(p)); setOpen(false); }}
-                            className="block w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-teal-50"
-                        >
-                            {productText(p)}
-                        </button>
+                        <Tooltip key={p._id} content={<Mgr4Tip value={mgr4Text(p)} />} className="block">
+                            <button
+                                type="button"
+                                onClick={() => { onChange(p._id, productText(p), mgr4Text(p)); setOpen(false); }}
+                                className="block w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-teal-50"
+                            >
+                                {productText(p)}
+                            </button>
+                        </Tooltip>
                     ))}
                 </div>
             )}
@@ -520,7 +559,7 @@ const TypeTestRegister = () => {
 
     const Empty = ({ cols, children }) => <tr><td colSpan={cols} className="text-center py-6 text-sm text-slate-500">{children}</td></tr>;
     const ProductCell = ({ r, sub }) => (
-        <td className={TD}><b className="text-slate-900" title={`MGR4 FG: ${mgr4Text(r.productId)}`}>{productName(r)}</b><br /><span className={muted}>{sub}</span></td>
+        <td className={TD}><Tooltip content={<Mgr4Tip value={mgr4Text(r.productId)} />}><b className="text-slate-900 cursor-help">{productName(r)}</b></Tooltip><br /><span className={muted}>{sub}</span></td>
     );
 
     const headingRow = (title, subtitle, action) => (
@@ -571,7 +610,7 @@ const TypeTestRegister = () => {
                     <form id="type-test-form" onSubmit={saveTest}>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                             <Field label="Product *">
-                                <ProductPicker label={form.productLabel} tooltip={form.productId ? `MGR4 FG: ${form.productMgr4 || 'Not set'}` : ''} onChange={(id, label, mgr4) => setForm(prev => ({ ...prev, productId: id, productLabel: label, productMgr4: mgr4 }))} />
+                                <ProductPicker label={form.productLabel} tooltip={form.productId ? (form.productMgr4 || 'Not set') : ''} onChange={(id, label, mgr4) => setForm(prev => ({ ...prev, productId: id, productLabel: label, productMgr4: mgr4 }))} />
                             </Field>
                             <Field label="Model" htmlFor="tModel"><input id="tModel" className={INPUT} value={form.modelName} onChange={e => setField('modelName', e.target.value)} placeholder="Model number" /></Field>
                             <Field label="Test name *" htmlFor="tTestName"><input id="tTestName" className={INPUT} value={form.testName} onChange={e => setField('testName', e.target.value)} placeholder="e.g. Temperature rise test" /></Field>
@@ -869,7 +908,7 @@ const TypeTestRegister = () => {
                                                     {productList.length ? productList.map(g => (
                                                         <tr key={g.key}>
                                                             <td className={TDN}>{g.product.productCode || '—'}</td>
-                                                            <td className={TD}><b title={`MGR4 FG: ${mgr4Text(g.product)}`}>{g.product.productName || 'Unknown product'}</b></td>
+                                                            <td className={TD}><Tooltip content={<Mgr4Tip value={mgr4Text(g.product)} />}><b className="cursor-help">{g.product.productName || 'Unknown product'}</b></Tooltip></td>
                                                             <td className={TDN}>{g.modelName || '—'}</td>
                                                             <td className={TD}>{g.records.map(r => r.testName).join(', ')}</td>
                                                             <td className={TDN}>{g.owners || '—'}</td>
