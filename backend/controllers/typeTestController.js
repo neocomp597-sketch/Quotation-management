@@ -4,7 +4,7 @@ const { formatDate } = require('../utils/dateFormat');
 const { normalizeLeadDays, buildReminders, startOfDay, DAY_MS } = require('../utils/typeTestReminders');
 
 const POPULATE = [
-    { path: 'productId', select: 'productName productCode brand status' },
+    { path: 'productId', select: 'productName productCode brand status mgr4', populate: { path: 'mgr4', select: 'code description' } },
     { path: 'ownerId', select: 'name email' },
     { path: 'backupOwnerId', select: 'name email' }
 ];

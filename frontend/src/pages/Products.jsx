@@ -104,7 +104,8 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
         technicalSpecificationUrl: '',
         operatingUserManualUrl: '',
         repairTroubleshootingUrl: '',
-        warrantyYears: DEFAULT_WARRANTY_YEARS
+        warrantyYears: DEFAULT_WARRANTY_YEARS,
+        applicableForTypeTest: false
     });
 
     const [uploadingPdf, setUploadingPdf] = useState({
@@ -330,7 +331,8 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                 technicalSpecificationUrl: '',
                 operatingUserManualUrl: '',
                 repairTroubleshootingUrl: '',
-                warrantyYears: DEFAULT_WARRANTY_YEARS
+                warrantyYears: DEFAULT_WARRANTY_YEARS,
+                applicableForTypeTest: false
             });
             setIsModalOpen(true);
         } else if (isEditPage && routeId) {
@@ -353,6 +355,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                     repairTroubleshootingUrl: item.repairTroubleshootingUrl || '',
                     // Stored in months; products saved before the field count as 3 years.
                     warrantyYears: String(Number.isFinite(item.warrantyMonths) ? item.warrantyMonths / 12 : DEFAULT_WARRANTY_YEARS),
+                    applicableForTypeTest: Boolean(item.applicableForTypeTest),
                     attributes: (item.attributes || []).map(a => a._id || a),
                     vendors: item.vendors?.length ? item.vendors.map(v => ({
                         vendorId: v.vendorId?._id || v.vendorId,
@@ -1920,6 +1923,31 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                     </label>
                                 ))}
                             </div>
+                        </div>
+
+                        <div>
+                            <h4 className="text-[10px] font-black text-primary-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
+                                <span className="h-px flex-1 bg-primary-100"></span>
+                                Applicable for Test Type
+                                <span className="h-px flex-1 bg-primary-100"></span>
+                            </h4>
+                            <div className="flex gap-6 p-1">
+                                {[{ label: 'Yes', value: true }, { label: 'No', value: false }].map((opt) => (
+                                    <label key={opt.label} className="flex-1 flex items-center justify-center gap-2 cursor-pointer group bg-slate-50 py-3.5 rounded-2xl border border-slate-200 transition-all has-[:checked]:bg-primary-50 has-[:checked]:border-primary-200">
+                                        <input
+                                            type="radio"
+                                            name="applicableForTypeTest"
+                                            checked={Boolean(formData.applicableForTypeTest) === opt.value}
+                                            onChange={() => setFormData(prev => ({ ...prev, applicableForTypeTest: opt.value }))}
+                                            className="sr-only"
+                                        />
+                                        <span className={`text-[10px] font-black uppercase tracking-widest ${Boolean(formData.applicableForTypeTest) === opt.value ? 'text-primary-600' : 'text-slate-400'}`}>{opt.label}</span>
+                                    </label>
+                                ))}
+                            </div>
+                            <p className="mt-2 text-xs font-medium text-slate-500">
+                                Yes lists this product in the Type Test Register product dropdown.
+                            </p>
                         </div>
 
                         <div>

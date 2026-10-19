@@ -343,6 +343,16 @@ const importProducts = async (req, res) => {
                 const uom = pickFirstNonEmpty(row.UOM ?? row.uom ?? row.Unit ?? row.unit, 'Nos');
                 const productImageUrl = pickFirstNonEmpty(row['Image URL'] ?? row.productImageUrl ?? row.imageUrl ?? row.image, '');
                 const status = pickFirstNonEmpty(row.Status ?? row.status, 'Active');
+                const vendorName = pickFirstNonEmpty(row['Vendor Name'] ?? row.vendorName);
+                const vendorPrice = toSafeNumber(row['Vendor Price'] ?? row.vendorPrice);
+                const vendorStock = toSafeNumber(row['Vendor Stock'] ?? row.vendorStock ?? row.stock);
+                const isPrimary = toBoolean(row['Is Primary'] ?? row.isPrimary ?? true);
+                // Test Type (Yes/No) lists the product in the Type Test product dropdown.
+                // A blank cell keeps the stored setting; a new product defaults to No.
+                const testTypeRaw = String(pickFirstNonEmpty(row['Test Type'], row['Applicable for Test Type'], row.testType) ?? '').trim().toLowerCase();
+                if (testTypeRaw && !['yes', 'y', 'no', 'n', 'true', 'false'].includes(testTypeRaw)) {
+                    throw new Error(`Test Type must be Yes or No (got "${testTypeRaw}")`);
+                }
 
                 if (!productName && productCode) {
                     productName = productCode;
@@ -401,6 +411,9 @@ const importProducts = async (req, res) => {
                     status,
                     companyId: req.user?.companyId
                 };
+                if (testTypeRaw) {
+                    productData.applicableForTypeTest = ['yes', 'y', 'true'].includes(testTypeRaw);
+                }
 
                 const isVendorUser = req.user?.role === 'vendor' || String(req.user?.role || '').toLowerCase() === 'vendor';
                 if (isVendorUser && req.user?.vendorId) {
@@ -1068,7 +1081,8 @@ const getProductTemplate = async (req, res) => {
                 'Vendor Stock': 25,
                 'Is Primary': true,
                 'Image URL': '',
-                'Status': 'Active'
+                'Status': 'Active',
+                'Test Type': 'Yes'
             }
         ];
 
@@ -1080,7 +1094,7 @@ const getProductTemplate = async (req, res) => {
         worksheet['!cols'] = [
             { wch: 15 }, { wch: 30 }, { wch: 12 }, { wch: 8 },
             { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 24 },
-            { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 40 }, { wch: 10 }
+            { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 40 }, { wch: 10 }, { wch: 10 }
         ];
 
         const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });

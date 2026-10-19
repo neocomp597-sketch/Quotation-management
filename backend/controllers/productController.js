@@ -31,7 +31,7 @@ const getPagination = (query) => {
     return { page, limit, skip: (page - 1) * limit };
 };
 
-const hasListParams = (query) => Boolean(query.page || query.limit || query.search || query.mgr1 || query.mgr2 || query.mgr3 || query.mgr4 || query.mgr5 || query.catalogType);
+const hasListParams = (query) => Boolean(query.page || query.limit || query.search || query.mgr1 || query.mgr2 || query.mgr3 || query.mgr4 || query.mgr5 || query.catalogType || query.typeTest);
 
 // Names copied from other screens (e.g. Invoice Bulk Upload) can carry doubled or
 // non-breaking spaces, so any run of whitespace in the term matches any run in the field.
@@ -66,6 +66,11 @@ const buildProductQuery = (queryParams = {}, user = null) => {
             query[key] = queryParams[key];
         }
     });
+
+    // Type Test Register product picker: only products marked "Applicable for Test Type".
+    if (queryParams.typeTest === 'true') {
+        query.applicableForTypeTest = true;
+    }
 
     if (queryParams.catalogType) {
         if (queryParams.catalogType === 'Product') {
@@ -218,7 +223,7 @@ const buildProductResponse = (productDoc) => {
 
 const fetchProductByIdWithRelations = (id) => {
     return Product.findById(id)
-        .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing technicalSpecificationUrl operatingUserManualUrl repairTroubleshootingUrl warrantyMonths createdAt updatedAt')
+        .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing technicalSpecificationUrl operatingUserManualUrl repairTroubleshootingUrl warrantyMonths applicableForTypeTest createdAt updatedAt')
         .populate('categoryId', 'name status')
         .populate('mgr1', 'code description status')
         .populate('mgr2', 'code description status')
@@ -321,7 +326,8 @@ const createProduct = async (req, res) => {
             technicalSpecificationUrl: technicalSpecificationUrl || '',
             operatingUserManualUrl: operatingUserManualUrl || '',
             repairTroubleshootingUrl: repairTroubleshootingUrl || '',
-            warrantyMonths: parseWarrantyMonths(req.body.warrantyMonths)
+            warrantyMonths: parseWarrantyMonths(req.body.warrantyMonths),
+            applicableForTypeTest: toBoolean(req.body.applicableForTypeTest)
         });
 
         if (preparedVendors.length) {
@@ -360,7 +366,7 @@ const getAllProducts = async (req, res) => {
         }
 
         const findProducts = (filter) => Product.find(filter)
-            .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing technicalSpecificationUrl operatingUserManualUrl repairTroubleshootingUrl warrantyMonths updatedAt')
+            .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing technicalSpecificationUrl operatingUserManualUrl repairTroubleshootingUrl warrantyMonths applicableForTypeTest updatedAt')
             .populate('categoryId', 'name status')
             .populate('mgr1', 'code description status')
             .populate('mgr2', 'code description status')
@@ -562,6 +568,9 @@ const updateProduct = async (req, res) => {
         if (Object.prototype.hasOwnProperty.call(req.body, 'warrantyMonths')) {
             updateData.warrantyMonths = parseWarrantyMonths(req.body.warrantyMonths);
         }
+        if (Object.prototype.hasOwnProperty.call(req.body, 'applicableForTypeTest')) {
+            updateData.applicableForTypeTest = toBoolean(req.body.applicableForTypeTest);
+        }
 
         // MGR 1-5: a key sent in the body is always written, so changing an MGR stores the
         // new id and choosing "Select MGR n" (empty) clears it. A key left out of the body
@@ -608,7 +617,7 @@ const updateProduct = async (req, res) => {
             updateData,
             { new: true, runValidators: true }
         )
-            .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing technicalSpecificationUrl operatingUserManualUrl repairTroubleshootingUrl warrantyMonths createdAt updatedAt')
+            .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing technicalSpecificationUrl operatingUserManualUrl repairTroubleshootingUrl warrantyMonths applicableForTypeTest createdAt updatedAt')
             .populate('categoryId', 'name status')
             .populate('mgr1', 'code description status')
             .populate('mgr2', 'code description status')
