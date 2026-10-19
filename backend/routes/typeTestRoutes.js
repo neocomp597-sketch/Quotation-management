@@ -4,6 +4,7 @@ const typeTestController = require('../controllers/typeTestController');
 const { protect } = require('../middlewares/authMiddleware');
 
 router.get('/summary/data', protect, typeTestController.getTypeTestSummary);
+router.get('/pending/products', protect, typeTestController.getPendingProducts);
 router.post('/', protect, typeTestController.createTypeTest);
 router.get('/', protect, typeTestController.getTypeTests);
 router.get('/:id', protect, typeTestController.getTypeTestById);

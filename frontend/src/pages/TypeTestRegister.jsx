@@ -5,7 +5,7 @@ import { typeTestService, productService, userService, uploadService } from '../
 import { formatDate, formatDateTime, resolveImageUrl } from '../utils/helpers';
 import {
     MdDashboard, MdListAlt, MdInventory2, MdSchedule, MdFactCheck, MdAdd, MdDownload,
-    MdCloudUpload, MdAssignment, MdVerified, MdUpdate, MdErrorOutline, MdInfoOutline, MdArrowBack
+    MdCloudUpload, MdAssignment, MdVerified, MdUpdate, MdErrorOutline, MdInfoOutline, MdArrowBack, MdPendingActions
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
@@ -21,7 +21,8 @@ const PAGES = [
     { key: 'dashboard', label: 'Dashboard', icon: MdDashboard },
     { key: 'tests', label: 'Type Test Records', icon: MdListAlt },
     { key: 'products', label: 'Product & Model Master', icon: MdInventory2 },
-    { key: 'renewals', label: 'Renewal Worklist', icon: MdSchedule }
+    { key: 'renewals', label: 'Renewal Worklist', icon: MdSchedule },
+    { key: 'pending', label: 'Pending Records', icon: MdPendingActions }
 ];
 
 const INPUT = 'w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm text-slate-700 font-semibold rounded-xl focus:outline-none focus:border-teal-500 focus:bg-white';
@@ -242,6 +243,9 @@ const TypeTestRegister = () => {
     const [renewalFilter, setRenewalFilter] = useState('');
     // Dashboard card or pipeline row the user clicked; '' shows upcoming renewals.
     const [dashFilter, setDashFilter] = useState('');
+    // Products marked "Applicable for Test Type" with no tested record yet.
+    const [pending, setPending] = useState([]);
+    const [pendingSearch, setPendingSearch] = useState('');
 
     // Dialogs
     const [formOpen, setFormOpen] = useState(false);
@@ -255,7 +259,12 @@ const TypeTestRegister = () => {
     const showPage = (key) => setSearchParams({ tab: key });
     const setField = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
 
+    const loadPending = () => typeTestService.getPending()
+        .then(res => setPending(res.data || []))
+        .catch(err => console.error('Failed to load pending products:', err));
+
     const loadRecords = async () => {
+        loadPending();
         try {
             const res = await typeTestService.getAll();
             setRecords(res.data || []);
@@ -288,6 +297,7 @@ const TypeTestRegister = () => {
 
     const replaceRecord = (updated) => {
         setRecords(prev => prev.map(r => (r._id === updated._id ? updated : r)));
+        loadPending();
         if (historyRecord?._id === updated._id) {
             typeTestService.getById(updated._id).then(res => setHistoryRecord(res.data)).catch(() => {});
         }
@@ -381,6 +391,7 @@ const TypeTestRegister = () => {
             } else {
                 const res = await typeTestService.create(payload);
                 setRecords(prev => [res.data, ...prev]);
+                loadPending();
                 toast.success('Type test record created.');
             }
             closeForm();
@@ -471,6 +482,7 @@ const TypeTestRegister = () => {
         try {
             await typeTestService.delete(record._id);
             setRecords(prev => prev.filter(r => r._id !== record._id));
+            loadPending();
             setHistoryRecord(null);
             toast.success('Type test record deleted.');
         } catch (err) {
@@ -519,10 +531,12 @@ const TypeTestRegister = () => {
         { key: 'total', label: 'Total Test Records', hint: 'All recorded tests', icon: <MdAssignment size={20} />, color: 'from-teal-500 to-emerald-600', rows: records },
         { key: 'valid', label: 'Valid Certificates', hint: 'Currently within validity', icon: <MdVerified size={20} />, color: 'from-sky-500 to-cyan-600', rows: activeRecords.filter(r => r.displayStatus === 'Valid') },
         { key: 'due', label: 'Renewals Due ≤ 90 Days', hint: 'Including already overdue', icon: <MdUpdate size={20} />, color: 'from-amber-400 to-orange-500', rows: activeRecords.filter(r => hasExpiry(r) && r.daysToExpiry <= 90) },
-        { key: 'expired', label: 'Expired Certificates', hint: 'Requires review', icon: <MdErrorOutline size={20} />, color: 'from-rose-500 to-red-600', rows: activeRecords.filter(r => r.displayStatus === 'Expired') }
+        { key: 'expired', label: 'Expired Certificates', hint: 'Requires review', icon: <MdErrorOutline size={20} />, color: 'from-rose-500 to-red-600', rows: activeRecords.filter(r => r.displayStatus === 'Expired') },
+        // Products, not test records, so it opens its own tab instead of filtering the table below.
+        { key: 'pending', label: 'Pending Records', hint: 'Applicable, not yet tested', icon: <MdPendingActions size={20} />, color: 'from-violet-500 to-purple-600', rows: pending, go: () => showPage('pending') }
     ];
     const pipeline = TEST_STATUSES.map(s => ({ key: `status:${s}`, label: s, rows: activeRecords.filter(r => r.displayStatus === s) }));
-    const dashSelection = [...dashboardCards, ...pipeline].find(c => c.key === dashFilter);
+    const dashSelection = [...dashboardCards.filter(c => !c.go), ...pipeline].find(c => c.key === dashFilter);
     const toggleDashFilter = (key) => setDashFilter(prev => (prev === key ? '' : key));
     const upcoming = activeRecords.filter(r => hasExpiry(r) && r.daysToExpiry <= 180).sort(byExpiry).slice(0, 8);
     const dashRows = dashSelection ? [...dashSelection.rows].sort(byExpiry) : upcoming;
@@ -750,13 +764,13 @@ const TypeTestRegister = () => {
                             {page === 'dashboard' && (
                                 <section>
                                     {headingRow('Overview', 'Product testing and certificate validity at a glance')}
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
                                         {dashboardCards.map(m => (
                                             <button
                                                 key={m.key}
                                                 type="button"
-                                                aria-pressed={dashFilter === m.key}
-                                                onClick={() => toggleDashFilter(m.key)}
+                                                aria-pressed={m.go ? undefined : dashFilter === m.key}
+                                                onClick={() => (m.go ? m.go() : toggleDashFilter(m.key))}
                                                 className={`relative overflow-hidden text-left bg-white border rounded-2xl px-4 py-3.5 shadow-sm flex items-center justify-between gap-3 hover:-translate-y-0.5 hover:shadow-md transition-all active:scale-[0.98] group ${dashFilter === m.key ? 'border-teal-500 ring-2 ring-teal-500/30' : 'border-slate-200/80'}`}
                                             >
                                                 <span className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${m.color}`} />
@@ -926,6 +940,48 @@ const TypeTestRegister = () => {
                                                             </td>
                                                         </tr>
                                                     )) : <Empty cols={7}>No products found.</Empty>}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </section>
+                            )}
+
+                            {page === 'pending' && (
+                                <section>
+                                    {headingRow(
+                                        'Pending Records',
+                                        'Products marked "Applicable for Test Type" in Product Master that have not been tested yet. A product leaves this list once its testing is completed.',
+                                        <button className={SECONDARY} onClick={loadPending}>Refresh</button>
+                                    )}
+                                    <div className={PANEL}>
+                                        <div className="flex flex-wrap gap-2.5 mb-4">
+                                            <input value={pendingSearch} onChange={e => setPendingSearch(e.target.value)} placeholder="Search product code or name..." className={`${INPUT} flex-1 min-w-[160px]`} />
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full min-w-[720px] border-collapse">
+                                                <thead><tr><th className={TH}>Product code</th><th className={TH}>Product name</th><th className={TH}>MGR4 FG</th><th className={TH}>Stage</th><th className={TH}>Open test records</th><th className={TH}>Action</th></tr></thead>
+                                                <tbody>
+                                                    {(() => {
+                                                        const q = pendingSearch.toLowerCase();
+                                                        const rows = pending.filter(item => [item.product.productCode, item.product.productName].join(' ').toLowerCase().includes(q));
+                                                        if (!rows.length) return <Empty cols={6}>{pending.length ? 'No matching products.' : 'No pending products. Every applicable product has been tested.'}</Empty>;
+                                                        return rows.map(item => (
+                                                            <tr key={item.product._id}>
+                                                                <td className={TDN}>{item.product.productCode || '—'}</td>
+                                                                <td className={TD}><Tooltip content={<Mgr4Tip value={mgr4Text(item.product)} />}><b className="text-slate-900 cursor-help">{item.product.productName}</b></Tooltip></td>
+                                                                <td className={TD}>{mgr4Text(item.product)}</td>
+                                                                <td className={TDN}><Badge value={item.stage} /></td>
+                                                                <td className={TD}>{item.records.length ? item.records.map(r => `${r.testName} (${r.status})`).join(', ') : <span className={muted}>None</span>}</td>
+                                                                <td className={TD}>
+                                                                    <button
+                                                                        className={SMALL}
+                                                                        onClick={() => openTestModal(null, { productId: item.product._id, productLabel: productText(item.product), productMgr4: mgr4Text(item.product) })}
+                                                                    >Add test</button>
+                                                                </td>
+                                                            </tr>
+                                                        ));
+                                                    })()}
                                                 </tbody>
                                             </table>
                                         </div>

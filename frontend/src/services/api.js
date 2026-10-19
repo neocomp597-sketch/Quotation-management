@@ -1161,6 +1161,7 @@ export const typeTestService = {
   getAll: (params) => api.get("/type-tests", { params }),
   getById: (id) => api.get(`/type-tests/${id}`),
   getSummary: () => api.get("/type-tests/summary/data"),
+  getPending: () => api.get("/type-tests/pending/products"),
   create: (data) => api.post("/type-tests", data),
   update: (id, data) => api.put(`/type-tests/${id}`, data),
   delete: (id) => api.delete(`/type-tests/${id}`),

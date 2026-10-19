@@ -473,3 +473,46 @@ exports.getTypeTestSummary = async (req, res) => {
         res.status(500).json({ message: err.message });
     }
 };
+
+// A record counts as tested once testing has finished: it has a result, a certificate,
+// or has moved past the testing stages.
+const isTested = (r) => ['Pass', 'Fail'].includes(r.testResult)
+    || Boolean(r.currentCertificate?.certificateNo || r.currentCertificate?.testCompletionDate)
+    || !['Not Started', 'In Progress'].includes(r.status);
+
+// Products marked "Applicable for Test Type" in Product Master that have no tested record yet.
+exports.getPendingProducts = async (req, res) => {
+    try {
+        const Product = require('../models/Product');
+        const products = await Product.find({ applicableForTypeTest: true })
+            .select('productCode productName status mgr4')
+            .populate('mgr4', 'code description')
+            .sort({ productCode: 1 })
+            .lean();
+        const records = await TypeTest.find({ productId: { $in: products.map(p => p._id) } })
+            .select('productId testName status testResult currentCertificate.certificateNo currentCertificate.testCompletionDate')
+            .lean();
+
+        const byProduct = new Map();
+        records.forEach(r => {
+            const key = String(r.productId);
+            if (!byProduct.has(key)) byProduct.set(key, []);
+            byProduct.get(key).push(r);
+        });
+
+        const pending = products
+            .filter(p => !(byProduct.get(String(p._id)) || []).some(isTested))
+            .map(p => {
+                const open = byProduct.get(String(p._id)) || [];
+                return {
+                    product: p,
+                    stage: open.length ? (open.some(r => r.status === 'In Progress') ? 'In Progress' : 'Not Started') : 'No record',
+                    records: open.map(r => ({ _id: r._id, testName: r.testName, status: r.status }))
+                };
+            });
+        res.json(pending);
+    } catch (err) {
+        console.error('[TypeTest Pending Error]', err);
+        res.status(500).json({ message: err.message });
+    }
+};
