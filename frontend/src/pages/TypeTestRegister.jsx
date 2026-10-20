@@ -10,6 +10,7 @@ import {
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 import DateInput from '../components/DateInput';
+import { byLatestTest } from '../utils/typeTests';
 import * as XLSX from 'xlsx';
 
 const TEST_STATUSES = ['Not Started', 'In Progress', 'Valid', 'Expired', 'Renewal In Progress'];
@@ -68,7 +69,7 @@ const nextReminderText = (r) => {
 };
 
 const EMPTY_FORM = {
-    productId: '', productLabel: '', productMgr4: '', modelName: '', testName: '', testStandard: '', testingAgency: '',
+    productId: '', productCode: '', productName: '', productMgr4: '', modelName: '', testName: '', testStandard: '', testingAgency: '',
     status: 'Not Started', testResult: 'Pending', testStartDate: '', testCompletionDate: '',
     certificateNo: '', issueDate: '', validUntil: '', documentUrl: '',
     ownerId: '', backupOwnerId: '', reminderLeadDays: '180', renewalStatus: 'Not Due',
@@ -139,42 +140,80 @@ const Mgr4Tip = ({ value }) => (
 );
 
 // Server-side product search, since the catalog is too large for a plain dropdown.
-// The parent owns the text (label) so it can prefill it when editing.
 // Lists only products marked "Applicable for Test Type" in Product Master.
-const ProductPicker = ({ label, tooltip, onChange }) => {
-    const query = label || '';
+const searchProducts = async (search, searchIn) => {
+    const res = await productService.getAll({ search, searchIn, limit: 20, page: 1, typeTest: 'true' });
+    return res.data?.data || res.data || [];
+};
+const sameText = (a, b) => String(a || '').replace(/\s+/g, ' ').trim().toLowerCase() === String(b || '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+// One of the two product boxes on the test form: `field` is productCode or productName.
+// The parent owns both texts, so choosing a product here fills the other box too.
+// Text typed without choosing is matched exactly when the box closes; it stays unselected
+// when no product, or more than one, has that code or name.
+const ProductField = ({ field, id, value, selected, tooltip, placeholder, onType, onSelect }) => {
+    const searchIn = field === 'productCode' ? 'code' : 'name';
     const [results, setResults] = useState([]);
     const [open, setOpen] = useState(false);
+    const [note, setNote] = useState('');
     const boxRef = useRef(null);
 
     useEffect(() => {
         if (!open) return undefined;
         const timer = setTimeout(async () => {
             try {
-                const res = await productService.getAll({ search: query, limit: 20, page: 1, typeTest: 'true' });
-                setResults(res.data?.data || res.data || []);
+                setResults(await searchProducts(value, searchIn));
             } catch (err) {
                 console.error('Product search failed:', err);
             }
         }, 300);
         return () => clearTimeout(timer);
-    }, [query, open]);
+    }, [value, open]);
 
+    // Clicking or tabbing anywhere outside closes the list.
     useEffect(() => {
         const close = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false); };
         document.addEventListener('mousedown', close);
-        return () => document.removeEventListener('mousedown', close);
+        document.addEventListener('focusin', close);
+        return () => {
+            document.removeEventListener('mousedown', close);
+            document.removeEventListener('focusin', close);
+        };
     }, []);
+
+    useEffect(() => {
+        if (open || selected || !value.trim()) return undefined;
+        let cancelled = false;
+        searchProducts(value, searchIn)
+            .then(list => {
+                if (cancelled) return;
+                const matches = list.filter(p => sameText(p[field], value));
+                const what = field === 'productCode' ? 'code' : 'name';
+                if (matches.length === 1) onSelect(matches[0], { field, text: value });
+                else setNote(matches.length
+                    ? `More than one product has this ${what}. Choose one from the list.`
+                    : `No product with this ${what} is applicable for test type.`);
+            })
+            .catch(err => console.error('Product lookup failed:', err));
+        return () => { cancelled = true; };
+    }, [open]);
+
+    const label = (p) => (field === 'productCode'
+        ? <><b className="block text-slate-900">{p.productCode || '—'}</b><span className={muted}>{p.productName}</span></>
+        : <><b className="block text-slate-900">{p.productName}</b><span className={muted}>{p.productCode || 'No code'}</span></>);
 
     return (
         <div className="relative" ref={boxRef}>
             <Tooltip content={!open && tooltip ? <Mgr4Tip value={tooltip} /> : null} className="block">
                 <input
+                    id={id}
                     type="text"
-                    value={query}
-                    onFocus={() => setOpen(true)}
-                    onChange={e => { setOpen(true); onChange('', e.target.value, ''); }}
-                    placeholder="Search product code or name"
+                    value={value}
+                    autoComplete="off"
+                    onFocus={() => { setNote(''); setOpen(true); }}
+                    onChange={e => { setNote(''); setOpen(true); onType(e.target.value); }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); setOpen(false); } }}
+                    placeholder={placeholder}
                     className={INPUT}
                 />
             </Tooltip>
@@ -186,15 +225,16 @@ const ProductPicker = ({ label, tooltip, onChange }) => {
                         <Tooltip key={p._id} content={<Mgr4Tip value={mgr4Text(p)} />} className="block">
                             <button
                                 type="button"
-                                onClick={() => { onChange(p._id, productText(p), mgr4Text(p)); setOpen(false); }}
+                                onClick={() => { onSelect(p); setOpen(false); }}
                                 className="block w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-teal-50"
                             >
-                                {productText(p)}
+                                {label(p)}
                             </button>
                         </Tooltip>
                     ))}
                 </div>
             )}
+            {note && !selected && value.trim() && <div className="mt-1 text-xs font-semibold text-rose-600">{note}</div>}
         </div>
     );
 };
@@ -240,8 +280,8 @@ const FileField = ({ id, value, onChange }) => {
     );
 };
 
-const Field = ({ label, htmlFor, full, children }) => (
-    <div className={`min-w-0 ${full ? 'sm:col-span-2 lg:col-span-3' : ''}`}>
+const Field = ({ label, htmlFor, full, wide, children }) => (
+    <div className={`min-w-0 ${full ? 'sm:col-span-2 lg:col-span-3' : wide ? 'lg:col-span-2' : ''}`}>
         <label htmlFor={htmlFor} className={LABEL}>{label}</label>
         {children}
     </div>
@@ -282,6 +322,17 @@ const TypeTestRegister = () => {
 
     const showPage = (key) => setSearchParams({ tab: key });
     const setField = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
+
+    // Product code and product name always describe the same chosen product. Editing either
+    // box drops the choice and clears the other box rather than leaving a stale pair.
+    const typeProduct = (field, text) => setForm(prev => ({ ...prev, productId: '', productCode: '', productName: '', productMgr4: '', [field]: text }));
+    // `typed` comes with an exact-match lookup that finishes later; it only applies while that
+    // box still holds the text that was looked up and nothing was chosen meanwhile.
+    const selectProduct = (p, typed) => setForm(prev => (
+        typed && (prev.productId || prev[typed.field] !== typed.text)
+            ? prev
+            : { ...prev, productId: p._id, productCode: p.productCode || '', productName: p.productName || '', productMgr4: mgr4Text(p) }
+    ));
 
     const loadPending = () => typeTestService.getPending()
         .then(res => setPending(res.data || []))
@@ -336,7 +387,8 @@ const TypeTestRegister = () => {
             setEditingId(record._id);
             setForm({
                 productId: record.productId?._id || record.productId || '',
-                productLabel: productText(record.productId),
+                productCode: record.productId?.productCode || '',
+                productName: record.productId?.productName || '',
                 productMgr4: mgr4Text(record.productId),
                 modelName: record.modelName || '',
                 testName: record.testName || '',
@@ -393,7 +445,7 @@ const TypeTestRegister = () => {
 
     const saveTest = async (e) => {
         e.preventDefault();
-        if (!form.productId) return toast.warning('Select a product.');
+        if (!form.productId) return toast.warning('Select a product by its code or name.');
         if (!form.testName.trim()) return toast.warning('Enter the test name.');
         if (!form.ownerId) return toast.warning('Select the renewal owner.');
         if (form.backupOwnerId && form.backupOwnerId === form.ownerId) return toast.warning('Backup owner must be a different person.');
@@ -402,7 +454,7 @@ const TypeTestRegister = () => {
         }
         if (form.status === 'Valid' && !form.validUntil) return toast.warning('A Valid test needs a certificate and valid until date.');
 
-        const { productLabel: _productLabel, productMgr4: _productMgr4, ...payload } = form;
+        const { productCode: _productCode, productName: _productName, productMgr4: _productMgr4, ...payload } = form;
         setSaving(true);
         try {
             if (editingId) {
@@ -662,12 +714,12 @@ const TypeTestRegister = () => {
         </div>
     );
 
-    // Other test records already kept for the chosen product, shown under the form so the
-    // earlier test can be read while the next one is entered.
+    // Other test records already kept for the chosen product, latest test first, shown under
+    // the form so the earlier test can be read while the next one is entered.
     const previousRecords = form.productId
         ? records
             .filter(r => String(r.productId?._id || r.productId) === String(form.productId) && r._id !== editingId)
-            .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+            .sort(byLatestTest)
         : [];
 
     const Detail = ({ label, children }) => (
@@ -699,8 +751,29 @@ const TypeTestRegister = () => {
                 <div className={PANEL}>
                     <form id="type-test-form" onSubmit={saveTest}>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                            <Field label="Product *">
-                                <ProductPicker label={form.productLabel} tooltip={form.productId ? (form.productMgr4 || 'Not set') : ''} onChange={(id, label, mgr4) => setForm(prev => ({ ...prev, productId: id, productLabel: label, productMgr4: mgr4 }))} />
+                            <Field label="Product code *" htmlFor="tProductCode">
+                                <ProductField
+                                    field="productCode"
+                                    id="tProductCode"
+                                    value={form.productCode}
+                                    selected={Boolean(form.productId)}
+                                    tooltip={form.productId ? (form.productMgr4 || 'Not set') : ''}
+                                    placeholder="Search product code"
+                                    onType={text => typeProduct('productCode', text)}
+                                    onSelect={selectProduct}
+                                />
+                            </Field>
+                            <Field label="Product name *" htmlFor="tProductName" wide>
+                                <ProductField
+                                    field="productName"
+                                    id="tProductName"
+                                    value={form.productName}
+                                    selected={Boolean(form.productId)}
+                                    tooltip={form.productId ? (form.productMgr4 || 'Not set') : ''}
+                                    placeholder="Search product name"
+                                    onType={text => typeProduct('productName', text)}
+                                    onSelect={selectProduct}
+                                />
                             </Field>
                             <Field label="Model" htmlFor="tModel"><input id="tModel" className={INPUT} value={form.modelName} onChange={e => setField('modelName', e.target.value)} placeholder="Model number" /></Field>
                             <Field label="Test name *" htmlFor="tTestName"><input id="tTestName" className={INPUT} value={form.testName} onChange={e => setField('testName', e.target.value)} placeholder="e.g. Temperature rise test" /></Field>
@@ -759,7 +832,7 @@ const TypeTestRegister = () => {
                         <h2 className="text-sm font-black text-slate-800 uppercase tracking-wide mb-1">
                             Previous test records for this product ({previousRecords.length})
                         </h2>
-                        <p className={`${muted} mb-4`}>{form.productLabel}</p>
+                        <p className={`${muted} mb-4`}>{productText(form)}</p>
                         {previousRecords.length ? (
                             <div className="space-y-4">
                                 {previousRecords.map(r => {
@@ -1163,7 +1236,7 @@ const TypeTestRegister = () => {
                                                                 <div className="flex flex-nowrap gap-1.5">
                                                                     <button
                                                                         className={SMALL}
-                                                                        onClick={() => openTestPage(null, { productId: g.product._id, productLabel: productText(g.product), productMgr4: mgr4Text(g.product), modelName: g.modelName })}
+                                                                        onClick={() => openTestPage(null, { productId: g.product._id, productCode: g.product.productCode || '', productName: g.product.productName || '', productMgr4: mgr4Text(g.product), modelName: g.modelName })}
                                                                     >Add test</button>
                                                                     <button className={SMALL} onClick={() => setGroupActive(g, g.status !== 'Active')}>
                                                                         {g.status === 'Active' ? 'Mark inactive' : 'Reactivate'}
@@ -1208,7 +1281,7 @@ const TypeTestRegister = () => {
                                                                 <td className={TD}>
                                                                     <button
                                                                         className={SMALL}
-                                                                        onClick={() => openTestPage(null, { productId: item.product._id, productLabel: productText(item.product), productMgr4: mgr4Text(item.product) })}
+                                                                        onClick={() => openTestPage(null, { productId: item.product._id, productCode: item.product.productCode || '', productName: item.product.productName || '', productMgr4: mgr4Text(item.product) })}
                                                                     >Add test</button>
                                                                 </td>
                                                             </tr>

@@ -8,6 +8,7 @@ import { productService, uploadService, importService, mgrService, attributeServ
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import PaginationControls from '../components/PaginationControls';
+import TypeTestHistory from '../components/TypeTestHistory';
 import { resolveImageUrl, getPlaceholderImage } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
@@ -1953,6 +1954,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                             <p className="mt-2 text-xs font-medium text-slate-500">
                                 Yes lists this product in the Type Test Register product dropdown.
                             </p>
+                            {editingProduct?._id && <TypeTestHistory productId={editingProduct._id} />}
                         </div>
 
                         <div>

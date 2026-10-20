@@ -47,18 +47,23 @@ const buildExactMatchClause = (search) => {
     return { $or: [{ productName: regex }, { productCode: regex }] };
 };
 
+// `searchIn` narrows the search to one field: the Type Test Register has separate
+// product code and product name boxes.
+const SEARCH_FIELDS = {
+    code: ['productCode'],
+    name: ['productName'],
+};
+
 const buildProductQuery = (queryParams = {}, user = null) => {
     const query = {};
     const search = normalizeSearch(queryParams.search);
 
     if (search) {
         const regex = new RegExp(toWhitespaceTolerantPattern(search), 'i');
-        query.$or = [
-            { productName: regex },
-            { productCode: regex },
-            { hsnCode: regex },
-            { uom: regex },
-        ];
+        const fields = Object.hasOwn(SEARCH_FIELDS, queryParams.searchIn || '')
+            ? SEARCH_FIELDS[queryParams.searchIn]
+            : ['productName', 'productCode', 'hsnCode', 'uom'];
+        query.$or = fields.map((field) => ({ [field]: regex }));
     }
 
     ['mgr1', 'mgr2', 'mgr3', 'mgr4', 'mgr5'].forEach((key) => {
