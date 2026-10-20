@@ -9,7 +9,6 @@ import {
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
-import Modal from '../components/Modal';
 import DateInput from '../components/DateInput';
 import * as XLSX from 'xlsx';
 
@@ -72,9 +71,34 @@ const EMPTY_FORM = {
     productId: '', productLabel: '', productMgr4: '', modelName: '', testName: '', testStandard: '', testingAgency: '',
     status: 'Not Started', testResult: 'Pending', testStartDate: '', testCompletionDate: '',
     certificateNo: '', issueDate: '', validUntil: '', documentUrl: '',
-    ownerId: '', backupOwnerId: '', reminderLeadDays: '180,90,30', renewalStatus: 'Not Due',
+    ownerId: '', backupOwnerId: '', reminderLeadDays: '180', renewalStatus: 'Not Due',
     nextAction: '', nextActionDate: '', remarks: ''
 };
+// One reminder lead time is chosen per record. Records saved with several lead times
+// (the old 180,90,30 default) open with the earliest of them that is still an option.
+const LEAD_DAY_OPTIONS = ['180', '90', '30'];
+const leadDayOption = (days) => (
+    LEAD_DAY_OPTIONS.find(o => (days || []).map(String).includes(o)) || LEAD_DAY_OPTIONS[0]
+);
+
+// Single choice shown as buttons; the chosen one is filled teal.
+const ChoiceGroup = ({ name, options, value, onChange }) => (
+    <div role="radiogroup" className="flex gap-2">
+        {options.map(o => {
+            const selected = value === o.value;
+            return (
+                <label
+                    key={o.value}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-black cursor-pointer transition-all focus-within:ring-2 focus-within:ring-teal-500/40 ${selected ? 'bg-teal-600 border-teal-600 text-white shadow-md' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-teal-50 hover:border-teal-200'}`}
+                >
+                    <input type="radio" name={name} value={o.value} checked={selected} onChange={() => onChange(o.value)} className="sr-only" />
+                    {o.label}
+                </label>
+            );
+        })}
+    </div>
+);
+
 const EMPTY_RENEWAL = { renewalStatus: 'Not Due', nextAction: '', nextActionDate: '', certificateNo: '', validUntil: '', documentUrl: '', note: '' };
 
 // Styled hover/focus tooltip. Rendered into <body> with fixed positioning so it is not
@@ -287,10 +311,7 @@ const TypeTestRegister = () => {
     useEffect(() => {
         const openId = searchParams.get('open');
         if (!openId) return;
-        typeTestService.getById(openId)
-            .then(res => setHistoryRecord(res.data))
-            .catch(() => toast.error('Could not open that type test record.'));
-        setSearchParams({ tab: 'renewals' }, { replace: true });
+        setSearchParams({ tab: 'renewals', history: openId }, { replace: true });
     }, [searchParams]);
 
     const activeRecords = useMemo(() => records.filter(r => r.isActive), [records]);
@@ -331,7 +352,7 @@ const TypeTestRegister = () => {
                 documentUrl: c.documentUrl || '',
                 ownerId: record.ownerId?._id || record.ownerId || '',
                 backupOwnerId: record.backupOwnerId?._id || record.backupOwnerId || '',
-                reminderLeadDays: (record.reminderLeadDays || [180, 90, 30]).join(','),
+                reminderLeadDays: leadDayOption(record.reminderLeadDays),
                 renewalStatus: record.renewalStatus || 'Not Due',
                 nextAction: record.nextAction || '',
                 nextActionDate: toInputDate(record.nextActionDate),
@@ -345,7 +366,7 @@ const TypeTestRegister = () => {
         window.scrollTo(0, 0);
     };
 
-    const openTestModal = (record = null, preset = {}) => {
+    const openTestPage = (record = null, preset = {}) => {
         fillForm(record, preset);
         setSearchParams({ tab: page, form: record?._id || 'new' });
     };
@@ -402,9 +423,13 @@ const TypeTestRegister = () => {
         }
     };
 
-    /* ---------------- Renewal ---------------- */
+    /* ---------------- Renewal & history screens ---------------- */
 
-    const openRenewalModal = (record) => {
+    // Like the form, these are full screens addressed as ?renewal=<id> and ?history=<id>.
+    const renewalParam = searchParams.get('renewal');
+    const historyParam = searchParams.get('history');
+
+    const fillRenewal = (record) => {
         setRenewalRecord(record);
         setRenewal({
             ...EMPTY_RENEWAL,
@@ -412,7 +437,58 @@ const TypeTestRegister = () => {
             nextAction: record.nextAction || '',
             nextActionDate: toInputDate(record.nextActionDate)
         });
+        window.scrollTo(0, 0);
     };
+
+    const openRenewalPage = (record) => {
+        fillRenewal(record);
+        setSearchParams({ tab: page, renewal: record._id });
+    };
+
+    const closeRenewal = () => {
+        setRenewalRecord(null);
+        setSearchParams({ tab: page }, { replace: true });
+    };
+
+    // The list copy shows at once; the full record adds who closed each old certificate.
+    const loadHistory = (id) => typeTestService.getById(id)
+        .then(res => setHistoryRecord(res.data))
+        .catch(() => {
+            toast.error('Could not open that type test record.');
+            setSearchParams({ tab: page }, { replace: true });
+        });
+
+    const openHistoryPage = (record) => {
+        setHistoryRecord(record);
+        window.scrollTo(0, 0);
+        setSearchParams({ tab: page, history: record._id });
+        loadHistory(record._id);
+    };
+
+    const closeHistory = () => {
+        setHistoryRecord(null);
+        setSearchParams({ tab: page }, { replace: true });
+    };
+
+    // Keep the screens in step with the address bar (Back / Forward / refresh).
+    useEffect(() => {
+        if (!renewalParam) {
+            if (renewalRecord) setRenewalRecord(null);
+        } else if (!renewalRecord && !loading) {
+            const record = records.find(r => r._id === renewalParam);
+            if (record) fillRenewal(record);
+            else setSearchParams({ tab: page }, { replace: true });
+        }
+    }, [renewalParam, loading]);
+
+    useEffect(() => {
+        if (!historyParam) {
+            if (historyRecord) setHistoryRecord(null);
+        } else if (historyRecord?._id !== historyParam) {
+            window.scrollTo(0, 0);
+            loadHistory(historyParam);
+        }
+    }, [historyParam]);
 
     const saveRenewal = async (e) => {
         e.preventDefault();
@@ -443,7 +519,7 @@ const TypeTestRegister = () => {
                 });
             }
             replaceRecord(res.data);
-            setRenewalRecord(null);
+            closeRenewal();
             toast.success(renewal.renewalStatus === 'Renewed' ? 'Renewal recorded. Old certificate closed.' : 'Renewal progress saved.');
         } catch (err) {
             toast.error(err.response?.data?.message || 'Could not save the renewal.');
@@ -483,7 +559,7 @@ const TypeTestRegister = () => {
             await typeTestService.delete(record._id);
             setRecords(prev => prev.filter(r => r._id !== record._id));
             loadPending();
-            setHistoryRecord(null);
+            closeHistory();
             toast.success('Type test record deleted.');
         } catch (err) {
             toast.error(err.response?.data?.message || 'Could not delete the record.');
@@ -657,7 +733,14 @@ const TypeTestRegister = () => {
                                     {users.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
                                 </select>
                             </Field>
-                            <Field label="Reminder lead times (days)" htmlFor="tLead"><input id="tLead" className={INPUT} value={form.reminderLeadDays} onChange={e => setField('reminderLeadDays', e.target.value)} placeholder="180,90,30" /></Field>
+                            <Field label="Reminder lead time (days before expiry)">
+                                <ChoiceGroup
+                                    name="reminderLeadDays"
+                                    options={LEAD_DAY_OPTIONS.map(d => ({ value: d, label: `${d} days` }))}
+                                    value={form.reminderLeadDays}
+                                    onChange={v => setField('reminderLeadDays', v)}
+                                />
+                            </Field>
                             <Field label="Renewal status" htmlFor="tRenewal">
                                 <select id="tRenewal" className={INPUT} value={form.renewalStatus} onChange={e => setField('renewalStatus', e.target.value)}>
                                     {RENEWAL_STATUSES.map(s => <option key={s}>{s}</option>)}
@@ -722,6 +805,155 @@ const TypeTestRegister = () => {
         );
     }
 
+    const screenHeader = (title, subtitle, onBack, actions) => (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+                <button type="button" onClick={onBack} aria-label="Back to type test register" className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-teal-50 hover:text-teal-700 transition">
+                    <MdArrowBack size={20} />
+                </button>
+                <div className="min-w-0">
+                    <h1 className="text-2xl font-black text-slate-900 tracking-tight">{title}</h1>
+                    <p className="text-xs text-slate-500 font-semibold">{subtitle}</p>
+                </div>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">{actions}</div>
+        </div>
+    );
+
+    if (renewalRecord) {
+        const c = renewalRecord.currentCertificate || {};
+        return (
+            <div className="space-y-6 min-w-0">
+                {screenHeader(
+                    'Update Renewal Progress',
+                    `${productName(renewalRecord)} · ${renewalRecord.modelName || '—'} · ${renewalRecord.testName}`,
+                    closeRenewal,
+                    <>
+                        <button type="button" className={SECONDARY} onClick={closeRenewal}>Cancel</button>
+                        <button type="submit" form="type-test-renewal-form" disabled={saving} className={PRIMARY}>{saving ? 'Saving...' : 'Save renewal'}</button>
+                    </>
+                )}
+
+                <div className={PANEL}>
+                    <div className="flex flex-wrap items-start justify-between gap-2 mb-4">
+                        <h2 className="text-sm font-black text-slate-800 uppercase tracking-wide">Current certificate</h2>
+                        <div className="flex gap-1.5"><Badge value={renewalRecord.displayStatus} /><Badge value={renewalRecord.renewalState} /></div>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                        <Detail label="Product">
+                            <Tooltip content={<Mgr4Tip value={mgr4Text(renewalRecord.productId)} />}><span className="cursor-help">{productName(renewalRecord)}</span></Tooltip>
+                        </Detail>
+                        <Detail label="Certificate number">{c.certificateNo || 'None'}</Detail>
+                        <Detail label="Valid until">{c.validUntil ? `${fmt(c.validUntil)} (${expiryNote(renewalRecord)})` : ''}</Detail>
+                        <Detail label="Owner / backup">{`${renewalRecord.ownerId?.name || '—'} / ${renewalRecord.backupOwnerId?.name || '—'}`}</Detail>
+                        <Detail label="Next action">{renewalRecord.nextAction ? `${renewalRecord.nextAction}${renewalRecord.nextActionDate ? ` (${fmt(renewalRecord.nextActionDate)})` : ''}` : ''}</Detail>
+                    </div>
+                </div>
+
+                <div className={PANEL}>
+                    <form id="type-test-renewal-form" onSubmit={saveRenewal}>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                            <Field label="Renewal status" htmlFor="rStatus">
+                                <select id="rStatus" className={INPUT} value={renewal.renewalStatus} onChange={e => setRenewal({ ...renewal, renewalStatus: e.target.value })}>
+                                    {RENEWAL_STATUSES.map(s => <option key={s}>{s}</option>)}
+                                </select>
+                            </Field>
+                            <Field label="Next action" htmlFor="rAction"><input id="rAction" className={INPUT} value={renewal.nextAction} onChange={e => setRenewal({ ...renewal, nextAction: e.target.value })} /></Field>
+                            <Field label="Next action due date"><DateInput type="date" className={INPUT} value={renewal.nextActionDate} onChange={e => setRenewal({ ...renewal, nextActionDate: e.target.value })} /></Field>
+                            <Field label="New certificate number" htmlFor="rNewCert"><input id="rNewCert" className={INPUT} value={renewal.certificateNo} onChange={e => setRenewal({ ...renewal, certificateNo: e.target.value })} /></Field>
+                            <Field label="New valid until date"><DateInput type="date" className={INPUT} value={renewal.validUntil} onChange={e => setRenewal({ ...renewal, validUntil: e.target.value })} /></Field>
+                            <Field label="New certificate document" htmlFor="rNewFile"><FileField id="rNewFile" value={renewal.documentUrl} onChange={url => setRenewal(prev => ({ ...prev, documentUrl: url }))} /></Field>
+                            <Field label="Progress notes" htmlFor="rNotes" full><textarea id="rNotes" rows="3" className={INPUT} value={renewal.note} onChange={e => setRenewal({ ...renewal, note: e.target.value })} /></Field>
+                        </div>
+                        <p className={`${muted} mt-3`}>Choose "Renewed" with the new certificate number and valid until date to close the old certificate and restart reminders.</p>
+                    </form>
+                </div>
+            </div>
+        );
+    }
+
+    if (historyRecord) {
+        const h = historyRecord;
+        return (
+            <div className="space-y-6 min-w-0">
+                {screenHeader(
+                    'Type Test History',
+                    `${h.productId?.productCode || ''} / ${h.modelName || '—'} · ${h.testName}${h.testStandard ? ` · ${h.testStandard}` : ''}`,
+                    closeHistory,
+                    <>
+                        <button className={SECONDARY} onClick={() => toggleRecordActive(h)}>{h.isActive ? 'Mark inactive' : 'Reactivate'}</button>
+                        <button className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-black rounded-xl" onClick={() => deleteRecord(h)}>Delete</button>
+                        <button className={SECONDARY} onClick={() => openTestPage(h)}>Edit record</button>
+                        <button className={PRIMARY} onClick={() => openRenewalPage(h)}>Update renewal</button>
+                    </>
+                )}
+
+                <div className={PANEL}>
+                    <div className="flex flex-wrap justify-between gap-2">
+                        <Tooltip content={<Mgr4Tip value={mgr4Text(h.productId)} />}>
+                            <span className="text-base font-bold text-slate-900 cursor-help">{productName(h)}</span>
+                        </Tooltip>
+                        <div className="flex gap-1.5 items-start"><Badge value={h.displayStatus} /><Badge value={h.renewalState} /></div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-[1fr_1.4fr] gap-4">
+                    <div className={PANEL}>
+                        <h2 className="text-sm font-black text-slate-800 uppercase tracking-wide mb-3">Reminders ({(h.reminderLeadDays || []).join(', ')} days before expiry)</h2>
+                        {h.reminders?.length ? h.reminders.map(rem => (
+                            <div key={rem.leadDays} className="flex justify-between py-1.5 border-b border-slate-100 text-sm">
+                                <span>{rem.leadDays} day milestone · {fmt(rem.remindOn)}</span>
+                                <span className={rem.sentAt ? 'text-green-700' : 'text-slate-500'}>{rem.sentAt ? `Sent ${fmt(rem.sentAt)}` : h.isActive ? 'Scheduled' : 'Paused'}</span>
+                            </div>
+                        )) : <p className={muted}>Reminders start once a certificate with a valid until date is recorded.</p>}
+                    </div>
+
+                    <div className={PANEL}>
+                        <h2 className="text-sm font-black text-slate-800 uppercase tracking-wide mb-3">Certificates</h2>
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[520px] border-collapse">
+                                <thead><tr><th className={TH}>Certificate</th><th className={TH}>Issued</th><th className={TH}>Valid until</th><th className={TH}>State</th></tr></thead>
+                                <tbody>
+                                    {h.currentCertificate?.certificateNo && (
+                                        <tr>
+                                            <td className={TD}>{h.currentCertificate.certificateNo}{h.currentCertificate.documentUrl && <> · <a href={resolveImageUrl(h.currentCertificate.documentUrl)} target="_blank" rel="noopener noreferrer" className="text-teal-700 font-bold hover:underline">View file</a></>}</td>
+                                            <td className={TD}>{fmt(h.currentCertificate.issueDate || h.currentCertificate.testCompletionDate)}</td>
+                                            <td className={TD}>{fmt(h.currentCertificate.validUntil)}</td>
+                                            <td className={TD}><Badge value="Active" /></td>
+                                        </tr>
+                                    )}
+                                    {[...(h.certificateHistory || [])].reverse().map(old => (
+                                        <tr key={old._id}>
+                                            <td className={TD}>{old.certificateNo || '—'}{old.documentUrl && <> · <a href={resolveImageUrl(old.documentUrl)} target="_blank" rel="noopener noreferrer" className="text-teal-700 font-bold hover:underline">View file</a></>}</td>
+                                            <td className={TD}>{fmt(old.issueDate || old.testCompletionDate)}</td>
+                                            <td className={TD}>{fmt(old.validUntil)}</td>
+                                            <td className={TD}><span className="text-slate-500">Closed {fmt(old.closedAt)}{old.closedBy?.name ? ` by ${old.closedBy.name}` : ''}</span></td>
+                                        </tr>
+                                    ))}
+                                    {!h.currentCertificate?.certificateNo && !h.certificateHistory?.length && <Empty cols={4}>No certificates recorded yet.</Empty>}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div className={PANEL}>
+                    <h2 className="text-sm font-black text-slate-800 uppercase tracking-wide mb-3">Progress log</h2>
+                    <div className="space-y-3 pl-3 border-l-2 border-teal-100 text-sm">
+                        {[...(h.activities || [])].reverse().map((a, i) => (
+                            <div key={i}>
+                                <div className="flex justify-between text-[11px] font-semibold text-slate-400"><span>{a.userName}</span><span>{formatDateTime(a.timestamp)}</span></div>
+                                <div className="text-slate-800">{a.action}</div>
+                                {a.note && <div className="text-slate-500 whitespace-pre-line">{a.note}</div>}
+                            </div>
+                        ))}
+                        {!h.activities?.length && <p className={muted}>No activity recorded yet.</p>}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6 min-w-0">
             {/* Header */}
@@ -737,7 +969,7 @@ const TypeTestRegister = () => {
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                     <button className={SECONDARY} onClick={exportCSV}><MdDownload size={18} /> Export CSV</button>
-                    <button className={PRIMARY} onClick={() => openTestModal()}><MdAdd size={20} /> New Test Record</button>
+                    <button className={PRIMARY} onClick={() => openTestPage()}><MdAdd size={20} /> New Test Record</button>
                 </div>
             </div>
 
@@ -806,7 +1038,7 @@ const TypeTestRegister = () => {
                                                                 <td className={TDN}>{r.ownerId?.name || '—'}</td>
                                                                 <td className={TDN}><Badge value={r.displayStatus} /></td>
                                                                 <td className={TDN}><Badge value={r.renewalState} /></td>
-                                                                <td className={TD}><button className={SMALL} onClick={() => setHistoryRecord(r)}>History</button></td>
+                                                                <td className={TD}><button className={SMALL} onClick={() => openHistoryPage(r)}>History</button></td>
                                                             </tr>
                                                         )) : <Empty cols={7}>{dashSelection ? 'No records in this category.' : 'No upcoming renewals.'}</Empty>}
                                                     </tbody>
@@ -839,7 +1071,7 @@ const TypeTestRegister = () => {
                                     <div className={`${PANEL} mt-4`}>
                                         <h2 className="text-sm font-black text-slate-800 uppercase tracking-wide mb-4">Quick actions</h2>
                                         <div className="flex flex-wrap gap-2">
-                                            <button className={PRIMARY} onClick={() => openTestModal()}>Create test record</button>
+                                            <button className={PRIMARY} onClick={() => openTestPage()}>Create test record</button>
                                             <button className={SECONDARY} onClick={() => showPage('renewals')}>Review renewal worklist</button>
                                             <button className={SECONDARY} onClick={exportCSV}>Export records (CSV)</button>
                                         </div>
@@ -882,9 +1114,9 @@ const TypeTestRegister = () => {
                                                             <td className={TDN}>{r.ownerId?.name || '—'}<br /><span className={muted}>Backup: {r.backupOwnerId?.name || '—'}</span></td>
                                                             <td className={TD}>
                                                                 <div className="flex flex-nowrap gap-1.5">
-                                                                    <button className={SMALL} onClick={() => openTestModal(r)}>Edit</button>
-                                                                    <button className={SMALL} onClick={() => openRenewalModal(r)}>Renewal</button>
-                                                                    <button className={SMALL} onClick={() => setHistoryRecord(r)}>History</button>
+                                                                    <button className={SMALL} onClick={() => openTestPage(r)}>Edit</button>
+                                                                    <button className={SMALL} onClick={() => openRenewalPage(r)}>Renewal</button>
+                                                                    <button className={SMALL} onClick={() => openHistoryPage(r)}>History</button>
                                                                 </div>
                                                             </td>
                                                         </tr>
@@ -931,7 +1163,7 @@ const TypeTestRegister = () => {
                                                                 <div className="flex flex-nowrap gap-1.5">
                                                                     <button
                                                                         className={SMALL}
-                                                                        onClick={() => openTestModal(null, { productId: g.product._id, productLabel: productText(g.product), productMgr4: mgr4Text(g.product), modelName: g.modelName })}
+                                                                        onClick={() => openTestPage(null, { productId: g.product._id, productLabel: productText(g.product), productMgr4: mgr4Text(g.product), modelName: g.modelName })}
                                                                     >Add test</button>
                                                                     <button className={SMALL} onClick={() => setGroupActive(g, g.status !== 'Active')}>
                                                                         {g.status === 'Active' ? 'Mark inactive' : 'Reactivate'}
@@ -976,7 +1208,7 @@ const TypeTestRegister = () => {
                                                                 <td className={TD}>
                                                                     <button
                                                                         className={SMALL}
-                                                                        onClick={() => openTestModal(null, { productId: item.product._id, productLabel: productText(item.product), productMgr4: mgr4Text(item.product) })}
+                                                                        onClick={() => openTestPage(null, { productId: item.product._id, productLabel: productText(item.product), productMgr4: mgr4Text(item.product) })}
                                                                     >Add test</button>
                                                                 </td>
                                                             </tr>
@@ -1016,7 +1248,7 @@ const TypeTestRegister = () => {
                                                             <td className={TDN}>{r.ownerId?.name || '—'}<br /><span className={muted}>Backup: {r.backupOwnerId?.name || '—'}</span></td>
                                                             <td className={TDN}><Badge value={r.renewalState} /></td>
                                                             <td className={TD}>{r.nextAction || 'No action set'}<br /><span className={muted}>{fmt(r.nextActionDate)}</span></td>
-                                                            <td className={TD}><button className={SMALL} onClick={() => openRenewalModal(r)}>Update</button></td>
+                                                            <td className={TD}><button className={SMALL} onClick={() => openRenewalPage(r)}>Update</button></td>
                                                         </tr>
                                                     )) : <Empty cols={8}>No renewal records match this filter.</Empty>}
                                                 </tbody>
@@ -1028,120 +1260,6 @@ const TypeTestRegister = () => {
                         </>
                     )}
                 </div>
-
-            {/* Renewal progress */}
-            <Modal
-                isOpen={!!renewalRecord}
-                onClose={() => setRenewalRecord(null)}
-                title="Update Renewal Progress"
-                maxWidth="max-w-4xl"
-                footer={
-                    <>
-                        <button type="button" className={SECONDARY} onClick={() => setRenewalRecord(null)}>Cancel</button>
-                        <button type="submit" form="type-test-renewal-form" disabled={saving} className={PRIMARY}>{saving ? 'Saving...' : 'Save renewal'}</button>
-                    </>
-                }
-            >
-                {renewalRecord && (
-                    <p className={`${muted} mb-4`}>
-                        {productName(renewalRecord)} · {renewalRecord.modelName || '—'} · {renewalRecord.testName} — current certificate {renewalRecord.currentCertificate?.certificateNo || 'none'}, valid until {fmt(renewalRecord.currentCertificate?.validUntil)}
-                    </p>
-                )}
-                <form id="type-test-renewal-form" onSubmit={saveRenewal}>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                        <Field label="Renewal status" htmlFor="rStatus">
-                            <select id="rStatus" className={INPUT} value={renewal.renewalStatus} onChange={e => setRenewal({ ...renewal, renewalStatus: e.target.value })}>
-                                {RENEWAL_STATUSES.map(s => <option key={s}>{s}</option>)}
-                            </select>
-                        </Field>
-                        <Field label="Next action" htmlFor="rAction"><input id="rAction" className={INPUT} value={renewal.nextAction} onChange={e => setRenewal({ ...renewal, nextAction: e.target.value })} /></Field>
-                        <Field label="Next action due date"><DateInput type="date" className={INPUT} value={renewal.nextActionDate} onChange={e => setRenewal({ ...renewal, nextActionDate: e.target.value })} /></Field>
-                        <Field label="New certificate number" htmlFor="rNewCert"><input id="rNewCert" className={INPUT} value={renewal.certificateNo} onChange={e => setRenewal({ ...renewal, certificateNo: e.target.value })} /></Field>
-                        <Field label="New valid until date"><DateInput type="date" className={INPUT} value={renewal.validUntil} onChange={e => setRenewal({ ...renewal, validUntil: e.target.value })} /></Field>
-                        <Field label="New certificate document" htmlFor="rNewFile"><FileField id="rNewFile" value={renewal.documentUrl} onChange={url => setRenewal(prev => ({ ...prev, documentUrl: url }))} /></Field>
-                        <Field label="Progress notes" htmlFor="rNotes" full><textarea id="rNotes" rows="3" className={INPUT} value={renewal.note} onChange={e => setRenewal({ ...renewal, note: e.target.value })} /></Field>
-                    </div>
-                    <p className={`${muted} mt-3`}>Choose "Renewed" with the new certificate number and valid until date to close the old certificate and restart reminders.</p>
-                </form>
-            </Modal>
-
-            {/* History */}
-            <Modal
-                isOpen={!!historyRecord}
-                onClose={() => setHistoryRecord(null)}
-                title="Type Test History"
-                maxWidth="max-w-3xl"
-                footer={historyRecord && (
-                    <>
-                        <button className={SECONDARY} onClick={() => toggleRecordActive(historyRecord)}>{historyRecord.isActive ? 'Mark inactive' : 'Reactivate'}</button>
-                        <button className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-black rounded-xl" onClick={() => deleteRecord(historyRecord)}>Delete</button>
-                        <button className={PRIMARY} onClick={() => { const r = historyRecord; setHistoryRecord(null); openRenewalModal(r); }}>Update renewal</button>
-                    </>
-                )}
-            >
-                {historyRecord && (
-                    <div className="space-y-5 text-sm">
-                        <div className="flex flex-wrap justify-between gap-2">
-                            <div>
-                                <div className="text-base font-bold text-slate-900">{productName(historyRecord)}</div>
-                                <div className={muted}>{historyRecord.productId?.productCode} / {historyRecord.modelName || '—'} · {historyRecord.testName}{historyRecord.testStandard ? ` · ${historyRecord.testStandard}` : ''}</div>
-                            </div>
-                            <div className="flex gap-1.5 items-start"><Badge value={historyRecord.displayStatus} /><Badge value={historyRecord.renewalState} /></div>
-                        </div>
-
-                        <div>
-                            <h3 className="text-xs font-bold uppercase text-slate-500 mb-2">Reminders ({(historyRecord.reminderLeadDays || []).join(', ')} days before expiry)</h3>
-                            {historyRecord.reminders?.length ? historyRecord.reminders.map(rem => (
-                                <div key={rem.leadDays} className="flex justify-between py-1 border-b border-slate-100">
-                                    <span>{rem.leadDays} day milestone · {fmt(rem.remindOn)}</span>
-                                    <span className={rem.sentAt ? 'text-green-700' : 'text-slate-500'}>{rem.sentAt ? `Sent ${fmt(rem.sentAt)}` : historyRecord.isActive ? 'Scheduled' : 'Paused'}</span>
-                                </div>
-                            )) : <p className={muted}>Reminders start once a certificate with a valid until date is recorded.</p>}
-                        </div>
-
-                        <div>
-                            <h3 className="text-xs font-bold uppercase text-slate-500 mb-2">Certificates</h3>
-                            <div className="overflow-x-auto">
-                                <table className="w-full min-w-[520px] border-collapse">
-                                    <thead><tr><th className={TH}>Certificate</th><th className={TH}>Issued</th><th className={TH}>Valid until</th><th className={TH}>State</th></tr></thead>
-                                    <tbody>
-                                        {historyRecord.currentCertificate?.certificateNo && (
-                                            <tr>
-                                                <td className={TD}>{historyRecord.currentCertificate.certificateNo}{historyRecord.currentCertificate.documentUrl && <> · <a href={resolveImageUrl(historyRecord.currentCertificate.documentUrl)} target="_blank" rel="noopener noreferrer" className="text-teal-700 font-bold hover:underline">View file</a></>}</td>
-                                                <td className={TD}>{fmt(historyRecord.currentCertificate.issueDate || historyRecord.currentCertificate.testCompletionDate)}</td>
-                                                <td className={TD}>{fmt(historyRecord.currentCertificate.validUntil)}</td>
-                                                <td className={TD}><Badge value="Active" /></td>
-                                            </tr>
-                                        )}
-                                        {[...(historyRecord.certificateHistory || [])].reverse().map(h => (
-                                            <tr key={h._id}>
-                                                <td className={TD}>{h.certificateNo || '—'}{h.documentUrl && <> · <a href={resolveImageUrl(h.documentUrl)} target="_blank" rel="noopener noreferrer" className="text-teal-700 font-bold hover:underline">View file</a></>}</td>
-                                                <td className={TD}>{fmt(h.issueDate || h.testCompletionDate)}</td>
-                                                <td className={TD}>{fmt(h.validUntil)}</td>
-                                                <td className={TD}><span className="text-slate-500">Closed {fmt(h.closedAt)}{h.closedBy?.name ? ` by ${h.closedBy.name}` : ''}</span></td>
-                                            </tr>
-                                        ))}
-                                        {!historyRecord.currentCertificate?.certificateNo && !historyRecord.certificateHistory?.length && <Empty cols={4}>No certificates recorded yet.</Empty>}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <div>
-                            <h3 className="text-xs font-bold uppercase text-slate-500 mb-2">Progress log</h3>
-                            <div className="space-y-3 pl-3 border-l-2 border-teal-100 max-h-64 overflow-y-auto">
-                                {[...(historyRecord.activities || [])].reverse().map((a, i) => (
-                                    <div key={i}>
-                                        <div className="flex justify-between text-[11px] font-semibold text-slate-400"><span>{a.userName}</span><span>{formatDateTime(a.timestamp)}</span></div>
-                                        <div className="text-slate-800">{a.action}</div>
-                                        {a.note && <div className="text-slate-500 whitespace-pre-line">{a.note}</div>}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </Modal>
 
         </div>
     );

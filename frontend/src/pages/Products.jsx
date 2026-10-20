@@ -1910,7 +1910,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                             </h4>
                             <div className="flex gap-6 p-1">
                                 {['Active', 'Inactive'].map((st) => (
-                                    <label key={st} className="flex-1 flex items-center justify-center gap-2 cursor-pointer group bg-slate-50 py-3.5 rounded-2xl border border-slate-200 transition-all has-[:checked]:bg-primary-50 has-[:checked]:border-primary-200">
+                                    <label key={st} className="flex-1 flex items-center justify-center gap-2 cursor-pointer group py-3.5 rounded-2xl border transition-all bg-slate-50 border-slate-200 hover:border-primary-300 has-[:checked]:bg-primary-600 has-[:checked]:border-primary-600 has-[:checked]:shadow-md focus-within:ring-2 focus-within:ring-primary-500/30">
                                         <input
                                             type="radio"
                                             name="status"
@@ -1919,7 +1919,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                             onChange={handleFormChange}
                                             className="sr-only"
                                         />
-                                        <span className={`text-[10px] font-black uppercase tracking-widest ${formData.status === st ? 'text-primary-600' : 'text-slate-400'}`}>{st}</span>
+                                        <span className={`text-[10px] font-black uppercase tracking-widest ${formData.status === st ? 'text-white' : 'text-slate-500'}`}>{st}</span>
                                     </label>
                                 ))}
                             </div>
@@ -1933,7 +1933,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                             </h4>
                             <div className="flex gap-6 p-1">
                                 {[{ label: 'Yes', value: true }, { label: 'No', value: false }].map((opt) => (
-                                    <label key={opt.label} className="flex-1 flex items-center justify-center gap-2 cursor-pointer group bg-slate-50 py-3.5 rounded-2xl border border-slate-200 transition-all has-[:checked]:bg-primary-50 has-[:checked]:border-primary-200">
+                                    <label key={opt.label} className="flex-1 flex items-center justify-center gap-2 cursor-pointer group py-3.5 rounded-2xl border transition-all bg-slate-50 border-slate-200 hover:border-primary-300 has-[:checked]:bg-primary-600 has-[:checked]:border-primary-600 has-[:checked]:shadow-md focus-within:ring-2 focus-within:ring-primary-500/30">
                                         <input
                                             type="radio"
                                             name="applicableForTypeTest"
@@ -1941,7 +1941,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                             onChange={() => setFormData(prev => ({ ...prev, applicableForTypeTest: opt.value }))}
                                             className="sr-only"
                                         />
-                                        <span className={`text-[10px] font-black uppercase tracking-widest ${Boolean(formData.applicableForTypeTest) === opt.value ? 'text-primary-600' : 'text-slate-400'}`}>{opt.label}</span>
+                                        <span className={`text-[10px] font-black uppercase tracking-widest ${Boolean(formData.applicableForTypeTest) === opt.value ? 'text-white' : 'text-slate-500'}`}>{opt.label}</span>
                                     </label>
                                 ))}
                             </div>
