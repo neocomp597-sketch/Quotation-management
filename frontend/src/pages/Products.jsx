@@ -21,6 +21,11 @@ const emptyVendorRow = () => ({
     isPrimary: false
 });
 
+// Yes/No style choice buttons. The selected one must not carry bg-slate-50: index.css
+// forces that background with !important, which would leave white text on white.
+const SELECTED_CHOICE = 'bg-primary-600 border-primary-600 shadow-md';
+const UNSELECTED_CHOICE = 'bg-slate-50 border-slate-200 hover:border-primary-300';
+
 // Product warranty, counted from the sale date of a serial; stored as warrantyMonths.
 const DEFAULT_WARRANTY_YEARS = '3';
 
@@ -1910,7 +1915,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                             </h4>
                             <div className="flex gap-6 p-1">
                                 {['Active', 'Inactive'].map((st) => (
-                                    <label key={st} className="flex-1 flex items-center justify-center gap-2 cursor-pointer group py-3.5 rounded-2xl border transition-all bg-slate-50 border-slate-200 hover:border-primary-300 has-[:checked]:bg-primary-600 has-[:checked]:border-primary-600 has-[:checked]:shadow-md focus-within:ring-2 focus-within:ring-primary-500/30">
+                                    <label key={st} className={`flex-1 flex items-center justify-center gap-2 cursor-pointer group py-3.5 rounded-2xl border transition-all focus-within:ring-2 focus-within:ring-primary-500/30 ${formData.status === st ? SELECTED_CHOICE : UNSELECTED_CHOICE}`}>
                                         <input
                                             type="radio"
                                             name="status"
@@ -1933,7 +1938,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                             </h4>
                             <div className="flex gap-6 p-1">
                                 {[{ label: 'Yes', value: true }, { label: 'No', value: false }].map((opt) => (
-                                    <label key={opt.label} className="flex-1 flex items-center justify-center gap-2 cursor-pointer group py-3.5 rounded-2xl border transition-all bg-slate-50 border-slate-200 hover:border-primary-300 has-[:checked]:bg-primary-600 has-[:checked]:border-primary-600 has-[:checked]:shadow-md focus-within:ring-2 focus-within:ring-primary-500/30">
+                                    <label key={opt.label} className={`flex-1 flex items-center justify-center gap-2 cursor-pointer group py-3.5 rounded-2xl border transition-all focus-within:ring-2 focus-within:ring-primary-500/30 ${Boolean(formData.applicableForTypeTest) === opt.value ? SELECTED_CHOICE : UNSELECTED_CHOICE}`}>
                                         <input
                                             type="radio"
                                             name="applicableForTypeTest"
