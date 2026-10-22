@@ -89,7 +89,7 @@ const CSMTickets = () => {
     }, [user, isAdmin, isSuperAdmin]);
 
     const [searchParams, setSearchParams] = useSearchParams();
-    const hasMetricFilter = searchParams.has('status') || searchParams.has('unassigned') || searchParams.has('slaBreached') || searchParams.has('resolvedOn');
+    const hasMetricFilter = searchParams.has('status') || searchParams.has('unassigned') || searchParams.has('slaBreached') || searchParams.has('resolvedOn') || searchParams.has('createdOn');
     const activeTab = searchParams.get('tab') || (hasMetricFilter || isManagerOrAdmin ? 'all' : 'my');
 
     const handleTabChange = (newTab) => {
@@ -486,6 +486,9 @@ const CSMTickets = () => {
             }
             if (searchParams.get('resolvedOn') === 'yesterday') {
                 queryParams.resolvedOn = 'yesterday';
+            }
+            if (searchParams.get('createdOn') === 'today') {
+                queryParams.createdOn = 'today';
             }
             if (filterInvoiceType === 'manual') {
                 queryParams.isManual = 'true';

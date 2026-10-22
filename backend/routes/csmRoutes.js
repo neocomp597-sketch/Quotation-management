@@ -18,7 +18,6 @@ router.get('/reports', protect, csmDashboardController.getReportData);
 
 // ─── TICKET MANAGEMENT ──────────────────────────────────────────────────────
 router.post('/tickets', protect, ticketController.createTicket);
-router.get('/tickets/debug-auto-assign', ticketController.debugAutoAssign);
 router.get('/tickets/customers', protect, ticketController.getTicketCustomers);
 router.get('/tickets/branch-options', protect, ticketController.getTicketBranchOptions);
 router.get('/tickets', protect, ticketController.getTickets);

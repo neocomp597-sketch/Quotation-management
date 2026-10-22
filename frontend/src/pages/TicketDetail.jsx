@@ -79,9 +79,8 @@ const TicketDetail = () => {
     const [assignTeam, setAssignTeam] = useState('');
     const [assignEngineers, setAssignEngineers] = useState([]);
     const [engineerSearch, setEngineerSearch] = useState('');
-    const [showAllEngineers, setShowAllEngineers] = useState(false);
     // 'all_employees' lists every active employee for assignment; 'service_engineers' only
-    // Service Engineers, filtered to the ticket PIN by default (CSM Config > Engineers Master).
+    // Service Engineers (CSM Config > Engineers Master). Assignment is always manual.
     const [engineerSource, setEngineerSource] = useState('all_employees');
 
     // Operations states
@@ -688,30 +687,20 @@ const TicketDetail = () => {
         loadAssignees();
     }, [id]);
 
-    // An engineer covers a PIN through their own PINs, their territory, or a territory that
-    // names them as Assigned Engineer (coveredPincodes from the API, same rules as auto-assign).
-    const engineerCoversPin = (eng, pin) => {
-        if (!pin) return false;
-        const covered = Array.isArray(eng.coveredPincodes)
-            ? eng.coveredPincodes
-            : [...(eng.pincodes || []), ...(eng.territoryId?.rules?.pincodes || [])];
-        return covered.map(p => String(p).trim()).includes(pin);
-    };
     const engineerCode = (eng) => eng.employeeId?.employeeId || eng.employeeId?.externalEmployeeCode || '';
     const engineerSearchText = (eng) => [eng.name, engineerCode(eng), eng.mobile, eng.email, eng.employeeId?.designation, eng.territoryId?.name]
         .filter(Boolean).join(' ').toLowerCase();
-    const engineerOptions = (pin, { includeInactive = false } = {}) => engineers
+    // Everyone who can be assigned, by name. No PIN code or location matching.
+    const engineerOptions = ({ includeInactive = false } = {}) => engineers
         .filter(eng => includeInactive || (eng.status || 'Active') === 'Active')
-        .map(eng => ({ eng, isMatch: engineerCoversPin(eng, pin) }))
-        .sort((a, b) => Number(b.isMatch) - Number(a.isMatch) || String(a.eng.name || '').localeCompare(String(b.eng.name || '')))
-        .map(({ eng, isMatch }) => ({
+        .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
+        .map(eng => ({
             value: eng._id,
             label: [
                 eng.name,
                 engineerCode(eng) && `[${engineerCode(eng)}]`,
                 eng.mobile,
-                eng.territoryId?.name,
-                isMatch ? '★ PIN match' : null,
+                eng.employeeId?.designation,
                 (eng.status || 'Active') !== 'Active' ? `(${eng.status})` : null,
             ].filter(Boolean).join(' · '),
         }));
@@ -799,7 +788,7 @@ const TicketDetail = () => {
                     billingStatus: entitlements?.recommendedBillingType || 'Paid'
                 });
 
-                // Auto-assign engineer to ticket if unassigned
+                // A ticket with nobody assigned gets the engineer picked for this visit.
                 if (!ticket.assignedEngineerId) {
                     await csmService.assignTicket(id, {
                         assignedEngineerId: visitEngineer,
@@ -1298,33 +1287,21 @@ const TicketDetail = () => {
                                     )}
                                 </div>
                                 {(() => {
-                                    const ticketPincode = ticket.pincode ? String(ticket.pincode).trim() : '';
                                     const currentEngIds = ticket.assignedEngineerIds?.map(e => e._id || e) || (ticket.assignedEngineerId ? [ticket.assignedEngineerId._id || ticket.assignedEngineerId] : []);
 
                                     const isPinned = (eng) => currentEngIds.includes(eng._id)
                                         || assignEngineers.includes(eng._id)
                                         || (activeVisit && (activeVisit.engineerId?._id === eng._id || activeVisit.engineerId === eng._id));
                                     const isActive = (eng) => (eng.status || 'Active') === 'Active';
-                                    const pinMatches = engineers.filter(eng => engineerCoversPin(eng, ticketPincode) && isActive(eng));
                                     const allEmployees = engineerSource === 'all_employees';
-                                    const ticketBranchId = String(ticket.branchId?._id || ticket.branchId || '');
-                                    const inTicketBranch = (eng) => Boolean(ticketBranchId) && String(eng.employeeId?.branchId || '') === ticketBranchId;
 
-                                    // Default view: every active engineer covering the ticket PIN (or everyone when the
-                                    // ticket has no PIN). "Show all" lists every active engineer for manual override.
-                                    // When assigning from all employees, every active employee is listed.
-                                    const baseList = engineers.filter(eng => {
-                                        if (isPinned(eng)) return true;
-                                        if (!isActive(eng)) return false;
-                                        if (!ticketPincode || showAllEngineers || allEmployees) return true;
-                                        return engineerCoversPin(eng, ticketPincode);
-                                    });
+                                    // Every active person who can be assigned (plus anyone already on the
+                                    // ticket), by name. Nobody is preselected or filtered by PIN code.
                                     const term = engineerSearch.trim().toLowerCase();
-                                    const eligibleEngineers = baseList
+                                    const eligibleEngineers = engineers
+                                        .filter(eng => isPinned(eng) || isActive(eng))
                                         .filter(eng => !term || engineerSearchText(eng).includes(term))
-                                        .sort((a, b) => Number(engineerCoversPin(b, ticketPincode)) - Number(engineerCoversPin(a, ticketPincode))
-                                            || Number(inTicketBranch(b)) - Number(inTicketBranch(a))
-                                            || String(a.name || '').localeCompare(String(b.name || '')));
+                                        .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
 
                                     const toggleEngineer = (engId) => {
                                         if (assignEngineers.includes(engId)) {
@@ -1343,37 +1320,19 @@ const TicketDetail = () => {
                                                 placeholder={allEmployees ? 'Search employee by name, code, mobile or designation...' : 'Search by name, employee code or mobile...'}
                                                 className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold outline-none focus:border-primary-500 bg-white"
                                             />
-                                            {allEmployees && (
-                                                <div className="text-[10px] font-bold text-slate-500">
-                                                    All active employees ({engineers.filter(isActive).length})
-                                                    {ticketPincode ? ` · ${pinMatches.length} cover PIN ${ticketPincode}` : ''}
-                                                </div>
-                                            )}
-                                            {ticketPincode && !allEmployees && (
-                                                <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
-                                                    <span>{pinMatches.length} engineer{pinMatches.length === 1 ? '' : 's'} cover PIN {ticketPincode}</span>
-                                                    <label className="flex items-center gap-1 cursor-pointer select-none">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={showAllEngineers}
-                                                            onChange={(e) => setShowAllEngineers(e.target.checked)}
-                                                            className="w-3.5 h-3.5 rounded text-primary-600 border-slate-300"
-                                                        />
-                                                        Show all engineers
-                                                    </label>
-                                                </div>
-                                            )}
+                                            <div className="text-[10px] font-bold text-slate-500">
+                                                {allEmployees ? 'All active employees' : 'All active service engineers'} ({engineers.filter(isActive).length})
+                                            </div>
                                             <div className="max-h-64 overflow-y-auto pr-1 space-y-1.5 custom-scrollbar border border-slate-200 rounded-xl p-2 bg-slate-50/50">
                                                 {eligibleEngineers.length === 0 ? (
                                                     <p className="text-[11px] font-semibold text-slate-400 p-2 text-center">
                                                         {term
                                                             ? `No ${allEmployees ? 'employees' : 'engineers'} match "${engineerSearch.trim()}".`
-                                                            : allEmployees ? 'No active employees found.' : `No eligible engineers for PIN ${ticketPincode || 'N/A'}.`}
+                                                            : `No active ${allEmployees ? 'employees' : 'service engineers'} found.`}
                                                     </p>
                                                 ) : (
                                                     eligibleEngineers.map(eng => {
                                                         const isSelected = assignEngineers.includes(eng._id);
-                                                        const isMatch = engineerCoversPin(eng, ticketPincode);
                                                         const code = engineerCode(eng);
                                                         return (
                                                             <div
@@ -1401,11 +1360,6 @@ const TicketDetail = () => {
                                                                     </div>
                                                                 </div>
                                                                 <div className="flex items-center gap-1 flex-shrink-0">
-                                                                    {ticketPincode && (isMatch ? (
-                                                                        <span className="text-[9px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md">PIN match</span>
-                                                                    ) : (
-                                                                        <span className="text-[9px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md">Outside PIN</span>
-                                                                    ))}
                                                                     {!isActive(eng) && (
                                                                         <span className="text-[9px] font-black text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">{eng.status}</span>
                                                                     )}
@@ -1418,9 +1372,6 @@ const TicketDetail = () => {
                                                     })
                                                 )}
                                             </div>
-                                            {ticketPincode && !allEmployees && pinMatches.length === 0 && (
-                                                <p className="text-[10px] font-bold text-amber-600 mt-1">No engineers assigned for pincode {ticketPincode}. Tick "Show all engineers" to assign manually.</p>
-                                            )}
                                         </div>
                                     );
                                 })()}
@@ -1704,7 +1655,7 @@ const TicketDetail = () => {
                                                 setVisitDate(defaultDate);
                                                 const defaultEng = (assignEngineers && assignEngineers.length > 0)
                                                     ? assignEngineers[0]
-                                                    : (ticket.assignedEngineerId?._id || ticket.assignedEngineerId || (engineers.length > 0 ? engineers[0]._id : ''));
+                                                    : (ticket.assignedEngineerId?._id || ticket.assignedEngineerId || '');
                                                 setVisitEngineer(defaultEng);
                                                 setShowVisitModal(true);
                                             }}
@@ -1786,7 +1737,7 @@ const TicketDetail = () => {
                                                     setVisitDate(defaultDate);
                                                     const defaultEng = (assignEngineers && assignEngineers.length > 0)
                                                         ? assignEngineers[0]
-                                                        : (ticket.assignedEngineerId?._id || ticket.assignedEngineerId || (engineers.length > 0 ? engineers[0]._id : ''));
+                                                        : (ticket.assignedEngineerId?._id || ticket.assignedEngineerId || '');
                                                     setVisitEngineer(defaultEng);
                                                     setShowVisitModal(true);
                                                 }}
@@ -1957,7 +1908,7 @@ const TicketDetail = () => {
                     <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Assign Service Engineer *</label>
                         <SearchableSelect
-                            options={engineerOptions(ticket?.pincode ? String(ticket.pincode).trim() : '')}
+                            options={engineerOptions()}
                             value={visitEngineer}
                             onChange={(val) => setVisitEngineer(val || '')}
                             placeholder="Search engineer by name, code or mobile..."
@@ -2035,7 +1986,6 @@ const TicketDetail = () => {
                                 onChange={(e) => setEditForm({ ...editForm, pincode: e.target.value.replace(/\D/g, '') })}
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
                             />
-                            <p className="text-[10px] text-slate-400 mt-1">Changing the PIN code re-runs engineer auto-assignment.</p>
                         </div>
                     </div>
                     <div>
@@ -2106,7 +2056,7 @@ const TicketDetail = () => {
                     <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Select New Service Engineer *</label>
                         <SearchableSelect
-                            options={engineerOptions(ticket?.pincode ? String(ticket.pincode).trim() : '', { includeInactive: true })
+                            options={engineerOptions({ includeInactive: true })
                                 .filter(o => o.value !== (ticket.assignedEngineerId?._id || ticket.assignedEngineerId))}
                             value={reassignEngineer}
                             onChange={(val) => setReassignEngineer(val || '')}

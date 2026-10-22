@@ -31,6 +31,12 @@ exports.getStats = async (req, res) => {
         const startOfToday = new Date();
         startOfToday.setHours(0, 0, 0, 0);
 
+        // Tickets raised today (any status), same day boundary as the Resolved cards.
+        const createdTodayCount = await Ticket.countDocuments({
+            ...baseScope,
+            createdAt: { $gte: startOfToday }
+        });
+
         const resolvedTodayCount = await Ticket.countDocuments({
             ...baseScope,
             status: 'Resolved',
@@ -161,6 +167,7 @@ exports.getStats = async (req, res) => {
             metrics: {
                 open: openCount + assignedCount + inProgressCount,
                 unassigned: unassignedCount,
+                createdToday: createdTodayCount,
                 pending: pendingCount,
                 overdue: overdueCount,
                 resolvedToday: resolvedTodayCount,
