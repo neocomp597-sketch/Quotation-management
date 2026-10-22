@@ -9,11 +9,13 @@ import {
 } from 'react-icons/md';
 import Modal from '../components/Modal';
 import SearchableSelect from '../components/SearchableSelect';
+import { useAuth } from '../context/AuthContext';
 
 const CSMMasters = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
     const { id: routeId } = useParams();
     const location = useLocation();
+    const { isAdmin, isSuperAdmin } = useAuth();
     const queryParams = new URLSearchParams(location.search);
     const defaultTab = queryParams.get('tab') || 'categories';
     const [activeTab, setActiveTab] = useState(defaultTab);
@@ -29,6 +31,8 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
     const [items, setItems] = useState([]);
     const [territories, setTerritories] = useState([]);
     const [employeesList, setEmployeesList] = useState([]);
+    const [engineerSource, setEngineerSource] = useState(null);
+    const [savingEngineerSource, setSavingEngineerSource] = useState(false);
     
     // Form states
     const [showModal, setShowModal] = useState(false);
@@ -96,11 +100,38 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
         }
     };
 
+    const fetchEngineerSettings = async () => {
+        try {
+            const res = await csmService.getEngineerSettings();
+            setEngineerSource(res.data?.engineerSource || 'all_employees');
+        } catch (e) {
+            console.error('Fetch engineer settings error:', e);
+        }
+    };
+
+    const changeEngineerSource = async (source) => {
+        if (source === engineerSource || savingEngineerSource) return;
+        setSavingEngineerSource(true);
+        try {
+            const res = await csmService.updateEngineerSettings({ engineerSource: source });
+            setEngineerSource(res.data?.engineerSource || source);
+            toast.success(source === 'all_employees'
+                ? 'All active employees can now be assigned tickets and visits'
+                : 'Only Service Engineers can now be assigned tickets and visits');
+            fetchItems();
+        } catch (e) {
+            toast.error(e.response?.data?.message || 'Failed to update engineer source');
+        } finally {
+            setSavingEngineerSource(false);
+        }
+    };
+
     useEffect(() => {
         fetchItems();
         if (activeTab === 'engineers') {
             fetchTerritories();
             fetchEmployees();
+            fetchEngineerSettings();
         }
     }, [activeTab]);
 
@@ -314,14 +345,35 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
             {/* List View */}
             <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100">
                 {activeTab === 'engineers' && (
-                    <div className="mb-4 p-4 bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100 rounded-2xl flex items-center justify-between gap-3 text-xs font-semibold text-teal-900 shadow-sm">
+                    <div className="mb-4 p-4 bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs font-semibold text-teal-900 shadow-sm">
                         <div className="flex items-center gap-2.5">
                             <span className="flex h-2.5 w-2.5 relative">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-teal-600"></span>
                             </span>
-                            <span><strong>Service Engineer Source:</strong> Employees created with designation <em>"Service Engineer"</em> in Employee Master automatically appear here. Use <strong>Edit</strong> to assign territories. Manual creation is disabled.</span>
+                            {engineerSource === 'all_employees' ? (
+                                <span><strong>Engineer Source:</strong> Every active employee in Employee Master appears here and can be assigned tickets and visits. Use <strong>Edit</strong> to assign territories. Manual creation is disabled.</span>
+                            ) : (
+                                <span><strong>Service Engineer Source:</strong> Employees created with designation <em>"Service Engineer"</em> in Employee Master automatically appear here. Use <strong>Edit</strong> to assign territories. Manual creation is disabled.</span>
+                            )}
                         </div>
+                        {engineerSource && (isAdmin || isSuperAdmin) && (
+                            <div className="flex flex-shrink-0 rounded-xl border border-teal-200 bg-white p-0.5" role="group" aria-label="Who can be assigned">
+                                {[['all_employees', 'All Employees'], ['service_engineers', 'Service Engineers']].map(([value, label]) => (
+                                    <button
+                                        key={value}
+                                        type="button"
+                                        disabled={savingEngineerSource}
+                                        onClick={() => changeEngineerSource(value)}
+                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all disabled:opacity-60 ${
+                                            engineerSource === value ? 'bg-teal-600 text-white' : 'text-teal-800 hover:bg-teal-50'
+                                        }`}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
                 {loading ? (

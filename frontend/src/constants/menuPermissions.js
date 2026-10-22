@@ -118,6 +118,7 @@ export const MENU_PERMISSION_GROUPS = [
             { key: 'inventory_transfers', label: 'Stock Transfers', description: 'Inter-warehouse transfers and approvals', defaultRoute: '/inventory/transfers' },
             { key: 'inventory_adjustments', label: 'Adjustments', description: 'Damage, loss, and physical audit adjustments', defaultRoute: '/inventory/adjustments' },
             { key: 'inventory_stock_counts', label: 'Physical Audit', description: 'Physical count sessions and reconciliation', defaultRoute: '/inventory/counts' },
+            { key: 'inventory_sap_audit', label: 'SAP Stock Audit', description: 'Create SAP B1 stock audit batches (people added to a batch open it without this)', defaultRoute: '/inventory/stock-audit' },
             { key: 'inventory_alerts', label: 'Stock Alerts', description: 'Low-stock and expiry notification setup', defaultRoute: '/inventory/alerts' },
             { key: 'inventory_reports', label: 'Valuation & Reports', description: 'Stock ledger, valuation, and dead-stock reports', defaultRoute: '/inventory/reports' }
         ]

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middlewares/authMiddleware');
+const { protect, admin } = require('../middlewares/authMiddleware');
 
 const csmDashboardController = require('../controllers/csmDashboardController');
 const ticketController = require('../controllers/ticketController');
@@ -135,6 +135,8 @@ router.put('/masters/teams/:id', protect, csmMasterController.serviceTeams.updat
 router.delete('/masters/teams/:id', protect, csmMasterController.serviceTeams.delete);
 
 // Engineers
+router.get('/masters/engineer-settings', protect, csmMasterController.engineerSettings.get);
+router.put('/masters/engineer-settings', protect, admin, csmMasterController.engineerSettings.update);
 router.post('/masters/engineers', protect, csmMasterController.engineers.create);
 router.get('/masters/engineers', protect, csmMasterController.engineers.getAll);
 router.put('/masters/engineers/:id', protect, csmMasterController.engineers.update);

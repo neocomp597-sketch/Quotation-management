@@ -67,6 +67,9 @@ const CompanySettingsSchema = new mongoose.Schema({
     // Quotation prefix settings
     quotationPrefix: { type: String, default: 'ARM/QTN' },
 
+    // CSM: who can be assigned tickets and visits (see services/engineerSyncService.js)
+    csmEngineerSource: { type: String, enum: ['all_employees', 'service_engineers'], default: 'all_employees' },
+
     // User who originally configured these settings
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 

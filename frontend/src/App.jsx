@@ -113,6 +113,9 @@ const CreateAudit = lazy(() => import('./pages/inventory/CreateAudit'));
 const RecordAuditCount = lazy(() => import('./pages/inventory/RecordAuditCount'));
 const StockAlertsPage = lazy(() => import('./pages/inventory/StockAlertsPage'));
 const InventoryReports = lazy(() => import('./pages/inventory/InventoryReports'));
+const StockAuditBatches = lazy(() => import('./pages/inventory/stockAudit/StockAuditBatches'));
+const StockAuditCreate = lazy(() => import('./pages/inventory/stockAudit/StockAuditCreate'));
+const StockAuditDetail = lazy(() => import('./pages/inventory/stockAudit/StockAuditDetail'));
 const CatalogSubmodule = lazy(() => import('./pages/CatalogSubmodule'));
 const PriceManagement = lazy(() => import('./pages/PriceManagement'));
 const GuidedSelling = lazy(() => import('./pages/GuidedSelling'));
@@ -412,6 +415,10 @@ function App() {
             <Route path="/inventory/counts/record/:id" element={<PermissionRoute permissionKey="inventory_stock_counts"><Layout><RecordAuditCount /></Layout></PermissionRoute>} />
             <Route path="/inventory/alerts" element={<PermissionRoute permissionKey="inventory_alerts"><Layout><StockAlertsPage /></Layout></PermissionRoute>} />
             <Route path="/inventory/reports" element={<PermissionRoute permissionKey="inventory_reports"><Layout><InventoryReports /></Layout></PermissionRoute>} />
+            {/* SAP stock audit: open to every signed-in user; the API shows each person only the batches shared with them. */}
+            <Route path="/inventory/stock-audit" element={<Layout><StockAuditBatches /></Layout>} />
+            <Route path="/inventory/stock-audit/new" element={<PermissionRoute permissionKey="inventory_sap_audit"><Layout><StockAuditCreate /></Layout></PermissionRoute>} />
+            <Route path="/inventory/stock-audit/:id" element={<Layout><StockAuditDetail /></Layout>} />
 
             <Route path="/info/:slug" element={<Layout><FooterPageView /></Layout>} />
           </Route>

@@ -1049,6 +1049,8 @@ export const csmService = {
   createEngineer: (data) => api.post("/csm/masters/engineers", data),
   updateEngineer: (id, data) => api.put(`/csm/masters/engineers/${id}`, data),
   deleteEngineer: (id) => api.delete(`/csm/masters/engineers/${id}`),
+  getEngineerSettings: () => api.get("/csm/masters/engineer-settings"),
+  updateEngineerSettings: (data) => api.put("/csm/masters/engineer-settings", data),
 };
 
 export const cpqService = {
@@ -1169,6 +1171,30 @@ export const typeTestService = {
   startRenewal: (id, data) => api.post(`/type-tests/${id}/renewal/start`, data),
   recordProgress: (id, data) => api.post(`/type-tests/${id}/progress`, data),
   setActive: (id, isActive, reason) => api.post(`/type-tests/${id}/active`, { isActive, reason }),
+};
+
+export const stockAuditService = {
+  getMeta: () => api.get("/stock-audits/meta"),
+  getAssignedCount: () => api.get("/stock-audits/assigned-count"),
+  checkName: (params) => api.get("/stock-audits/name-check", { params }),
+  searchUsers: (search) => api.get("/stock-audits/users", { params: { search } }),
+  getAll: (params) => api.get("/stock-audits", { params }),
+  getById: (id) => api.get(`/stock-audits/${id}`),
+  create: (data) => api.post("/stock-audits", data),
+  update: (id, data) => api.put(`/stock-audits/${id}`, data),
+  delete: (id) => api.delete(`/stock-audits/${id}`),
+  changeStatus: (id, action, reason) => api.post(`/stock-audits/${id}/status`, { action, reason }),
+  getAccess: (id) => api.get(`/stock-audits/${id}/access`),
+  updateAccess: (id, data) => api.put(`/stock-audits/${id}/access`, data),
+  getDashboard: (id) => api.get(`/stock-audits/${id}/dashboard`),
+  getLogs: (id, params) => api.get(`/stock-audits/${id}/logs`, { params }),
+  exportBatch: (id) => api.get(`/stock-audits/${id}/export`, { responseType: "blob" }),
+  getItems: (id, params) => api.get(`/stock-audits/${id}/items`, { params }),
+  addItem: (id, data) => api.post(`/stock-audits/${id}/items`, data),
+  importItems: (id, data) => api.post(`/stock-audits/${id}/items/import`, data),
+  deleteItem: (id, itemId) => api.delete(`/stock-audits/${id}/items/${itemId}`),
+  recordCount: (id, itemId, data) => api.put(`/stock-audits/${id}/items/${itemId}/count`, data),
+  updateMismatch: (id, itemId, data) => api.put(`/stock-audits/${id}/items/${itemId}/mismatch`, data),
 };
 
 export const stateMasterService = {

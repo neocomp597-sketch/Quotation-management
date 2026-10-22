@@ -130,6 +130,7 @@ const MENU_GROUPS = [
             { key: 'inventory_transfers', label: 'Stock Transfers', description: 'Inter-warehouse transfers and approvals' },
             { key: 'inventory_adjustments', label: 'Stock Adjustments', description: 'Damage, loss, and physical audit adjustments' },
             { key: 'inventory_stock_counts', label: 'Physical Audit', description: 'Physical count sessions and reconciliation' },
+            { key: 'inventory_sap_audit', label: 'SAP Stock Audit', description: 'Create SAP B1 stock audit batches (people added to a batch open it without this)' },
             { key: 'inventory_alerts', label: 'Stock Alerts', description: 'Low-stock and expiry notification setup' },
             { key: 'inventory_reports', label: 'Valuation & Reports', description: 'Stock ledger, valuation, and dead-stock reports' }
         ]
@@ -260,7 +261,8 @@ const LEGACY_PERMISSION_FALLBACKS = {
     master_bom: 'master_products',
     master_type_tests: 'master_products',
     master_divisions: 'master_mgrs',
-    master_segments: 'master_mgrs'
+    master_segments: 'master_mgrs',
+    inventory_sap_audit: 'inventory_stock_counts'
 };
 
 const getLegacyFallback = (input, key) => {

@@ -549,6 +549,8 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                 navigate('/planning');
             } else if (n.type === 'TypeTest') {
                 navigate(n.relatedId ? `/type-tests?open=${n.relatedId}` : '/type-tests');
+            } else if (n.type === 'StockAudit') {
+                navigate(n.relatedId ? `/inventory/stock-audit/${n.relatedId}` : '/inventory/stock-audit');
             } else if (n.type.startsWith('MEETING_')) {
                 navigate('/meetings');
             } else {
