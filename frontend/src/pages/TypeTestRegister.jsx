@@ -132,8 +132,9 @@ const Tooltip = ({ content, children, className = '' }) => {
     );
 };
 
-const Mgr4Tip = ({ value }) => (
+const Mgr4Tip = ({ value, name }) => (
     <>
+        {name && <div className="text-xs font-bold mb-1.5">{name}</div>}
         <div className="text-[10px] font-black uppercase tracking-wider text-teal-300">MGR4 FG</div>
         <div className="text-xs font-semibold">{value || 'Not set'}</div>
     </>
@@ -700,8 +701,14 @@ const TypeTestRegister = () => {
     }).sort(byExpiry);
 
     const Empty = ({ cols, children }) => <tr><td colSpan={cols} className="text-center py-6 text-sm text-slate-500">{children}</td></tr>;
+    // Long product names are cut to two lines (the model line to one); hovering shows them in full.
     const ProductCell = ({ r, sub }) => (
-        <td className={TD}><Tooltip content={<Mgr4Tip value={mgr4Text(r.productId)} />}><b className="text-slate-900 cursor-help">{productName(r)}</b></Tooltip><br /><span className={muted}>{sub}</span></td>
+        <td className={`${TD} min-w-[220px] max-w-[340px]`}>
+            <Tooltip content={<Mgr4Tip value={mgr4Text(r.productId)} name={productName(r)} />} className="block">
+                <b className="text-slate-900 cursor-help line-clamp-2 break-words">{productName(r)}</b>
+            </Tooltip>
+            <span className={`${muted} block truncate`} title={sub}>{sub}</span>
+        </td>
     );
 
     const headingRow = (title, subtitle, action) => (
@@ -1100,20 +1107,24 @@ const TypeTestRegister = () => {
                                                 {dashSelection && <button type="button" className={SMALL} onClick={() => setDashFilter('')}>Show all</button>}
                                             </div>
                                             <div className="overflow-x-auto">
-                                                <table className="w-full min-w-[640px] border-collapse">
-                                                    <thead><tr><th className={TH}>Product / Model</th><th className={TH}>Certificate</th><th className={TH}>Valid until</th><th className={TH}>Owner</th><th className={TH}>Test status</th><th className={TH}>Renewal</th><th className={TH}></th></tr></thead>
+                                                <table className="w-full min-w-[600px] border-collapse">
+                                                    {/* Fits the half-width panel: certificate and validity share a column, as do
+                                                        the two statuses, so the product name keeps room for two lines. */}
+                                                    <thead><tr><th className={TH}>Product / Model</th><th className={TH}>Certificate</th><th className={TH}>Owner</th><th className={TH}>Status</th><th className={TH}></th></tr></thead>
                                                     <tbody>
                                                         {dashRows.length ? dashRows.map(r => (
                                                             <tr key={r._id}>
                                                                 <ProductCell r={r} sub={`${r.modelName || '—'} · ${r.testName}`} />
-                                                                <td className={TDN}>{r.currentCertificate?.certificateNo || '—'}</td>
-                                                                <td className={TDN}>{fmt(r.currentCertificate?.validUntil)}{hasExpiry(r) && <><br /><span className={muted}>{expiryNote(r)}</span></>}</td>
-                                                                <td className={TDN}>{r.ownerId?.name || '—'}</td>
-                                                                <td className={TDN}><Badge value={r.displayStatus} /></td>
-                                                                <td className={TDN}><Badge value={r.renewalState} /></td>
+                                                                <td className={TDN}>
+                                                                    {r.currentCertificate?.certificateNo || '—'}
+                                                                    <br /><span className={muted}>{fmt(r.currentCertificate?.validUntil)}</span>
+                                                                    {hasExpiry(r) && <><br /><span className={muted}>{expiryNote(r)}</span></>}
+                                                                </td>
+                                                                <td className={`${TD} min-w-[110px]`}>{r.ownerId?.name || '—'}</td>
+                                                                <td className={TDN}><div className="flex flex-col items-start gap-1"><Badge value={r.displayStatus} /><Badge value={r.renewalState} /></div></td>
                                                                 <td className={TD}><button className={SMALL} onClick={() => openHistoryPage(r)}>History</button></td>
                                                             </tr>
-                                                        )) : <Empty cols={7}>{dashSelection ? 'No records in this category.' : 'No upcoming renewals.'}</Empty>}
+                                                        )) : <Empty cols={5}>{dashSelection ? 'No records in this category.' : 'No upcoming renewals.'}</Empty>}
                                                     </tbody>
                                                 </table>
                                             </div>
