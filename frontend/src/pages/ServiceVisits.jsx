@@ -2,68 +2,29 @@ import React, { useEffect, useState, useRef } from 'react';
 import { csmService, mgrService, productService, uploadService } from '../services/api';
 import { formatDate, formatDateTime } from '../utils/helpers';
 import { toast } from 'react-toastify';
-import { 
-    MdLocalShipping, MdMyLocation, MdCheckCircle, 
-    MdAssignment, MdEvent, MdAttachMoney, MdDelete, MdAdd, MdCalendarMonth, MdPhotoCamera,
+import {
+    MdLocalShipping, MdMyLocation, MdCheckCircle,
+    MdEvent, MdDelete, MdAdd, MdCalendarMonth, MdPhotoCamera,
     MdMap, MdOpenInNew, MdSearch, MdClose, MdExpandMore, MdBuild, MdInventory2, MdEdit, MdPushPin,
-    MdHowToReg, MdBadge, MdAccessTime, MdLocationOn, MdCameraAlt, MdRefresh, MdArrowBack
+    MdRefresh, MdArrowBack
 } from 'react-icons/md';
 import Modal from '../components/Modal';
-import { loadGoogleMaps } from '../utils/loadGoogleMaps';
+import { fetchAccurateLocation } from '../utils/reverseGeocode';
 import DateInput from '../components/DateInput';
 
-// Client-side image compression & resizing helper before upload (max 800x800, quality 0.7)
-const compressSelfieImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.7) => {
-    return new Promise((resolve, reject) => {
-        if (!file || !file.type.startsWith('image/')) {
-            return resolve(file);
-        }
+const visitStatusClass = (status) => (
+    status === 'Completed' ? 'bg-teal-50 text-teal-600 border-teal-200' :
+    status === 'Started' ? 'bg-indigo-50 text-indigo-600 border-indigo-200' :
+    status === 'Cancelled' ? 'bg-rose-50 text-rose-600 border-rose-200' :
+    'bg-slate-50 text-slate-500 border-slate-200'
+);
 
-        const reader = new FileReader();
-        reader.onerror = (err) => reject(err);
-        reader.onload = (event) => {
-            const img = new Image();
-            img.onerror = (err) => reject(err);
-            img.onload = () => {
-                let { width, height } = img;
-                if (width > maxWidth || height > maxHeight) {
-                    if (width > height) {
-                        height = Math.round((height * maxWidth) / width);
-                        width = maxWidth;
-                    } else {
-                        width = Math.round((width * maxHeight) / height);
-                        height = maxHeight;
-                    }
-                }
-
-                const canvas = document.createElement('canvas');
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-
-                canvas.toBlob(
-                    (blob) => {
-                        if (!blob) {
-                            return resolve(file);
-                        }
-                        const fileName = (file.name || 'selfie.jpg').replace(/\.[^/.]+$/, "") + "_compressed.jpg";
-                        const compressedFile = new File([blob], fileName, {
-                            type: 'image/jpeg',
-                            lastModified: Date.now(),
-                        });
-                        console.log(`Selfie compressed: Original ${(file.size / 1024).toFixed(1)}KB -> Compressed ${(compressedFile.size / 1024).toFixed(1)}KB`);
-                        resolve(compressedFile);
-                    },
-                    'image/jpeg',
-                    quality
-                );
-            };
-            img.src = event.target.result;
-        };
-        reader.readAsDataURL(file);
-    });
-};
+const VisitInfoField = ({ label, value }) => (
+    <div className="min-w-0">
+        <dt className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</dt>
+        <dd className="mt-0.5 text-sm font-bold text-slate-900 break-words">{value || '—'}</dd>
+    </div>
+);
 
 // Fixated MGR5 Search Select Component with 2 distinct sections (MGR5 Spare Parts & Products Catalog)
 const Mgr5SearchSelect = ({ mgr5Parts, selectedId, onSelect, isCustomDesc }) => {
@@ -144,7 +105,7 @@ const Mgr5SearchSelect = ({ mgr5Parts, selectedId, onSelect, isCustomDesc }) => 
 
             {/* Dropdown Menu with 2 Distinct Sections */}
             {isOpen && (
-                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150 min-w-[320px]">
+                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150 sm:min-w-[320px]">
                     {/* Live Search Filter Input */}
                     <div className="p-2.5 bg-slate-50/90 border-b border-slate-100">
                         <div className="relative">
@@ -283,30 +244,18 @@ const Mgr5SearchSelect = ({ mgr5Parts, selectedId, onSelect, isCustomDesc }) => 
     );
 };
 
-const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
+const ServiceVisits = () => {
     const canvasRef = useRef(null);
 
-    // Active module tab ('visits' | 'attendance')
-    const [activeTab, setActiveTab] = useState(initialTab || 'visits');
-
-    useEffect(() => {
-        if (initialTab) {
-            setActiveTab(initialTab);
-        }
-    }, [initialTab]);
-
     const [loading, setLoading] = useState(false);
+    const [loadError, setLoadError] = useState('');
     const [visits, setVisits] = useState([]);
+    // The visit open in the full-width workspace; null shows the queue
     const [selectedVisit, setSelectedVisit] = useState(null);
+    // Last visit opened (or scheduled) from the queue, highlighted and scrolled back into view
+    const [lastOpenedVisitId, setLastOpenedVisitId] = useState(null);
     const [engineers, setEngineers] = useState([]);
     const [tickets, setTickets] = useState([]);
-    const [isQueueCollapsed, setIsQueueCollapsed] = useState(false);
-    
-    // Collapsible filter state
-    const [isFilterCollapsed, setIsFilterCollapsed] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState('all');
-    const [engineerFilter, setEngineerFilter] = useState('all');
 
     // Create Modal State
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -338,449 +287,33 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
     const [isPartChange, setIsPartChange] = useState(true);
     const [isCustomExpDesc, setIsCustomExpDesc] = useState(false);
     const [isDrawing, setIsDrawing] = useState(false);
+    const [hasSignature, setHasSignature] = useState(false);
+    const [checkingOut, setCheckingOut] = useState(false);
 
-    // Field Attendance State & Logic
-    const [attendanceList, setAttendanceList] = useState([]);
-    const [loadingAttendance, setLoadingAttendance] = useState(false);
-    const [activeAttendance, setActiveAttendance] = useState(null);
-    const [todayAttendance, setTodayAttendance] = useState(null);
-    const [hasCompletedToday, setHasCompletedToday] = useState(false);
-    const [showAttendanceForm, setShowAttendanceForm] = useState(false);
-    const [checkInAreaName, setCheckInAreaName] = useState('');
-    const [checkInAddress, setCheckInAddress] = useState('');
-    const [checkInLat, setCheckInLat] = useState(null);
-    const [checkInLng, setCheckInLng] = useState(null);
-    const [checkInSelfie, setCheckInSelfie] = useState('');
-    const [checkInNotes, setCheckInNotes] = useState('');
-    const [uploadingSelfie, setUploadingSelfie] = useState(false);
-    const [isLocating, setIsLocating] = useState(false);
-    const [submittingCheckIn, setSubmittingCheckIn] = useState(false);
-    const [submittingCheckOut, setSubmittingCheckOut] = useState(false);
-    const [attendanceDateFilter, setAttendanceDateFilter] = useState('');
-    const [selectedAttendanceSelfie, setSelectedAttendanceSelfie] = useState(null);
-
-    // Check-Out Form State & Logic
-    const [showCheckOutForm, setShowCheckOutForm] = useState(false);
-    const [checkOutAreaName, setCheckOutAreaName] = useState('');
-    const [checkOutAddress, setCheckOutAddress] = useState('');
-    const [checkOutLat, setCheckOutLat] = useState(null);
-    const [checkOutLng, setCheckOutLng] = useState(null);
-    const [checkOutSelfie, setCheckOutSelfie] = useState('');
-    const [checkOutNotes, setCheckOutNotes] = useState('');
-    const [uploadingCheckOutSelfie, setUploadingCheckOutSelfie] = useState(false);
-    const [isCheckOutLocating, setIsCheckOutLocating] = useState(false);
-
-    const currentUser = (() => {
-        try {
-            return JSON.parse(localStorage.getItem('user') || '{}');
-        } catch {
-            return {};
-        }
-    })();
-
-    const fetchAccurateLocation = async (lat, lng) => {
-        let detailedAddress = '';
-        let detailedArea = '';
-
-        // The Maps API is fetched on demand (it is no longer loaded by index.html);
-        // if it is unavailable we fall through to the OpenStreetMap lookup below.
-        await loadGoogleMaps().catch(() => false);
-
-        // 1. Google Maps JS API Geocoder (if available)
-        if (window.google && window.google.maps && window.google.maps.Geocoder) {
-            try {
-                const geocoder = new window.google.maps.Geocoder();
-                const result = await new Promise((resolve) => {
-                    geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-                        if (status === 'OK' && results && results[0]) {
-                            resolve(results[0].formatted_address);
-                        } else {
-                            resolve(null);
-                        }
-                    });
-                });
-                if (result) {
-                    detailedAddress = result;
-                    detailedArea = result.split(',').slice(0, 2).join(', ').trim();
-                }
-            } catch (gErr) {
-                console.warn('Google Maps Geocoder error:', gErr);
-            }
-        }
-
-        // 2. Photon (Komoot Reverse Geocoding API based on OSM)
-        if (!detailedAddress) {
-            try {
-                const pRes = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}`);
-                if (pRes.ok) {
-                    const pData = await pRes.json();
-                    if (pData?.features?.length > 0) {
-                        const props = pData.features[0].properties || {};
-                        const name = props.name || props.housenumber || '';
-                        const street = props.street || '';
-                        const district = props.district || props.suburb || props.neighbourhood || props.quarter || '';
-                        const city = props.city || props.town || props.county || '';
-                        const state = props.state || '';
-                        const postcode = props.postcode ? ` - ${props.postcode}` : '';
-
-                        const parts = [name, street, district, city, state ? `${state}${postcode}` : postcode].filter(Boolean);
-                        if (parts.length >= 2) {
-                            detailedAddress = parts.join(', ');
-                            detailedArea = [name || street, district || city].filter(Boolean).join(', ');
-                        }
-                    }
-                }
-            } catch (pErr) {
-                console.warn('Photon geocoding error:', pErr);
-            }
-        }
-
-        // 3. OpenStreetMap / Nominatim API (with zoom=18 & extratags)
-        try {
-            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&extratags=1`, {
-                headers: { 'Accept-Language': 'en-US,en;q=0.9' }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                let nomAddr = '';
-                let nomArea = '';
-
-                if (data && data.address) {
-                    const addr = data.address;
-                    const spot = addr.building || addr.amenity || addr.shop || addr.office || addr.commercial || addr.industrial || addr.historic || addr.tourism || addr.leisure || (addr.house_number ? `No. ${addr.house_number}` : '');
-                    const street = addr.road || addr.street || addr.pedestrian || addr.footway || addr.path || '';
-                    const subLocality = addr.suburb || addr.neighbourhood || addr.residential || addr.quarter || addr.city_district || addr.hamlet || addr.subdistrict || '';
-                    const mainLocality = addr.city || addr.town || addr.village || addr.municipality || addr.county || '';
-                    const stateStr = addr.state || '';
-                    const pinStr = addr.postcode ? ` - ${addr.postcode}` : '';
-
-                    const areaParts = [spot, street, subLocality, mainLocality].filter(Boolean);
-                    if (areaParts.length > 0) {
-                        nomArea = areaParts.slice(0, 2).join(', ');
-                    }
-
-                    const addrParts = [spot, street, subLocality, mainLocality, stateStr ? `${stateStr}${pinStr}` : pinStr].filter(Boolean);
-                    if (addrParts.length >= 3) {
-                        nomAddr = addrParts.join(', ');
-                    }
-                }
-
-                // If display_name is richer than constructed address (or if constructed address has less detail), use display_name
-                if (data?.display_name) {
-                    const cleanDisplayName = data.display_name.replace(/,\s*India$/i, '').trim();
-                    if (!nomAddr || cleanDisplayName.split(',').length > nomAddr.split(',').length) {
-                        nomAddr = cleanDisplayName;
-                    }
-                }
-
-                if (nomAddr && (!detailedAddress || nomAddr.split(',').length > detailedAddress.split(',').length)) {
-                    detailedAddress = nomAddr;
-                }
-                if (nomArea && (!detailedArea || detailedArea.split(',').length < 2)) {
-                    detailedArea = nomArea;
-                }
-            }
-        } catch (e) {
-            console.warn('Nominatim reverse geocoding error:', e);
-        }
-
-        // 4. BigDataCloud API (fallback)
-        if (!detailedAddress || detailedAddress.split(',').length < 2) {
-            try {
-                const bdcRes = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`);
-                if (bdcRes.ok) {
-                    const bdcData = await bdcRes.json();
-                    if (bdcData) {
-                        const locality = bdcData.locality || bdcData.city || bdcData.principalSubdivision || '';
-                        const informative = bdcData.localityInfo?.informative || [];
-                        const infoNames = informative.map(i => i.name).filter(n => n && n !== locality);
-                        const subLocality = infoNames.join(', ');
-
-                        if (subLocality || locality) {
-                            const bdcAddr = [subLocality, locality, bdcData.principalSubdivision, bdcData.postcode].filter(Boolean).join(', ');
-                            if (bdcAddr && (!detailedAddress || bdcAddr.length > detailedAddress.length)) {
-                                detailedAddress = bdcAddr;
-                            }
-                            if (!detailedArea) {
-                                detailedArea = [infoNames[0] || subLocality, locality].filter(Boolean).join(', ');
-                            }
-                        }
-                    }
-                }
-            } catch (err) {
-                console.warn('BigDataCloud geocoding error:', err);
-            }
-        }
-
-        if (!detailedArea && detailedAddress) {
-            detailedArea = detailedAddress.split(',').slice(0, 2).join(', ').trim();
-        }
-
-        return {
-            address: detailedAddress || `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`,
-            areaName: detailedArea || 'Field Location'
-        };
+    const resetCompletionForm = () => {
+        setReport('');
+        setNextAction('');
+        setBilling('Paid');
+        setExpenses([]);
+        setProductPhoto('');
+        setHasSignature(false);
     };
 
-    const fetchGpsLocation = () => {
-        setIsLocating(true);
-        setCheckInAddress('Locking onto high-precision GPS signal...');
-
-        const handleGpsUnavailable = () => {
-            setCheckInLat(null);
-            setCheckInLng(null);
-            setCheckInAddress('');
-            toast.warn('Could not get GPS location. Please allow location access or type the street address.');
-            setIsLocating(false);
-        };
-
-        if (!navigator.geolocation) {
-            handleGpsUnavailable();
-            return;
-        }
-
-        navigator.geolocation.getCurrentPosition(
-            async (pos) => {
-                const lat = pos.coords.latitude;
-                const lng = pos.coords.longitude;
-                setCheckInLat(lat);
-                setCheckInLng(lng);
-
-                const locData = await fetchAccurateLocation(lat, lng);
-                setCheckInAddress(locData.address);
-                if (locData.areaName) {
-                    setCheckInAreaName(prev => prev ? prev : locData.areaName);
-                }
-                setIsLocating(false);
-            },
-            (err) => {
-                console.warn('Geolocation error:', err);
-                handleGpsUnavailable();
-            },
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-        );
-    };
-
-    const fetchAttendanceRecords = async () => {
-        setLoadingAttendance(true);
-        try {
-            const params = {};
-            if (attendanceDateFilter) params.date = attendanceDateFilter;
-
-            // The register shows only the signed-in user's own attendance (enforced by the API).
-            const res = await csmService.getAttendance(params);
-            const data = Array.isArray(res.data) ? res.data : (res.data?.data || []);
-            setAttendanceList(data);
-        } catch (error) {
-            console.error('Failed to load attendance history', error);
-        } finally {
-            setLoadingAttendance(false);
-        }
-    };
-
-    const fetchActiveAttendance = async () => {
-        try {
-            const res = await csmService.getActiveAttendance();
-            setActiveAttendance(res.data?.activeRecord || null);
-            setTodayAttendance(res.data?.todayRecord || null);
-            setHasCompletedToday(!!res.data?.hasCompletedToday);
-            if (!res.data?.activeRecord && !res.data?.hasCompletedToday) {
-                fetchGpsLocation();
-            } else if (res.data?.activeRecord) {
-                setCheckOutAreaName(res.data.activeRecord.checkInLocation?.areaName || '');
-                setCheckOutAddress(res.data.activeRecord.checkInLocation?.address || '');
-                fetchCheckOutGpsLocation();
-            }
-        } catch (error) {
-            console.error('Failed to fetch active attendance status', error);
-        }
-    };
-
-    const handleOpenAttendanceModal = () => {
-        if (hasCompletedToday) {
-            toast.error('You have already completed your check-in for today. Users are allowed to check in only once per day.');
-            return;
-        }
-        setCheckInAreaName('');
-        setCheckInAddress('Locking onto high-precision GPS signal...');
-        setCheckInLat(null);
-        setCheckInLng(null);
-        setCheckInSelfie('');
-        setCheckInNotes('');
-        setShowAttendanceForm(true);
-        fetchGpsLocation();
-    };
-
-    const handleSelfieChange = async (e) => {
-        const file = e.target.files && e.target.files[0];
-        if (!file) return;
-        setUploadingSelfie(true);
-        try {
-            const compressedFile = await compressSelfieImage(file);
-            const res = await uploadService.uploadImage(compressedFile);
-            const photoUrl = res.data?.url || res.data?.imageUrl;
-            if (photoUrl) {
-                setCheckInSelfie(photoUrl);
-                toast.success('Selfie compressed & uploaded successfully!');
-            } else {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    setCheckInSelfie(reader.result);
-                    toast.success('Selfie attached!');
-                };
-                reader.readAsDataURL(compressedFile);
-            }
-        } catch (err) {
-            console.error('Selfie compress/upload error', err);
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setCheckInSelfie(reader.result);
-                toast.success('Selfie attached!');
-            };
-            reader.readAsDataURL(file);
-        } finally {
-            setUploadingSelfie(false);
-        }
-    };
-
-    const handleSubmitAttendanceCheckIn = async (e) => {
-        e.preventDefault();
-        if (!checkInSelfie) {
-            toast.error('Selfie photo is mandatory to mark Check-In');
-            return;
-        }
-        if (!checkInAreaName.trim()) {
-            toast.error('Area Name is required');
-            return;
-        }
-
-        setSubmittingCheckIn(true);
-        try {
-            const payload = {
-                employeeName: currentUser.name || 'Field Engineer',
-                areaName: checkInAreaName.trim(),
-                address: checkInAddress,
-                latitude: checkInLat,
-                longitude: checkInLng,
-                selfieUrl: checkInSelfie,
-                notes: checkInNotes
-            };
-            await csmService.checkInAttendance(payload);
-            toast.success('Field Attendance Check-In recorded successfully!');
-            setShowAttendanceForm(false);
-            fetchActiveAttendance();
-            if (activeTab === 'attendance') fetchAttendanceRecords();
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Attendance Check-In failed');
-        } finally {
-            setSubmittingCheckIn(false);
-        }
-    };
-
-    const handleOpenCheckOutModal = () => {
-        if (!activeAttendance) return;
-        setCheckOutAreaName(activeAttendance.checkInLocation?.areaName || '');
-        setCheckOutAddress(activeAttendance.checkInLocation?.address || 'Acquiring high-accuracy GPS signal...');
-        setCheckOutLat(activeAttendance.checkInLocation?.latitude || null);
-        setCheckOutLng(activeAttendance.checkInLocation?.longitude || null);
-        setCheckOutSelfie('');
-        setCheckOutNotes(activeAttendance.notes || '');
-        setShowCheckOutForm(true);
-        fetchCheckOutGpsLocation();
-    };
-
-    const fetchCheckOutGpsLocation = () => {
-        if (!navigator.geolocation) return;
-        setIsCheckOutLocating(true);
-        navigator.geolocation.getCurrentPosition(
-            async (pos) => {
-                const lat = pos.coords.latitude;
-                const lng = pos.coords.longitude;
-                setCheckOutLat(lat);
-                setCheckOutLng(lng);
-                const locData = await fetchAccurateLocation(lat, lng);
-                if (locData.address) setCheckOutAddress(locData.address);
-                if (locData.areaName && !checkOutAreaName) setCheckOutAreaName(locData.areaName);
-                setIsCheckOutLocating(false);
-            },
-            (err) => {
-                console.warn('GPS failed on check-out:', err);
-                setIsCheckOutLocating(false);
-            },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
-    };
-
-    const handleCheckOutSelfieChange = async (e) => {
-        const file = e.target.files && e.target.files[0];
-        if (!file) return;
-        setUploadingCheckOutSelfie(true);
-        try {
-            const compressedFile = await compressSelfieImage(file);
-            const res = await uploadService.uploadImage(compressedFile);
-            const photoUrl = res.data?.url || res.data?.imageUrl;
-            if (photoUrl) {
-                setCheckOutSelfie(photoUrl);
-                toast.success('Check-Out selfie compressed & uploaded successfully!');
-            } else {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    setCheckOutSelfie(reader.result);
-                    toast.success('Check-Out selfie attached!');
-                };
-                reader.readAsDataURL(compressedFile);
-            }
-        } catch (err) {
-            console.error('Check-Out selfie compress/upload error', err);
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setCheckOutSelfie(reader.result);
-                toast.success('Check-Out selfie attached!');
-            };
-            reader.readAsDataURL(file);
-        } finally {
-            setUploadingCheckOutSelfie(false);
-        }
-    };
-
-    const handleSubmitAttendanceCheckOutModal = async (e) => {
-        e.preventDefault();
-        if (!activeAttendance) return;
-        if (!checkOutSelfie) {
-            toast.error('Selfie photo is mandatory to mark Check-Out');
-            return;
-        }
-        if (!checkOutAreaName.trim()) {
-            toast.error('Area / Site Name is required');
-            return;
-        }
-
-        setSubmittingCheckOut(true);
-        try {
-            const payload = {
-                attendanceId: activeAttendance._id,
-                areaName: checkOutAreaName.trim(),
-                address: checkOutAddress,
-                latitude: checkOutLat,
-                longitude: checkOutLng,
-                checkOutSelfieUrl: checkOutSelfie,
-                notes: checkOutNotes
-            };
-            await csmService.checkOutAttendance(payload);
-            toast.success('Field Attendance Check-Out recorded successfully!');
-            setShowCheckOutForm(false);
-            fetchActiveAttendance();
-            if (activeTab === 'attendance') fetchAttendanceRecords();
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Attendance Check-Out failed');
-        } finally {
-            setSubmittingCheckOut(false);
-        }
-    };
+    const hasUnsavedCompletion = selectedVisit?.status === 'Started' && Boolean(
+        report.trim() || nextAction.trim() || expenses.length > 0 || productPhoto || hasSignature || billing !== 'Paid'
+    );
 
     const handleSelectVisit = (v) => {
+        resetCompletionForm();
         setSelectedVisit(v);
-        setIsQueueCollapsed(true); // Open full-screen view on Select
+        setLastOpenedVisitId(v._id);
+        window.scrollTo({ top: 0 });
+    };
+
+    const handleBackToQueue = () => {
+        if (hasUnsavedCompletion && !window.confirm('Discard the unsaved visit report, parts and signature for this visit?')) return;
+        resetCompletionForm();
+        setSelectedVisit(null);
     };
 
     const fetchVisits = async () => {
@@ -789,15 +322,51 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
             const res = await csmService.getVisits();
             const data = Array.isArray(res.data) ? res.data : (res.data?.data || []);
             setVisits(data);
-            if (data.length > 0 && !selectedVisit) {
-                setSelectedVisit(data[0]);
-            }
+            setLoadError('');
+            // Keep the open workspace on the same visit, refreshed from the populated list
+            setSelectedVisit((prev) => (prev ? data.find((v) => v._id === prev._id) || prev : prev));
+            return data;
         } catch (error) {
+            setLoadError(error.response?.data?.message || 'Failed to load visits');
             toast.error('Failed to load visits');
+            return [];
         } finally {
             setLoading(false);
         }
     };
+
+    // Action responses come back unpopulated: show the new status straight away while keeping
+    // the populated ticket/engineer, then reload the list so the open visit is fully current.
+    const applyVisitUpdate = (updated) => {
+        if (updated?._id) {
+            setSelectedVisit((prev) => (prev && prev._id === updated._id
+                ? {
+                    ...updated,
+                    ticketId: prev.ticketId,
+                    engineerId: typeof updated.engineerId === 'object'
+                        ? updated.engineerId
+                        : engineers.find((e) => e._id === updated.engineerId) || prev.engineerId
+                }
+                : prev));
+        }
+        fetchVisits();
+    };
+
+    const openRescheduleModal = () => {
+        if (hasUnsavedCompletion && !window.confirm('Rescheduling resets this visit to Scheduled and discards the unsaved visit report, parts and signature. Continue?')) return;
+        setRescheduleDate(selectedVisit.scheduledDate ? new Date(selectedVisit.scheduledDate).toISOString().slice(0, 16) : '');
+        setRescheduleEngineer(selectedVisit.engineerId?._id || selectedVisit.engineerId || '');
+        setRescheduleTicketType(selectedVisit.ticketType || '');
+        setShowRescheduleModal(true);
+    };
+
+    // Back on the queue: bring the visit that was just open (or just scheduled) into view
+    const isWorkspaceOpen = Boolean(selectedVisit);
+    useEffect(() => {
+        if (isWorkspaceOpen || !lastOpenedVisitId) return;
+        const rows = document.querySelectorAll(`[data-visit-id="${lastOpenedVisitId}"]`);
+        [...rows].find((el) => el.offsetParent !== null)?.scrollIntoView({ block: 'center' });
+    }, [isWorkspaceOpen, lastOpenedVisitId]);
 
     const fetchEngineers = async () => {
         try {
@@ -893,14 +462,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
         fetchEngineers();
         fetchTickets();
         fetchMgr5Parts();
-        fetchActiveAttendance();
     }, []);
-
-    useEffect(() => {
-        if (activeTab === 'attendance') {
-            fetchAttendanceRecords();
-        }
-    }, [activeTab, attendanceDateFilter]);
 
     // Open create visit modal
     const handleOpenCreateModal = async (preselectedTicketId = '') => {
@@ -933,11 +495,13 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
             });
             toast.success('Field Service Visit scheduled successfully!');
             setShowCreateModal(false);
-            const updated = await csmService.getVisits();
-            const data = updated.data || [];
-            setVisits(data);
-            if (res.data) {
-                setSelectedVisit(res.data);
+            const data = await fetchVisits();
+            const created = data.find((v) => v._id === res.data?._id);
+            if (created) {
+                // Scheduled from a visit's workspace: move the workspace to the new visit.
+                // Scheduled from the queue: stay on the queue with the new visit highlighted.
+                if (selectedVisit) handleSelectVisit(created);
+                else setLastOpenedVisitId(created._id);
             }
         } catch (error) {
             const errMsg = error.response?.data?.message || 'Failed to schedule visit';
@@ -985,26 +549,33 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
         try {
             const res = await csmService.checkInVisit(visitId, { latitude: lat, longitude: lng, address });
             toast.success('Engineer Check-In stamp saved successfully!');
-            fetchVisits();
-            if (res.data) setSelectedVisit(res.data);
+            applyVisitUpdate(res.data);
         } catch (error) {
             toast.error('Check-in stamp failed');
         }
     };
 
     // Canvas drawing helper functions
+    // The canvas is stretched to its box, so scale the pointer position to canvas pixels
+    const getCanvasPoint = (e, canvas) => {
+        const rect = canvas.getBoundingClientRect();
+        const point = e.touches ? e.touches[0] : e;
+        return {
+            x: (point.clientX - rect.left) * (canvas.width / rect.width),
+            y: (point.clientY - rect.top) * (canvas.height / rect.height)
+        };
+    };
+
     const startDrawing = (e) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
-        const rect = canvas.getBoundingClientRect();
-        
-        const x = (e.clientX || e.touches[0].clientX) - rect.left;
-        const y = (e.clientY || e.touches[0].clientY) - rect.top;
+        const { x, y } = getCanvasPoint(e, canvas);
 
         ctx.beginPath();
         ctx.moveTo(x, y);
         setIsDrawing(true);
+        setHasSignature(true);
     };
 
     const draw = (e) => {
@@ -1012,10 +583,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
-        const rect = canvas.getBoundingClientRect();
-        
-        const x = (e.clientX || e.touches[0].clientX) - rect.left;
-        const y = (e.clientY || e.touches[0].clientY) - rect.top;
+        const { x, y } = getCanvasPoint(e, canvas);
 
         ctx.lineTo(x, y);
         ctx.stroke();
@@ -1030,8 +598,8 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        setHasSignature(false);
     };
-    const clearCanvas = clearSignature;
 
     const handleSelectMgr5Part = (itemOrId) => {
         if (typeof itemOrId === 'string') {
@@ -1111,8 +679,9 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
             });
             toast.success('Service Visit rescheduled successfully');
             setShowRescheduleModal(false);
-            fetchVisits();
-            if (res.data) setSelectedVisit(res.data);
+            // The visit goes back to Scheduled, so any half-filled completion form no longer applies
+            resetCompletionForm();
+            applyVisitUpdate(res.data);
         } catch (error) {
             const errMsg = error.response?.data?.message || 'Rescheduling failed';
             toast.error(errMsg);
@@ -1175,6 +744,8 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
             signatureData = canvas.toDataURL('image/png');
         }
 
+        // The GPS fix can take several seconds; don't let a second click submit the visit twice
+        setCheckingOut(true);
         try {
             const loc = await getDeviceLocation();
             if (!loc) {
@@ -1199,20 +770,19 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                 toast.success('Field Visit completed. Ticket closed permanently as resolved.');
             }
 
-            setReport('');
-            setNextAction('');
-            setBilling('Paid');
-            setExpenses([]);
-            setProductPhoto('');
-            fetchVisits();
-            if (res.data) setSelectedVisit(res.data);
+            resetCompletionForm();
+            applyVisitUpdate(res.data);
         } catch (error) {
             toast.error(error.response?.data?.message || 'Check-out failed');
+        } finally {
+            setCheckingOut(false);
         }
     };
 
+    // Keyed on id + status so refreshing the open visit doesn't wipe a signature being drawn
+    const signatureVisitKey = selectedVisit?.status === 'Started' ? selectedVisit._id : null;
     useEffect(() => {
-        if (selectedVisit && selectedVisit.status === 'Started') {
+        if (signatureVisitKey) {
             setTimeout(() => {
                 const canvas = canvasRef.current;
                 if (canvas) {
@@ -1225,26 +795,22 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                 }
             }, 100);
         }
-    }, [selectedVisit]);
+    }, [signatureVisitKey]);
 
     return (
         <div className="p-6 space-y-6 max-w-7xl mx-auto animate-fade-in-up">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white font-outfit uppercase">
-                        {hideTabs 
-                            ? (activeTab === 'attendance' ? 'Field Engineer Attendance' : 'Field Service Visits Queue') 
-                            : 'Field Service Visits & Attendance'}
-                    </h1>
-                    <p className="text-slate-500 dark:text-slate-400 font-semibold text-sm">
-                        {activeTab === 'attendance' 
-                            ? 'Track daily engineer duty, check-in timestamps, GPS location, and selfie verification.' 
-                            : 'Manage field engineer dispatches, service reports, check-ins, and daily field attendance.'}
-                    </p>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                    {activeTab === 'visits' && (
+            {!selectedVisit ? (
+                <>
+                    {/* Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white font-outfit uppercase">
+                                Field Service Visits
+                            </h1>
+                            <p className="text-slate-500 dark:text-slate-400 font-semibold text-sm">
+                                Manage field engineer dispatches, visit check-ins, service reports and visit completion.
+                            </p>
+                        </div>
                         <button
                             onClick={() => handleOpenCreateModal()}
                             className="px-5 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-xs tracking-wider rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 shrink-0"
@@ -1252,291 +818,291 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                             <MdAdd size={20} />
                             Schedule Field Visit
                         </button>
-                    )}
-                </div>
-            </div>
-
-            {/* Navigation Tabs (Only rendered if hideTabs is false) */}
-            {!hideTabs && (
-                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => setActiveTab('visits')}
-                            className={`px-5 py-3 font-black text-xs uppercase tracking-wider transition-all border-b-2 ${
-                                activeTab === 'visits'
-                                    ? 'border-primary-600 text-primary-600 bg-primary-50/50 rounded-t-xl'
-                                    : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-xl'
-                            } flex items-center gap-2`}
-                        >
-                            <MdLocalShipping size={18} />
-                            Service Visits Queue
-                            <span className="ml-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-slate-200 text-slate-700">
-                                {visits.length}
-                            </span>
-                        </button>
-
-                        <button
-                            onClick={() => setActiveTab('attendance')}
-                            className={`px-5 py-3 font-black text-xs uppercase tracking-wider transition-all border-b-2 ${
-                                activeTab === 'attendance'
-                                    ? 'border-teal-600 text-teal-700 bg-teal-50/50 rounded-t-xl'
-                                    : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-xl'
-                            } flex items-center gap-2`}
-                        >
-                            <MdHowToReg size={18} />
-                            Field Engineer Attendance
-                            {activeAttendance ? (
-                                <span className="ml-1 px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-teal-100 text-teal-800 border border-teal-300">
-                                    Checked-In
-                                </span>
-                            ) : (
-                                <span className="ml-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 text-amber-800">
-                                    Not Checked-In
-                                </span>
-                            )}
-                        </button>
                     </div>
-                </div>
-            )}
 
-            {activeTab === 'visits' ? (
-                /* List & Simulator Panels */
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
-                {/* Left Queue list */}
-                {!isQueueCollapsed && (
-                    <div className="lg:col-span-2 space-y-4">
-                        <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100">
-                            {loading ? (
-                                <div className="flex flex-col items-center justify-center py-20 space-y-3">
-                                    <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
-                                    <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Loading Visits...</p>
-                                </div>
-                            ) : visits.length === 0 ? (
-                                <div className="text-center py-20 text-slate-400 space-y-4">
-                                    <p className="text-lg font-bold">No field service visits scheduled.</p>
-                                    <p className="text-sm">Click below to schedule your first field service visit.</p>
-                                    <button
-                                        onClick={() => handleOpenCreateModal()}
-                                        className="px-4 py-2.5 bg-primary-600 text-white font-black uppercase text-xs rounded-xl shadow-md"
-                                    >
-                                        + Schedule Field Visit
-                                    </button>
-                                </div>
-                            ) : (
-                                <>
-                                    {/* Mobile Cards View (Phone Screens) */}
-                                    <div className="space-y-3 block sm:hidden">
-                                        {visits.map((v) => {
-                                            const isSelected = selectedVisit?._id === v._id;
-                                            return (
-                                                <div 
-                                                    key={v._id} 
-                                                    onClick={() => handleSelectVisit(v)}
-                                                    className={`csm-mobile-card border transition-all cursor-pointer ${
-                                                        isSelected 
-                                                            ? 'bg-primary-50/70 border-primary-500 shadow-md ring-2 ring-primary-500/20' 
-                                                            : 'bg-white border-slate-200 hover:border-slate-300'
-                                                    }`}
-                                                >
-                                                    <div className="flex items-center justify-between gap-2 mb-2">
-                                                        <span className="font-black text-slate-900 text-sm">{v.visitNo}</span>
-                                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border tracking-wider ${
-                                                            v.status === 'Completed' ? 'bg-teal-50 text-teal-600 border-teal-200' :
-                                                            v.status === 'Started' ? 'bg-indigo-50 text-indigo-600 border-indigo-200' :
-                                                            v.status === 'Cancelled' ? 'bg-rose-50 text-rose-600 border-rose-200' :
-                                                            'bg-slate-50 text-slate-500 border-slate-200'
-                                                        }`}>
-                                                            {v.status}
-                                                        </span>
-                                                    </div>
-                                                    <div className="space-y-1 mb-3 text-xs font-semibold">
-                                                        <p className="font-black text-slate-800">{v.ticketId?.ticketNo || 'N/A'} - {v.ticketId?.issueTitle}</p>
-                                                        <p className="text-slate-500">{v.ticketId?.customerId?.customerName}</p>
-                                                        <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-100 mt-2">
-                                                            <span>Eng: {v.engineerId?.name || 'Unassigned'}</span>
-                                                            <span>{formatDate(v.scheduledDate)}</span>
-                                                        </div>
-                                                    </div>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); handleSelectVisit(v); }}
-                                                        className={`csm-mobile-btn-full font-black uppercase rounded-xl transition-all ${
-                                                            isSelected
-                                                                ? 'bg-primary-600 text-white shadow-sm'
-                                                                : 'bg-primary-50 text-primary-600 hover:bg-primary-100'
-                                                        }`}
-                                                    >
-                                                        {isSelected ? '✓ Selected (Viewing Details)' : 'Select & View Details'}
-                                                    </button>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-
-                                    {/* Desktop & Tablet Table View */}
-                                    <div className="overflow-x-auto hidden sm:block">
-                                        <table className="w-full text-left border-collapse text-sm">
-                                            <thead>
-                                                <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
-                                                    <th className="px-6 py-4">Visit No</th>
-                                                    <th className="px-6 py-4">Ticket Details</th>
-                                                    <th className="px-6 py-4">Engineer</th>
-                                                    <th className="px-6 py-4">Scheduled Date</th>
-                                                    <th className="px-6 py-4">Status</th>
-                                                    <th className="px-6 py-4 text-center">Action</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
-                                                {visits.map((v) => {
-                                                    const isSelected = selectedVisit?._id === v._id;
-                                                    return (
-                                                        <tr 
-                                                            key={v._id} 
-                                                            className={`transition-colors cursor-pointer ${
-                                                                isSelected 
-                                                                    ? 'bg-primary-50/60 border-l-4 border-l-primary-600 font-bold' 
-                                                                    : 'hover:bg-slate-50/50'
-                                                            }`}
-                                                            onClick={() => handleSelectVisit(v)}
-                                                        >
-                                                            <td className="px-6 py-4 font-black text-slate-900">{v.visitNo}</td>
-                                                            <td className="px-6 py-4">
-                                                                <p className="font-bold text-slate-900">{v.ticketId?.ticketNo || 'N/A'}</p>
-                                                                <p className="text-[10px] text-slate-400 uppercase tracking-tight">{v.ticketId?.customerId?.customerName}</p>
-                                                            </td>
-                                                            <td className="px-6 py-4 text-slate-500">{v.engineerId?.name || 'Unassigned'}</td>
-                                                            <td className="px-6 py-4 text-slate-500">{formatDateTime(v.scheduledDate)}</td>
-                                                            <td className="px-4 py-4 whitespace-nowrap">
-                                                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border tracking-wider ${
-                                                                    v.status === 'Completed' ? 'bg-teal-50 text-teal-600 border-teal-200' :
-                                                                    v.status === 'Started' ? 'bg-indigo-50 text-indigo-600 border-indigo-200' :
-                                                                    v.status === 'Cancelled' ? 'bg-rose-50 text-rose-600 border-rose-200' :
-                                                                    'bg-slate-50 text-slate-500 border-slate-200'
-                                                                }`}>
-                                                                    {v.status}
-                                                                </span>
-                                                            </td>
-                                                            <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
-                                                                <div className="flex justify-center">
-                                                                    <button
-                                                                        onClick={() => handleSelectVisit(v)}
-                                                                        className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase transition-all ${
-                                                                            isSelected
-                                                                                ? 'bg-primary-600 text-white shadow-sm'
-                                                                                : 'bg-primary-50 text-primary-600 hover:bg-primary-100'
-                                                                        }`}
-                                                                    >
-                                                                        {isSelected ? 'Selected' : 'Select'}
-                                                                    </button>
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </>
+                    {/* Service Visits Queue */}
+                    <div className="glass shadow-premium rounded-[2rem] p-4 sm:p-6 bg-white border border-slate-100 space-y-4">
+                        <div className="flex items-center justify-between gap-3">
+                            <h2 className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-900">
+                                <MdLocalShipping size={18} className="text-primary-600" />
+                                Service Visits Queue
+                                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-slate-200 text-slate-700">
+                                    {visits.length}
+                                </span>
+                            </h2>
+                            {loading && visits.length > 0 && (
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Refreshing...</span>
                             )}
                         </div>
-                    </div>
-                )}
-
-                {/* Right Simulator checkin/out panel */}
-                <div className={isQueueCollapsed ? 'lg:col-span-3' : 'lg:col-span-1'}>
-                    {selectedVisit ? (
-                        <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100 space-y-6 animate-scale-in">
-                            <div className="border-b border-slate-100 pb-4">
-                                {isQueueCollapsed && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsQueueCollapsed(false)}
-                                        className="mb-3 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black uppercase tracking-wider transition-all border border-slate-200 inline-flex items-center gap-1.5 active:scale-95 shadow-2xs"
-                                    >
-                                        ← Back to Visit Queue List
-                                    </button>
-                                )}
-                                <div className="flex justify-between items-start gap-4">
-                                    <div>
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-teal-600">Active Service Dispatch</span>
-                                        <h3 className="text-xl font-black text-slate-900 font-outfit uppercase -mt-0.5">{selectedVisit.visitNo}</h3>
-                                        <p className="text-xs text-slate-500 font-bold">{selectedVisit.ticketId?.ticketNo} - {selectedVisit.ticketId?.issueTitle}</p>
-                                        {selectedVisit.ticketId?.customerId?.customerName && (
-                                            <p className="text-[11px] text-slate-600 font-semibold mt-0.5">Customer: {selectedVisit.ticketId.customerId.customerName}</p>
-                                        )}
-                                    </div>
-                                    <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
-                                        {['Scheduled', 'In Transit', 'Started'].includes(selectedVisit.status) && (
-                                            <button
-                                                onClick={() => {
-                                                    setRescheduleDate(selectedVisit.scheduledDate ? new Date(selectedVisit.scheduledDate).toISOString().slice(0, 16) : '');
-                                                    setRescheduleEngineer(selectedVisit.engineerId?._id || selectedVisit.engineerId || '');
-                                                    setRescheduleTicketType(selectedVisit.ticketType || '');
-                                                    setShowRescheduleModal(true);
-                                                }}
-                                                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border border-slate-200 shrink-0"
-                                            >
-                                                Reschedule
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-
+                        {loading && visits.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-20 space-y-3">
+                                <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
+                                <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Loading Visits...</p>
                             </div>
-
-                            {/* Check-In Mode */}
-                            {(selectedVisit.status === 'Scheduled' || selectedVisit.status === 'In Transit') && (
-                                <div className="space-y-4 text-center py-6">
-                                    <div className="w-16 h-16 bg-primary-50 rounded-full flex items-center justify-center mx-auto text-primary-600">
-                                        <MdMyLocation size={32} />
-                                    </div>
-                                    <h4 className="font-outfit font-black text-slate-900 uppercase">Field Check-In Simulator</h4>
-                                    <p className="text-xs text-slate-400 font-semibold px-4">
-                                        Performs checking-in at site location. Click the button below to simulate matching GPS coordinate stamps.
-                                    </p>
-                                    <button
-                                        onClick={() => handleCheckIn(selectedVisit._id)}
-                                        className="w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95"
-                                    >
-                                        Stamp Check-In Location
-                                    </button>
+                        ) : loadError && visits.length === 0 ? (
+                            <div className="text-center py-20 space-y-4">
+                                <p className="text-lg font-bold text-rose-600">Could not load service visits.</p>
+                                <p className="text-sm text-slate-400">{loadError}</p>
+                                <button
+                                    onClick={() => fetchVisits()}
+                                    className="px-4 py-2.5 bg-slate-900 hover:bg-black text-white font-black uppercase text-xs rounded-xl shadow-md inline-flex items-center gap-1.5"
+                                >
+                                    <MdRefresh size={16} />
+                                    Retry
+                                </button>
+                            </div>
+                        ) : visits.length === 0 ? (
+                            <div className="text-center py-20 text-slate-400 space-y-4">
+                                <p className="text-lg font-bold">No field service visits scheduled.</p>
+                                <p className="text-sm">Click below to schedule your first field service visit.</p>
+                                <button
+                                    onClick={() => handleOpenCreateModal()}
+                                    className="px-4 py-2.5 bg-primary-600 text-white font-black uppercase text-xs rounded-xl shadow-md"
+                                >
+                                    + Schedule Field Visit
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Mobile Cards View (Phone Screens) */}
+                                <div className="space-y-3 block sm:hidden">
+                                    {visits.map((v) => {
+                                        const isLastOpened = lastOpenedVisitId === v._id;
+                                        return (
+                                            <div
+                                                key={v._id}
+                                                data-visit-id={v._id}
+                                                onClick={() => handleSelectVisit(v)}
+                                                className={`csm-mobile-card border transition-all cursor-pointer ${
+                                                    isLastOpened
+                                                        ? 'bg-primary-50/70 border-primary-500 shadow-md ring-2 ring-primary-500/20'
+                                                        : 'bg-white border-slate-200 hover:border-slate-300'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between gap-2 mb-2">
+                                                    <span className="font-black text-slate-900 text-sm">{v.visitNo}</span>
+                                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border tracking-wider ${visitStatusClass(v.status)}`}>
+                                                        {v.status}
+                                                    </span>
+                                                </div>
+                                                <div className="space-y-1 mb-3 text-xs font-semibold">
+                                                    <p className="font-black text-slate-800">{v.ticketId?.ticketNo || 'N/A'} - {v.ticketId?.issueTitle}</p>
+                                                    <p className="text-slate-500">{v.ticketId?.customerId?.customerName}</p>
+                                                    <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-100 mt-2">
+                                                        <span>Eng: {v.engineerId?.name || 'Unassigned'}</span>
+                                                        <span>{formatDate(v.scheduledDate)}</span>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleSelectVisit(v); }}
+                                                    className="csm-mobile-btn-full font-black uppercase rounded-xl transition-all bg-primary-600 hover:bg-primary-700 text-white shadow-sm"
+                                                >
+                                                    Select & View Details
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-                            )}
 
-                            {/* Check-Out Mode */}
-                            {selectedVisit.status === 'Started' && (
-                                <div className="space-y-4">
-                                    <h4 className="font-outfit font-black text-slate-900 uppercase text-sm border-b border-slate-50 pb-2">
-                                        Completion & Check-Out
-                                    </h4>
-                                    
-                                    <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Billing Status</label>
-                                        <select
-                                            value={billing}
-                                            onChange={(e) => setBilling(e.target.value)}
-                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold"
-                                        >
-                                            <option value="Paid">Paid Out-Of-Warranty Service</option>
-                                            <option value="Under Warranty">Covered Under Warranty</option>
-                                            <option value="Under AMC">Covered Under AMC Contract</option>
-                                            <option value="Free Service">Complimentary Service</option>
-                                        </select>
+                                {/* Desktop & Tablet Table View */}
+                                <div className="overflow-x-auto hidden sm:block">
+                                    <table className="w-full text-left border-collapse text-sm">
+                                        <thead>
+                                            <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
+                                                <th className="px-6 py-4">Visit No</th>
+                                                <th className="px-6 py-4">Ticket Details</th>
+                                                <th className="px-6 py-4">Engineer</th>
+                                                <th className="px-6 py-4">Scheduled Date</th>
+                                                <th className="px-6 py-4">Status</th>
+                                                <th className="px-6 py-4 text-center">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
+                                            {visits.map((v) => {
+                                                const isLastOpened = lastOpenedVisitId === v._id;
+                                                return (
+                                                    <tr
+                                                        key={v._id}
+                                                        data-visit-id={v._id}
+                                                        className={`transition-colors cursor-pointer ${
+                                                            isLastOpened
+                                                                ? 'bg-primary-50/60 border-l-4 border-l-primary-600'
+                                                                : 'hover:bg-slate-50/50'
+                                                        }`}
+                                                        onClick={() => handleSelectVisit(v)}
+                                                    >
+                                                        <td className="px-6 py-4 font-black text-slate-900 whitespace-nowrap">{v.visitNo}</td>
+                                                        <td className="px-6 py-4">
+                                                            <p className="font-bold text-slate-900">{v.ticketId?.ticketNo || 'N/A'}</p>
+                                                            {v.ticketId?.issueTitle && (
+                                                                <p className="text-xs text-slate-600 line-clamp-1">{v.ticketId.issueTitle}</p>
+                                                            )}
+                                                            <p className="text-[10px] text-slate-400 uppercase tracking-tight">{v.ticketId?.customerId?.customerName}</p>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-slate-500">{v.engineerId?.name || 'Unassigned'}</td>
+                                                        <td className="px-6 py-4 text-slate-500 whitespace-nowrap">{formatDateTime(v.scheduledDate)}</td>
+                                                        <td className="px-4 py-4 whitespace-nowrap">
+                                                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border tracking-wider ${visitStatusClass(v.status)}`}>
+                                                                {v.status}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                                                            <div className="flex justify-center">
+                                                                <button
+                                                                    onClick={() => handleSelectVisit(v)}
+                                                                    className="px-3.5 py-1.5 rounded-xl text-xs font-black uppercase transition-all bg-primary-50 text-primary-600 hover:bg-primary-600 hover:text-white"
+                                                                >
+                                                                    Select
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </>
+            ) : (
+                /* Full-width workspace for the selected visit */
+                <div className="space-y-6 animate-scale-in">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <button
+                            type="button"
+                            onClick={handleBackToQueue}
+                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black uppercase tracking-wider transition-all border border-slate-200 active:scale-95 shadow-2xs"
+                        >
+                            <MdArrowBack size={18} />
+                            Back to Service Visits
+                        </button>
+                        {['Scheduled', 'In Transit', 'Started'].includes(selectedVisit.status) && (
+                            <button
+                                type="button"
+                                onClick={openRescheduleModal}
+                                className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-black uppercase tracking-wider transition-all border border-slate-200 active:scale-95 shadow-2xs"
+                            >
+                                <MdCalendarMonth size={16} />
+                                Reschedule
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Visit Information */}
+                    <div className="glass shadow-premium rounded-[2rem] p-4 sm:p-6 bg-white border border-slate-100 space-y-5">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-teal-600">Active Service Dispatch</span>
+                                <h1 className="text-2xl sm:text-3xl font-black text-slate-900 font-outfit uppercase break-words">{selectedVisit.visitNo}</h1>
+                                {selectedVisit.ticketId?.issueTitle && (
+                                    <p className="text-sm text-slate-500 font-bold break-words">{selectedVisit.ticketId.issueTitle}</p>
+                                )}
+                            </div>
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border tracking-wider ${visitStatusClass(selectedVisit.status)}`}>
+                                {selectedVisit.status}
+                            </span>
+                        </div>
+                        <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-slate-100">
+                            <VisitInfoField label="Ticket No" value={selectedVisit.ticketId?.ticketNo} />
+                            <VisitInfoField label="Customer" value={selectedVisit.ticketId?.customerId?.customerName || selectedVisit.ticketId?.customerId?.companyName} />
+                            <VisitInfoField label="Service Engineer" value={selectedVisit.engineerId?.name || 'Unassigned'} />
+                            <VisitInfoField label="Scheduled Date & Time" value={selectedVisit.scheduledDate && formatDateTime(selectedVisit.scheduledDate)} />
+                        </dl>
+                    </div>
+
+                    {/* Check-in, completion & check-out, or the visit summary, depending on status */}
+                    <div className="glass shadow-premium rounded-[2rem] p-4 sm:p-6 bg-white border border-slate-100 space-y-6">
+                        {/* Check-In Mode */}
+                        {(selectedVisit.status === 'Scheduled' || selectedVisit.status === 'In Transit') && (
+                            <div className="space-y-4 text-center py-6 max-w-md mx-auto">
+                                <div className="w-16 h-16 bg-primary-50 rounded-full flex items-center justify-center mx-auto text-primary-600">
+                                    <MdMyLocation size={32} />
+                                </div>
+                                <h4 className="font-outfit font-black text-slate-900 uppercase">Field Check-In Simulator</h4>
+                                <p className="text-xs text-slate-400 font-semibold px-4">
+                                    Performs checking-in at site location. Click the button below to simulate matching GPS coordinate stamps.
+                                </p>
+                                <button
+                                    onClick={() => handleCheckIn(selectedVisit._id)}
+                                    className="w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95"
+                                >
+                                    Stamp Check-In Location
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Check-Out Mode */}
+                        {selectedVisit.status === 'Started' && (
+                            <div className="space-y-6">
+                                <h4 className="font-outfit font-black text-slate-900 uppercase text-sm border-b border-slate-50 pb-2">
+                                    Completion & Check-Out
+                                </h4>
+
+                                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Billing Status</label>
+                                            <select
+                                                value={billing}
+                                                onChange={(e) => setBilling(e.target.value)}
+                                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold"
+                                            >
+                                                <option value="Paid">Paid Out-Of-Warranty Service</option>
+                                                <option value="Under Warranty">Covered Under Warranty</option>
+                                                <option value="Under AMC">Covered Under AMC Contract</option>
+                                                <option value="Free Service">Complimentary Service</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Visit Report / Actions Taken *</label>
+                                            <textarea
+                                                required
+                                                placeholder="Troubleshooting steps and fix summary..."
+                                                value={report}
+                                                onChange={(e) => setReport(e.target.value)}
+                                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold h-32"
+                                            />
+                                        </div>
+
+                                        {/* Next Action / Next Step Field */}
+                                        <div className="p-3.5 bg-amber-50/50 rounded-2xl border border-amber-200/60 space-y-2">
+                                            <div className="flex justify-between items-center">
+                                                <label className="block text-[10px] font-black text-amber-800 uppercase tracking-widest">
+                                                    Next Action / Next Step <span className="text-rose-600 font-black">* (Mandatory for Close Visit)</span>
+                                                </label>
+                                            </div>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. Need Painter, Need Material, Customer Not Available..."
+                                                value={nextAction}
+                                                onChange={(e) => setNextAction(e.target.value)}
+                                                className="w-full px-3.5 py-2 rounded-xl border border-amber-200 bg-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                            />
+                                            <div className="flex flex-wrap gap-1.5 pt-1">
+                                                {['Need Painter', 'Need Material', 'Customer Not Available', 'Part Required', 'Follow-up Visit'].map((preset) => (
+                                                    <button
+                                                        key={preset}
+                                                        type="button"
+                                                        onClick={() => setNextAction(preset)}
+                                                        className={`px-2.5 py-1 rounded-md text-[9px] font-bold transition-all border ${
+                                                            nextAction === preset
+                                                                ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                                                                : 'bg-white text-amber-900 border-amber-200 hover:bg-amber-100'
+                                                        }`}
+                                                    >
+                                                        + {preset}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
                                     </div>
 
-                                    <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Visit Report / Actions Taken *</label>
-                                        <textarea
-                                            required
-                                            placeholder="Troubleshooting steps and fix summary..."
-                                            value={report}
-                                            onChange={(e) => setReport(e.target.value)}
-                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold h-20"
-                                        />
-                                    </div>
                                     {/* Expenses Array Log */}
                                     <div className="space-y-3 p-4 bg-slate-50/80 rounded-2xl border border-slate-200/60">
-                                        <div className="flex justify-between items-center pb-1">
+                                        <div className="flex flex-wrap justify-between items-center gap-2 pb-1">
                                             <div>
                                                 <label className="block text-[10px] font-black text-slate-600 uppercase tracking-widest">
                                                     PART CHANGE & EXPENSE LOG
@@ -1564,7 +1130,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
 
                                         {/* Line Input Row (Part Description, Qty, Rate, Add Button) */}
                                         <div className="grid grid-cols-12 gap-2 items-center pt-1">
-                                            <div className="col-span-5">
+                                            <div className="col-span-12 sm:col-span-5">
                                                 {isCustomExpDesc ? (
                                                     <div className="relative flex items-center">
                                                         <input 
@@ -1618,7 +1184,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                                                     </select>
                                                 )}
                                             </div>
-                                            <div className="col-span-2">
+                                            <div className="col-span-4 sm:col-span-2">
                                                 <input 
                                                     type="number" 
                                                     min="1"
@@ -1628,7 +1194,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                                                     className="w-full px-2 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 text-center bg-white focus:ring-2 focus:ring-teal-500 outline-none"
                                                 />
                                             </div>
-                                            <div className="col-span-2">
+                                            <div className="col-span-4 sm:col-span-2">
                                                 <input 
                                                     type="number" 
                                                     min="0"
@@ -1638,7 +1204,7 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                                                     className="w-full px-2 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 text-center bg-white focus:ring-2 focus:ring-teal-500 outline-none"
                                                 />
                                             </div>
-                                            <div className="col-span-3">
+                                            <div className="col-span-4 sm:col-span-3">
                                                 <button 
                                                     type="button"
                                                     onClick={handleAddExpense}
@@ -1677,39 +1243,9 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                                             </div>
                                         )}
                                     </div>
+                                </div>
 
-                                    {/* Next Action / Next Step Field */}
-                                    <div className="p-3.5 bg-amber-50/50 rounded-2xl border border-amber-200/60 space-y-2">
-                                        <div className="flex justify-between items-center">
-                                            <label className="block text-[10px] font-black text-amber-800 uppercase tracking-widest">
-                                                Next Action / Next Step <span className="text-rose-600 font-black">* (Mandatory for Close Visit)</span>
-                                            </label>
-                                        </div>
-                                        <input
-                                            type="text"
-                                            placeholder="e.g. Need Painter, Need Material, Customer Not Available..."
-                                            value={nextAction}
-                                            onChange={(e) => setNextAction(e.target.value)}
-                                            className="w-full px-3.5 py-2 rounded-xl border border-amber-200 bg-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
-                                        />
-                                        <div className="flex flex-wrap gap-1.5 pt-1">
-                                            {['Need Painter', 'Need Material', 'Customer Not Available', 'Part Required', 'Follow-up Visit'].map((preset) => (
-                                                <button
-                                                    key={preset}
-                                                    type="button"
-                                                    onClick={() => setNextAction(preset)}
-                                                    className={`px-2.5 py-1 rounded-md text-[9px] font-bold transition-all border ${
-                                                        nextAction === preset
-                                                            ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
-                                                            : 'bg-white text-amber-900 border-amber-200 hover:bg-amber-100'
-                                                    }`}
-                                                >
-                                                    + {preset}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                      {/* ADD PRODUCT PICTURE */}
                                      <div className="space-y-1.5">
                                          <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">
@@ -1783,794 +1319,178 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                                              />
                                          </div>
                                      </div>
-
-                                    {/* Two Action Buttons */}
-                                    <div className="pt-2 grid grid-cols-2 gap-3">
-                                        <button
-                                            type="button"
-                                            onClick={() => handleCheckOut('close_visit')}
-                                            className="py-3 px-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5"
-                                        >
-                                            <MdEvent size={16} />
-                                            Close Visit
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleCheckOut('close_ticket')}
-                                            className="py-3 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5"
-                                        >
-                                            <MdCheckCircle size={16} />
-                                            Close Ticket
-                                        </button>
-                                    </div>
                                 </div>
-                            )}
 
-                            {/* Completed Visit Summary View */}
-                            {selectedVisit.status === 'Completed' && (
-                                <div className="space-y-4 animate-fade-in">
-                                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                                        <h4 className="font-outfit font-black text-slate-900 uppercase text-xs tracking-wider flex items-center gap-1.5 text-teal-700">
-                                            <MdCheckCircle size={18} />
-                                            Visit Report & Summary
-                                        </h4>
-                                        <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-teal-100 text-teal-800 border border-teal-200">
-                                            Completed
-                                        </span>
+                                {/* Two Action Buttons */}
+                                <div className="pt-2 grid grid-cols-2 gap-3 sm:max-w-md sm:ml-auto">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCheckOut('close_visit')}
+                                        disabled={checkingOut}
+                                        className="py-3 px-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <MdEvent size={16} />
+                                        Close Visit
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCheckOut('close_ticket')}
+                                        disabled={checkingOut}
+                                        className="py-3 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <MdCheckCircle size={16} />
+                                        Close Ticket
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Completed Visit Summary View */}
+                        {selectedVisit.status === 'Completed' && (
+                            <div className="space-y-4 animate-fade-in">
+                                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                    <h4 className="font-outfit font-black text-slate-900 uppercase text-xs tracking-wider flex items-center gap-1.5 text-teal-700">
+                                        <MdCheckCircle size={18} />
+                                        Visit Report & Summary
+                                    </h4>
+                                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-teal-100 text-teal-800 border border-teal-200">
+                                        Completed
+                                    </span>
+                                </div>
+
+                                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-2 text-xs font-semibold">
+                                    <div className="flex justify-between text-slate-500">
+                                        <span>Billing Coverage:</span>
+                                        <span className="font-bold text-slate-900">{selectedVisit.billingStatus || 'Paid'}</span>
                                     </div>
-
-                                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-2 text-xs font-semibold">
+                                    {selectedVisit.checkIn?.time && (
                                         <div className="flex justify-between text-slate-500">
-                                            <span>Billing Coverage:</span>
-                                            <span className="font-bold text-slate-900">{selectedVisit.billingStatus || 'Paid'}</span>
-                                        </div>
-                                        {selectedVisit.checkIn?.time && (
-                                            <div className="flex justify-between text-slate-500">
-                                                <span>Check-In Time:</span>
-                                                <span className="font-bold text-slate-900">{formatDateTime(selectedVisit.checkIn.time)}</span>
-                                            </div>
-                                        )}
-                                        {selectedVisit.checkOut?.time && (
-                                            <div className="flex justify-between text-slate-500">
-                                                <span>Check-Out Time:</span>
-                                                <span className="font-bold text-slate-900">{formatDateTime(selectedVisit.checkOut.time)}</span>
-                                            </div>
-                                        )}
-                                        {selectedVisit.checkIn?.location && (
-                                            <div className="pt-1 text-[11px] text-slate-600 flex items-center justify-between gap-2">
-                                                <div>
-                                                    <span className="block text-[9px] font-black uppercase text-slate-400">GPS Location Stamp</span>
-                                                    <p className="font-medium text-slate-700">{selectedVisit.checkIn.location.address || `Lat: ${selectedVisit.checkIn.location.lat}, Lng: ${selectedVisit.checkIn.location.lng}`}</p>
-                                                </div>
-                                                {(selectedVisit.checkIn.location.lat || selectedVisit.checkIn.location.latitude) && (
-                                                    <a
-                                                        href={`https://www.google.com/maps?q=${selectedVisit.checkIn.location.lat || selectedVisit.checkIn.location.latitude},${selectedVisit.checkIn.location.lng || selectedVisit.checkIn.location.longitude}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-lg text-[10px] font-bold transition-all shrink-0 shadow-2xs group"
-                                                        title="Open in Google Maps"
-                                                    >
-                                                        <MdMap size={14} className="text-teal-600 group-hover:scale-110 transition-transform" />
-                                                        <span>Open Map</span>
-                                                        <MdOpenInNew size={11} />
-                                                    </a>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div>
-                                        <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Visit Report / Work Done</span>
-                                        <div className="p-3 bg-white rounded-xl border border-slate-200 text-xs font-medium text-slate-800 leading-relaxed min-h-[60px]">
-                                            {selectedVisit.visitReport || 'No written report attached.'}
-                                        </div>
-                                    </div>
-
-                                    {selectedVisit.nextAction && (
-                                        <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs space-y-0.5">
-                                            <span className="block text-[9px] font-black uppercase tracking-widest text-amber-800">Next Action Logged</span>
-                                            <p className="font-bold text-amber-950">{selectedVisit.nextAction}</p>
+                                            <span>Check-In Time:</span>
+                                            <span className="font-bold text-slate-900">{formatDateTime(selectedVisit.checkIn.time)}</span>
                                         </div>
                                     )}
-
-                                    {selectedVisit.expenses && selectedVisit.expenses.length > 0 && (
-                                        <div>
-                                            <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Part Change & Expenses Logged</span>
-                                            <div className="space-y-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100 text-xs">
-                                                {selectedVisit.expenses.map((ex, idx) => (
-                                                    <div key={idx} className="flex justify-between items-center font-bold text-slate-700">
-                                                        <div className="flex items-center gap-2">
-                                                            {ex.isPartChange && (
-                                                                <span className="px-1.5 py-0.5 bg-teal-100 text-teal-800 text-[9px] font-black uppercase rounded tracking-wider">
-                                                                    Part Changed
-                                                                </span>
-                                                            )}
-                                                            <span>{ex.description} ({ex.quantity || 1} x ₹{ex.rate || 0})</span>
-                                                        </div>
-                                                        <span className="text-teal-700">₹{ex.amount}</span>
-                                                    </div>
-                                                ))}
-                                                <div className="border-t border-slate-200 pt-1 flex justify-between font-black text-slate-900">
-                                                    <span>Total Expense Amount:</span>
-                                                    <span className="text-teal-800">₹{selectedVisit.expenses.reduce((acc, curr) => acc + (curr.amount || 0), 0)}</span>
-                                                </div>
+                                    {selectedVisit.checkOut?.time && (
+                                        <div className="flex justify-between text-slate-500">
+                                            <span>Check-Out Time:</span>
+                                            <span className="font-bold text-slate-900">{formatDateTime(selectedVisit.checkOut.time)}</span>
+                                        </div>
+                                    )}
+                                    {selectedVisit.checkIn?.location && (
+                                        <div className="pt-1 text-[11px] text-slate-600 flex items-center justify-between gap-2">
+                                            <div>
+                                                <span className="block text-[9px] font-black uppercase text-slate-400">GPS Location Stamp</span>
+                                                <p className="font-medium text-slate-700">{selectedVisit.checkIn.location.address || `Lat: ${selectedVisit.checkIn.location.lat}, Lng: ${selectedVisit.checkIn.location.lng}`}</p>
                                             </div>
-                                        </div>
-                                    )}
-
-                                    {selectedVisit.productPhoto && (
-                                         <div>
-                                             <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Finished Product Picture</span>
-                                             <div className="p-2 bg-slate-50 rounded-xl border border-slate-200 flex justify-center">
-                                                 <img src={selectedVisit.productPhoto} alt="Product Picture" className="max-h-48 object-contain rounded-lg shadow-xs" />
-                                             </div>
-                                         </div>
-                                     )}
-
-                                     {selectedVisit.customerSignature && selectedVisit.customerSignature.startsWith('data:image') && (
-                                        <div>
-                                            <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Customer Sign Approval</span>
-                                            <div className="p-2 bg-slate-50 rounded-xl border border-slate-200 flex justify-center">
-                                                <img src={selectedVisit.customerSignature} alt="Customer Signature" className="max-h-20 object-contain" />
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="pt-2 space-y-2">
-                                        <button
-                                            onClick={() => handleOpenCreateModal(selectedVisit.ticketId?._id || selectedVisit.ticketId)}
-                                            className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-1.5"
-                                        >
-                                            <MdAdd size={16} />
-                                            Schedule New Visit for Ticket
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setRescheduleDate(selectedVisit.scheduledDate ? new Date(selectedVisit.scheduledDate).toISOString().slice(0, 16) : '');
-                                                setRescheduleEngineer(selectedVisit.engineerId?._id || selectedVisit.engineerId || '');
-                                                setShowRescheduleModal(true);
-                                            }}
-                                            className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border border-slate-200"
-                                        >
-                                            Re-open / Reschedule Visit
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Cancelled State View */}
-                            {selectedVisit.status === 'Cancelled' && (
-                                <div className="space-y-4 text-center py-6">
-                                    <h4 className="font-outfit font-black text-rose-600 uppercase">Visit Cancelled</h4>
-                                    <p className="text-xs text-slate-400 font-semibold px-4">
-                                        This visit was marked as cancelled. You can reschedule it or schedule a new visit.
-                                    </p>
-                                    <button
-                                        onClick={() => {
-                                            setRescheduleDate(selectedVisit.scheduledDate ? new Date(selectedVisit.scheduledDate).toISOString().slice(0, 16) : '');
-                                            setRescheduleEngineer(selectedVisit.engineerId?._id || selectedVisit.engineerId || '');
-                                            setShowRescheduleModal(true);
-                                        }}
-                                        className="w-full py-3 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                                    >
-                                        Reschedule Visit
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <div className="glass shadow-premium rounded-[2rem] p-8 bg-white border border-slate-100 text-center py-20 text-slate-400">
-                            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-300 mb-4">
-                                <MdLocalShipping size={32} />
-                            </div>
-                            <h4 className="font-outfit font-black text-slate-900 uppercase mb-2">No Active dispatch</h4>
-                            <p className="text-xs text-slate-400 font-semibold px-4 mb-4">
-                                Select a visit from the scheduled visits table to open the field service check-in / check-out dispatch simulator.
-                            </p>
-                            <button
-                                onClick={() => handleOpenCreateModal()}
-                                className="px-4 py-2.5 bg-primary-600 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md"
-                            >
-                                + Schedule Field Visit
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
-            ) : (
-                /* Field Engineer Attendance View */
-                showAttendanceForm ? (
-                    /* Full Page Check-In Form View */
-                    <div className="space-y-6 max-w-3xl mx-auto animate-fade-in-up">
-                        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-                            <button
-                                type="button"
-                                onClick={() => setShowAttendanceForm(false)}
-                                className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
-                            >
-                                <MdArrowBack size={18} />
-                                Back to Attendance Register
-                            </button>
-                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                                Field Duty Check-In Page
-                            </span>
-                        </div>
-
-                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative">
-                            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
-                                <div>
-                                    <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-outfit uppercase tracking-tight">
-                                        Field Engineer Attendance Check-In
-                                    </h2>
-                                    <div className="w-16 h-1.5 bg-emerald-500 rounded-full mt-1.5" />
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowAttendanceForm(false)}
-                                    className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
-                                    title="Close Form View"
-                                >
-                                    <MdClose size={22} />
-                                </button>
-                            </div>
-
-                            <form onSubmit={handleSubmitAttendanceCheckIn} className="space-y-5">
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">
-                                        Employee Name
-                                    </label>
-                                    <input
-                                        type="text"
-                                        readOnly
-                                        value={currentUser.name || 'Field Engineer'}
-                                        className="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 cursor-not-allowed"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">
-                                        Area / Site Name *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        required
-                                        placeholder="e.g. Aditraj Complex, Jodhpur Village..."
-                                        value={checkInAreaName}
-                                        onChange={(e) => setCheckInAreaName(e.target.value)}
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold focus:ring-2 focus:ring-teal-500 outline-none bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
-                                    />
-                                </div>
-
-                                <div className="p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2 shadow-xs">
-                                    <div className="flex items-center justify-between">
-                                        <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-                                            GPS Location / Exact Street Address *
-                                        </label>
-                                        <button
-                                            type="button"
-                                            onClick={fetchGpsLocation}
-                                            disabled={isLocating}
-                                            className="text-[10px] font-bold text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 flex items-center gap-1 cursor-pointer transition-colors"
-                                            title="Re-query device GPS hardware for maximum precision"
-                                        >
-                                            <MdRefresh size={14} className={isLocating ? 'animate-spin' : ''} />
-                                            {isLocating ? 'Acquiring GPS...' : 'Refresh High-Accuracy GPS'}
-                                        </button>
-                                    </div>
-                                    <textarea
-                                        rows={2}
-                                        value={checkInAddress}
-                                        onChange={(e) => setCheckInAddress(e.target.value)}
-                                        placeholder="Auto-detecting exact location or type full street address..."
-                                        className="w-full px-3.5 py-2.5 text-xs font-semibold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none leading-relaxed resize-none shadow-inner"
-                                    />
-                                    {checkInLat && checkInLng && (
-                                        <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
-                                            <p className="text-[10px] font-mono text-teal-700 dark:text-teal-300 font-bold">
-                                                Lat: {checkInLat.toFixed(5)}, Lng: {checkInLng.toFixed(5)}
-                                            </p>
-                                            <a
-                                                href={`https://www.google.com/maps?q=${checkInLat},${checkInLng}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-[10px] font-bold text-teal-600 dark:text-teal-400 hover:underline flex items-center gap-1"
-                                            >
-                                                <MdMap size={12} /> View Map Pin
-                                            </a>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">
-                                        Selfie Photo Verification *
-                                    </label>
-                                    {checkInSelfie ? (
-                                        <div className="relative p-3 bg-slate-50 dark:bg-slate-800 border border-teal-300 dark:border-teal-700 rounded-2xl flex flex-col items-center justify-center space-y-3">
-                                            <img src={checkInSelfie} alt="Selfie" className="h-44 rounded-xl object-cover shadow-md" />
-                                            <div className="flex items-center gap-3">
-                                                <label className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-all shadow-md">
-                                                    Retake Selfie
-                                                    <input type="file" accept="image/*" capture="user" onChange={handleSelfieChange} className="hidden" />
-                                                </label>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setCheckInSelfie('')}
-                                                    className="px-4 py-2 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                                            {(selectedVisit.checkIn.location.lat || selectedVisit.checkIn.location.latitude) && (
+                                                <a
+                                                    href={`https://www.google.com/maps?q=${selectedVisit.checkIn.location.lat || selectedVisit.checkIn.location.latitude},${selectedVisit.checkIn.location.lng || selectedVisit.checkIn.location.longitude}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-lg text-[10px] font-bold transition-all shrink-0 shadow-2xs group"
+                                                    title="Open in Google Maps"
                                                 >
-                                                    Remove
-                                                </button>
-                                            </div>
+                                                    <MdMap size={14} className="text-teal-600 group-hover:scale-110 transition-transform" />
+                                                    <span>Open Map</span>
+                                                    <MdOpenInNew size={11} />
+                                                </a>
+                                            )}
                                         </div>
-                                    ) : (
-                                        <label className="border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-teal-500 dark:hover:border-teal-400 bg-slate-50/70 dark:bg-slate-800/50 hover:bg-teal-50/30 dark:hover:bg-teal-950/20 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all group text-center">
-                                            <input type="file" accept="image/*" capture="user" onChange={handleSelfieChange} className="hidden" />
-                                            <div className="w-14 h-14 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-center text-slate-400 group-hover:text-teal-600 group-hover:border-teal-300 transition-all mb-3">
-                                                {uploadingSelfie ? (
-                                                    <div className="w-6 h-6 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
-                                                ) : (
-                                                    <MdPhotoCamera size={28} />
-                                                )}
-                                            </div>
-                                            <span className="text-xs font-black text-slate-800 dark:text-slate-200 group-hover:text-teal-700 dark:group-hover:text-teal-300">
-                                                {uploadingSelfie ? 'Uploading Selfie...' : 'Take / Upload Selfie'}
-                                            </span>
-                                            <span className="text-[10px] text-slate-400 font-semibold mt-1">
-                                                Capture engineer selfie for attendance record
-                                            </span>
-                                        </label>
                                     )}
                                 </div>
 
                                 <div>
-                                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">
-                                        Notes / Remarks (Optional)
-                                    </label>
-                                    <textarea
-                                        placeholder="Optional check-in notes..."
-                                        value={checkInNotes}
-                                        onChange={(e) => setCheckInNotes(e.target.value)}
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold h-20 outline-none focus:ring-2 focus:ring-teal-500 bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
-                                    />
-                                </div>
-
-                                <div className="pt-2">
-                                    <button
-                                        type="submit"
-                                        disabled={submittingCheckIn || uploadingSelfie}
-                                        className="w-full py-4 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-teal-600/30 active:scale-[0.99] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                    >
-                                        <MdHowToReg size={20} />
-                                        {submittingCheckIn ? 'Recording Check-In...' : 'Record Check-In'}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                ) : showCheckOutForm ? (
-                    /* Full Page Check-Out Form View */
-                    <div className="space-y-6 max-w-3xl mx-auto animate-fade-in-up">
-                        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-                            <button
-                                type="button"
-                                onClick={() => setShowCheckOutForm(false)}
-                                className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
-                            >
-                                <MdArrowBack size={18} />
-                                Back to Attendance Register
-                            </button>
-                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                                Field Duty Check-Out Page
-                            </span>
-                        </div>
-
-                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative">
-                            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
-                                <div>
-                                    <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-outfit uppercase tracking-tight">
-                                        Field Engineer Attendance Check-Out
-                                    </h2>
-                                    <div className="w-16 h-1.5 bg-rose-500 rounded-full mt-1.5" />
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowCheckOutForm(false)}
-                                    className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
-                                    title="Close Form View"
-                                >
-                                    <MdClose size={22} />
-                                </button>
-                            </div>
-
-                            <form onSubmit={handleSubmitAttendanceCheckOutModal} className="space-y-5">
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">
-                                        Employee Name
-                                    </label>
-                                    <input
-                                        type="text"
-                                        readOnly
-                                        value={activeAttendance?.employeeName || currentUser.name || 'Field Engineer'}
-                                        className="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 cursor-not-allowed"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">
-                                        Area / Site Name *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        required
-                                        placeholder="e.g. Baner Site, Hinjewadi Phase 1, Pune..."
-                                        value={checkOutAreaName}
-                                        onChange={(e) => setCheckOutAreaName(e.target.value)}
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold focus:ring-2 focus:ring-rose-500 outline-none bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
-                                    />
-                                </div>
-
-                                <div className="p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2 shadow-xs">
-                                    <div className="flex items-center justify-between">
-                                        <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-                                            GPS Location / Exact Street Address *
-                                        </label>
-                                        <button
-                                            type="button"
-                                            onClick={fetchCheckOutGpsLocation}
-                                            disabled={isCheckOutLocating}
-                                            className="text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 flex items-center gap-1 cursor-pointer transition-colors"
-                                        >
-                                            <MdRefresh size={14} className={isCheckOutLocating ? 'animate-spin' : ''} />
-                                            {isCheckOutLocating ? 'Acquiring GPS...' : 'Refresh High-Accuracy GPS'}
-                                        </button>
+                                    <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Visit Report / Work Done</span>
+                                    <div className="p-3 bg-white rounded-xl border border-slate-200 text-xs font-medium text-slate-800 leading-relaxed min-h-[60px]">
+                                        {selectedVisit.visitReport || 'No written report attached.'}
                                     </div>
-                                    <textarea
-                                        rows={2}
-                                        value={checkOutAddress}
-                                        onChange={(e) => setCheckOutAddress(e.target.value)}
-                                        placeholder="Auto-detecting exact location or type full street address..."
-                                        className="w-full px-3.5 py-2.5 text-xs font-semibold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none leading-relaxed resize-none shadow-inner"
-                                    />
-                                    {checkOutLat && checkOutLng && (
-                                        <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
-                                            <p className="text-[10px] font-mono text-rose-700 dark:text-rose-300 font-bold">
-                                                Lat: {checkOutLat.toFixed(5)}, Lng: {checkOutLng.toFixed(5)}
-                                            </p>
-                                            <a
-                                                href={`https://www.google.com/maps?q=${checkOutLat},${checkOutLng}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1"
-                                            >
-                                                <MdMap size={12} /> View Map Pin
-                                            </a>
-                                        </div>
-                                    )}
                                 </div>
 
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">
-                                        Check-Out Selfie Photo Verification *
-                                    </label>
-                                    {checkOutSelfie ? (
-                                        <div className="relative p-3 bg-slate-50 dark:bg-slate-800 border border-rose-300 dark:border-rose-700 rounded-2xl flex flex-col items-center justify-center space-y-3">
-                                            <img src={checkOutSelfie} alt="Check-Out Selfie" className="h-44 rounded-xl object-cover shadow-md" />
-                                            <div className="flex items-center gap-3">
-                                                <label className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-all shadow-md">
-                                                    Retake Selfie
-                                                    <input type="file" accept="image/*" capture="user" onChange={handleCheckOutSelfieChange} className="hidden" />
-                                                </label>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setCheckOutSelfie('')}
-                                                    className="px-4 py-2 bg-slate-200 text-slate-700 hover:bg-slate-300 rounded-xl text-xs font-bold transition-all cursor-pointer"
-                                                >
-                                                    Remove
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <label className="border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-rose-500 dark:hover:border-rose-400 bg-slate-50/70 dark:bg-slate-800/50 hover:bg-rose-50/30 dark:hover:bg-rose-950/20 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all group text-center">
-                                            <input type="file" accept="image/*" capture="user" onChange={handleCheckOutSelfieChange} className="hidden" />
-                                            <div className="w-14 h-14 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-center text-slate-400 group-hover:text-rose-600 group-hover:border-rose-300 transition-all mb-3">
-                                                {uploadingCheckOutSelfie ? (
-                                                    <div className="w-6 h-6 border-2 border-rose-600 border-t-transparent rounded-full animate-spin" />
-                                                ) : (
-                                                    <MdPhotoCamera size={28} />
-                                                )}
-                                            </div>
-                                            <span className="text-xs font-black text-slate-800 dark:text-slate-200 group-hover:text-rose-700 dark:group-hover:text-rose-300">
-                                                {uploadingCheckOutSelfie ? 'Uploading Check-Out Selfie...' : 'Take / Upload Check-Out Selfie'}
-                                            </span>
-                                            <span className="text-[10px] text-slate-400 font-semibold mt-1">
-                                                Capture engineer selfie for duty check-out
-                                            </span>
-                                        </label>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">
-                                        Check-Out Remarks (Optional)
-                                    </label>
-                                    <textarea
-                                        placeholder="Optional check-out remarks..."
-                                        value={checkOutNotes}
-                                        onChange={(e) => setCheckOutNotes(e.target.value)}
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold h-20 outline-none focus:ring-2 focus:ring-rose-500 bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
-                                    />
-                                </div>
-
-                                <div className="pt-2">
-                                    <button
-                                        type="submit"
-                                        disabled={submittingCheckOut || uploadingCheckOutSelfie}
-                                        className="w-full py-4 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-rose-600/30 active:scale-[0.99] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                    >
-                                        <MdCheckCircle size={20} />
-                                        {submittingCheckOut ? 'Recording Check-Out...' : 'Record Check-Out'}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                ) : (
-                    /* Main Attendance Status & Register Table View */
-                    <div className="space-y-6">
-                        {/* Active Status Card */}
-                        <div className={`rounded-[2rem] p-6 border shadow-2xl transition-all relative overflow-hidden ${
-                            activeAttendance 
-                                ? 'bg-slate-900 text-white border-teal-500/50 shadow-teal-950/40' 
-                                : hasCompletedToday
-                                    ? 'bg-slate-900 text-white border-indigo-500/50 shadow-indigo-950/40'
-                                    : 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-slate-200 dark:border-slate-800'
-                        }`}>
-                            {(activeAttendance || hasCompletedToday) && (
-                                <div className="absolute -right-16 -bottom-16 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
-                            )}
-                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 relative z-10">
-                                <div className="flex items-center gap-4">
-                                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ${
-                                        activeAttendance 
-                                            ? 'bg-teal-500/20 text-teal-300 border border-teal-400/40' 
-                                            : hasCompletedToday
-                                                ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-400/40'
-                                                : 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
-                                    }`}>
-                                        {activeAttendance ? <MdCheckCircle size={32} /> : hasCompletedToday ? <MdCheckCircle size={32} /> : <MdHowToReg size={32} />}
+                                {selectedVisit.nextAction && (
+                                    <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs space-y-0.5">
+                                        <span className="block text-[9px] font-black uppercase tracking-widest text-amber-800">Next Action Logged</span>
+                                        <p className="font-bold text-amber-950">{selectedVisit.nextAction}</p>
                                     </div>
+                                )}
+
+                                {selectedVisit.expenses && selectedVisit.expenses.length > 0 && (
                                     <div>
-                                        <div className="flex items-center gap-2">
-                                            <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border ${
-                                                activeAttendance 
-                                                    ? 'bg-teal-500/25 text-teal-200 border-teal-400/40' 
-                                                    : hasCompletedToday
-                                                        ? 'bg-indigo-500/25 text-indigo-200 border-indigo-400/40'
-                                                        : 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200 border-amber-300 dark:border-amber-700'
-                                            }`}>
-                                                {activeAttendance 
-                                                    ? 'STATUS: CURRENTLY CHECKED-IN' 
-                                                    : hasCompletedToday
-                                                        ? 'STATUS: ATTENDANCE COMPLETED TODAY'
-                                                        : 'STATUS: NOT CHECKED-IN TODAY'}
-                                            </span>
-                                            <span className={`text-xs font-bold ${activeAttendance || hasCompletedToday ? 'text-slate-300' : 'text-slate-500 dark:text-slate-400'}`}>
-                                                • Field Engineer Duty
-                                            </span>
-                                        </div>
-                                        <h3 className={`text-xl sm:text-2xl font-black font-outfit uppercase mt-1.5 ${activeAttendance || hasCompletedToday ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
-                                            {activeAttendance 
-                                                ? activeAttendance.employeeName 
-                                                : todayAttendance 
-                                                    ? todayAttendance.employeeName 
-                                                    : (currentUser.name || 'Field Engineer')}
-                                        </h3>
-                                        {activeAttendance ? (
-                                            <div className="text-xs text-slate-300 font-medium mt-1 flex flex-wrap items-center gap-1.5 leading-relaxed">
-                                                <span>Checked in at</span>
-                                                <span className="font-extrabold text-teal-300 bg-teal-950/80 px-2 py-0.5 rounded-md border border-teal-800/80">
-                                                    {new Date(activeAttendance.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </span>
-                                                <span>— Location:</span>
-                                                <span className="font-bold text-emerald-300 bg-slate-800 px-2 py-0.5 rounded-md border border-slate-700">
-                                                    {activeAttendance.checkInLocation?.areaName || 'Field Site'}
-                                                </span>
-                                                {activeAttendance.checkInLocation?.address && (
-                                                    <span className="text-slate-400 font-normal">
-                                                        ({activeAttendance.checkInLocation.address})
-                                                    </span>
-                                                )}
-                                            </div>
-                                        ) : hasCompletedToday ? (
-                                            <div className="text-xs text-slate-300 font-medium mt-1 flex flex-wrap items-center gap-1.5 leading-relaxed">
-                                                <span>Checked-in at</span>
-                                                <span className="font-extrabold text-indigo-300 bg-indigo-950/80 px-2 py-0.5 rounded-md border border-indigo-800/80">
-                                                    {new Date(todayAttendance.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </span>
-                                                <span>& Checked-out at</span>
-                                                <span className="font-extrabold text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-800/80">
-                                                    {todayAttendance.checkOutTime ? new Date(todayAttendance.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
-                                                </span>
-                                                <span className="text-slate-400 font-medium">• 1 Check-in Daily Limit Reached</span>
-                                            </div>
-                                        ) : (
-                                            <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-1">
-                                                Click the Check-In button to record your field attendance with live GPS location & selfie verification.
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
-                                    {activeAttendance ? (
-                                        <button
-                                            onClick={handleOpenCheckOutModal}
-                                            disabled={submittingCheckOut}
-                                            className="px-6 py-3.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-rose-600/30 hover:shadow-rose-600/50 active:scale-95 cursor-pointer"
-                                        >
-                                            {submittingCheckOut ? 'Checking Out...' : 'CHECK-OUT NOW'}
-                                        </button>
-                                    ) : hasCompletedToday ? (
-                                        <button
-                                            disabled
-                                            className="px-6 py-3.5 bg-slate-800/80 text-slate-400 font-black text-xs uppercase tracking-wider rounded-2xl border border-slate-700/80 flex items-center gap-2 cursor-not-allowed opacity-90 shadow-inner"
-                                            title="Daily check-in limit reached"
-                                        >
-                                            <MdCheckCircle size={18} className="text-emerald-400" />
-                                            CHECK-IN COMPLETED FOR TODAY
-                                        </button>
-                                    ) : (
-                                        <button
-                                            onClick={handleOpenAttendanceModal}
-                                            className="px-6 py-3.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-teal-600/30 hover:shadow-teal-600/50 active:scale-95 flex items-center gap-2 cursor-pointer"
-                                        >
-                                            <MdHowToReg size={18} />
-                                            CHECK-IN FIELD ATTENDANCE
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-
-                    {/* Register Filter & Table Card */}
-                    <div className="glass shadow-premium rounded-[2rem] p-6 bg-white border border-slate-100 space-y-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-                            <div>
-                                <h3 className="text-lg font-black text-slate-900 font-outfit uppercase">
-                                    My Attendance Register
-                                </h3>
-                                <p className="text-xs text-slate-500 font-semibold">
-                                    Your own field check-ins, check-outs, area locations, and selfie captures.
-                                </p>
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-3">
-                                <DateInput
-                                    type="date"
-                                    value={attendanceDateFilter}
-                                    onChange={(e) => setAttendanceDateFilter(e.target.value)}
-                                    className="px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                />
-
-                                <button
-                                    onClick={fetchAttendanceRecords}
-                                    className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-all"
-                                    title="Refresh Register"
-                                >
-                                    <MdRefresh size={18} />
-                                </button>
-                            </div>
-                        </div>
-
-                        {loadingAttendance ? (
-                            <div className="flex flex-col items-center justify-center py-16 space-y-3">
-                                <div className="w-10 h-10 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin"></div>
-                                <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Loading Attendance Logs...</p>
-                            </div>
-                        ) : attendanceList.length === 0 ? (
-                            <div className="text-center py-16 text-slate-400 space-y-3">
-                                <p className="text-base font-bold">No attendance records found.</p>
-                                <p className="text-xs">Field check-in records will appear here once engineers mark attendance.</p>
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse text-xs">
-                                    <thead>
-                                        <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
-                                            <th className="px-4 py-3">Employee Name</th>
-                                            <th className="px-4 py-3">Date</th>
-                                            <th className="px-4 py-3">Check-In Details</th>
-                                            <th className="px-4 py-3">Check-Out Details</th>
-                                            <th className="px-4 py-3 text-center">Selfie</th>
-                                            <th className="px-4 py-3 text-center">Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
-                                        {attendanceList.map((rec) => (
-                                            <tr key={rec._id} className="hover:bg-slate-50/70 transition-colors">
-                                                <td className="px-4 py-3 font-bold text-slate-900">
-                                                    {rec.employeeName || rec.engineerId?.name || 'Engineer'}
-                                                </td>
-                                                <td className="px-4 py-3 text-slate-600">
-                                                    {formatDate(rec.attendanceDate)}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <div className="space-y-0.5">
-                                                        <span className="font-bold text-slate-900">
-                                                            {new Date(rec.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                        </span>
-                                                        <p className="text-[10px] text-teal-700 font-bold">{rec.checkInLocation?.areaName || 'Field Location'}</p>
-                                                        {rec.checkInLocation?.address && (
-                                                            <p className="text-[10px] text-slate-400 max-w-xs truncate">{rec.checkInLocation.address}</p>
-                                                        )}
-                                                        {rec.checkInLocation?.latitude && rec.checkInLocation?.longitude && (
-                                                            <a
-                                                                href={`https://www.google.com/maps?q=${rec.checkInLocation.latitude},${rec.checkInLocation.longitude}`}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="inline-flex items-center gap-1 text-[9px] font-bold text-teal-600 hover:underline pt-0.5"
-                                                            >
-                                                                <MdMap size={12} /> Map GPS
-                                                            </a>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    {rec.checkOutTime ? (
-                                                        <div className="space-y-0.5">
-                                                            <span className="font-bold text-slate-900">
-                                                                {new Date(rec.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Part Change & Expenses Logged</span>
+                                        <div className="space-y-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+                                            {selectedVisit.expenses.map((ex, idx) => (
+                                                <div key={idx} className="flex justify-between items-center font-bold text-slate-700">
+                                                    <div className="flex items-center gap-2">
+                                                        {ex.isPartChange && (
+                                                            <span className="px-1.5 py-0.5 bg-teal-100 text-teal-800 text-[9px] font-black uppercase rounded tracking-wider">
+                                                                Part Changed
                                                             </span>
-                                                            <p className="text-[10px] text-slate-500">{rec.checkOutLocation?.areaName || rec.checkInLocation?.areaName}</p>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">Active Duty</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    <div className="flex items-center justify-center gap-1.5">
-                                                        {rec.selfieUrl ? (
-                                                            <img
-                                                                src={rec.selfieUrl}
-                                                                alt="Check-In Selfie"
-                                                                onClick={() => setSelectedAttendanceSelfie(rec.selfieUrl)}
-                                                                className="w-9 h-9 rounded-xl object-cover border border-teal-400 shadow-2xs cursor-pointer hover:scale-105 transition-transform"
-                                                                title="Check-In Selfie (Click to expand)"
-                                                            />
-                                                        ) : (
-                                                            <span className="text-[9px] text-slate-400">No In Selfie</span>
                                                         )}
-                                                        {rec.checkOutSelfieUrl ? (
-                                                            <img
-                                                                src={rec.checkOutSelfieUrl}
-                                                                alt="Check-Out Selfie"
-                                                                onClick={() => setSelectedAttendanceSelfie(rec.checkOutSelfieUrl)}
-                                                                className="w-9 h-9 rounded-xl object-cover border border-rose-400 shadow-2xs cursor-pointer hover:scale-105 transition-transform"
-                                                                title="Check-Out Selfie (Click to expand)"
-                                                            />
-                                                        ) : rec.status === 'Checked-Out' ? (
-                                                            <span className="text-[9px] text-slate-400">No Out Selfie</span>
-                                                        ) : null}
+                                                        <span>{ex.description} ({ex.quantity || 1} x ₹{ex.rate || 0})</span>
                                                     </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase border tracking-wider ${
-                                                        rec.status === 'Checked-In' ? 'bg-teal-50 text-teal-700 border-teal-200' : 'bg-slate-100 text-slate-600 border-slate-200'
-                                                    }`}>
-                                                        {rec.status}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                                    <span className="text-teal-700">₹{ex.amount}</span>
+                                                </div>
+                                            ))}
+                                            <div className="border-t border-slate-200 pt-1 flex justify-between font-black text-slate-900">
+                                                <span>Total Expense Amount:</span>
+                                                <span className="text-teal-800">₹{selectedVisit.expenses.reduce((acc, curr) => acc + (curr.amount || 0), 0)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {selectedVisit.productPhoto && (
+                                     <div>
+                                         <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Finished Product Picture</span>
+                                         <div className="p-2 bg-slate-50 rounded-xl border border-slate-200 flex justify-center">
+                                             <img src={selectedVisit.productPhoto} alt="Product Picture" className="max-h-48 object-contain rounded-lg shadow-xs" />
+                                         </div>
+                                     </div>
+                                 )}
+
+                                 {selectedVisit.customerSignature && selectedVisit.customerSignature.startsWith('data:image') && (
+                                    <div>
+                                        <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Customer Sign Approval</span>
+                                        <div className="p-2 bg-slate-50 rounded-xl border border-slate-200 flex justify-center">
+                                            <img src={selectedVisit.customerSignature} alt="Customer Signature" className="max-h-20 object-contain" />
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="pt-2 flex flex-col sm:flex-row sm:justify-end gap-2">
+                                    <button
+                                        onClick={() => handleOpenCreateModal(selectedVisit.ticketId?._id || selectedVisit.ticketId)}
+                                        className="w-full sm:w-auto sm:px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-1.5"
+                                    >
+                                        <MdAdd size={16} />
+                                        Schedule New Visit for Ticket
+                                    </button>
+                                    <button
+                                        onClick={openRescheduleModal}
+                                        className="w-full sm:w-auto sm:px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border border-slate-200"
+                                    >
+                                        Re-open / Reschedule Visit
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Cancelled State View */}
+                        {selectedVisit.status === 'Cancelled' && (
+                            <div className="space-y-4 text-center py-6">
+                                <h4 className="font-outfit font-black text-rose-600 uppercase">Visit Cancelled</h4>
+                                <p className="text-xs text-slate-400 font-semibold px-4">
+                                    This visit was marked as cancelled. You can reschedule it or schedule a new visit.
+                                </p>
+                                <button
+                                    onClick={openRescheduleModal}
+                                    className="w-full sm:w-auto sm:px-10 py-3 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                >
+                                    Reschedule Visit
+                                </button>
                             </div>
                         )}
                     </div>
                 </div>
-            )
-        )}
+            )}
 
             {/* Reschedule Visit Modal */}
             <Modal
@@ -2713,20 +1633,6 @@ const ServiceVisits = ({ initialTab = 'visits', hideTabs = false }) => {
                         </select>
                     </div>
                 </form>
-            </Modal>
-
-            {/* Selfie Image Preview Modal */}
-            <Modal
-                isOpen={!!selectedAttendanceSelfie}
-                onClose={() => setSelectedAttendanceSelfie(null)}
-                title="Field Engineer Selfie Photo"
-                maxWidth="max-w-sm"
-            >
-                {selectedAttendanceSelfie && (
-                    <div className="flex flex-col items-center p-2">
-                        <img src={selectedAttendanceSelfie} alt="Selfie Full View" className="max-h-96 rounded-2xl object-contain shadow-md" />
-                    </div>
-                )}
             </Modal>
         </div>
     );

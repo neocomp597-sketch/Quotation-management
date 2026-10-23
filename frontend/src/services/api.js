@@ -463,7 +463,6 @@ export const bomService = {
     return api.post(`/bom/${id}/components/import`, form, { headers: { "Content-Type": "multipart/form-data" } });
   },
   getBySerial: (serialNumber) => api.get(`/bom/serial/${encodeURIComponent(serialNumber)}`),
-  getForTicket: (ticketId) => api.get(`/bom/ticket/${ticketId}`),
 };
 
 // Serial No Transfer: customer-wise ownership history of sold serial numbers.

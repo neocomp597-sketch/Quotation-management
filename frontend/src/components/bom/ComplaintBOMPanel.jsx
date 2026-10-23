@@ -4,42 +4,40 @@ import { bomService } from '../../services/api';
 import BOMComponentsTable from './BOMComponentsTable';
 
 /**
- * Read-only BOM for a complaint. Pass `ticketId` for an existing complaint, or `serialNumber`
- * while booking one. The BOM is looked up through the FG serial number and cannot be changed here.
+ * Read-only BOM shown while booking a complaint, looked up through the FG serial number.
+ * The BOM cannot be changed here.
  */
-const ComplaintBOMPanel = ({ ticketId, serialNumber }) => {
+const ComplaintBOMPanel = ({ serialNumber }) => {
     const serial = String(serialNumber || '').trim();
-    const lookupKey = ticketId ? `ticket:${ticketId}` : serial ? `serial:${serial}` : '';
     const [state, setState] = useState({ key: '', error: '', bom: null, serial: '' });
 
     useEffect(() => {
-        if (!lookupKey) return undefined;
+        if (!serial) return undefined;
 
         let cancelled = false;
         // Debounce so typing a serial number doesn't fire a lookup per keystroke.
         const timer = setTimeout(() => {
-            const request = ticketId ? bomService.getForTicket(ticketId) : bomService.getBySerial(serial);
-            request
+            bomService.getBySerial(serial)
                 .then((res) => {
                     if (cancelled) return;
-                    setState({ key: lookupKey, error: '', bom: res.data?.bom || null, serial: res.data?.serialNumber ?? serial });
+                    setState({ key: serial, error: '', bom: res.data?.bom || null, serial: res.data?.serialNumber ?? serial });
                 })
                 .catch((err) => {
                     if (cancelled) return;
-                    setState({ key: lookupKey, error: err.response?.data?.message || 'Could not load BOM', bom: null, serial });
+                    setState({ key: serial, error: err.response?.data?.message || 'Could not load BOM', bom: null, serial });
                 });
-        }, ticketId ? 0 : 400);
+        }, 400);
 
         return () => {
             cancelled = true;
             clearTimeout(timer);
         };
-    }, [lookupKey, ticketId, serial]);
+    }, [serial]);
 
-    const loading = state.key !== lookupKey;
+    const loading = state.key !== serial;
     const { error, bom } = state;
 
-    if (!lookupKey) {
+    if (!serial) {
         return <p className="p-4 text-sm font-medium text-slate-400">Enter the product serial number to see its BOM.</p>;
     }
     if (loading) {
@@ -55,7 +53,7 @@ const ComplaintBOMPanel = ({ ticketId, serialNumber }) => {
     if (!bom) {
         return (
             <p className="p-4 text-sm font-medium text-slate-400">
-                {state.serial ? <>No BOM has been entered for serial number <span className="font-bold text-slate-600">{state.serial}</span>.</> : 'This complaint has no product serial number, so no BOM can be shown.'}
+                No BOM has been entered for serial number <span className="font-bold text-slate-600">{state.serial}</span>.
             </p>
         );
     }
