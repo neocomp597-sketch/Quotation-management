@@ -19,9 +19,10 @@ const generateVisitNumber = async (companyId) => {
 exports.createVisit = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
+        const { assignTicketIfUnassigned, ...visitFields } = req.body || {};
         const visitNo = await generateVisitNumber(companyId);
 
-        const ticket = await Ticket.findOne({ _id: req.body.ticketId, companyId });
+        const ticket = await Ticket.findOne({ _id: visitFields.ticketId, companyId });
         if (!ticket) {
             return res.status(404).json({ message: 'Ticket not found' });
         }
@@ -43,7 +44,7 @@ exports.createVisit = async (req, res) => {
         }
 
         const visitData = {
-            ...req.body,
+            ...visitFields,
             visitNo,
             companyId,
             status: 'Scheduled',
@@ -59,6 +60,34 @@ exports.createVisit = async (req, res) => {
             description: `Field Service Visit scheduled (${visitNo})`,
             performedBy: req.user?.id
         });
+
+        // Scheduling from the ticket screen hands a ticket nobody is assigned to over
+        // to the visit's engineer. Done here, as part of scheduling, so it needs only
+        // the permission to schedule visits.
+        if (assignTicketIfUnassigned && !ticket.assignedEngineerId && visit.engineerId) {
+            const Engineer = require('../models/Engineer');
+            const engineer = await Engineer.findById(visit.engineerId).select('name').lean();
+            const engineerName = engineer?.name || 'Assigned Engineer';
+            ticket.assignedEngineerId = visit.engineerId;
+            ticket.assignedEngineerIds = [visit.engineerId];
+            if (ticket.status === 'Open') ticket.status = 'Assigned';
+            ticket.reassignmentHistory.push({
+                fromEngineerId: null,
+                fromEngineerName: 'Unassigned',
+                toEngineerId: visit.engineerId,
+                toEngineerName: engineerName,
+                reason: 'Workload',
+                notes: `Assigned with service visit ${visitNo}`,
+                reassignedBy: req.user?.id,
+                reassignedByName: req.user?.name || 'System User',
+                reassignedAt: new Date()
+            });
+            ticket.timeline.push({
+                activityType: 'Assigned',
+                description: `Ticket assigned to engineer(s): ${engineerName}`,
+                performedBy: req.user?.id
+            });
+        }
         await ticket.save({ validateBeforeSave: false });
 
         res.status(201).json(visit);

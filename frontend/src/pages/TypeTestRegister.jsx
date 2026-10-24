@@ -382,7 +382,9 @@ const TypeTestRegister = () => {
 
     // The form is a full screen of its own, addressed as ?form=new or ?form=<record id>,
     // so the browser Back button and a page refresh behave like any other screen.
-    const formParam = searchParams.get('form');
+    // A typed or bookmarked address does not open a form the user may not use.
+    const requestedForm = searchParams.get('form');
+    const formParam = (requestedForm === 'new' ? canCreate : canModify) ? requestedForm : null;
 
     const fillForm = (record = null, preset = {}) => {
         if (record) {
@@ -481,7 +483,7 @@ const TypeTestRegister = () => {
     /* ---------------- Renewal & history screens ---------------- */
 
     // Like the form, these are full screens addressed as ?renewal=<id> and ?history=<id>.
-    const renewalParam = searchParams.get('renewal');
+    const renewalParam = canModify ? searchParams.get('renewal') : null;
     const historyParam = searchParams.get('history');
 
     const fillRenewal = (record) => {

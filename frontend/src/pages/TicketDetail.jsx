@@ -788,16 +788,10 @@ const TicketDetail = () => {
                     ticketId: id,
                     engineerId: visitEngineer,
                     scheduledDate: visitDate,
-                    billingStatus: entitlements?.recommendedBillingType || 'Paid'
+                    billingStatus: entitlements?.recommendedBillingType || 'Paid',
+                    // A ticket with nobody assigned gets the engineer picked for this visit.
+                    assignTicketIfUnassigned: true
                 });
-
-                // A ticket with nobody assigned gets the engineer picked for this visit.
-                if (!ticket.assignedEngineerId) {
-                    await csmService.assignTicket(id, {
-                        assignedEngineerId: visitEngineer,
-                        assignedEngineerIds: [visitEngineer]
-                    });
-                }
                 toast.success('Service Visit scheduled successfully');
             }
             setShowVisitModal(false);

@@ -52,7 +52,7 @@ const LIST_PAGE_SIZE = 20;
 
 const unwrapList = (payload) => Array.isArray(payload) ? payload : payload?.data || [];
 
-const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect, onSearch, isLoading }) => {
+const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect, onSearch, isLoading, disabled = false }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [logoErrors, setLogoErrors] = useState({});
@@ -107,8 +107,8 @@ const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect, onSea
         <div ref={dropdownRef} className="relative">
             {/* Selected Value Display / Trigger */}
             <div
-                onClick={() => setIsOpen(!isOpen)}
-                className={`w-full pl-14 pr-10 py-3.5 bg-slate-50 border rounded-2xl cursor-pointer transition-all flex items-center relative ${isOpen ? 'border-primary-500 ring-4 ring-primary-500/10' : 'border-slate-200 hover:border-slate-300'
+                onClick={() => !disabled && setIsOpen(!isOpen)}
+                className={`w-full pl-14 pr-10 py-3.5 bg-slate-50 border rounded-2xl ${disabled ? 'cursor-default' : 'cursor-pointer'} transition-all flex items-center relative ${isOpen ? 'border-primary-500 ring-4 ring-primary-500/10' : 'border-slate-200 hover:border-slate-300'
                     }`}
             >
                 {selectedCustomer ? (
@@ -1078,9 +1078,9 @@ const CreateQuotation = () => {
                         <MdArrowBack size={24} />
                     </button>
                     <div>
-                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">{isEditMode ? 'Edit Quotation' : 'Create Quotation'}</h1>
+                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">{isEditMode ? (canSave ? 'Edit Quotation' : 'View Quotation') : 'Create Quotation'}</h1>
                         <p className="text-slate-500 font-medium">
-                            {isEditMode ? 'Editing Reference:' : 'Drafting Reference:'} <span className="text-primary-600 font-bold">{header.quotationNo}</span>
+                            {isEditMode ? (canSave ? 'Editing Reference:' : 'Reference:') : 'Drafting Reference:'} <span className="text-primary-600 font-bold">{header.quotationNo}</span>
                             {!isEditMode && hasMeaningfulDraft && (
                                 <span className="ml-3 text-[10px] uppercase tracking-widest text-slate-400">
                                     {autosaveStatus === 'saving' ? 'Saving draft...' : lastSavedAt ? 'Draft saved' : ''}
@@ -1141,6 +1141,7 @@ const CreateQuotation = () => {
                                     onSelect={(customerId) => setHeader(prev => ({ ...prev, customerId }))}
                                     onSearch={searchCustomers}
                                     isLoading={isCustomerSearchLoading}
+                                    disabled={!canSave}
                                 />
                                 {duplicateWarning && (
                                     <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3">

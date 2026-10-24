@@ -169,6 +169,22 @@ exports.createTicket = async (req, res) => {
         }
         PROTECTED_TICKET_FIELDS.forEach(field => delete ticketBody[field]);
 
+        // The manual complaint register files complaints under a fixed category and type,
+        // sent by name. The first complaint creates them, as part of logging it, so this
+        // needs only the permission to log complaints (not CSM Config).
+        const namedMasters = [
+            ['categoryId', 'categoryName', require('../models/TicketCategory')],
+            ['typeId', 'typeName', require('../models/TicketType')]
+        ];
+        for (const [idField, nameField, Model] of namedMasters) {
+            const name = String(ticketBody[nameField] || '').trim();
+            delete ticketBody[nameField];
+            if (ticketBody[idField] || !name) continue;
+            const pattern = new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+            const existing = await Model.findOne({ name: pattern, companyId }).select('_id').lean();
+            ticketBody[idField] = existing ? existing._id : (await Model.create({ name, companyId }))._id;
+        }
+
         const timelineEntry = {
             activityType: 'Created',
             description: `Ticket created via ${ticketBody.source || 'Web Portal'}`,

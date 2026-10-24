@@ -1224,17 +1224,10 @@ const CSMTickets = () => {
                 }
             }
 
-            // 2. Resolve Category
-            let categoryId = '';
+            // 2. Resolve Category (a missing one is created by the server with the ticket)
             const selectedCatName = manualFormData.category;
             const matchedCat = categories.find(c => c.name.toLowerCase() === selectedCatName.toLowerCase());
-            if (matchedCat) {
-                categoryId = matchedCat._id;
-            } else {
-                const newCatRes = await csmService.createCategory({ name: selectedCatName });
-                categoryId = newCatRes.data._id;
-                setCategories(prev => [...prev, newCatRes.data]);
-            }
+            const categoryId = matchedCat?._id || undefined;
 
             // 3. Resolve Priority
             let priorityId = '';
@@ -1248,17 +1241,10 @@ const CSMTickets = () => {
                 setPriorities(prev => [...prev, newPriRes.data]);
             }
 
-            // 4. Resolve Type
-            let typeId = '';
+            // 4. Resolve Type (a missing one is created by the server with the ticket)
             const selectedTypeName = manualFormData.type;
             const matchedType = types.find(t => t.name.toLowerCase() === selectedTypeName.toLowerCase());
-            if (matchedType) {
-                typeId = matchedType._id;
-            } else {
-                const newTypeRes = await csmService.createType({ name: selectedTypeName });
-                typeId = newTypeRes.data._id;
-                setTypes(prev => [...prev, newTypeRes.data]);
-            }
+            const typeId = matchedType?._id || undefined;
 
             // 5. Resolve Product (optional)
             let productId = (!isManualProductText && manualFormData.productId) ? manualFormData.productId : null;
@@ -1309,7 +1295,9 @@ const CSMTickets = () => {
                 source: manualFormData.source,
                 priorityId,
                 categoryId,
+                categoryName: categoryId ? undefined : selectedCatName,
                 typeId,
+                typeName: typeId ? undefined : selectedTypeName,
                 productId,
                 assetId,
                 issueTitle: manualFormData.issueTitle,
