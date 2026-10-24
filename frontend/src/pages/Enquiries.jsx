@@ -8,6 +8,7 @@ import Modal from '../components/Modal';
 import CreateEnquiry from './CreateEnquiry';
 import { formatDate, buildSalesExecutiveList } from '../utils/helpers';
 import DateInput from '../components/DateInput';
+import usePermission from '../hooks/usePermission';
 
 const StatusPill = ({ status }) => {
     const styles = {
@@ -78,6 +79,7 @@ const Enquiries = () => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const { user, isAdmin, isSuperAdmin } = useAuth();
+    const { canCreate, canModify } = usePermission('enquiry_leads');
 
     const isManagerOrAdmin = useMemo(() => {
         if (!user) return false;
@@ -258,13 +260,13 @@ const Enquiries = () => {
                     >
                         <MdAnalytics size={18} /> Analytics
                     </button>
-                    <button
+                    {canCreate && <button
                         onClick={() => navigate('/enquiries/create')}
                         className="group px-8 py-4 bg-primary-600 text-white rounded-[2rem] font-black uppercase text-[10px] tracking-widest hover:bg-primary-700 transition-all shadow-xl shadow-primary-600/20 active:scale-95 flex items-center gap-3"
                     >
                         <div className="h-6 w-6 rounded-full bg-white/20 flex items-center justify-center group-hover:rotate-90 transition-transform"><MdAdd size={20} /></div>
                         New Enquiry
-                    </button>
+                    </button>}
                 </div>
             </div>
 
@@ -490,7 +492,7 @@ const Enquiries = () => {
                                                     <div className="text-xs font-bold text-slate-900 leading-none">
                                                         {e.assignedTo?.name || <span className="text-slate-400 font-normal italic">Unassigned</span>}
                                                     </div>
-                                                    {isManagerOrAdmin && (
+                                                    {isManagerOrAdmin && canModify && (
                                                         <button
                                                             onClick={() => setReassignModal({ open: true, enquiry: e, targetUser: e.assignedTo?._id || '' })}
                                                             className="text-[10px] font-bold text-primary-600 hover:underline mt-0.5 block"
@@ -531,13 +533,13 @@ const Enquiries = () => {
                                                 >
                                                     <MdVisibility size={18} />
                                                 </button>
-                                                <button
+                                                {canModify && <button
                                                     onClick={() => navigate(`/enquiries/edit/${e._id}`)}
                                                     title="Edit Enquiry"
                                                     className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-colors"
                                                 >
                                                     <MdEdit size={18} />
-                                                </button>
+                                                </button>}
 
                                             </div>
                                         </td>

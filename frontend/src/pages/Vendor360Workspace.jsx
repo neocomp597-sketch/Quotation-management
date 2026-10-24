@@ -23,6 +23,7 @@ import { vendorService, vendorCatalogService } from '../services/api';
 import { formatDate, formatDateTime } from '../utils/helpers';
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
+import usePermission from '../hooks/usePermission';
 
 const TABS = [
     { id: 'overview', label: 'Overview', icon: <MdStorefront size={18} /> },
@@ -50,6 +51,7 @@ const defaultCatalogForm = {
 const Vendor360Workspace = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { canCreate, canModify, canDelete } = usePermission('master_vendors');
     const [activeTab, setActiveTab] = useState('overview');
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState(null);
@@ -358,22 +360,24 @@ const Vendor360Workspace = () => {
                                 <h3 className="font-black text-slate-800 text-base uppercase tracking-wider">{vendor.name}'s Product Catalog</h3>
                                 <p className="text-xs text-slate-500 font-medium mt-1">Vendor-specific products available for reference and future purchase orders.</p>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <button
-                                    onClick={() => setIsImportModalOpen(true)}
-                                    className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-wider transition-all"
-                                >
-                                    <MdFileUpload size={18} />
-                                    Import Excel Catalog
-                                </button>
-                                <button
-                                    onClick={() => handleOpenCatalogModal()}
-                                    className="flex items-center gap-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-primary-600/20"
-                                >
-                                    <MdAdd size={18} />
-                                    Add Product to Catalog
-                                </button>
-                            </div>
+                            {canCreate && (
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={() => setIsImportModalOpen(true)}
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-wider transition-all"
+                                    >
+                                        <MdFileUpload size={18} />
+                                        Import Excel Catalog
+                                    </button>
+                                    <button
+                                        onClick={() => handleOpenCatalogModal()}
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-primary-600/20"
+                                    >
+                                        <MdAdd size={18} />
+                                        Add Product to Catalog
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         {/* Search Input */}
@@ -423,20 +427,24 @@ const Vendor360Workspace = () => {
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-2">
-                                                    <button
-                                                        onClick={() => handleOpenCatalogModal(p)}
-                                                        className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-slate-100 rounded-lg transition-colors"
-                                                        title="Edit Product"
-                                                    >
-                                                        <MdEdit size={16} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteCatalogProduct(p._id)}
-                                                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                                        title="Delete Product"
-                                                    >
-                                                        <MdDelete size={16} />
-                                                    </button>
+                                                    {canModify && (
+                                                        <button
+                                                            onClick={() => handleOpenCatalogModal(p)}
+                                                            className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                                            title="Edit Product"
+                                                        >
+                                                            <MdEdit size={16} />
+                                                        </button>
+                                                    )}
+                                                    {canDelete && (
+                                                        <button
+                                                            onClick={() => handleDeleteCatalogProduct(p._id)}
+                                                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                                            title="Delete Product"
+                                                        >
+                                                            <MdDelete size={16} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

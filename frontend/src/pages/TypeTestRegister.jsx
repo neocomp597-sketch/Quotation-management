@@ -9,6 +9,7 @@ import {
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
+import usePermission from '../hooks/usePermission';
 import DateInput from '../components/DateInput';
 import { byLatestTest } from '../utils/typeTests';
 import * as XLSX from 'xlsx';
@@ -289,7 +290,8 @@ const Field = ({ label, htmlFor, full, wide, children }) => (
 );
 
 const TypeTestRegister = () => {
-    const { user: currentUser } = useAuth();
+    const { user: currentUser, can } = useAuth();
+    const { canCreate, canModify, canDelete } = usePermission('master_type_tests');
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const page = PAGES.some(p => p.key === searchParams.get('tab')) ? searchParams.get('tab') : 'dashboard';
@@ -961,10 +963,10 @@ const TypeTestRegister = () => {
                     `${h.productId?.productCode || ''} / ${h.modelName || '—'} · ${h.testName}${h.testStandard ? ` · ${h.testStandard}` : ''}`,
                     closeHistory,
                     <>
-                        <button className={SECONDARY} onClick={() => toggleRecordActive(h)}>{h.isActive ? 'Mark inactive' : 'Reactivate'}</button>
-                        <button className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-black rounded-xl" onClick={() => deleteRecord(h)}>Delete</button>
-                        <button className={SECONDARY} onClick={() => openTestPage(h)}>Edit record</button>
-                        <button className={PRIMARY} onClick={() => openRenewalPage(h)}>Update renewal</button>
+                        {canModify && <button className={SECONDARY} onClick={() => toggleRecordActive(h)}>{h.isActive ? 'Mark inactive' : 'Reactivate'}</button>}
+                        {canDelete && <button className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-black rounded-xl" onClick={() => deleteRecord(h)}>Delete</button>}
+                        {canModify && <button className={SECONDARY} onClick={() => openTestPage(h)}>Edit record</button>}
+                        {canModify && <button className={PRIMARY} onClick={() => openRenewalPage(h)}>Update renewal</button>}
                     </>
                 )}
 
@@ -1049,7 +1051,7 @@ const TypeTestRegister = () => {
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                     <button className={SECONDARY} onClick={exportCSV}><MdDownload size={18} /> Export CSV</button>
-                    <button className={PRIMARY} onClick={() => openTestPage()}><MdAdd size={20} /> New Test Record</button>
+                    {canCreate && <button className={PRIMARY} onClick={() => openTestPage()}><MdAdd size={20} /> New Test Record</button>}
                 </div>
             </div>
 
@@ -1155,7 +1157,7 @@ const TypeTestRegister = () => {
                                     <div className={`${PANEL} mt-4`}>
                                         <h2 className="text-sm font-black text-slate-800 uppercase tracking-wide mb-4">Quick actions</h2>
                                         <div className="flex flex-wrap gap-2">
-                                            <button className={PRIMARY} onClick={() => openTestPage()}>Create test record</button>
+                                            {canCreate && <button className={PRIMARY} onClick={() => openTestPage()}>Create test record</button>}
                                             <button className={SECONDARY} onClick={() => showPage('renewals')}>Review renewal worklist</button>
                                             <button className={SECONDARY} onClick={exportCSV}>Export records (CSV)</button>
                                         </div>
@@ -1198,8 +1200,8 @@ const TypeTestRegister = () => {
                                                             <td className={TDN}>{r.ownerId?.name || '—'}<br /><span className={muted}>Backup: {r.backupOwnerId?.name || '—'}</span></td>
                                                             <td className={TD}>
                                                                 <div className="flex flex-nowrap gap-1.5">
-                                                                    <button className={SMALL} onClick={() => openTestPage(r)}>Edit</button>
-                                                                    <button className={SMALL} onClick={() => openRenewalPage(r)}>Renewal</button>
+                                                                    {canModify && <button className={SMALL} onClick={() => openTestPage(r)}>Edit</button>}
+                                                                    {canModify && <button className={SMALL} onClick={() => openRenewalPage(r)}>Renewal</button>}
                                                                     <button className={SMALL} onClick={() => openHistoryPage(r)}>History</button>
                                                                 </div>
                                                             </td>
@@ -1217,7 +1219,7 @@ const TypeTestRegister = () => {
                                     {headingRow(
                                         'Product & Model Master',
                                         'Products and models with type tests. Mark discontinued products inactive to stop their reminders.',
-                                        <button className={SECONDARY} onClick={() => navigate('/products/new')}><MdAdd size={18} /> Add Product</button>
+                                        can('master_products', 'create') && <button className={SECONDARY} onClick={() => navigate('/products/new')}><MdAdd size={18} /> Add Product</button>
                                     )}
                                     <div className={`${NOTICE} mb-4`}><MdInfoOutline size={18} className="flex-shrink-0 mt-0.5" />
                                         Products are created in Product Master. Use "Add test" to record a type test against an existing product and model.
@@ -1245,13 +1247,17 @@ const TypeTestRegister = () => {
                                                             <td className={TDN}><Badge value={g.status} /></td>
                                                             <td className={TD}>
                                                                 <div className="flex flex-nowrap gap-1.5">
-                                                                    <button
-                                                                        className={SMALL}
-                                                                        onClick={() => openTestPage(null, { productId: g.product._id, productCode: g.product.productCode || '', productName: g.product.productName || '', productMgr4: mgr4Text(g.product), modelName: g.modelName })}
-                                                                    >Add test</button>
-                                                                    <button className={SMALL} onClick={() => setGroupActive(g, g.status !== 'Active')}>
-                                                                        {g.status === 'Active' ? 'Mark inactive' : 'Reactivate'}
-                                                                    </button>
+                                                                    {canCreate && (
+                                                                        <button
+                                                                            className={SMALL}
+                                                                            onClick={() => openTestPage(null, { productId: g.product._id, productCode: g.product.productCode || '', productName: g.product.productName || '', productMgr4: mgr4Text(g.product), modelName: g.modelName })}
+                                                                        >Add test</button>
+                                                                    )}
+                                                                    {canModify && (
+                                                                        <button className={SMALL} onClick={() => setGroupActive(g, g.status !== 'Active')}>
+                                                                            {g.status === 'Active' ? 'Mark inactive' : 'Reactivate'}
+                                                                        </button>
+                                                                    )}
                                                                 </div>
                                                             </td>
                                                         </tr>
@@ -1290,10 +1296,12 @@ const TypeTestRegister = () => {
                                                                 <td className={TDN}><Badge value={item.stage} /></td>
                                                                 <td className={TD}>{item.records.length ? item.records.map(r => `${r.testName} (${r.status})`).join(', ') : <span className={muted}>None</span>}</td>
                                                                 <td className={TD}>
-                                                                    <button
-                                                                        className={SMALL}
-                                                                        onClick={() => openTestPage(null, { productId: item.product._id, productCode: item.product.productCode || '', productName: item.product.productName || '', productMgr4: mgr4Text(item.product) })}
-                                                                    >Add test</button>
+                                                                    {canCreate && (
+                                                                        <button
+                                                                            className={SMALL}
+                                                                            onClick={() => openTestPage(null, { productId: item.product._id, productCode: item.product.productCode || '', productName: item.product.productName || '', productMgr4: mgr4Text(item.product) })}
+                                                                        >Add test</button>
+                                                                    )}
                                                                 </td>
                                                             </tr>
                                                         ));
@@ -1332,7 +1340,7 @@ const TypeTestRegister = () => {
                                                             <td className={TDN}>{r.ownerId?.name || '—'}<br /><span className={muted}>Backup: {r.backupOwnerId?.name || '—'}</span></td>
                                                             <td className={TDN}><Badge value={r.renewalState} /></td>
                                                             <td className={TD}>{r.nextAction || 'No action set'}<br /><span className={muted}>{fmt(r.nextActionDate)}</span></td>
-                                                            <td className={TD}><button className={SMALL} onClick={() => openRenewalPage(r)}>Update</button></td>
+                                                            <td className={TD}>{canModify && <button className={SMALL} onClick={() => openRenewalPage(r)}>Update</button>}</td>
                                                         </tr>
                                                     )) : <Empty cols={8}>No renewal records match this filter.</Empty>}
                                                 </tbody>

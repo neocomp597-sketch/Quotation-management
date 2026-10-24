@@ -11,6 +11,7 @@ import Modal from '../components/Modal';
 import SearchableSelect from '../components/SearchableSelect';
 import ComplaintBOMPanel from '../components/bom/ComplaintBOMPanel';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
+import usePermission from '../hooks/usePermission';
 import { isValidMobile, isValidPincode, sanitizePhoneNumber } from '../utils/validation';
 import DateInput from '../components/DateInput';
 
@@ -66,7 +67,8 @@ const getManualImagesForTicket = (ticket) => {
 
 const CSMTickets = () => {
     const navigate = useNavigate();
-    const { user, isAdmin, isSuperAdmin, activeBranchId } = useAuth();
+    const { user, isAdmin, isSuperAdmin, activeBranchId, can } = useAuth();
+    const { canCreate } = usePermission('csm_tickets');
     // Branch the new ticket is raised under ('all' = All Branches). Options and whether
     // "All Branches" is offered come from the server's branch-access rules.
     const [ticketBranchOptions, setTicketBranchOptions] = useState({ branches: [], allowAllBranches: false });
@@ -2272,39 +2274,41 @@ const CSMTickets = () => {
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                    <button
-                        onClick={() => {
-                            const lowPriority = priorities.find(p => p.name?.toLowerCase() === 'low');
-                            setFormData({
-                                customerId: '',
-                                contactId: '',
-                                contactName: '',
-                                contactDesignationId: '',
-                                contactDesignation: '',
-                                contactPhone: '',
-                                contactEmail: '',
-                                priorityId: lowPriority ? lowPriority._id : '',
-                                categoryId: '',
-                                typeId: '',
-                                productId: '',
-                                assetId: '',
-                                invoiceId: '',
-                                issueTitle: '',
-                                description: '',
-                                source: 'Web Portal',
-                                serialNumber: ''
-                            });
-                            setCustomerContacts([]);
-                            setAssetSummary(null);
-                            setShowAllProducts(false);
-                            setGeneratedSerial('');
-                            setPageView('standard');
-                        }}
-                        className="flex items-center gap-2 px-6 py-4 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-lg shadow-primary-600/20 active:scale-95 self-start md:self-auto"
-                    >
-                        <MdAdd size={18} />
-                        New Ticket
-                    </button>
+                    {canCreate && (
+                        <button
+                            onClick={() => {
+                                const lowPriority = priorities.find(p => p.name?.toLowerCase() === 'low');
+                                setFormData({
+                                    customerId: '',
+                                    contactId: '',
+                                    contactName: '',
+                                    contactDesignationId: '',
+                                    contactDesignation: '',
+                                    contactPhone: '',
+                                    contactEmail: '',
+                                    priorityId: lowPriority ? lowPriority._id : '',
+                                    categoryId: '',
+                                    typeId: '',
+                                    productId: '',
+                                    assetId: '',
+                                    invoiceId: '',
+                                    issueTitle: '',
+                                    description: '',
+                                    source: 'Web Portal',
+                                    serialNumber: ''
+                                });
+                                setCustomerContacts([]);
+                                setAssetSummary(null);
+                                setShowAllProducts(false);
+                                setGeneratedSerial('');
+                                setPageView('standard');
+                            }}
+                            className="flex items-center gap-2 px-6 py-4 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-lg shadow-primary-600/20 active:scale-95 self-start md:self-auto"
+                        >
+                            <MdAdd size={18} />
+                            New Ticket
+                        </button>
+                    )}
 
                     <button
                         onClick={exportToExcel}
@@ -2314,16 +2318,18 @@ const CSMTickets = () => {
                         Export
                     </button>
 
-                    <label className="flex items-center gap-2 px-5 py-4 bg-slate-800 hover:bg-slate-900 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-md cursor-pointer active:scale-95">
-                        <MdPublish size={18} />
-                        Import
-                        <input
-                            type="file"
-                            accept=".xlsx, .xls, .csv"
-                            onChange={handleImportFile}
-                            className="hidden"
-                        />
-                    </label>
+                    {canCreate && (
+                        <label className="flex items-center gap-2 px-5 py-4 bg-slate-800 hover:bg-slate-900 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-md cursor-pointer active:scale-95">
+                            <MdPublish size={18} />
+                            Import
+                            <input
+                                type="file"
+                                accept=".xlsx, .xls, .csv"
+                                onChange={handleImportFile}
+                                className="hidden"
+                            />
+                        </label>
+                    )}
 
                     <button
                         onClick={handleDownloadTemplate}
@@ -2948,20 +2954,22 @@ const CSMTickets = () => {
                         <div>
                             <div className="flex justify-between items-center mb-1">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Ticket Source</label>
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleOpenMiniMaster('source')}
-                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
-                                >
-                                    + Quick Add
-                                </button>
+                                {can('csm_masters', 'create') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOpenMiniMaster('source')}
+                                        className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                    >
+                                        + Quick Add
+                                    </button>
+                                )}
                             </div>
                             <SearchableSelect
                                 options={sources.map(s => ({ value: s.name, label: s.name, id: s._id }))}
                                 value={formData.source}
                                 onChange={(val) => setFormData({ ...formData, source: val })}
                                 placeholder="Select Source"
-                                onAddOption={handleAddSourceDropdown}
+                                onAddOption={can('csm_masters', 'create') ? handleAddSourceDropdown : undefined}
                             />
                         </div>
                         <div>
@@ -2992,13 +3000,15 @@ const CSMTickets = () => {
                         <div>
                             <div className="flex justify-between items-center mb-1">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Designation</label>
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleOpenMiniMaster('designation')}
-                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
-                                >
-                                    + Quick Add
-                                </button>
+                                {can('csm_masters', 'create') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOpenMiniMaster('designation')}
+                                        className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                    >
+                                        + Quick Add
+                                    </button>
+                                )}
                             </div>
                             <SearchableSelect
                                 options={designations.map(d => ({ value: d._id, label: d.name, id: d._id }))}
@@ -3011,7 +3021,7 @@ const CSMTickets = () => {
                                     });
                                 }}
                                 placeholder="Select Designation"
-                                onAddOption={handleAddDesignationDropdown}
+                                onAddOption={can('csm_masters', 'create') ? handleAddDesignationDropdown : undefined}
                             />
                         </div>
                         <div>
@@ -3061,13 +3071,15 @@ const CSMTickets = () => {
                         <div>
                             <div className="flex justify-between items-center mb-1">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Problem List</label>
-                                <button 
-                                    type="button" 
-                                    onClick={() => setShowQuickAddProblemModal(true)}
-                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
-                                >
-                                    + Quick Add
-                                </button>
+                                {can('csm_masters', 'create') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowQuickAddProblemModal(true)}
+                                        className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                    >
+                                        + Quick Add
+                                    </button>
+                                )}
                             </div>
                             <SearchableSelect
                                 options={problems.map(p => ({ value: p._id, label: p.name, id: p._id }))}
@@ -3075,26 +3087,28 @@ const CSMTickets = () => {
                                 onChange={(val) => handleProblemChange(val)}
                                 placeholder="Select Problem..."
                                 noResultsText="No problems available"
-                                onAddOption={handleAddProblemDropdown}
+                                onAddOption={can('csm_masters', 'create') ? handleAddProblemDropdown : undefined}
                             />
                         </div>
                         <div>
                             <div className="flex justify-between items-center mb-1">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Priority *</label>
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleOpenMiniMaster('priority')}
-                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
-                                >
-                                    + Quick Add
-                                </button>
+                                {can('csm_masters', 'create') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOpenMiniMaster('priority')}
+                                        className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                    >
+                                        + Quick Add
+                                    </button>
+                                )}
                             </div>
                             <SearchableSelect
                                 options={priorities.map(p => ({ value: p._id, label: p.name, id: p._id }))}
                                 value={formData.priorityId}
                                 onChange={(val) => setFormData({ ...formData, priorityId: val })}
                                 placeholder="Select Priority"
-                                onAddOption={handleAddPriorityDropdown}
+                                onAddOption={can('csm_masters', 'create') ? handleAddPriorityDropdown : undefined}
                             />
                         </div>
                         
@@ -3659,22 +3673,26 @@ const CSMTickets = () => {
                                                     >
                                                         Select
                                                     </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleStartEditMiniMaster(item)}
-                                                        className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-lg transition-all"
-                                                        title="Edit"
-                                                    >
-                                                        <MdEdit size={16} />
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleDeleteMiniMaster(item._id)}
-                                                        className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-all"
-                                                        title="Delete"
-                                                    >
-                                                        <MdDelete size={16} />
-                                                    </button>
+                                                    {can('csm_masters', 'modify') && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleStartEditMiniMaster(item)}
+                                                            className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-lg transition-all"
+                                                            title="Edit"
+                                                        >
+                                                            <MdEdit size={16} />
+                                                        </button>
+                                                    )}
+                                                    {can('csm_masters', 'delete') && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDeleteMiniMaster(item._id)}
+                                                            className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-all"
+                                                            title="Delete"
+                                                        >
+                                                            <MdDelete size={16} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}
@@ -3819,16 +3837,18 @@ const CSMTickets = () => {
                         <div>
                             <div className="flex justify-between items-center mb-1.5">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer Name *</label>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIsManualCustomerText(!isManualCustomerText);
-                                        setManualFormData(prev => ({ ...prev, customerId: '', customerName: '' }));
-                                    }}
-                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
-                                >
-                                    {isManualCustomerText ? 'Select Existing' : '+ Enter Manually'}
-                                </button>
+                                {can('master_customers', 'create') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsManualCustomerText(!isManualCustomerText);
+                                            setManualFormData(prev => ({ ...prev, customerId: '', customerName: '' }));
+                                        }}
+                                        className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                    >
+                                        {isManualCustomerText ? 'Select Existing' : '+ Enter Manually'}
+                                    </button>
+                                )}
                             </div>
                             {isManualCustomerText ? (
                                 <input
@@ -3931,20 +3951,22 @@ const CSMTickets = () => {
                         <div>
                             <div className="flex justify-between items-center mb-1.5">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Ticket Source</label>
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleOpenMiniMaster('source')}
-                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
-                                >
-                                    + Quick Add
-                                </button>
+                                {can('csm_masters', 'create') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOpenMiniMaster('source')}
+                                        className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                    >
+                                        + Quick Add
+                                    </button>
+                                )}
                             </div>
                             <SearchableSelect
                                 options={sources.map(s => ({ value: s.name, label: s.name, id: s._id }))}
                                 value={manualFormData.source}
                                 onChange={(val) => setManualFormData({ ...manualFormData, source: val })}
                                 placeholder="Select Source"
-                                onAddOption={handleAddSourceDropdown}
+                                onAddOption={can('csm_masters', 'create') ? handleAddSourceDropdown : undefined}
                             />
                         </div>
 
@@ -3985,20 +4007,22 @@ const CSMTickets = () => {
                         <div>
                             <div className="flex justify-between items-center mb-1.5">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Priority</label>
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleOpenMiniMaster('priority')}
-                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
-                                >
-                                    + Quick Add
-                                </button>
+                                {can('csm_masters', 'create') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOpenMiniMaster('priority')}
+                                        className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                    >
+                                        + Quick Add
+                                    </button>
+                                )}
                             </div>
                             <SearchableSelect
                                 options={priorities.map(p => ({ value: p.name, label: p.name, id: p._id }))}
                                 value={manualFormData.priority}
                                 onChange={(val) => setManualFormData({ ...manualFormData, priority: val })}
                                 placeholder="Select Priority"
-                                onAddOption={handleAddPriorityDropdown}
+                                onAddOption={can('csm_masters', 'create') ? handleAddPriorityDropdown : undefined}
                             />
                         </div>
 

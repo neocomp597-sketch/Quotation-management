@@ -42,7 +42,11 @@ const UserSchema = new mongoose.Schema({
     },
     vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', default: null },
     employeeProfileId: { type: mongoose.Schema.Types.ObjectId, ref: 'EmployeeProfile', default: null },
+    // Overrides of the role's permissions: "<screen>" is View, "<screen>:create",
+    // "<screen>:modify" and "<screen>:delete" are the actions (see config/authorization.js).
     customPermissions: { type: Map, of: Boolean, default: {} },
+    customPermissionsUpdatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    customPermissionsUpdatedAt: { type: Date, default: null },
     resetPasswordToken: { type: String, default: null },
     resetPasswordExpires: { type: Date, default: null },
     createdAt: { type: Date, default: Date.now },

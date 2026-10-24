@@ -4,8 +4,10 @@ import { toast } from 'react-toastify';
 import { MdCheck, MdClose, MdLockOpen, MdLock } from 'react-icons/md';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
 import { formatDate } from '../utils/helpers';
+import usePermission from '../hooks/usePermission';
 
 const Approvals = () => {
+    const { canModify } = usePermission('sales_approvals');
     const [pendingQuotes, setPendingQuotes] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -91,7 +93,7 @@ const Approvals = () => {
                                     </div>
                                 </div>
 
-                                 <div className="flex gap-2 w-full md:w-auto border-t md:border-none pt-4 md:pt-0">
+                                 {canModify && <div className="flex gap-2 w-full md:w-auto border-t md:border-none pt-4 md:pt-0">
                                     <button
                                         onClick={() => handleReject(quote._id, quote.quotationNo)}
                                         disabled={isApproving || isRejecting}
@@ -108,7 +110,7 @@ const Approvals = () => {
                                         <MdCheck size={18} />
                                         {isApproving ? 'Approving...' : 'Approve Override'}
                                     </button>
-                                </div>
+                                </div>}
                             </div>
                         ))}
                     </div>

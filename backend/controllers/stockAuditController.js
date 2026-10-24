@@ -6,8 +6,8 @@ const StockAuditLog = require('../models/StockAuditLog');
 const User = require('../models/User');
 const Product = require('../models/Product');
 const Notification = require('../models/Notification');
-const RolePermission = require('../models/RolePermission');
-const { resolvePermissions } = require('../config/authorization');
+const { mergeUserPermissions, hasPermission } = require('../config/authorization');
+const { getRolePermissions, toPlainObject } = require('../middlewares/permissionMiddleware');
 const { isSuperAdminRole } = require('../middlewares/authMiddleware');
 const { formatDate, formatDateTime } = require('../utils/dateFormat');
 
@@ -61,8 +61,9 @@ const fail = (res, status, message, extra = {}) => res.status(status).json({ mes
 
 const canCreateBatches = async (user) => {
     if (isAdminUser(user)) return true;
-    const roleDoc = await RolePermission.findOne({ companyId: user.companyId, role: user.role }).lean();
-    return resolvePermissions(user.role, roleDoc?.menuVisibility || {})[CREATE_PERMISSION] === true;
+    const rolePermissions = await getRolePermissions(String(user.companyId), user.role);
+    const permissions = mergeUserPermissions(user.role, rolePermissions, toPlainObject(user.customPermissions));
+    return hasPermission(permissions, CREATE_PERMISSION, 'create');
 };
 
 // owner: creator and admins - settings, scope, access, status, resolving mismatches

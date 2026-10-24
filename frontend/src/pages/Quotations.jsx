@@ -8,12 +8,14 @@ import { PDFDownloadLink } from '@react-pdf/renderer';
 import QuotationPDF from '../components/QuotationPDF';
 import Modal from '../components/Modal';
 import PaginationControls from '../components/PaginationControls';
+import usePermission from '../hooks/usePermission';
 
 const LIST_PAGE_SIZE = 20;
 
 const Quotations = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
+    const { canCreate, canModify, canDelete } = usePermission('quotation_list');
     const statusFilter = searchParams.get('status');
     const [quotations, setQuotations] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -229,13 +231,13 @@ const Quotations = () => {
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">{headerDetails.title}</h1>
                     <p className="text-slate-500 font-medium">{headerDetails.desc}</p>
                 </div>
-                <Link
+                {canCreate && <Link
                     to="/quotations/new"
                     className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
                 >
                     <MdAdd size={20} />
                     <span>New Quotation</span>
-                </Link>
+                </Link>}
             </div>
 
             <div className="mobile-master-shell bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
@@ -340,14 +342,14 @@ const Quotations = () => {
                                                 {formatDate(q.quotationDate)}
                                             </div>
                                             <div className="flex gap-1">
-                                                <button
+                                                {canModify && <button
                                                     onClick={() => navigate(`/quotations/${q._id}`)}
                                                     className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
                                                     title={q.status === 'draft' ? "Edit Draft" : q.status === 'rejected' ? "Edit & Revise Rejected Quote" : "Edit Quotation"}
                                                 >
                                                     <MdEdit size={18} />
-                                                </button>
-                                                {(q.status === 'draft' || q.status === 'pending_approval') && (
+                                                </button>}
+                                                {canModify && (q.status === 'draft' || q.status === 'pending_approval') && (
                                                     <button
                                                         onClick={() => handleFinalize(q._id)}
                                                         className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
@@ -356,7 +358,7 @@ const Quotations = () => {
                                                         <MdCheckCircle size={18} />
                                                     </button>
                                                 )}
-                                                {q.status === 'final' && (
+                                                {canModify && q.status === 'final' && (
                                                     <button
                                                         onClick={() => handleMarkAsOrdered(q._id)}
                                                         className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
@@ -383,13 +385,13 @@ const Quotations = () => {
                                                         </button>
                                                     )}
                                                 </PDFDownloadLink>
-                                                <button
+                                                {canDelete && <button
                                                     onClick={() => handleDelete(q._id)}
                                                     className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
                                                     title="Delete Quotation"
                                                 >
                                                     <MdDelete size={18} />
-                                                </button>
+                                                </button>}
                                             </div>
                                         </div>
                                     </div>
@@ -455,15 +457,15 @@ const Quotations = () => {
                                                 </td>
                                                 <td className="px-8 py-5 text-right">
                                                     <div className="flex items-center justify-end gap-2">
-                                                        <button
+                                                        {canModify && <button
                                                             onClick={() => navigate(`/quotations/${q._id}`)}
                                                             className="p-2.5 text-amber-600 hover:bg-amber-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
                                                             title={q.status === 'draft' ? "Edit Draft" : q.status === 'rejected' ? "Edit & Revise Rejected Quote" : "Edit Quotation"}
                                                         >
                                                             <MdEdit size={18} />
-                                                        </button>
+                                                        </button>}
 
-                                                        {(q.status === 'draft' || q.status === 'pending_approval') && (
+                                                        {canModify && (q.status === 'draft' || q.status === 'pending_approval') && (
                                                             <button
                                                                 onClick={() => handleFinalize(q._id)}
                                                                 className="p-2.5 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
@@ -473,7 +475,7 @@ const Quotations = () => {
                                                             </button>
                                                         )}
 
-                                                        {q.status === 'final' && (
+                                                        {canModify && q.status === 'final' && (
                                                             <button
                                                                 onClick={() => handleMarkAsOrdered(q._id)}
                                                                 className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
@@ -516,13 +518,13 @@ const Quotations = () => {
                                                             )}
                                                         </PDFDownloadLink>
 
-                                                        <button
+                                                        {canDelete && <button
                                                             onClick={() => handleDelete(q._id)}
                                                             className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
                                                             title="Delete Quotation"
                                                         >
                                                             <MdDelete size={18} />
-                                                        </button>
+                                                        </button>}
                                                     </div>
                                                 </td>
                                             </tr>

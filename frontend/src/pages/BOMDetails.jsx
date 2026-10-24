@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import { bomService } from '../services/api';
 import { formatDateTime } from '../utils/helpers';
 import BOMComponentsTable from '../components/bom/BOMComponentsTable';
+import usePermission from '../hooks/usePermission';
 
 const Field = ({ label, children }) => (
     <div>
@@ -27,6 +28,7 @@ const BOMDetails = () => {
     const { id } = useParams();
     const [searchParams] = useSearchParams();
     const parentId = searchParams.get('parent') || '';
+    const { canModify } = usePermission('master_bom');
     const [result, setResult] = useState({ id: null, bom: null, error: '' });
     const loading = result.id !== id;
     const { bom, error } = result;
@@ -295,6 +297,7 @@ const BOMDetails = () => {
                         >
                             <MdPictureAsPdf size={18} /> {printing ? 'Preparing…' : 'Export to PDF'}
                         </button>
+                        {canModify && (
                         <button
                             type="button"
                             onClick={() => setConfirming(true)}
@@ -306,6 +309,8 @@ const BOMDetails = () => {
                             {bom.status === 'Active' ? <MdToggleOff size={18} /> : <MdToggleOn size={18} />}
                             {bom.status === 'Active' ? 'Deactivate' : 'Activate'}
                         </button>
+                        )}
+                        {canModify && (
                         <button
                             type="button"
                             onClick={() => navigate(`/bom-master/${bom._id}/edit`)}
@@ -313,6 +318,7 @@ const BOMDetails = () => {
                         >
                             <MdEdit size={18} /> Edit
                         </button>
+                        )}
                     </div>
                 )}
             </div>
@@ -628,6 +634,7 @@ const BOMDetails = () => {
                             <h2 className="text-xs font-black uppercase tracking-widest text-slate-500">
                                 {isProduct ? 'Assemblies' : 'Components / F.G. Items'}
                             </h2>
+                            {canModify && (
                             <div className="ml-auto flex flex-wrap gap-2">
                                 {!isProduct && (
                                     <button
@@ -665,6 +672,7 @@ const BOMDetails = () => {
                                     <MdUploadFile size={16} /> Import Data
                                 </button>
                             </div>
+                            )}
                         </div>
                         {showSummary && (
                             <div className="border-b border-slate-100 bg-slate-50/60 px-6 py-4">
@@ -690,7 +698,7 @@ const BOMDetails = () => {
                         <BOMComponentsTable
                             items={bom.items || []}
                             onOpen={(subBomId) => navigate(`/bom-master/${subBomId}?parent=${bom._id}`)}
-                            onMove={(item) => setMoving(item)}
+                            onMove={canModify ? (item) => setMoving(item) : undefined}
                         />
                     </div>
 

@@ -8,6 +8,7 @@ import VoucherPDF from '../components/VoucherPDF';
 import PortalDropdown from '../components/PortalDropdown';
 import Modal from '../components/Modal';
 import DateInput from '../components/DateInput';
+import usePermission from '../hooks/usePermission';
 
 const CreateVoucher = ({ mode = 'grn', isViewOnly = false }) => {
     const navigate = useNavigate();
@@ -17,6 +18,8 @@ const CreateVoucher = ({ mode = 'grn', isViewOnly = false }) => {
     const isEditMode = Boolean(id);
     const isInvoiceMode = mode === 'invoice';
     const basePath = isInvoiceMode ? '/invoices' : '/grn';
+    const { canCreate, canModify } = usePermission(isInvoiceMode ? 'sale_invoices' : 'purchase_grn');
+    const canSave = isEditMode ? canModify : canCreate;
     
     const [loading, setLoading] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -264,7 +267,7 @@ const CreateVoucher = ({ mode = 'grn', isViewOnly = false }) => {
                     </div>
                 </div>
                 {!isViewOnlyMode ? (
-                    <button
+                    canSave && <button
                         onClick={handleSubmit}
                         disabled={loading}
                         className="flex items-center gap-2 bg-slate-900 hover:bg-black text-white px-6 py-3 rounded-xl font-bold transition-all shadow-xl disabled:opacity-50"
@@ -292,6 +295,7 @@ const CreateVoucher = ({ mode = 'grn', isViewOnly = false }) => {
                 )}
             </div>
 
+            <fieldset disabled={!isViewOnlyMode && !canSave} className="min-w-0">
             <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-8">
                 {/* Header Row similar to screenshot colors basically */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -599,6 +603,7 @@ const CreateVoucher = ({ mode = 'grn', isViewOnly = false }) => {
                     </div>
                 </div>
             </div>
+            </fieldset>
 
             {/* Success Actions Modal */}
             <Modal
@@ -628,7 +633,7 @@ const CreateVoucher = ({ mode = 'grn', isViewOnly = false }) => {
                             )}
                         </PDFDownloadLink>
                         
-                        {!isEditMode && savedVoucherId && savedVoucherId !== 'new' && (
+                        {!isEditMode && canModify && savedVoucherId && savedVoucherId !== 'new' && (
                             <button
                                 onClick={() => {
                                     setShowSuccessModal(false);
@@ -639,7 +644,7 @@ const CreateVoucher = ({ mode = 'grn', isViewOnly = false }) => {
                                 <MdEdit size={20} className="text-amber-500" /> Edit Current Voucher
                             </button>
                         )}
-                        <button
+                        {canCreate && <button
                             onClick={() => {
                                 setVoucherData({
                                     voucherType: isInvoiceMode ? 'Invoice' : 'Purchase',
@@ -660,7 +665,7 @@ const CreateVoucher = ({ mode = 'grn', isViewOnly = false }) => {
                             className="w-full flex items-center justify-center gap-2 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-lg shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-95"
                         >
                             <MdAdd size={20} /> Create New
-                        </button>
+                        </button>}
                         <button
                             onClick={() => {
                                 setShowSuccessModal(false);

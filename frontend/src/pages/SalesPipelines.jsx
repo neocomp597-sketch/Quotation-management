@@ -3,10 +3,12 @@ import { salesService } from '../services/api';
 import { toast } from 'react-toastify';
 import { MdAdd, MdEdit, MdDelete, MdClose, MdSave, MdStar, MdBuildCircle } from 'react-icons/md';
 import Modal from '../components/Modal';
+import usePermission from '../hooks/usePermission';
 
 const DEFAULT_COLORS = ['#94a3b8', '#3b82f6', '#8b5cf6', '#f59e0b', '#f97316', '#10b981', '#22c55e', '#ec4899', '#ef4444'];
 
 const SalesPipelines = () => {
+    const { canCreate, canModify, canDelete } = usePermission('sales_pipelines');
     const [pipelines, setPipelines] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -120,9 +122,9 @@ const SalesPipelines = () => {
                         <p className="text-xs text-slate-500">Configure your deal stages</p>
                     </div>
                 </div>
-                <button onClick={openCreate} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/25 flex items-center gap-1.5">
+                {canCreate && <button onClick={openCreate} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/25 flex items-center gap-1.5">
                     <MdAdd size={18} /> New Pipeline
-                </button>
+                </button>}
             </div>
 
             {/* Pipeline Cards */}
@@ -139,8 +141,8 @@ const SalesPipelines = () => {
                                 )}
                             </div>
                             <div className="flex items-center gap-1">
-                                <button onClick={() => openEdit(pipeline)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-indigo-600"><MdEdit size={18} /></button>
-                                <button onClick={() => handleDelete(pipeline._id)} className="p-2 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-600"><MdDelete size={18} /></button>
+                                {canModify && <button onClick={() => openEdit(pipeline)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-indigo-600"><MdEdit size={18} /></button>}
+                                {canDelete && <button onClick={() => handleDelete(pipeline._id)} className="p-2 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-600"><MdDelete size={18} /></button>}
                             </div>
                         </div>
                         {pipeline.description && <p className="text-sm text-slate-500 mb-4">{pipeline.description}</p>}
@@ -165,7 +167,7 @@ const SalesPipelines = () => {
             {pipelines.length === 0 && (
                 <div className="text-center py-20 text-slate-400">
                     <p className="text-lg font-bold mb-2">No pipelines yet</p>
-                    <button onClick={openCreate} className="text-indigo-600 font-bold hover:underline">Create your first pipeline</button>
+                    {canCreate && <button onClick={openCreate} className="text-indigo-600 font-bold hover:underline">Create your first pipeline</button>}
                 </div>
             )}
 

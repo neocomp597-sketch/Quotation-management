@@ -17,7 +17,9 @@ import { FaWhatsapp } from 'react-icons/fa';
 
 const OrgChart = () => {
     const navigate = useNavigate();
-    const { user, isAdmin, isSuperAdmin, hasAccess } = useAuth();
+    const { user, isAdmin, isSuperAdmin, hasAccess, can } = useAuth();
+    const canCreateEmployees = can('payroll_employees', 'create');
+    const canModifyEmployees = can('payroll_employees', 'modify');
 
     const [employees, setEmployees] = useState([]);
     const [branches, setBranches] = useState([]);
@@ -558,7 +560,7 @@ const OrgChart = () => {
                 {meta.isTopTier ? (
                     /* Tier 0 / Leadership Style: Diamond Frame on Left + Teal Pill Container */
                     <div
-                        draggable={canEditOrgChart}
+                        draggable={canEditOrgChart && canModifyEmployees}
                         onDragStart={(e) => handleDragStart(e, node._id)}
                         onDragOver={(e) => handleDragOver(e, node._id)}
                         onDragLeave={handleDragLeave}
@@ -616,7 +618,7 @@ const OrgChart = () => {
                 ) : (
                     /* Tier 1+ Style matching Reference Image: Oval Pill + Small Floating Circular Avatar Photo on Top-Right */
                     <div
-                        draggable={canEditOrgChart}
+                        draggable={canEditOrgChart && canModifyEmployees}
                         onDragStart={(e) => handleDragStart(e, node._id)}
                         onDragOver={(e) => handleDragOver(e, node._id)}
                         onDragLeave={handleDragLeave}
@@ -834,7 +836,7 @@ const OrgChart = () => {
 
                     {canEditOrgChart && (
                         <>
-                            {treeData.roots.length > 1 && (
+                            {treeData.roots.length > 1 && canModifyEmployees && (
                                 <button
                                     onClick={handleAutoOrganizeHierarchy}
                                     className="flex items-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-xl font-bold text-sm transition-all shadow-md"
@@ -845,6 +847,7 @@ const OrgChart = () => {
                                 </button>
                             )}
 
+                            {canModifyEmployees && (
                             <button
                                 onClick={handleOpenHierarchyModal}
                                 className="flex items-center space-x-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-sm transition-all shadow-md"
@@ -853,7 +856,9 @@ const OrgChart = () => {
                                 <MdOutlineSwapVert size={20} className="text-teal-400" />
                                 <span>Organize Hierarchy</span>
                             </button>
+                            )}
 
+                            {canCreateEmployees && (
                             <button
                                 onClick={() => setIsVacantModalOpen(true)}
                                 className="flex items-center space-x-2 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl font-bold text-sm transition-all shadow-sm"
@@ -861,7 +866,9 @@ const OrgChart = () => {
                                 <MdAdd size={20} className="text-teal-500" />
                                 <span>Add Vacant Position</span>
                             </button>
+                            )}
 
+                            {canModifyEmployees && (
                             <button
                                 onClick={handleOpenBatchModal}
                                 className="flex items-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-amber-500/20"
@@ -869,6 +876,7 @@ const OrgChart = () => {
                                 <MdCorporateFare size={20} />
                                 <span>Batch Assign Branch & ID</span>
                             </button>
+                            )}
                         </>
                     )}
 
@@ -999,7 +1007,7 @@ const OrgChart = () => {
                             </div>
 
                             {/* Unassigned Helper Banner */}
-                            {treeData.roots.length > 1 && (
+                            {treeData.roots.length > 1 && canModifyEmployees && (
                                 <div className="mb-6 p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-2xl text-amber-800 dark:text-amber-300 text-xs font-medium flex items-center justify-between">
                                     <span>
                                         💡 <b>Multiple Unassigned Employees Found ({treeData.roots.length}):</b> Drag any card onto its manager's card, or click <b>"Auto-Build Tree"</b> to attach them into a multi-tier hierarchy structure automatically.
@@ -1251,6 +1259,7 @@ const OrgChart = () => {
                                 </div>
                             </div>
 
+                            {canModifyEmployees && (
                             <button
                                 onClick={() => {
                                     const empId = selectedEmp._id;
@@ -1264,6 +1273,7 @@ const OrgChart = () => {
                                 <MdPerson size={18} />
                                 <span>View Profile</span>
                             </button>
+                            )}
                         </div>
 
                         {/* Modal Navigation Tabs */}

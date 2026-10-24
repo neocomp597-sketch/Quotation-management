@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { formatDate } from '../../utils/helpers';
+import usePermission from '../../hooks/usePermission';
 import {
     MdFactCheck,
     MdAdd,
@@ -13,6 +14,7 @@ const API_BASE = '/inventory';
 
 const StockAudits = () => {
     const navigate = useNavigate();
+    const { canCreate, canModify } = usePermission('inventory_stock_counts');
     const [counts, setCounts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState('');
@@ -71,12 +73,14 @@ const StockAudits = () => {
                         Conduct periodic inventory audits, record physical quantities, and auto-reconcile stock variances.
                     </p>
                 </div>
-                <button
-                    onClick={() => navigate('/inventory/counts/new')}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-xl transition-all shadow-md text-sm"
-                >
-                    <MdAdd className="text-lg" /> Start Physical Audit
-                </button>
+                {canCreate && (
+                    <button
+                        onClick={() => navigate('/inventory/counts/new')}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-xl transition-all shadow-md text-sm"
+                    >
+                        <MdAdd className="text-lg" /> Start Physical Audit
+                    </button>
+                )}
             </div>
 
             {/* Filter Bar */}
@@ -131,7 +135,7 @@ const StockAudits = () => {
                                             {formatDate(cnt.scheduledDate)}
                                         </td>
                                         <td className="px-5 py-4 text-right space-x-2">
-                                            {['In_Progress', 'Pending_Review'].includes(cnt.status) && (
+                                            {canModify && ['In_Progress', 'Pending_Review'].includes(cnt.status) && (
                                                 <button
                                                     onClick={() => navigate(`/inventory/counts/record/${cnt._id}`)}
                                                     className="px-3 py-1 bg-sky-100 hover:bg-sky-200 text-sky-800 text-xs font-semibold rounded-lg inline-flex items-center gap-1"
@@ -140,7 +144,7 @@ const StockAudits = () => {
                                                 </button>
                                             )}
 
-                                            {cnt.status === 'Pending_Review' && (
+                                            {canModify && cnt.status === 'Pending_Review' && (
                                                 <button
                                                     onClick={() => handleReconcile(cnt._id)}
                                                     className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg inline-flex items-center gap-1"

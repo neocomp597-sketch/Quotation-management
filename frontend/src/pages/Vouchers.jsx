@@ -8,12 +8,14 @@ import { pdf } from '@react-pdf/renderer';
 import VoucherPDF from '../components/VoucherPDF';
 
 import { useAuth } from '../context/AuthContext';
+import usePermission from '../hooks/usePermission';
 
 const Vouchers = ({ mode = 'grn' }) => {
     const navigate = useNavigate();
     const { user } = useAuth();
     const isVendorUser = user?.role === 'vendor' || String(user?.role || '').toLowerCase() === 'vendor';
     const isInvoiceMode = mode === 'invoice';
+    const { canCreate, canModify, canDelete } = usePermission(isInvoiceMode ? 'sale_invoices' : 'purchase_grn');
     const basePath = isInvoiceMode ? '/invoices' : '/grn';
     const [vouchers, setVouchers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -97,7 +99,7 @@ const Vouchers = ({ mode = 'grn' }) => {
                     <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">{isInvoiceMode ? 'Sales Invoice' : 'Invoice Voucher'}</h1>
                     <p className="text-slate-500 dark:text-slate-400 font-medium">{isInvoiceMode ? 'Sales outward, customer billing and stock deduction' : 'Material inward, vendor invoice vouchers, and return management'}</p>
                 </div>
-                {!isVendorUser && (
+                {!isVendorUser && canCreate && (
                     <Link
                         to={`${basePath}/new`}
                         className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
@@ -177,7 +179,7 @@ const Vouchers = ({ mode = 'grn' }) => {
                                                     >
                                                         <MdVisibility size={20} />
                                                     </button>
-                                                    {!isVendorUser && (
+                                                    {!isVendorUser && canModify && (
                                                         <button
                                                             onClick={() => navigate(`${basePath}/${v._id}`)}
                                                             className="p-2 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-slate-800 rounded-lg transition-all"
@@ -194,7 +196,7 @@ const Vouchers = ({ mode = 'grn' }) => {
                                                     >
                                                         <MdPrint size={20} />
                                                     </button>
-                                                    {!isVendorUser && (
+                                                    {!isVendorUser && canDelete && (
                                                         <button
                                                             onClick={() => handleDelete(v._id)}
                                                             className="p-2 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-lg transition-all"

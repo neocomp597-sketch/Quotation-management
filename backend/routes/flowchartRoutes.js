@@ -1,16 +1,20 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middlewares/auth');
+const { enforceApiPermission } = require('../middlewares/permissionMiddleware');
 const flowchartController = require('../controllers/flowchartController');
 
-router.get('/', auth, flowchartController.getAll);
-router.post('/generate', auth, flowchartController.generate);
-router.post('/import', auth, flowchartController.importJson);
-router.get('/:id', auth, flowchartController.getById);
-router.post('/', auth, flowchartController.create);
-router.put('/:id', auth, flowchartController.update);
-router.delete('/:id', auth, flowchartController.delete);
-router.get('/:id/versions', auth, flowchartController.getVersions);
-router.post('/:id/restore/:versionId', auth, flowchartController.restoreVersion);
+// Screen permissions (View/Create/Modify/Delete), see config/apiPermissions.js
+router.use(auth, enforceApiPermission);
+
+router.get('/', flowchartController.getAll);
+router.post('/generate', flowchartController.generate);
+router.post('/import', flowchartController.importJson);
+router.get('/:id', flowchartController.getById);
+router.post('/', flowchartController.create);
+router.put('/:id', flowchartController.update);
+router.delete('/:id', flowchartController.delete);
+router.get('/:id/versions', flowchartController.getVersions);
+router.post('/:id/restore/:versionId', flowchartController.restoreVersion);
 
 module.exports = router;

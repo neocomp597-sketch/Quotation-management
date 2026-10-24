@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import usePermission from '../../hooks/usePermission';
 import {
     MdTune,
     MdAdd,
@@ -13,6 +14,7 @@ const API_BASE = '/inventory';
 
 const StockAdjustments = () => {
     const navigate = useNavigate();
+    const { canCreate, canModify } = usePermission('inventory_adjustments');
     const [adjustments, setAdjustments] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -85,12 +87,14 @@ const StockAdjustments = () => {
                         Record stock write-offs for damaged goods, inventory loss, expiry, or audit physical variances.
                     </p>
                 </div>
-                <button
-                    onClick={() => navigate('/inventory/adjustments/new')}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-xl transition-all shadow-md text-sm"
-                >
-                    <MdAdd className="text-lg" /> New Adjustment
-                </button>
+                {canCreate && (
+                    <button
+                        onClick={() => navigate('/inventory/adjustments/new')}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-xl transition-all shadow-md text-sm"
+                    >
+                        <MdAdd className="text-lg" /> New Adjustment
+                    </button>
+                )}
             </div>
 
             {/* Filter Bar */}
@@ -159,7 +163,7 @@ const StockAdjustments = () => {
                                             {adj.requestedBy?.name || 'Manager'}
                                         </td>
                                         <td className="px-5 py-4 text-right space-x-2">
-                                            {adj.status === 'PENDING_APPROVAL' && (
+                                            {canModify && adj.status === 'PENDING_APPROVAL' && (
                                                 <>
                                                     <button
                                                         onClick={() => handleApprove(adj._id)}

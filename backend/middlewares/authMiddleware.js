@@ -3,6 +3,7 @@ const User = require('../models/User');
 const { getRedis } = require('../config/redis');
 const { getCachedJson, setCachedJson } = require('../utils/apiCache');
 const { runWithTenant } = require('./tenantContext');
+const { enforceApiPermission } = require('./permissionMiddleware');
 const {
     normalizeBranchId,
     canUseBranch,
@@ -184,7 +185,9 @@ exports.protect = async (req, res, next) => {
                 branchIds = assignedBranchIds;
             }
 
-            runWithTenant(req.user.companyId, () => next(), {
+            // Screen-level permissions (View/Create/Modify/Delete) are checked last,
+            // inside the tenant context, for every protected route.
+            runWithTenant(req.user.companyId, () => enforceApiPermission(req, res, next), {
                 bypassTenant: isSuperAdmin,
                 bypassBranch: isSuperAdmin && isPlatformAdminRequest(req),
                 branchScoped,

@@ -12,6 +12,7 @@ import PortalDropdown from '../components/PortalDropdown';
 import SearchableSelect from '../components/SearchableSelect';
 import { formatDate } from '../utils/helpers';
 import DateInput from '../components/DateInput';
+import usePermission from '../hooks/usePermission';
 
 const formatCurrency = (val) => {
     if (!val) return '₹0';
@@ -23,9 +24,11 @@ const formatCurrency = (val) => {
 
 // Deal Card Component
 const DealCard = ({ deal, onClick }) => {
+    const { canModify } = usePermission('sales_deals');
     const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
         id: deal._id,
-        data: { deal }
+        data: { deal },
+        disabled: !canModify
     });
 
     const style = {
@@ -70,6 +73,7 @@ const DealCard = ({ deal, onClick }) => {
 
 // Stage Column Component
 const StageColumn = ({ stage, onDealClick, onAddDeal }) => {
+    const { canCreate } = usePermission('sales_deals');
     return (
         <div className="flex-shrink-0 w-72 flex flex-col bg-slate-50/50 rounded-2xl border border-slate-100 max-h-[calc(100vh-260px)]">
             {/* Column Header */}
@@ -80,12 +84,12 @@ const StageColumn = ({ stage, onDealClick, onAddDeal }) => {
                         <h3 className="font-bold text-slate-900 text-sm">{stage.name}</h3>
                         <span className="text-xs bg-white px-2 py-0.5 rounded-lg font-bold text-slate-500 border border-slate-100">{stage.count}</span>
                     </div>
-                    <button
+                    {canCreate && <button
                         onClick={() => onAddDeal(stage)}
                         className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-300 transition-all"
                     >
                         <MdAdd size={14} />
-                    </button>
+                    </button>}
                 </div>
                 <p className="text-xs font-bold text-slate-500 mt-1">{formatCurrency(stage.totalValue)}</p>
             </div>
@@ -100,12 +104,12 @@ const StageColumn = ({ stage, onDealClick, onAddDeal }) => {
                 {stage.deals.length === 0 && (
                     <div className="text-center py-8 text-xs text-slate-400">
                         <p>No deals</p>
-                        <button
+                        {canCreate && <button
                             onClick={() => onAddDeal(stage)}
                             className="mt-2 text-indigo-600 font-bold hover:underline"
                         >
                             + Add deal
-                        </button>
+                        </button>}
                     </div>
                 )}
             </div>
@@ -116,6 +120,7 @@ const StageColumn = ({ stage, onDealClick, onAddDeal }) => {
 const DealBoard = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
+    const { canCreate, canDelete } = usePermission('sales_deals');
     const [pipelines, setPipelines] = useState([]);
     const [selectedPipeline, setSelectedPipeline] = useState('');
     const [boardData, setBoardData] = useState(null);
@@ -365,12 +370,12 @@ const DealBoard = () => {
                         ))}
                     </select>
 
-                    <button
+                    {canCreate && <button
                         onClick={() => openCreateModal(null)}
                         className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/25 flex items-center gap-1.5"
                     >
                         <MdAdd size={18} /> New Deal
-                    </button>
+                    </button>}
                 </div>
             </div>
 
@@ -523,7 +528,7 @@ const DealBoard = () => {
                                 onChange={val => setForm({ ...form, source: val })}
                                 placeholder="Select Source"
                                 onAddOption={handleAddSource}
-                                onDeleteOption={handleDeleteSource}
+                                onDeleteOption={canDelete ? handleDeleteSource : undefined}
                             />
                         </div>
                     </div>

@@ -13,6 +13,7 @@ import ImportModal from '../components/ImportModal';
 import PaginationControls from '../components/PaginationControls';
 import { formatDate } from '../utils/helpers';
 import DateInput from '../components/DateInput';
+import usePermission from '../hooks/usePermission';
 
 const PAGE_SIZE = 15;
 
@@ -93,6 +94,7 @@ const MgrLine = ({ record }) => {
 
 const SerialNoMaster = () => {
     const navigate = useNavigate();
+    const { canCreate, canModify } = usePermission('master_serials');
     const [assets, setAssets] = useState([]);
     const [assetPagination, setAssetPagination] = useState({ page: 1, limit: PAGE_SIZE, total: 0, pages: 1 });
     const [assetSummary, setAssetSummary] = useState({ total: 0, inStock: 0, sold: 0, returned: 0 });
@@ -703,6 +705,7 @@ const SerialNoMaster = () => {
                     <p className="text-slate-500 font-semibold text-sm">Track serial numbers, invoice information, customers and product transactions.</p>
                 </div>
                 <div className="flex flex-wrap gap-3 items-center justify-start md:justify-end">
+                    {canCreate && (
                     <button
                         onClick={() => openSingleEntry()}
                         className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-black transition-all uppercase text-[10px] tracking-widest active:scale-95 shadow-md shadow-emerald-600/10 cursor-pointer"
@@ -711,6 +714,8 @@ const SerialNoMaster = () => {
                         <MdAdd size={18} />
                         <span>Add Single Entry</span>
                     </button>
+                    )}
+                    {canCreate && (
                     <button
                         onClick={() => setIsImportModalOpen(true)}
                         className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-black text-white px-5 py-3 rounded-2xl font-black transition-all uppercase text-[10px] tracking-widest active:scale-95 shadow-md shadow-slate-900/10"
@@ -719,6 +724,7 @@ const SerialNoMaster = () => {
                         <MdFileUpload size={18} />
                         <span>Import</span>
                     </button>
+                    )}
                     <button
                         onClick={handleExport}
                         className="flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-5 py-3 rounded-2xl font-black transition-all uppercase text-[10px] tracking-widest active:scale-95 shadow-md shadow-teal-600/10"
@@ -1033,7 +1039,7 @@ const SerialNoMaster = () => {
                                                                         <MdInfoOutline size={16} />
                                                                         View details
                                                                     </button>
-                                                                    {asset.status === 'SOLD' && (
+                                                                    {asset.status === 'SOLD' && canModify && (
                                                                         <button
                                                                             onClick={() => {
                                                                                 setOpenActionMenuAssetId(null);

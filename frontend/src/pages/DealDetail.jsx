@@ -12,6 +12,7 @@ import {
     MdBusiness, MdPerson, MdCalendarToday, MdTrendingUp
 } from 'react-icons/md';
 import DateInput from '../components/DateInput';
+import usePermission from '../hooks/usePermission';
 
 const ACTIVITY_ICONS = {
     Call: <MdPhone />, Email: <MdEmail />, Meeting: <MdEvent />,
@@ -36,6 +37,7 @@ const formatCurrency = (val) => {
 const DealDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { canModify, canDelete } = usePermission('sales_deals');
     const [deal, setDeal] = useState(null);
     const [activities, setActivities] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -246,7 +248,7 @@ const DealDetail = () => {
                 </div>
                 {id && (
                     <div className="flex items-center gap-2">
-                        {!editing && deal?.status === 'Open' && (
+                        {canModify && !editing && deal?.status === 'Open' && (
                             <>
                                 <button onClick={() => setEditing(true)} className="px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 flex items-center gap-1.5">
                                     <MdEdit size={16} /> Edit
@@ -256,14 +258,14 @@ const DealDetail = () => {
                                 </button>
                             </>
                         )}
-                        {deal?.status === 'Lost' && (
+                        {canModify && deal?.status === 'Lost' && (
                             <button onClick={handleReopen} className="px-3 py-2 rounded-xl border border-emerald-200 text-sm font-bold text-emerald-600 hover:bg-emerald-50 flex items-center gap-1.5">
                                 <MdReplay size={16} /> Reopen
                             </button>
                         )}
-                        <button onClick={handleDelete} className="px-3 py-2 rounded-xl border border-red-200 text-sm font-bold text-red-600 hover:bg-red-50 flex items-center gap-1.5">
+                        {canDelete && <button onClick={handleDelete} className="px-3 py-2 rounded-xl border border-red-200 text-sm font-bold text-red-600 hover:bg-red-50 flex items-center gap-1.5">
                             <MdDelete size={16} />
-                        </button>
+                        </button>}
                     </div>
                 )}
             </div>
@@ -386,7 +388,7 @@ const DealDetail = () => {
                                         onChange={val => setForm({ ...form, source: val })}
                                         placeholder="Select Source"
                                         onAddOption={handleAddSource}
-                                        onDeleteOption={handleDeleteSource}
+                                        onDeleteOption={canDelete ? handleDeleteSource : undefined}
                                     />
                                 </div>
                                 <div>
@@ -447,10 +449,10 @@ const DealDetail = () => {
                         <div className="bg-white rounded-2xl border border-slate-100 p-6">
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="text-sm font-black text-slate-900 uppercase">Activity Timeline</h3>
-                                <button onClick={() => setShowActivity(!showActivity)}
+                                {canModify && <button onClick={() => setShowActivity(!showActivity)}
                                     className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center hover:bg-indigo-100 transition-all">
                                     <MdAdd size={18} />
-                                </button>
+                                </button>}
                             </div>
 
                             {showActivity && (

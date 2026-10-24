@@ -13,6 +13,8 @@ import {
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import DateInput from '../components/DateInput';
+import { useAuth } from '../context/AuthContext';
+import usePermission from '../hooks/usePermission';
 
 // The paper sheet uses the ARCRM date format (DD.MMM.YY); unreadable text is shown as typed.
 const sheetDate = (value) => (value ? formatDate(value, String(value)) : '');
@@ -65,6 +67,8 @@ const INITIAL_FORM = {
 };
 
 const CSMRcaReport = () => {
+    const { can } = useAuth();
+    const { canCreate, canModify } = usePermission('csm_rca');
     const [reports, setReports] = useState([]);
     const [tickets, setTickets] = useState([]);
     const [isManualTicket, setIsManualTicket] = useState(false);
@@ -532,7 +536,7 @@ const CSMRcaReport = () => {
                                 <MdArrowBack size={18} /> Back to Register
                             </button>
 
-                            {viewMode === 'view' && (
+                            {viewMode === 'view' && can('settings_profile', 'modify') && (
                                 <button
                                     onClick={() => setLogoEditor({ open: true, saving: false, side: null })}
                                     className="px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center gap-2 no-print"
@@ -541,7 +545,7 @@ const CSMRcaReport = () => {
                                     <MdImage size={18} /> Edit Logos
                                 </button>
                             )}
-                            {viewMode === 'view' && (
+                            {viewMode === 'view' && canModify && (
                                 <button
                                     onClick={() => setViewMode('form')}
                                     className="flex items-center gap-1.5 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
@@ -591,12 +595,14 @@ const CSMRcaReport = () => {
                             >
                                 <MdRefresh size={20} />
                             </button>
-                            <button
-                                onClick={handleCreateNew}
-                                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-lg hover:shadow-teal-500/20 active:scale-95"
-                            >
-                                <MdAdd size={20} /> Create New RCA
-                            </button>
+                            {canCreate && (
+                                <button
+                                    onClick={handleCreateNew}
+                                    className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-lg hover:shadow-teal-500/20 active:scale-95"
+                                >
+                                    <MdAdd size={20} /> Create New RCA
+                                </button>
+                            )}
                         </>
                     )}
                 </div>
@@ -619,12 +625,14 @@ const CSMRcaReport = () => {
                         <div className="text-center py-16 space-y-3">
                             <MdAssessment size={48} className="mx-auto text-slate-300 dark:text-slate-700" />
                             <p className="text-slate-500 dark:text-slate-400 font-bold text-sm">No RCA Reports created yet.</p>
-                            <button
-                                onClick={handleCreateNew}
-                                className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
-                            >
-                                Create First RCA Report
-                            </button>
+                            {canCreate && (
+                                <button
+                                    onClick={handleCreateNew}
+                                    className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
+                                >
+                                    Create First RCA Report
+                                </button>
+                            )}
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
@@ -669,13 +677,15 @@ const CSMRcaReport = () => {
                                                     <MdVisibility size={16} />
                                                 </button>
                                                 {/* Edit Button */}
-                                                <button
-                                                    onClick={() => handleEdit(report)}
-                                                    className="p-2 text-teal-600 dark:text-teal-400 hover:text-teal-800 bg-teal-50 dark:bg-teal-950/60 rounded-xl hover:bg-teal-100 transition-all border border-teal-200/50 dark:border-teal-800/50"
-                                                    title="Edit RCA Report"
-                                                >
-                                                    <MdEdit size={16} />
-                                                </button>
+                                                {canModify && (
+                                                    <button
+                                                        onClick={() => handleEdit(report)}
+                                                        className="p-2 text-teal-600 dark:text-teal-400 hover:text-teal-800 bg-teal-50 dark:bg-teal-950/60 rounded-xl hover:bg-teal-100 transition-all border border-teal-200/50 dark:border-teal-800/50"
+                                                        title="Edit RCA Report"
+                                                    >
+                                                        <MdEdit size={16} />
+                                                    </button>
+                                                )}
                                                 {/* Download PDF Button */}
                                                 <button
                                                     onClick={() => handleDownloadPdf(report)}

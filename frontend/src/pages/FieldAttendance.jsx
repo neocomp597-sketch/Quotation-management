@@ -6,6 +6,7 @@ import { MdArrowBack, MdCheckCircle, MdClose, MdHowToReg, MdMap, MdPhotoCamera, 
 import Modal from '../components/Modal';
 import DateInput from '../components/DateInput';
 import { fetchAccurateLocation } from '../utils/reverseGeocode';
+import usePermission from '../hooks/usePermission';
 
 // Client-side image compression & resizing helper before upload (max 800x800, quality 0.7)
 const compressSelfieImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.7) => {
@@ -61,6 +62,7 @@ const compressSelfieImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.
 };
 
 const FieldAttendance = () => {
+    const { canCreate } = usePermission('csm_attendance');
     const [attendanceList, setAttendanceList] = useState([]);
     const [loadingAttendance, setLoadingAttendance] = useState(false);
     const [activeAttendance, setActiveAttendance] = useState(null);
@@ -798,7 +800,7 @@ const FieldAttendance = () => {
                             </div>
 
                             <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
-                                {activeAttendance ? (
+                                {activeAttendance ? canCreate && (
                                     <button
                                         onClick={handleOpenCheckOutModal}
                                         disabled={submittingCheckOut}
@@ -815,7 +817,7 @@ const FieldAttendance = () => {
                                         <MdCheckCircle size={18} className="text-emerald-400" />
                                         CHECK-IN COMPLETED FOR TODAY
                                     </button>
-                                ) : (
+                                ) : canCreate && (
                                     <button
                                         onClick={handleOpenAttendanceModal}
                                         className="px-6 py-3.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-teal-600/30 hover:shadow-teal-600/50 active:scale-95 flex items-center gap-2 cursor-pointer"

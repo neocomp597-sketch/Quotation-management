@@ -10,6 +10,8 @@ import { clearQuotationDraft, setAutosaveStatus, setQuotationDraft } from '../st
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
 import { loadGoogleMaps } from '../utils/loadGoogleMaps';
 import DateInput from '../components/DateInput';
+import usePermission from '../hooks/usePermission';
+import { useAuth } from '../context/AuthContext';
 
 // Skeleton loader for product rows
 const SkeletonRow = () => (
@@ -251,6 +253,9 @@ const CreateQuotation = () => {
     const navigate = useNavigate();
     const { id } = useParams();
     const isEditMode = !!id;
+    const { canCreate, canModify } = usePermission('quotation_list');
+    const { can } = useAuth();
+    const canSave = isEditMode ? canModify : canCreate;
     const dispatch = useDispatch();
     const autosaveStatus = useSelector((state) => state.quotationDraft.autosaveStatus);
     const lastSavedAt = useSelector((state) => state.quotationDraft.lastSavedAt);
@@ -1084,7 +1089,7 @@ const CreateQuotation = () => {
                         </p>
                     </div>
                 </div>
-                <div className="flex gap-3">
+                {canSave && <div className="flex gap-3">
                     <button
                         onClick={() => handleSubmit('draft')}
                         disabled={isSaving}
@@ -1111,9 +1116,10 @@ const CreateQuotation = () => {
                         )}
                         {isSaving ? 'Saving...' : 'Finalize & Issue'}
                     </button>
-                </div>
+                </div>}
             </div>
 
+            <fieldset disabled={!canSave} className="min-w-0">
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
                 {/* Left Side: Form Content (8 cols) */}
                 <div className="xl:col-span-8 space-y-8">
@@ -1196,13 +1202,13 @@ const CreateQuotation = () => {
                                                     ))}
                                                 </select>
                                             </div>
-                                            <button
+                                            {can('admin_salespersons', 'create') && <button
                                                 type="button"
                                                 onClick={() => setIsSalespersonModalOpen(true)}
                                                 className="p-3.5 bg-primary-50 text-primary-600 rounded-2xl border border-primary-100 hover:bg-primary-100 transition-all"
                                             >
                                                 <MdAdd size={20} />
-                                            </button>
+                                            </button>}
                                         </div>
                                     </div>
                                     <div className="space-y-2">
@@ -1233,13 +1239,13 @@ const CreateQuotation = () => {
                                                     <option key={s._id} value={s._id}>{s.siteName}</option>
                                                 ))}
                                             </select>
-                                            <button
+                                            {can('master_customers', 'create') && <button
                                                 type="button"
                                                 onClick={() => setIsSiteModalOpen(true)}
                                                 className="p-3.5 bg-primary-50 text-primary-600 rounded-2xl border border-primary-100 hover:bg-primary-100 transition-all"
                                             >
                                                 <MdAdd size={20} />
-                                            </button>
+                                            </button>}
                                         </div>
                                     </div>
                                 </div>
@@ -1329,13 +1335,13 @@ const CreateQuotation = () => {
                                                     ))}
                                                 </select>
                                             </div>
-                                            <button
+                                            {can('admin_salespersons', 'create') && <button
                                                 type="button"
                                                 onClick={() => setIsSalespersonModalOpen(true)}
                                                 className="p-3.5 bg-primary-50 text-primary-600 rounded-2xl border border-primary-100 hover:bg-primary-100 transition-all"
                                             >
                                                 <MdAdd size={20} />
-                                            </button>
+                                            </button>}
                                         </div>
                                     </div>
                                     <div className="space-y-2">
@@ -1366,13 +1372,13 @@ const CreateQuotation = () => {
                                                     <option key={s._id} value={s._id}>{s.siteName}</option>
                                                 ))}
                                             </select>
-                                            <button
+                                            {can('master_customers', 'create') && <button
                                                 type="button"
                                                 onClick={() => setIsSiteModalOpen(true)}
                                                 className="p-3.5 bg-primary-50 text-primary-600 rounded-2xl border border-primary-100 hover:bg-primary-100 transition-all"
                                             >
                                                 <MdAdd size={20} />
-                                            </button>
+                                            </button>}
                                         </div>
                                     </div>
                                 </div>
@@ -1671,6 +1677,7 @@ const CreateQuotation = () => {
                     </div>
                 </div>
             </div>
+            </fieldset>
 
             {/* Product Selector Modal */}
             <Modal
@@ -1901,7 +1908,7 @@ const CreateQuotation = () => {
                             {items.length} item{items.length !== 1 ? 's' : ''} • Tax: ₹{totals.gst.toLocaleString()}
                         </div>
                     </div>
-                    <div className="flex gap-2 flex-shrink-0">
+                    {canSave && <div className="flex gap-2 flex-shrink-0">
                         <button
                             onClick={() => handleSubmit('draft')}
                             disabled={isSaving}
@@ -1918,7 +1925,7 @@ const CreateQuotation = () => {
                             {isSaving ? <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <MdCheckCircle size={14} />}
                             Finalize
                         </button>
-                    </div>
+                    </div>}
                 </div>
             </div>
         </div >

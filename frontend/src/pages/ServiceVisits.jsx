@@ -11,6 +11,7 @@ import {
 import Modal from '../components/Modal';
 import { fetchAccurateLocation } from '../utils/reverseGeocode';
 import DateInput from '../components/DateInput';
+import usePermission from '../hooks/usePermission';
 
 const visitStatusClass = (status) => (
     status === 'Completed' ? 'bg-teal-50 text-teal-600 border-teal-200' :
@@ -246,6 +247,7 @@ const Mgr5SearchSelect = ({ mgr5Parts, selectedId, onSelect, isCustomDesc }) => 
 
 const ServiceVisits = () => {
     const canvasRef = useRef(null);
+    const { canCreate, canModify } = usePermission('csm_visits');
 
     const [loading, setLoading] = useState(false);
     const [loadError, setLoadError] = useState('');
@@ -811,13 +813,15 @@ const ServiceVisits = () => {
                                 Manage field engineer dispatches, visit check-ins, service reports and visit completion.
                             </p>
                         </div>
-                        <button
-                            onClick={() => handleOpenCreateModal()}
-                            className="px-5 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-xs tracking-wider rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 shrink-0"
-                        >
-                            <MdAdd size={20} />
-                            Schedule Field Visit
-                        </button>
+                        {canCreate && (
+                            <button
+                                onClick={() => handleOpenCreateModal()}
+                                className="px-5 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-xs tracking-wider rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 shrink-0"
+                            >
+                                <MdAdd size={20} />
+                                Schedule Field Visit
+                            </button>
+                        )}
                     </div>
 
                     {/* Service Visits Queue */}
@@ -854,13 +858,17 @@ const ServiceVisits = () => {
                         ) : visits.length === 0 ? (
                             <div className="text-center py-20 text-slate-400 space-y-4">
                                 <p className="text-lg font-bold">No field service visits scheduled.</p>
-                                <p className="text-sm">Click below to schedule your first field service visit.</p>
-                                <button
-                                    onClick={() => handleOpenCreateModal()}
-                                    className="px-4 py-2.5 bg-primary-600 text-white font-black uppercase text-xs rounded-xl shadow-md"
-                                >
-                                    + Schedule Field Visit
-                                </button>
+                                {canCreate && (
+                                    <>
+                                        <p className="text-sm">Click below to schedule your first field service visit.</p>
+                                        <button
+                                            onClick={() => handleOpenCreateModal()}
+                                            className="px-4 py-2.5 bg-primary-600 text-white font-black uppercase text-xs rounded-xl shadow-md"
+                                        >
+                                            + Schedule Field Visit
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         ) : (
                             <>
@@ -978,7 +986,7 @@ const ServiceVisits = () => {
                             <MdArrowBack size={18} />
                             Back to Service Visits
                         </button>
-                        {['Scheduled', 'In Transit', 'Started'].includes(selectedVisit.status) && (
+                        {canModify && ['Scheduled', 'In Transit', 'Started'].includes(selectedVisit.status) && (
                             <button
                                 type="button"
                                 onClick={openRescheduleModal}
@@ -1024,17 +1032,19 @@ const ServiceVisits = () => {
                                 <p className="text-xs text-slate-400 font-semibold px-4">
                                     Performs checking-in at site location. Click the button below to simulate matching GPS coordinate stamps.
                                 </p>
-                                <button
-                                    onClick={() => handleCheckIn(selectedVisit._id)}
-                                    className="w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95"
-                                >
-                                    Stamp Check-In Location
-                                </button>
+                                {canModify && (
+                                    <button
+                                        onClick={() => handleCheckIn(selectedVisit._id)}
+                                        className="w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95"
+                                    >
+                                        Stamp Check-In Location
+                                    </button>
+                                )}
                             </div>
                         )}
 
                         {/* Check-Out Mode */}
-                        {selectedVisit.status === 'Started' && (
+                        {canModify && selectedVisit.status === 'Started' && (
                             <div className="space-y-6">
                                 <h4 className="font-outfit font-black text-slate-900 uppercase text-sm border-b border-slate-50 pb-2">
                                     Completion & Check-Out
@@ -1456,19 +1466,23 @@ const ServiceVisits = () => {
                                 )}
 
                                 <div className="pt-2 flex flex-col sm:flex-row sm:justify-end gap-2">
-                                    <button
-                                        onClick={() => handleOpenCreateModal(selectedVisit.ticketId?._id || selectedVisit.ticketId)}
-                                        className="w-full sm:w-auto sm:px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-1.5"
-                                    >
-                                        <MdAdd size={16} />
-                                        Schedule New Visit for Ticket
-                                    </button>
-                                    <button
-                                        onClick={openRescheduleModal}
-                                        className="w-full sm:w-auto sm:px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border border-slate-200"
-                                    >
-                                        Re-open / Reschedule Visit
-                                    </button>
+                                    {canCreate && (
+                                        <button
+                                            onClick={() => handleOpenCreateModal(selectedVisit.ticketId?._id || selectedVisit.ticketId)}
+                                            className="w-full sm:w-auto sm:px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-1.5"
+                                        >
+                                            <MdAdd size={16} />
+                                            Schedule New Visit for Ticket
+                                        </button>
+                                    )}
+                                    {canModify && (
+                                        <button
+                                            onClick={openRescheduleModal}
+                                            className="w-full sm:w-auto sm:px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border border-slate-200"
+                                        >
+                                            Re-open / Reschedule Visit
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -1480,12 +1494,14 @@ const ServiceVisits = () => {
                                 <p className="text-xs text-slate-400 font-semibold px-4">
                                     This visit was marked as cancelled. You can reschedule it or schedule a new visit.
                                 </p>
-                                <button
-                                    onClick={openRescheduleModal}
-                                    className="w-full sm:w-auto sm:px-10 py-3 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                                >
-                                    Reschedule Visit
-                                </button>
+                                {canModify && (
+                                    <button
+                                        onClick={openRescheduleModal}
+                                        className="w-full sm:w-auto sm:px-10 py-3 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                    >
+                                        Reschedule Visit
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>

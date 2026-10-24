@@ -11,6 +11,7 @@ import Modal from '../components/Modal';
 import SearchableSelect from '../components/SearchableSelect';
 import SerialSearchInput from '../components/bom/SerialSearchInput';
 import DateInput from '../components/DateInput';
+import usePermission from '../hooks/usePermission';
 
 const EMPTY_FORM = {
     customerId: '',
@@ -48,6 +49,7 @@ const warrantyPeriodText = (months) => {
 };
 
 const WarrantyAMC = () => {
+    const { canCreate } = usePermission('csm_warranties_amc');
     const [activeSection, setActiveSection] = useState('warranties');
     const [loading, setLoading] = useState(false);
     const [warranties, setWarranties] = useState([]);
@@ -426,43 +428,47 @@ const WarrantyAMC = () => {
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                    {/* Add Buttons */}
-                    <button
-                        onClick={() => openForm('warranties')}
-                        className="flex items-center gap-1.5 px-4 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-md active:scale-95"
-                    >
-                        <MdAdd size={16} />
-                        Add Warranty
-                    </button>
-                    <button
-                        onClick={() => openForm('amc')}
-                        className="flex items-center gap-1.5 px-4 py-3 bg-teal-600 hover:bg-teal-700 text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-md active:scale-95"
-                    >
-                        <MdAdd size={16} />
-                        Add AMC
-                    </button>
+                    {canCreate && (
+                        <>
+                            {/* Add Buttons */}
+                            <button
+                                onClick={() => openForm('warranties')}
+                                className="flex items-center gap-1.5 px-4 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-md active:scale-95"
+                            >
+                                <MdAdd size={16} />
+                                Add Warranty
+                            </button>
+                            <button
+                                onClick={() => openForm('amc')}
+                                className="flex items-center gap-1.5 px-4 py-3 bg-teal-600 hover:bg-teal-700 text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-md active:scale-95"
+                            >
+                                <MdAdd size={16} />
+                                Add AMC
+                            </button>
 
-                    {/* Import Buttons */}
-                    <label className="flex items-center gap-1.5 px-4 py-3 bg-slate-800 hover:bg-slate-950 text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-md cursor-pointer active:scale-95">
-                        <MdPublish size={16} />
-                        Import Warranty
-                        <input
-                            type="file"
-                            accept=".xlsx, .xls, .csv"
-                            onChange={(e) => handleImportFile(e, 'warranty')}
-                            className="hidden"
-                        />
-                    </label>
-                    <label className="flex items-center gap-1.5 px-4 py-3 bg-slate-800 hover:bg-slate-950 text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-md cursor-pointer active:scale-95">
-                        <MdPublish size={16} />
-                        Import AMC
-                        <input
-                            type="file"
-                            accept=".xlsx, .xls, .csv"
-                            onChange={(e) => handleImportFile(e, 'amc')}
-                            className="hidden"
-                        />
-                    </label>
+                            {/* Import Buttons */}
+                            <label className="flex items-center gap-1.5 px-4 py-3 bg-slate-800 hover:bg-slate-950 text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-md cursor-pointer active:scale-95">
+                                <MdPublish size={16} />
+                                Import Warranty
+                                <input
+                                    type="file"
+                                    accept=".xlsx, .xls, .csv"
+                                    onChange={(e) => handleImportFile(e, 'warranty')}
+                                    className="hidden"
+                                />
+                            </label>
+                            <label className="flex items-center gap-1.5 px-4 py-3 bg-slate-800 hover:bg-slate-950 text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-md cursor-pointer active:scale-95">
+                                <MdPublish size={16} />
+                                Import AMC
+                                <input
+                                    type="file"
+                                    accept=".xlsx, .xls, .csv"
+                                    onChange={(e) => handleImportFile(e, 'amc')}
+                                    className="hidden"
+                                />
+                            </label>
+                        </>
+                    )}
 
                     {/* Download Template Buttons */}
                     <button

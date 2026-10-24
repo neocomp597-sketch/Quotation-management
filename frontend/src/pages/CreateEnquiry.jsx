@@ -8,6 +8,7 @@ import PortalDropdown from '../components/PortalDropdown';
 import { isValidMobile, isValidGSTIN } from '../utils/validation';
 import { buildSalesExecutiveList } from '../utils/helpers';
 import DateInput from '../components/DateInput';
+import { useAuth } from '../context/AuthContext';
 
 // Reuse CustomerSearchDropdown with Teal accents
 const CustomerSearchDropdown = ({ customers, selectedCustomerId, onSelect }) => {
@@ -283,6 +284,7 @@ const CreateEnquiry = () => {
     const navigate = useNavigate();
     const { id } = useParams();
     const isEditMode = !!id;
+    const { can } = useAuth();
 
     const [customers, setCustomers] = useState([]);
     const [allVendors, setAllVendors] = useState([]);
@@ -1108,13 +1110,13 @@ const CreateEnquiry = () => {
                         </div>
                         {/* Inline blue + New Customer button */}
                         <div className="lg:col-span-2">
-                            <button
+                            {can('master_customers', 'create') && <button
                                 type="button"
                                 onClick={() => setIsInlineCustomerFormOpen(!isInlineCustomerFormOpen)}
                                 className="w-full py-3.5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center whitespace-nowrap gap-1 shadow-md active:scale-95 shrink-0"
                             >
                                 {isInlineCustomerFormOpen ? '✕ Close Form' : '+ New Customer'}
-                            </button>
+                            </button>}
                         </div>
                         {/* Contact Person */}
                         <div className="lg:col-span-3 space-y-2">

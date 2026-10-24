@@ -19,11 +19,13 @@ import { resolveImageUrl } from '../utils/helpers';
 import SiteLogo from '../components/SiteLogo';
 import { ROLE_LABELS } from '../constants/menuPermissions';
 import RichTextEditor from '../components/RichTextEditor';
+import usePermission from '../hooks/usePermission';
 
 const Settings = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const { user: authUser, refreshSession } = useAuth();
+    const { canModify } = usePermission('settings_profile');
     const [activeTab, setActiveTab] = useState('profile');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState(null);
@@ -444,6 +446,7 @@ const [logoUploading, setLogoUploading] = useState(false);
                     </h2>
 
                     <form onSubmit={handleCompanySettingsUpdate} className="space-y-6">
+                        <fieldset disabled={!canModify} className="space-y-6">
                         {/* Logo Upload */}
                         <div className="flex items-start gap-6">
                             <div className="flex-shrink-0">
@@ -594,6 +597,7 @@ const [logoUploading, setLogoUploading] = useState(false);
                             </div>
                         </div>
 
+                        {canModify && (
                         <div className="pt-4 border-t border-slate-100">
                             <button
                                 type="submit"
@@ -604,6 +608,8 @@ const [logoUploading, setLogoUploading] = useState(false);
                                 {loading ? 'Saving...' : 'Save Company Info'}
                             </button>
                         </div>
+                        )}
+                        </fieldset>
                     </form>
                 </div>
             )}
@@ -617,6 +623,7 @@ const [logoUploading, setLogoUploading] = useState(false);
                     </h2>
 
                     <form onSubmit={handleCompanySettingsUpdate} className="space-y-5">
+                        <fieldset disabled={!canModify} className="space-y-5">
                         <div>
                             <label className={labelClass}>Address Line 1 <span className="text-rose-500">*</span></label>
                             <input
@@ -687,6 +694,7 @@ const [logoUploading, setLogoUploading] = useState(false);
                             </div>
                         </div>
 
+                        {canModify && (
                         <div className="pt-4 border-t border-slate-100">
                             <button
                                 type="submit"
@@ -697,6 +705,8 @@ const [logoUploading, setLogoUploading] = useState(false);
                                 {loading ? 'Saving...' : 'Save Address'}
                             </button>
                         </div>
+                        )}
+                        </fieldset>
                     </form>
                 </div>
             )}
@@ -711,6 +721,7 @@ const [logoUploading, setLogoUploading] = useState(false);
                     <p className="text-sm text-slate-500 mb-6">These details will appear on your quotations and invoices for payment reference.</p>
 
                     <form onSubmit={handleCompanySettingsUpdate} className="space-y-5">
+                        <fieldset disabled={!canModify} className="space-y-5">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className={labelClass}>Bank Name</label>
@@ -769,6 +780,7 @@ const [logoUploading, setLogoUploading] = useState(false);
                             </div>
                         </div>
 
+                        {canModify && (
                         <div className="pt-4 border-t border-slate-100">
                             <button
                                 type="submit"
@@ -779,6 +791,8 @@ const [logoUploading, setLogoUploading] = useState(false);
                                 {loading ? 'Saving...' : 'Save Bank Details'}
                             </button>
                         </div>
+                        )}
+                        </fieldset>
                     </form>
                 </div>
             )}
@@ -792,6 +806,7 @@ const [logoUploading, setLogoUploading] = useState(false);
                     </h2>
 
                     <form onSubmit={handleCompanySettingsUpdate} className="space-y-6">
+                        <fieldset disabled={!canModify} className="space-y-6">
                         {/* Authorized Signatory */}
                         <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
                             <h3 className="text-sm font-black text-slate-400 uppercase tracking-wider mb-4">Authorized Signatory</h3>
@@ -872,6 +887,7 @@ const [logoUploading, setLogoUploading] = useState(false);
                             />
                         </div>
 
+                        {canModify && (
                         <div className="pt-4 border-t border-slate-100">
                             <button
                                 type="submit"
@@ -882,6 +898,8 @@ const [logoUploading, setLogoUploading] = useState(false);
                                 {loading ? 'Saving...' : 'Save Settings'}
                             </button>
                         </div>
+                        )}
+                        </fieldset>
                     </form>
                 </div>
             )}
@@ -896,6 +914,7 @@ const [logoUploading, setLogoUploading] = useState(false);
                     <p className="text-sm text-slate-500 mb-6">Customize how your company brand appears across the CRM. Upload your logo in Company Info tab to enable dual branding.</p>
 
                     <form onSubmit={handleCompanySettingsUpdate} className="space-y-6">
+                        <fieldset disabled={!canModify} className="space-y-6">
                         {/* Dual Branding Toggle */}
                         <div className="p-5 bg-gradient-to-r from-primary-50 to-blue-50 rounded-2xl border border-primary-100">
                             <div className="flex items-center justify-between">
@@ -985,6 +1004,7 @@ const [logoUploading, setLogoUploading] = useState(false);
                             <p className="text-[10px] text-slate-400 mt-1 font-bold">Used for the sidebar logo badge accent color.</p>
                         </div>
 
+                        {canModify && (
                         <div className="pt-4 border-t border-slate-100">
                             <button
                                 type="submit"
@@ -995,6 +1015,8 @@ const [logoUploading, setLogoUploading] = useState(false);
                                 {loading ? 'Saving...' : 'Save Branding'}
                             </button>
                         </div>
+                        )}
+                        </fieldset>
                     </form>
                 </div>
             )}

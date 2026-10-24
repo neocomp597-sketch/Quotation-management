@@ -151,7 +151,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             children: [
                 { key: 'master_attributes', name: 'Attributes', icon: <MdAssignment size={18} />, path: '/attributes' },
                 { key: 'master_branches', name: 'Branch Master', icon: <MdBusiness size={18} />, path: '/branches' },
-                { key: 'master_branches', name: 'City Master', icon: <MdLocationCity size={18} />, path: '/city-master' },
+                { key: 'city_master', name: 'City Master', icon: <MdLocationCity size={18} />, path: '/city-master' },
                 { key: 'master_contacts', name: 'Contacts', icon: <MdContactPhone size={18} />, path: '/contacts' },
                 { key: 'master_customers', name: 'Customers', icon: <MdPeople size={18} />, path: '/customers' },
                 { key: 'sales_deals', name: 'Deals', icon: <MdViewKanban size={18} />, path: '/sales/deals' },
@@ -166,7 +166,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'master_products', name: 'Product Master', icon: <MdInventory size={18} />, path: '/products' },
                 { key: 'master_mgrs', name: 'Product MGR Master', icon: <MdCategory size={18} />, path: '/mgrs' },
                 { key: 'master_segments', name: 'Segment Master', icon: <MdCategory size={18} />, path: '/segments' },
-                { key: 'master_branches', name: 'State Master', icon: <MdMap size={18} />, path: '/state-master' },
+                { key: 'state_master_create', name: 'State Master', icon: <MdMap size={18} />, path: '/state-master' },
                 { key: 'master_statuses', name: 'Status Master', icon: <MdBarChart size={18} />, path: '/status-master', adminOnly: true },
                 { key: 'master_terms', name: 'Terms & Conditions', icon: <MdDescription size={18} />, path: '/terms' },
                 { key: 'master_type_tests', name: 'Type Test Register', icon: <MdFactCheck size={18} />, path: '/type-tests' },

@@ -10,12 +10,14 @@ import {
 import Modal from '../components/Modal';
 import SearchableSelect from '../components/SearchableSelect';
 import { useAuth } from '../context/AuthContext';
+import usePermission from '../hooks/usePermission';
 
 const CSMMasters = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
     const { id: routeId } = useParams();
     const location = useLocation();
     const { isAdmin, isSuperAdmin } = useAuth();
+    const { canCreate, canModify, canDelete } = usePermission('csm_masters');
     const queryParams = new URLSearchParams(location.search);
     const defaultTab = queryParams.get('tab') || 'categories';
     const [activeTab, setActiveTab] = useState(defaultTab);
@@ -312,7 +314,7 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
                         <MdCloudDownload size={18} />
                         Seed Defaults
                     </button>
-                    {activeTab !== 'engineers' && (
+                    {activeTab !== 'engineers' && canCreate && (
                         <button
                             onClick={() => handleOpenModal()}
                             className="flex items-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-lg shadow-primary-600/20 active:scale-95"
@@ -357,7 +359,7 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
                                 <span><strong>Service Engineer Source:</strong> Employees created with designation <em>"Service Engineer"</em> in Employee Master automatically appear here. Use <strong>Edit</strong> to assign territories. Manual creation is disabled.</span>
                             )}
                         </div>
-                        {engineerSource && (isAdmin || isSuperAdmin) && (
+                        {engineerSource && (isAdmin || isSuperAdmin) && canModify && (
                             <div className="flex flex-shrink-0 rounded-xl border border-teal-200 bg-white p-0.5" role="group" aria-label="Who can be assigned">
                                 {[['all_employees', 'All Employees'], ['service_engineers', 'Service Engineers']].map(([value, label]) => (
                                     <button
@@ -454,14 +456,16 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
                                         )}
                                         <td className="px-6 py-4">
                                             <div className="flex items-center justify-center gap-3">
-                                                <button
-                                                    onClick={() => handleOpenModal(item)}
-                                                    title={activeTab === 'engineers' ? "Edit Engineer & Assign Territory" : "Edit Item"}
-                                                    className="p-2 rounded-xl text-slate-400 hover:text-primary-600 hover:bg-slate-50 transition-all"
-                                                >
-                                                    <MdEdit size={18} />
-                                                </button>
-                                                {activeTab !== 'engineers' && (
+                                                {canModify && (
+                                                    <button
+                                                        onClick={() => handleOpenModal(item)}
+                                                        title={activeTab === 'engineers' ? "Edit Engineer & Assign Territory" : "Edit Item"}
+                                                        className="p-2 rounded-xl text-slate-400 hover:text-primary-600 hover:bg-slate-50 transition-all"
+                                                    >
+                                                        <MdEdit size={18} />
+                                                    </button>
+                                                )}
+                                                {activeTab !== 'engineers' && canDelete && (
                                                     <button
                                                         onClick={() => handleDelete(item._id)}
                                                         className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50/50 transition-all"

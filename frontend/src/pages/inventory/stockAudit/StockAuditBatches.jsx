@@ -4,6 +4,7 @@ import { MdAdd, MdFactCheck, MdSearch, MdInfoOutline } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { stockAuditService } from '../../../services/api';
 import { formatDate } from '../../../utils/helpers';
+import usePermission from '../../../hooks/usePermission';
 import { PRIMARY, INPUT, NOTICE, ROLE_LABEL, fmtMoney, fmtMoneyShort, fmtSigned, varianceTone, errorMessage } from './shared';
 import { Badge, ProgressBar } from './ui';
 
@@ -22,6 +23,7 @@ const StockAuditBatches = () => {
     // Batches of the last finished request, tagged with that request's filters.
     const [loaded, setLoaded] = useState({ key: null, batches: [] });
     const [canCreate, setCanCreate] = useState(false);
+    const { canCreate: canCreateBatch } = usePermission('inventory_sap_audit');
     const [status, setStatus] = useState('');
     const [search, setSearch] = useState('');
     const [term, setTerm] = useState('');
@@ -63,7 +65,7 @@ const StockAuditBatches = () => {
                         <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">SAP B1 book stock · Physical count · Mismatch follow-up</p>
                     </div>
                 </div>
-                {canCreate && (
+                {canCreate && canCreateBatch && (
                     <button type="button" onClick={() => navigate('/inventory/stock-audit/new')} className={PRIMARY}>
                         <MdAdd size={18} /> New audit batch
                     </button>
@@ -94,7 +96,7 @@ const StockAuditBatches = () => {
             ) : batches.length === 0 ? (
                 <div className="py-16 text-center space-y-3">
                     <p className="text-slate-500 font-bold">No audit batches{status || term ? ' match these filters' : ' yet'}.</p>
-                    {!canCreate && !status && !term && (
+                    {!(canCreate && canCreateBatch) && !status && !term && (
                         <div className={`${NOTICE} max-w-xl mx-auto text-left`}>
                             <MdInfoOutline size={18} className="flex-shrink-0 mt-0.5" />
                             <span>Batches appear here when their owner adds your email as an auditor or viewer.</span>

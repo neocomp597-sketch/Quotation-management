@@ -13,6 +13,7 @@ import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import * as XLSX from 'xlsx';
 import DateInput from '../components/DateInput';
+import usePermission from '../hooks/usePermission';
 
 const STATUS_CLASSES = {
     'Active': 'bg-blue-50 text-blue-700 border-blue-100',
@@ -29,6 +30,7 @@ const formatCurrency = (val) => {
 
 const TenderRegister = () => {
     const { user: currentUser } = useAuth();
+    const { canCreate, canModify, canDelete } = usePermission('tender_register');
     const [searchParams, setSearchParams] = useSearchParams();
 
     // Tenders data
@@ -252,20 +254,20 @@ const TenderRegister = () => {
                         <MdDownload size={18} />
                         Export
                     </button>
-                    <button
+                    {canCreate && <button
                         onClick={() => setIsImportModalOpen(true)}
                         className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-sm font-black rounded-xl transition-all"
                     >
                         <MdCloudUpload size={18} />
                         Import
-                    </button>
-                    <button
+                    </button>}
+                    {canCreate && <button
                         onClick={handleOpenCreateModal}
                         className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-black rounded-xl shadow-lg hover:shadow-xl transition-all"
                     >
                         <MdAdd size={20} />
                         Create Tender
-                    </button>
+                    </button>}
                 </div>
             </div>
 
@@ -392,20 +394,20 @@ const TenderRegister = () => {
                                                 >
                                                     <MdInfo size={18} />
                                                 </button>
-                                                <button
+                                                {canModify && <button
                                                     onClick={() => handleOpenEditModal(t)}
                                                     className="p-1.5 rounded-lg hover:bg-teal-50 text-teal-600 hover:text-teal-800 transition"
                                                     title="Edit"
                                                 >
                                                     <MdEdit size={18} />
-                                                </button>
-                                                <button
+                                                </button>}
+                                                {canDelete && <button
                                                     onClick={() => handleDeleteTender(t._id)}
                                                     className="p-1.5 rounded-lg hover:bg-rose-50 text-rose-600 hover:text-rose-800 transition"
                                                     title="Delete"
                                                 >
                                                     <MdDelete size={18} />
-                                                </button>
+                                                </button>}
                                             </div>
                                         </td>
                                     </tr>
@@ -590,7 +592,7 @@ const TenderRegister = () => {
                 maxWidth="max-w-xl"
                 footer={
                     <>
-                        <button
+                        {canModify && <button
                             onClick={() => {
                                 if (selectedTender) {
                                     handleOpenEditModal(selectedTender);
@@ -601,8 +603,8 @@ const TenderRegister = () => {
                         >
                             <MdEdit size={18} />
                             Edit Tender
-                        </button>
-                        <button
+                        </button>}
+                        {canDelete && <button
                             onClick={() => {
                                 if (selectedTender) {
                                     handleDeleteTender(selectedTender._id);
@@ -612,7 +614,7 @@ const TenderRegister = () => {
                         >
                             <MdDelete size={18} />
                             Delete Tender
-                        </button>
+                        </button>}
                     </>
                 }
             >

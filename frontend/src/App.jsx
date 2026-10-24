@@ -215,84 +215,84 @@ function App() {
             <Route path="/select-branch" element={<SelectBranch />} />
             <Route path="/dashboard" element={<PermissionRoute permissionKey="dashboard_overview"><Layout><Dashboard /></Layout></PermissionRoute>} />
             <Route path="/salespersons" element={<PermissionRoute permissionKey="admin_salespersons"><Layout><Salespersons /></Layout></PermissionRoute>} />
-            <Route path="/salespersons/new" element={<PermissionRoute permissionKey="admin_salespersons"><Layout><Salespersons isCreatePage={true} /></Layout></PermissionRoute>} />
-            <Route path="/salespersons/edit/:id" element={<PermissionRoute permissionKey="admin_salespersons"><Layout><Salespersons isEditPage={true} /></Layout></PermissionRoute>} />
+            <Route path="/salespersons/new" element={<PermissionRoute permissionKey="admin_salespersons" action="create"><Layout><Salespersons isCreatePage={true} /></Layout></PermissionRoute>} />
+            <Route path="/salespersons/edit/:id" element={<PermissionRoute permissionKey="admin_salespersons" action="modify"><Layout><Salespersons isEditPage={true} /></Layout></PermissionRoute>} />
             <Route path="/customers" element={<PermissionRoute permissionKey="master_customers"><Layout><Customers /></Layout></PermissionRoute>} />
-            <Route path="/customers/new" element={<PermissionRoute permissionKey="master_customers"><Layout><Customers isCreatePage={true} /></Layout></PermissionRoute>} />
-            <Route path="/customers/edit/:id" element={<PermissionRoute permissionKey="master_customers"><Layout><Customers isEditPage={true} /></Layout></PermissionRoute>} />
+            <Route path="/customers/new" element={<PermissionRoute permissionKey="master_customers" action="create"><Layout><Customers isCreatePage={true} /></Layout></PermissionRoute>} />
+            <Route path="/customers/edit/:id" element={<PermissionRoute permissionKey="master_customers" action="modify"><Layout><Customers isEditPage={true} /></Layout></PermissionRoute>} />
             <Route path="/customers/analytics" element={<PermissionRoute permissionKey="master_customers"><Layout><CustomerAnalytics /></Layout></PermissionRoute>} />
             <Route path="/customers/:id/360" element={<PermissionRoute permissionKey="master_customers"><Layout><Customer360Workspace /></Layout></PermissionRoute>} />
             <Route path="/vendors" element={<PermissionRoute permissionKey="master_vendors"><Layout><Vendors /></Layout></PermissionRoute>} />
-            <Route path="/vendors/new" element={<PermissionRoute permissionKey="master_vendors"><Layout><Vendors isCreatePage={true} /></Layout></PermissionRoute>} />
-            <Route path="/vendors/edit/:id" element={<PermissionRoute permissionKey="master_vendors"><Layout><Vendors isEditPage={true} /></Layout></PermissionRoute>} />
+            <Route path="/vendors/new" element={<PermissionRoute permissionKey="master_vendors" action="create"><Layout><Vendors isCreatePage={true} /></Layout></PermissionRoute>} />
+            <Route path="/vendors/edit/:id" element={<PermissionRoute permissionKey="master_vendors" action="modify"><Layout><Vendors isEditPage={true} /></Layout></PermissionRoute>} />
             <Route path="/vendors/:id/360" element={<PermissionRoute permissionKey="master_vendors"><Layout><Vendor360Workspace /></Layout></PermissionRoute>} />
             <Route path="/contacts" element={<PermissionRoute permissionKey="master_contacts"><Layout><Contacts /></Layout></PermissionRoute>} />
-            <Route path="/contacts/new" element={<PermissionRoute permissionKey="master_contacts"><Layout><Contacts isCreatePage={true} /></Layout></PermissionRoute>} />
-            <Route path="/contacts/edit/:id" element={<PermissionRoute permissionKey="master_contacts"><Layout><Contacts isEditPage={true} /></Layout></PermissionRoute>} />
+            <Route path="/contacts/new" element={<PermissionRoute permissionKey="master_contacts" action="create"><Layout><Contacts isCreatePage={true} /></Layout></PermissionRoute>} />
+            <Route path="/contacts/edit/:id" element={<PermissionRoute permissionKey="master_contacts" action="modify"><Layout><Contacts isEditPage={true} /></Layout></PermissionRoute>} />
             <Route path="/contacts/:id/360" element={<PermissionRoute permissionKey="master_contacts"><Layout><Contact360Workspace /></Layout></PermissionRoute>} />
             <Route path="/enquiries" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><Enquiries /></Layout></PermissionRoute>} />
             <Route path="/enquiries/analytics" element={<PermissionRoute permissionKey="enquiry_analytics"><Layout><EnquiryAnalytics /></Layout></PermissionRoute>} />
-            <Route path="/enquiries/create" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><CreateEnquiry /></Layout></PermissionRoute>} />
-            <Route path="/enquiries/edit/:id" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><CreateEnquiry /></Layout></PermissionRoute>} />
+            <Route path="/enquiries/create" element={<PermissionRoute permissionKey="enquiry_leads" action="create"><Layout><CreateEnquiry /></Layout></PermissionRoute>} />
+            <Route path="/enquiries/edit/:id" element={<PermissionRoute permissionKey="enquiry_leads" action="modify"><Layout><CreateEnquiry /></Layout></PermissionRoute>} />
             <Route path="/enquiries/view/:id" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><EnquiryDetail /></Layout></PermissionRoute>} />
-            <Route path="/enquiries/view/:id/visit/new" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><ScheduleEnquiryVisit /></Layout></PermissionRoute>} />
-            <Route path="/enquiries/view/:id/visit/edit/:visitIndex" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><ScheduleEnquiryVisit /></Layout></PermissionRoute>} />
+            <Route path="/enquiries/view/:id/visit/new" element={<PermissionRoute permissionKey="enquiry_leads" action="modify"><Layout><ScheduleEnquiryVisit /></Layout></PermissionRoute>} />
+            <Route path="/enquiries/view/:id/visit/edit/:visitIndex" element={<PermissionRoute permissionKey="enquiry_leads" action="modify"><Layout><ScheduleEnquiryVisit /></Layout></PermissionRoute>} />
             <Route path="/enquiries/details/:id" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><EnquiryDetail /></Layout></PermissionRoute>} />
-            <Route path="/enquiries/:id/visit/new" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><ScheduleEnquiryVisit /></Layout></PermissionRoute>} />
-            <Route path="/enquiries/:id/visit/edit/:visitIndex" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><ScheduleEnquiryVisit /></Layout></PermissionRoute>} />
+            <Route path="/enquiries/:id/visit/new" element={<PermissionRoute permissionKey="enquiry_leads" action="modify"><Layout><ScheduleEnquiryVisit /></Layout></PermissionRoute>} />
+            <Route path="/enquiries/:id/visit/edit/:visitIndex" element={<PermissionRoute permissionKey="enquiry_leads" action="modify"><Layout><ScheduleEnquiryVisit /></Layout></PermissionRoute>} />
             <Route path="/enquiries/:id" element={<PermissionRoute permissionKey="enquiry_leads"><Layout><EnquiryDetail /></Layout></PermissionRoute>} />
             <Route path="/meetings" element={<PermissionRoute permissionKey="meetings_list"><Layout><Meetings /></Layout></PermissionRoute>} />
-            <Route path="/meetings/new" element={<PermissionRoute permissionKey="meetings_list"><Layout><CreateMeeting /></Layout></PermissionRoute>} />
+            <Route path="/meetings/new" element={<PermissionRoute permissionKey="meetings_list" action="create"><Layout><CreateMeeting /></Layout></PermissionRoute>} />
             <Route path="/meetings/:id" element={<PermissionRoute permissionKey="meetings_list"><Layout><CreateMeeting /></Layout></PermissionRoute>} />
             <Route path="/products" element={<PermissionRoute permissionKey="master_products"><Layout><Products initialTab="products" /></Layout></PermissionRoute>} />
-            <Route path="/products/new" element={<PermissionRoute permissionKey="master_products"><Layout><Products initialTab="products" isCreatePage={true} /></Layout></PermissionRoute>} />
-            <Route path="/products/edit/:id" element={<PermissionRoute permissionKey="master_products"><Layout><Products initialTab="products" isEditPage={true} /></Layout></PermissionRoute>} />
+            <Route path="/products/new" element={<PermissionRoute permissionKey="master_products" action="create"><Layout><Products initialTab="products" isCreatePage={true} /></Layout></PermissionRoute>} />
+            <Route path="/products/edit/:id" element={<PermissionRoute permissionKey="master_products" action="modify"><Layout><Products initialTab="products" isEditPage={true} /></Layout></PermissionRoute>} />
             <Route path="/invoices" element={<PermissionRoute permissionKey="sale_invoices"><Layout><CreateVoucher mode="invoice" /></Layout></PermissionRoute>} />
-            <Route path="/invoices/new" element={<PermissionRoute permissionKey="sale_invoices"><Layout><CreateVoucher mode="invoice" /></Layout></PermissionRoute>} />
+            <Route path="/invoices/new" element={<PermissionRoute permissionKey="sale_invoices" action="create"><Layout><CreateVoucher mode="invoice" /></Layout></PermissionRoute>} />
             <Route path="/invoices/view/:id" element={<PermissionRoute permissionKey="sale_invoices"><Layout><CreateVoucher mode="invoice" isViewOnly={true} /></Layout></PermissionRoute>} />
-            <Route path="/invoices/:id" element={<PermissionRoute permissionKey="sale_invoices"><Layout><CreateVoucher mode="invoice" /></Layout></PermissionRoute>} />
+            <Route path="/invoices/:id" element={<PermissionRoute permissionKey="sale_invoices" action="modify"><Layout><CreateVoucher mode="invoice" /></Layout></PermissionRoute>} />
             <Route path="/vouchers" element={<Navigate to="/grn" replace />} />
             <Route path="/vouchers/new" element={<Navigate to="/grn/new" replace />} />
             <Route path="/vouchers/:id" element={<Navigate to="/grn" replace />} />
             <Route path="/grn" element={<PermissionRoute permissionKey="purchase_grn"><Layout><Vouchers mode="grn" /></Layout></PermissionRoute>} />
-            <Route path="/grn/new" element={<PermissionRoute permissionKey="purchase_grn"><Layout><CreateVoucher mode="grn" /></Layout></PermissionRoute>} />
+            <Route path="/grn/new" element={<PermissionRoute permissionKey="purchase_grn" action="create"><Layout><CreateVoucher mode="grn" /></Layout></PermissionRoute>} />
             <Route path="/grn/view/:id" element={<PermissionRoute permissionKey="purchase_grn"><Layout><CreateVoucher mode="grn" isViewOnly={true} /></Layout></PermissionRoute>} />
-            <Route path="/grn/:id" element={<PermissionRoute permissionKey="purchase_grn"><Layout><CreateVoucher mode="grn" /></Layout></PermissionRoute>} />
+            <Route path="/grn/:id" element={<PermissionRoute permissionKey="purchase_grn" action="modify"><Layout><CreateVoucher mode="grn" /></Layout></PermissionRoute>} />
             <Route path="/mgrs" element={<PermissionRoute permissionKey="master_mgrs"><Layout><MGRMaster /></Layout></PermissionRoute>} />
-            <Route path="/mgrs/new" element={<PermissionRoute permissionKey="master_mgrs"><Layout><MGRMaster isCreatePage={true} /></Layout></PermissionRoute>} />
-            <Route path="/mgrs/edit/:id" element={<PermissionRoute permissionKey="master_mgrs"><Layout><MGRMaster isEditPage={true} /></Layout></PermissionRoute>} />
+            <Route path="/mgrs/new" element={<PermissionRoute permissionKey="master_mgrs" action="create"><Layout><MGRMaster isCreatePage={true} /></Layout></PermissionRoute>} />
+            <Route path="/mgrs/edit/:id" element={<PermissionRoute permissionKey="master_mgrs" action="modify"><Layout><MGRMaster isEditPage={true} /></Layout></PermissionRoute>} />
             <Route path="/divisions" element={<PermissionRoute permissionKey="master_divisions"><Layout><DivisionMaster /></Layout></PermissionRoute>} />
             <Route path="/segments" element={<PermissionRoute permissionKey="master_segments"><Layout><SegmentMaster /></Layout></PermissionRoute>} />
             <Route path="/bom-master" element={<PermissionRoute permissionKey="master_bom"><Layout><BOMMaster /></Layout></PermissionRoute>} />
-            <Route path="/bom-master/new" element={<PermissionRoute permissionKey="master_bom"><Layout><BOMForm key="new" /></Layout></PermissionRoute>} />
-            <Route path="/bom-master/:id/edit" element={<PermissionRoute permissionKey="master_bom"><Layout><BOMForm /></Layout></PermissionRoute>} />
+            <Route path="/bom-master/new" element={<PermissionRoute permissionKey="master_bom" action="create"><Layout><BOMForm key="new" /></Layout></PermissionRoute>} />
+            <Route path="/bom-master/:id/edit" element={<PermissionRoute permissionKey="master_bom" action="modify"><Layout><BOMForm /></Layout></PermissionRoute>} />
             <Route path="/bom-master/:id" element={<PermissionRoute permissionKey="master_bom"><Layout><BOMDetails /></Layout></PermissionRoute>} />
             <Route path="/attributes" element={<PermissionRoute permissionKey="master_attributes"><Layout><Attributes /></Layout></PermissionRoute>} />
-            <Route path="/attributes/new" element={<PermissionRoute permissionKey="master_attributes"><Layout><Attributes isCreatePage={true} /></Layout></PermissionRoute>} />
-            <Route path="/attributes/edit/:id" element={<PermissionRoute permissionKey="master_attributes"><Layout><Attributes isEditPage={true} /></Layout></PermissionRoute>} />
+            <Route path="/attributes/new" element={<PermissionRoute permissionKey="master_attributes" action="create"><Layout><Attributes isCreatePage={true} /></Layout></PermissionRoute>} />
+            <Route path="/attributes/edit/:id" element={<PermissionRoute permissionKey="master_attributes" action="modify"><Layout><Attributes isEditPage={true} /></Layout></PermissionRoute>} />
             <Route path="/planning" element={<PermissionRoute permissionKey="planning_screen"><Layout><ErrorBoundary><PlanningScreen /></ErrorBoundary></Layout></PermissionRoute>} />
             <Route path="/simulations" element={<PermissionRoute permissionKey="planning_simulations"><Layout><Simulations /></Layout></PermissionRoute>} />
             <Route path="/reports" element={<PermissionRoute permissionKey="reports_main"><Layout><Reports /></Layout></PermissionRoute>} />
             <Route path="/quotations" element={<PermissionRoute permissionKey="quotation_list"><Layout><Quotations /></Layout></PermissionRoute>} />
             <Route path="/quotations/conversion-report" element={<PermissionRoute permissionKey="reports_main"><Layout><QuoteConversionReport /></Layout></PermissionRoute>} />
-            <Route path="/quotations/new" element={<PermissionRoute permissionKey="quotation_list"><Layout><CreateQuotation /></Layout></PermissionRoute>} />
+            <Route path="/quotations/new" element={<PermissionRoute permissionKey="quotation_list" action="create"><Layout><CreateQuotation /></Layout></PermissionRoute>} />
             <Route path="/quotations/:id" element={<PermissionRoute permissionKey="quotation_list"><Layout><CreateQuotation /></Layout></PermissionRoute>} />
             <Route path="/terms" element={<PermissionRoute permissionKey="master_terms"><Layout><Terms /></Layout></PermissionRoute>} />
-            <Route path="/terms/new" element={<PermissionRoute permissionKey="master_terms"><Layout><Terms isCreatePage={true} /></Layout></PermissionRoute>} />
-            <Route path="/terms/edit/:id" element={<PermissionRoute permissionKey="master_terms"><Layout><Terms isEditPage={true} /></Layout></PermissionRoute>} />
+            <Route path="/terms/new" element={<PermissionRoute permissionKey="master_terms" action="create"><Layout><Terms isCreatePage={true} /></Layout></PermissionRoute>} />
+            <Route path="/terms/edit/:id" element={<PermissionRoute permissionKey="master_terms" action="modify"><Layout><Terms isEditPage={true} /></Layout></PermissionRoute>} />
             <Route path="/territory-master" element={<PermissionRoute permissionKey="master_territories"><Layout><TerritoryMaster /></Layout></PermissionRoute>} />
-            <Route path="/territory-master/new" element={<PermissionRoute permissionKey="master_territories"><Layout><TerritoryMaster isCreatePage={true} /></Layout></PermissionRoute>} />
-            <Route path="/territory-master/edit/:id" element={<PermissionRoute permissionKey="master_territories"><Layout><TerritoryMaster isEditPage={true} /></Layout></PermissionRoute>} />
+            <Route path="/territory-master/new" element={<PermissionRoute permissionKey="master_territories" action="create"><Layout><TerritoryMaster isCreatePage={true} /></Layout></PermissionRoute>} />
+            <Route path="/territory-master/edit/:id" element={<PermissionRoute permissionKey="master_territories" action="modify"><Layout><TerritoryMaster isEditPage={true} /></Layout></PermissionRoute>} />
             <Route path="/branches" element={<PermissionRoute permissionKey="master_branches"><Layout><BranchMaster /></Layout></PermissionRoute>} />
-            <Route path="/branches/new" element={<PermissionRoute permissionKey="master_branches"><Layout><BranchMaster isCreatePage={true} /></Layout></PermissionRoute>} />
-            <Route path="/branches/edit/:id" element={<PermissionRoute permissionKey="master_branches"><Layout><BranchMaster isEditPage={true} /></Layout></PermissionRoute>} />
-            <Route path="/state-master" element={<PermissionRoute permissionKey="master_branches"><Layout><StateMaster /></Layout></PermissionRoute>} />
-            <Route path="/state-master/new" element={<PermissionRoute permissionKey="master_branches"><Layout><StateMaster isCreatePage={true} /></Layout></PermissionRoute>} />
-            <Route path="/state-master/edit/:id" element={<PermissionRoute permissionKey="master_branches"><Layout><StateMaster isEditPage={true} /></Layout></PermissionRoute>} />
-            <Route path="/city-master" element={<PermissionRoute permissionKey="master_branches"><Layout><CityMaster /></Layout></PermissionRoute>} />
-            <Route path="/city-master/new" element={<PermissionRoute permissionKey="master_branches"><Layout><CityMaster isCreatePage={true} /></Layout></PermissionRoute>} />
-            <Route path="/city-master/edit/:id" element={<PermissionRoute permissionKey="master_branches"><Layout><CityMaster isEditPage={true} /></Layout></PermissionRoute>} />
-            <Route path="/masters/city" element={<PermissionRoute permissionKey="master_branches"><Layout><CityMaster /></Layout></PermissionRoute>} />
+            <Route path="/branches/new" element={<PermissionRoute permissionKey="master_branches" action="create"><Layout><BranchMaster isCreatePage={true} /></Layout></PermissionRoute>} />
+            <Route path="/branches/edit/:id" element={<PermissionRoute permissionKey="master_branches" action="modify"><Layout><BranchMaster isEditPage={true} /></Layout></PermissionRoute>} />
+            <Route path="/state-master" element={<PermissionRoute permissionKey="state_master_create"><Layout><StateMaster /></Layout></PermissionRoute>} />
+            <Route path="/state-master/new" element={<PermissionRoute permissionKey="state_master_create" action="create"><Layout><StateMaster isCreatePage={true} /></Layout></PermissionRoute>} />
+            <Route path="/state-master/edit/:id" element={<PermissionRoute permissionKey="state_master_create" action="modify"><Layout><StateMaster isEditPage={true} /></Layout></PermissionRoute>} />
+            <Route path="/city-master" element={<PermissionRoute permissionKey="city_master"><Layout><CityMaster /></Layout></PermissionRoute>} />
+            <Route path="/city-master/new" element={<PermissionRoute permissionKey="city_master" action="create"><Layout><CityMaster isCreatePage={true} /></Layout></PermissionRoute>} />
+            <Route path="/city-master/edit/:id" element={<PermissionRoute permissionKey="city_master" action="modify"><Layout><CityMaster isEditPage={true} /></Layout></PermissionRoute>} />
+            <Route path="/masters/city" element={<PermissionRoute permissionKey="city_master"><Layout><CityMaster /></Layout></PermissionRoute>} />
             <Route path="/serial-no-master" element={<PermissionRoute permissionKey="master_serials"><Layout><SerialNoMaster /></Layout></PermissionRoute>} />
             <Route path="/serial-no-transfer" element={<PermissionRoute permissionKey="master_serials"><Layout><SerialNoTransfer /></Layout></PermissionRoute>} />
             <Route path="/serial-no-transfer/:assetId" element={<PermissionRoute permissionKey="master_serials"><Layout><SerialNoDetails /></Layout></PermissionRoute>} />
@@ -325,7 +325,7 @@ function App() {
             {/* Sales Pipeline Routes */}
             <Route path="/sales/dashboard" element={<PermissionRoute permissionKey="sales_dashboard"><Layout><SalesDashboard /></Layout></PermissionRoute>} />
             <Route path="/sales/deals" element={<PermissionRoute permissionKey="sales_deals"><Layout><DealBoard /></Layout></PermissionRoute>} />
-            <Route path="/sales/deals/new" element={<PermissionRoute permissionKey="sales_deals"><Layout><DealDetail /></Layout></PermissionRoute>} />
+            <Route path="/sales/deals/new" element={<PermissionRoute permissionKey="sales_deals" action="create"><Layout><DealDetail /></Layout></PermissionRoute>} />
             <Route path="/sales/deals/:id" element={<PermissionRoute permissionKey="sales_deals"><Layout><DealDetail /></Layout></PermissionRoute>} />
             <Route path="/sales/pipelines" element={<PermissionRoute permissionKey="sales_pipelines"><Layout><SalesPipelines /></Layout></PermissionRoute>} />
             <Route path="/sales/forecasting" element={<PermissionRoute permissionKey="sales_forecasting"><Layout><SalesForecasting /></Layout></PermissionRoute>} />
@@ -368,12 +368,12 @@ function App() {
 
             {/* Payroll Routes */}
             <Route path="/payroll/employees" element={<PermissionRoute permissionKey="payroll_employees"><Layout><PayrollEmployees /></Layout></PermissionRoute>} />
-            <Route path="/payroll/employees/new" element={<PermissionRoute permissionKey="payroll_employees"><Layout><PayrollEmployees isCreatePage={true} /></Layout></PermissionRoute>} />
-            <Route path="/payroll/employees/edit/:id" element={<PermissionRoute permissionKey="payroll_employees"><Layout><PayrollEmployees isEditPage={true} /></Layout></PermissionRoute>} />
+            <Route path="/payroll/employees/new" element={<PermissionRoute permissionKey="payroll_employees" action="create"><Layout><PayrollEmployees isCreatePage={true} /></Layout></PermissionRoute>} />
+            <Route path="/payroll/employees/edit/:id" element={<PermissionRoute permissionKey="payroll_employees" action="modify"><Layout><PayrollEmployees isEditPage={true} /></Layout></PermissionRoute>} />
             <Route path="/payroll/org-chart" element={<PermissionRoute permissionKey="payroll_org_chart"><Layout><OrgChart /></Layout></PermissionRoute>} />
             <Route path="/org-chart" element={<PermissionRoute permissionKey="payroll_org_chart"><Layout><OrgChart /></Layout></PermissionRoute>} />
             <Route path="/payroll/masters" element={<PermissionRoute permissionKey="payroll_employees"><Layout><PayrollMasters /></Layout></PermissionRoute>} />
-            <Route path="/payroll/masters/new" element={<PermissionRoute permissionKey="payroll_employees"><Layout><PayrollMasters isCreatePage={true} /></Layout></PermissionRoute>} />
+            <Route path="/payroll/masters/new" element={<PermissionRoute permissionKey="payroll_employees" action="create"><Layout><PayrollMasters isCreatePage={true} /></Layout></PermissionRoute>} />
 
             {/* CSM Routes */}
             <Route path="/csm/dashboard" element={<PermissionRoute permissionKey="csm_dashboard"><Layout><CSMDashboard /></Layout></PermissionRoute>} />
@@ -386,7 +386,7 @@ function App() {
             <Route path="/csm/warranties-amc" element={<PermissionRoute permissionKey="csm_warranties_amc"><Layout><WarrantyAMC /></Layout></PermissionRoute>} />
             <Route path="/csm/kb" element={<PermissionRoute permissionKey="csm_kb"><Layout><KnowledgeBase /></Layout></PermissionRoute>} />
             <Route path="/csm/masters" element={<PermissionRoute permissionKey="csm_masters"><Layout><CSMMasters /></Layout></PermissionRoute>} />
-            <Route path="/csm/masters/new" element={<PermissionRoute permissionKey="csm_masters"><Layout><CSMMasters isCreatePage={true} /></Layout></PermissionRoute>} />
+            <Route path="/csm/masters/new" element={<PermissionRoute permissionKey="csm_masters" action="create"><Layout><CSMMasters isCreatePage={true} /></Layout></PermissionRoute>} />
             <Route path="/csm/reports" element={<PermissionRoute permissionKey="csm_reports"><Layout><CSMReports /></Layout></PermissionRoute>} />
             <Route path="/csm/rca" element={<PermissionRoute permissionKey="csm_rca"><Layout><CSMRcaReport /></Layout></PermissionRoute>} />
             <Route path="/analytics/why-why" element={<PermissionRoute permissionKey="csm_rca"><Layout><WhyWhyAnalytics /></Layout></PermissionRoute>} />
@@ -404,20 +404,20 @@ function App() {
             <Route path="/inventory/stock" element={<PermissionRoute permissionKey="inventory_items"><Layout><StockMatrix /></Layout></PermissionRoute>} />
             <Route path="/inventory/stock/:id" element={<PermissionRoute permissionKey="inventory_items"><Layout><ProductStockDetail /></Layout></PermissionRoute>} />
             <Route path="/inventory/warehouses" element={<PermissionRoute permissionKey="inventory_warehouses"><Layout><WarehouseMaster /></Layout></PermissionRoute>} />
-            <Route path="/inventory/warehouses/new" element={<PermissionRoute permissionKey="inventory_warehouses"><Layout><WarehouseForm /></Layout></PermissionRoute>} />
-            <Route path="/inventory/warehouses/edit/:id" element={<PermissionRoute permissionKey="inventory_warehouses"><Layout><WarehouseForm /></Layout></PermissionRoute>} />
+            <Route path="/inventory/warehouses/new" element={<PermissionRoute permissionKey="inventory_warehouses" action="create"><Layout><WarehouseForm /></Layout></PermissionRoute>} />
+            <Route path="/inventory/warehouses/edit/:id" element={<PermissionRoute permissionKey="inventory_warehouses" action="modify"><Layout><WarehouseForm /></Layout></PermissionRoute>} />
             <Route path="/inventory/transfers" element={<PermissionRoute permissionKey="inventory_transfers"><Layout><StockTransfers /></Layout></PermissionRoute>} />
-            <Route path="/inventory/transfers/new" element={<PermissionRoute permissionKey="inventory_transfers"><Layout><CreateTransfer /></Layout></PermissionRoute>} />
+            <Route path="/inventory/transfers/new" element={<PermissionRoute permissionKey="inventory_transfers" action="create"><Layout><CreateTransfer /></Layout></PermissionRoute>} />
             <Route path="/inventory/adjustments" element={<PermissionRoute permissionKey="inventory_adjustments"><Layout><StockAdjustments /></Layout></PermissionRoute>} />
-            <Route path="/inventory/adjustments/new" element={<PermissionRoute permissionKey="inventory_adjustments"><Layout><CreateAdjustment /></Layout></PermissionRoute>} />
+            <Route path="/inventory/adjustments/new" element={<PermissionRoute permissionKey="inventory_adjustments" action="create"><Layout><CreateAdjustment /></Layout></PermissionRoute>} />
             <Route path="/inventory/counts" element={<PermissionRoute permissionKey="inventory_stock_counts"><Layout><StockAudits /></Layout></PermissionRoute>} />
-            <Route path="/inventory/counts/new" element={<PermissionRoute permissionKey="inventory_stock_counts"><Layout><CreateAudit /></Layout></PermissionRoute>} />
-            <Route path="/inventory/counts/record/:id" element={<PermissionRoute permissionKey="inventory_stock_counts"><Layout><RecordAuditCount /></Layout></PermissionRoute>} />
+            <Route path="/inventory/counts/new" element={<PermissionRoute permissionKey="inventory_stock_counts" action="create"><Layout><CreateAudit /></Layout></PermissionRoute>} />
+            <Route path="/inventory/counts/record/:id" element={<PermissionRoute permissionKey="inventory_stock_counts" action="modify"><Layout><RecordAuditCount /></Layout></PermissionRoute>} />
             <Route path="/inventory/alerts" element={<PermissionRoute permissionKey="inventory_alerts"><Layout><StockAlertsPage /></Layout></PermissionRoute>} />
             <Route path="/inventory/reports" element={<PermissionRoute permissionKey="inventory_reports"><Layout><InventoryReports /></Layout></PermissionRoute>} />
             {/* SAP stock audit: open to every signed-in user; the API shows each person only the batches shared with them. */}
             <Route path="/inventory/stock-audit" element={<Layout><StockAuditBatches /></Layout>} />
-            <Route path="/inventory/stock-audit/new" element={<PermissionRoute permissionKey="inventory_sap_audit"><Layout><StockAuditCreate /></Layout></PermissionRoute>} />
+            <Route path="/inventory/stock-audit/new" element={<PermissionRoute permissionKey="inventory_sap_audit" action="create"><Layout><StockAuditCreate /></Layout></PermissionRoute>} />
             <Route path="/inventory/stock-audit/:id" element={<Layout><StockAuditDetail /></Layout>} />
 
             <Route path="/info/:slug" element={<Layout><FooterPageView /></Layout>} />

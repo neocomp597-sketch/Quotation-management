@@ -27,6 +27,7 @@ import { meetingService, customerService, enquiryService, userService } from '..
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 import { formatDate } from '../utils/helpers';
+import usePermission from '../hooks/usePermission';
 
 // Searchable dropdown component for Related Record (inside drawer)
 const RecordSearchDropdown = ({ items, selectedId, onSelect, placeholder, labelField, subLabelField }) => {
@@ -120,6 +121,7 @@ const RecordSearchDropdown = ({ items, selectedId, onSelect, placeholder, labelF
 const Meetings = () => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
+    const { canCreate, canModify } = usePermission('meetings_list');
 
     // View toggles: list (default), calendar, reports
     const [viewMode, setViewMode] = useState('list'); 
@@ -541,12 +543,12 @@ const Meetings = () => {
                         }`}>
                             {day}
                         </span>
-                        <button
+                        {canCreate && <button
                             onClick={() => handleOpenDrawer('create', null, dateStr)}
                             className="text-[10px] text-primary-600 font-extrabold opacity-0 group-hover:opacity-100 hover:underline transition-opacity"
                         >
                             + Add
-                        </button>
+                        </button>}
                     </div>
 
                     <div className="flex-grow space-y-1 overflow-y-auto max-h-[85px] custom-scrollbar">
@@ -556,7 +558,7 @@ const Meetings = () => {
                             return (
                                 <div
                                     key={m._id}
-                                    draggable={m.status !== 'Completed' && m.status !== 'Cancelled'}
+                                    draggable={canModify && m.status !== 'Completed' && m.status !== 'Cancelled'}
                                     onDragStart={(e) => handleDragStart(e, m)}
                                     onMouseMove={handleMouseMove}
                                     onMouseEnter={() => setHoveredMeeting(m)}
@@ -633,19 +635,19 @@ const Meetings = () => {
                                         onDrop={(e) => handleDrop(e, dateStr, currentHourStr)}
                                         className="h-full border border-dashed border-slate-100 rounded-xl p-1 bg-slate-50/20 hover:bg-slate-50/70 transition-colors relative flex flex-col gap-1 min-h-[45px]"
                                     >
-                                        <button
+                                        {canCreate && <button
                                             onClick={() => handleOpenDrawer('create', null, `${dateStr}T${currentHourStr}:00`)}
                                             className="absolute inset-0 opacity-0 hover:opacity-100 flex items-center justify-center text-[9px] font-black text-primary-600 z-0 bg-white/70 rounded-xl"
                                         >
                                             + Add
-                                        </button>
+                                        </button>}
                                         {cellMeetings.map(m => {
                                             const colors = getStatusColor(m.status);
                                             const endHourStr = new Date(m.endDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                                             return (
                                                 <div
                                                     key={m._id}
-                                                    draggable={m.status !== 'Completed' && m.status !== 'Cancelled'}
+                                                    draggable={canModify && m.status !== 'Completed' && m.status !== 'Cancelled'}
                                                     onDragStart={(e) => handleDragStart(e, m)}
                                                     onMouseMove={handleMouseMove}
                                                     onMouseEnter={() => setHoveredMeeting(m)}
@@ -696,12 +698,12 @@ const Meetings = () => {
                                     onDrop={(e) => handleDrop(e, dateStr, hour)}
                                     className="flex-1 min-h-[45px] border border-dashed border-slate-100 rounded-xl p-1 bg-slate-50/20 hover:bg-slate-50/70 transition-colors relative flex flex-col gap-1"
                                 >
-                                    <button
+                                    {canCreate && <button
                                         onClick={() => handleOpenDrawer('create', null, `${dateStr}T${hour}:00`)}
                                         className="absolute inset-0 opacity-0 hover:opacity-100 flex items-center justify-center text-[9px] font-black text-primary-600 z-0 bg-white/70 rounded-xl"
                                     >
                                         + Book Time Slot
-                                    </button>
+                                    </button>}
                                     {cellMeetings.map(m => {
                                         const colors = getStatusColor(m.status);
                                         const endHourStr = new Date(m.endDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -713,7 +715,7 @@ const Meetings = () => {
                                         return (
                                             <div
                                                 key={m._id}
-                                                draggable={m.status !== 'Completed' && m.status !== 'Cancelled'}
+                                                draggable={canModify && m.status !== 'Completed' && m.status !== 'Cancelled'}
                                                 onDragStart={(e) => handleDragStart(e, m)}
                                                 onMouseMove={handleMouseMove}
                                                 onMouseEnter={() => setHoveredMeeting(m)}
@@ -901,12 +903,12 @@ const Meetings = () => {
                         </button>
                     </div>
 
-                    <button
+                    {canCreate && <button
                         onClick={() => handleOpenDrawer('create')}
                         className="px-4 py-2 bg-primary-600 rounded-xl text-xs font-bold text-white hover:bg-primary-700 transition-all shadow-md shadow-primary-600/20 flex items-center gap-2"
                     >
                         <MdAdd size={18} /> Schedule Appointment
-                    </button>
+                    </button>}
                 </div>
             </div>
 
@@ -1191,9 +1193,9 @@ const Meetings = () => {
                                                     </td>
                                                     <td className="px-6 py-4 text-right">
                                                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <button onClick={() => handleOpenDrawer('edit', m._id)} className="px-2.5 py-1 text-[9px] font-black uppercase text-primary-600 bg-primary-50 rounded-xl hover:bg-primary-100 transition-all">
+                                                            {canModify && <button onClick={() => handleOpenDrawer('edit', m._id)} className="px-2.5 py-1 text-[9px] font-black uppercase text-primary-600 bg-primary-50 rounded-xl hover:bg-primary-100 transition-all">
                                                                 Edit
-                                                            </button>
+                                                            </button>}
                                                         </div>
                                                     </td>
                                                 </tr>

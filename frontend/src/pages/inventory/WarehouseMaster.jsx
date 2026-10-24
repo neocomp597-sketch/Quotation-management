@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import usePermission from '../../hooks/usePermission';
 import {
     MdStorefront,
     MdAdd,
@@ -17,6 +18,7 @@ const API_BASE = '/inventory/warehouses';
 
 const WarehouseMaster = () => {
     const navigate = useNavigate();
+    const { canCreate, canModify, canDelete } = usePermission('inventory_warehouses');
     const [warehouses, setWarehouses] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -63,12 +65,14 @@ const WarehouseMaster = () => {
                         Configure storage locations, regional depots, retail stores, and bin/rack layouts.
                     </p>
                 </div>
-                <button
-                    onClick={() => navigate('/inventory/warehouses/new')}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-xl transition-all shadow-md shadow-teal-600/20 text-sm"
-                >
-                    <MdAdd className="text-lg" /> Add Warehouse
-                </button>
+                {canCreate && (
+                    <button
+                        onClick={() => navigate('/inventory/warehouses/new')}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-xl transition-all shadow-md shadow-teal-600/20 text-sm"
+                    >
+                        <MdAdd className="text-lg" /> Add Warehouse
+                    </button>
+                )}
             </div>
 
             {/* Filter Bar */}
@@ -151,20 +155,24 @@ const WarehouseMaster = () => {
                                             )}
                                         </td>
                                         <td className="px-5 py-4 text-right space-x-2">
-                                            <button
-                                                onClick={() => navigate(`/inventory/warehouses/edit/${wh._id}`)}
-                                                className="p-2 text-slate-600 hover:text-teal-600 dark:text-slate-400 dark:hover:text-teal-400 transition-colors"
-                                                title="Edit Warehouse Page"
-                                            >
-                                                <MdEdit className="text-lg" />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(wh._id)}
-                                                className="p-2 text-slate-600 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 transition-colors"
-                                                title="Delete / Deactivate"
-                                            >
-                                                <MdDelete className="text-lg" />
-                                            </button>
+                                            {canModify && (
+                                                <button
+                                                    onClick={() => navigate(`/inventory/warehouses/edit/${wh._id}`)}
+                                                    className="p-2 text-slate-600 hover:text-teal-600 dark:text-slate-400 dark:hover:text-teal-400 transition-colors"
+                                                    title="Edit Warehouse Page"
+                                                >
+                                                    <MdEdit className="text-lg" />
+                                                </button>
+                                            )}
+                                            {canDelete && (
+                                                <button
+                                                    onClick={() => handleDelete(wh._id)}
+                                                    className="p-2 text-slate-600 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 transition-colors"
+                                                    title="Delete / Deactivate"
+                                                >
+                                                    <MdDelete className="text-lg" />
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}

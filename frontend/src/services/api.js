@@ -164,6 +164,14 @@ api.interceptors.response.use(
 
     if (
       error.response?.status === 403 &&
+      error.response?.data?.code === "PERMISSION_DENIED"
+    ) {
+      // The user's permissions changed since they were loaded; AuthContext reloads them.
+      window.dispatchEvent(new CustomEvent("onPermissionDenied", { detail: error.response.data.permission }));
+    }
+
+    if (
+      error.response?.status === 403 &&
       /account deactivated|company account is suspended/i.test(message)
     ) {
       setAccessToken(null);
@@ -355,7 +363,8 @@ export const userService = {
   updateRole: (id, role, params) => api.patch(`/users/${id}/role`, { role }, { params }),
   update: (id, data, params) => api.put(`/users/${id}`, data, { params }),
   delete: (id, params) => api.delete(`/users/${id}`, { params }),
-  updatePermissions: (id, customPermissions, params) => api.put(`/users/${id}/permissions`, { customPermissions }, { params }),
+  // payload: { permissions } (the full set the user should have) or { customPermissions: {} } (back to role defaults)
+  updatePermissions: (id, payload, params) => api.put(`/users/${id}/permissions`, payload, { params }),
 };
 
 export const branchService = {
@@ -370,8 +379,8 @@ export const branchService = {
 export const authorizationService = {
   getAll: (params) => api.get("/authorization", { params }),
   getMy: () => api.get("/authorization/me"),
-  update: (role, permissions, params) =>
-    api.put(`/authorization/${role}`, { permissions }, { params }),
+  update: (role, permissions, params, extra = {}) =>
+    api.put(`/authorization/${role}`, { permissions, ...extra }, { params }),
   initialize: (params) => api.post("/authorization/initialize", {}, { params }),
   createRole: (label, description, params) =>
     api.post("/authorization/roles", { label, description }, { params }),

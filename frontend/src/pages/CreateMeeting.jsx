@@ -16,6 +16,7 @@ import { toast } from 'react-toastify';
 import { meetingService, customerService, enquiryService, userService } from '../services/api';
 import { formatDate } from '../utils/helpers';
 import DateInput from '../components/DateInput';
+import usePermission from '../hooks/usePermission';
 
 // Searchable dropdown component for Related Record
 const RecordSearchDropdown = ({ items, selectedId, onSelect, placeholder, labelField, subLabelField }) => {
@@ -111,6 +112,8 @@ const CreateMeeting = () => {
     const { id } = useParams();
     const [searchParams] = useSearchParams();
     const isEditMode = !!id;
+    const { canCreate, canModify } = usePermission('meetings_list');
+    const canSave = isEditMode ? canModify : canCreate;
 
     // Filter Date prefill if passed from Calendar Day View
     const prefillDate = searchParams.get('date') || new Date().toISOString().split('T')[0];
@@ -366,6 +369,7 @@ const CreateMeeting = () => {
                     <p className="mt-4 text-slate-400 font-bold uppercase text-xs tracking-widest">Loading Appointment Details...</p>
                 </div>
             ) : (
+                <fieldset disabled={!canSave} className="min-w-0">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     {/* Left Column: APPOINTMENT & CUSTOMER DETAILS */}
                     <div className="bg-slate-50/70 p-6 rounded-3xl border border-slate-200/80 space-y-6">
@@ -610,6 +614,7 @@ const CreateMeeting = () => {
                         </div>
                     </div>
                 </div>
+                </fieldset>
             )}
 
             {/* Bottom Action Footer */}
@@ -621,14 +626,14 @@ const CreateMeeting = () => {
                 >
                     Cancel
                 </button>
-                <button
+                {canSave && <button
                     type="button"
                     onClick={() => handleSave(false)}
                     className="px-10 py-3.5 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl text-xs font-black shadow-lg shadow-teal-600/20 transition-all flex items-center gap-2"
                 >
                     <MdSave size={18} />
                     {isEditMode ? 'Update Changes' : 'Save Changes'}
-                </button>
+                </button>}
             </div>
 
             {/* Overlap Conflict Warning Modal */}

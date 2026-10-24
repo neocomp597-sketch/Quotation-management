@@ -9,6 +9,8 @@ import Modal from '../components/Modal';
 import Customers from './Customers';
 import { formatDate } from '../utils/helpers';
 import DateInput from '../components/DateInput';
+import usePermission from '../hooks/usePermission';
+import { useAuth } from '../context/AuthContext';
 
 const PAGE_SIZE = 20;
 const TABS = [
@@ -182,6 +184,7 @@ const DateRangeFilter = ({ range, field, onChange }) => {
 };
 
 const SerialListTab = ({ onOpen, onTransfer }) => {
+    const { canModify } = usePermission('master_serials');
     const [search, setSearch] = useStoredState('list.search', '');
     const [field, setField] = useStoredState('list.field', '');
     const [status, setStatus] = useStoredState('list.status', '');
@@ -261,9 +264,11 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                                                 <button type="button" title="Download Customer Activity Log" aria-label={`Download customer activity log of ${row.serialNumber}`} onClick={(e) => { e.stopPropagation(); setDownloadFor(row); }} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all">
                                                     <MdFileDownload size={18} />
                                                 </button>
-                                                <button type="button" onClick={(e) => { e.stopPropagation(); onTransfer(row._id); }} className="ml-1 inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all">
-                                                    <MdSwapHoriz size={16} /> Transfer
-                                                </button>
+                                                {canModify && (
+                                                    <button type="button" onClick={(e) => { e.stopPropagation(); onTransfer(row._id); }} className="ml-1 inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all">
+                                                        <MdSwapHoriz size={16} /> Transfer
+                                                    </button>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}
@@ -647,9 +652,10 @@ export const SerialNoDetails = ({ transfer = false }) => {
     const { assetId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
+    const { canModify } = usePermission('master_serials');
     const [result, setResult] = useState({ id: null, data: null, error: '' });
     // Open form: 'transfer' (new current customer) or 'past' (an earlier customer, inactive).
-    const [formMode, setFormMode] = useState(transfer ? 'transfer' : null);
+    const [formMode, setFormMode] = useState(transfer && canModify ? 'transfer' : null);
     const [refreshCount, setRefreshCount] = useState(0);
     // Back returns to wherever the page was opened from (list filters, history tab), else the list.
     const goBack = () => (location.key !== 'default' ? navigate(-1) : navigate('/serial-no-transfer'));
@@ -710,7 +716,7 @@ export const SerialNoDetails = ({ transfer = false }) => {
                         </p>
                     )}
                 </div>
-                {data && !formMode && (
+                {data && !formMode && canModify && (
                     <div className="flex flex-wrap gap-3">
                         <button
                             type="button"
@@ -824,6 +830,8 @@ const toDateInput = (value) => {
 
 const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved }) => {
     const past = mode === 'past';
+    const { can } = useAuth();
+    const canAddCustomer = can('master_customers', 'create');
     const latestPastDate = currentSince ? toDateInput(currentSince) : todayInput();
     const [customerMode, setCustomerMode] = useState('existing');
     const [query, setQuery] = useState('');
@@ -922,6 +930,7 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
                     </div>
                 ) : (
                     <>
+                        {canAddCustomer && (
                         <div className="mb-3 inline-flex rounded-2xl border border-slate-200 p-1">
                             {[['existing', 'Select Existing Customer'], ['new', 'Add New Customer']].map(([value, text]) => (
                                 <button
@@ -934,6 +943,7 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
                                 </button>
                             ))}
                         </div>
+                        )}
                         {customerMode === 'existing' ? (
                             <div className="relative">
                                 <MdSearch className="absolute left-4 top-[1.4rem] -translate-y-1/2 text-slate-400" size={20} />
@@ -969,7 +979,7 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
                                         {!searching && !matches.rows.length && (
                                             <li className="px-4 py-3 text-sm text-slate-500">
                                                 No customer found.{' '}
-                                                <button type="button" onClick={() => { setCustomerMode('new'); setAddingCustomer(true); }} className="font-black text-primary-600 hover:underline">Add a new customer</button>
+                                                {canAddCustomer && <button type="button" onClick={() => { setCustomerMode('new'); setAddingCustomer(true); }} className="font-black text-primary-600 hover:underline">Add a new customer</button>}
                                             </li>
                                         )}
                                     </ul>

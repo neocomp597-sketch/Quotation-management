@@ -3,8 +3,10 @@ import { cpqService, productService } from '../services/api';
 import { toast } from 'react-toastify';
 import { MdAdd, MdFlag, MdShowChart } from 'react-icons/md';
 import Modal from '../components/Modal';
+import usePermission from '../hooks/usePermission';
 
 const CompetitorIntel = () => {
+    const { canCreate } = usePermission('sales_competitors');
     const [prices, setPrices] = useState([]);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -63,7 +65,7 @@ const CompetitorIntel = () => {
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Competitor Intelligence</h1>
                     <p className="text-slate-500 font-medium">Track external competitor price points and market dynamics.</p>
                 </div>
-                <div>
+                {canCreate && <div>
                     <button
                         onClick={() => setIsModalOpen(true)}
                         className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
@@ -71,7 +73,7 @@ const CompetitorIntel = () => {
                         <MdAdd size={20} />
                         <span>Log Competitor Rate</span>
                     </button>
-                </div>
+                </div>}
             </div>
 
             <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">

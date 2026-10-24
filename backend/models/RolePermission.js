@@ -19,10 +19,22 @@ const RolePermissionSchema = new mongoose.Schema(
             type: Boolean,
             default: false
         },
+        // "<screen>" is View; "<screen>:create", "<screen>:modify" and "<screen>:delete"
+        // are the actions (see config/authorization.js).
         menuVisibility: {
             type: Map,
             of: Boolean,
             default: {}
+        },
+        createdBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            default: null
+        },
+        updatedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            default: null
         }
     },
     {

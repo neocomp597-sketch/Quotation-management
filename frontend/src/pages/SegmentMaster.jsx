@@ -4,6 +4,7 @@ import { MdAdd, MdEdit, MdDelete, MdFileUpload, MdFileDownload } from 'react-ico
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
 import { divisionService, segmentService } from '../services/api';
+import usePermission from '../hooks/usePermission';
 
 const EMPTY_FORM = { divisionId: '', code: '', description: '', status: 'Active' };
 
@@ -15,6 +16,7 @@ const codeLabel = (doc) => (doc ? `${doc.code} - ${doc.description}` : '');
 // Segment Master: every segment belongs to one Division. The import template carries codes
 // only (Division_Code, Segment_Code); the export adds both descriptions.
 const SegmentMaster = () => {
+    const { canCreate, canModify, canDelete } = usePermission('master_segments');
     const [divisions, setDivisions] = useState([]);
     const [segments, setSegments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -126,13 +128,15 @@ const SegmentMaster = () => {
                     <p className="text-slate-500 font-medium">Segments grouped under their Division.</p>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                    <button
-                        onClick={() => setIsImportOpen(true)}
-                        className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-black text-white px-5 py-3 rounded-2xl font-bold transition-all uppercase text-xs tracking-widest active:scale-95"
-                    >
-                        <MdFileUpload size={18} />
-                        <span>Import</span>
-                    </button>
+                    {canCreate && (
+                        <button
+                            onClick={() => setIsImportOpen(true)}
+                            className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-black text-white px-5 py-3 rounded-2xl font-bold transition-all uppercase text-xs tracking-widest active:scale-95"
+                        >
+                            <MdFileUpload size={18} />
+                            <span>Import</span>
+                        </button>
+                    )}
                     <button
                         onClick={handleExport}
                         className="flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-5 py-3 rounded-2xl font-bold transition-all uppercase text-xs tracking-widest active:scale-95"
@@ -140,13 +144,15 @@ const SegmentMaster = () => {
                         <MdFileDownload size={18} />
                         <span>Export</span>
                     </button>
-                    <button
-                        onClick={() => openModal()}
-                        className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
-                    >
-                        <MdAdd size={20} />
-                        <span>Add Segment</span>
-                    </button>
+                    {canCreate && (
+                        <button
+                            onClick={() => openModal()}
+                            className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                        >
+                            <MdAdd size={20} />
+                            <span>Add Segment</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -189,6 +195,7 @@ const SegmentMaster = () => {
                                             <td className="p-4 text-center">
                                                 <button
                                                     onClick={() => toggleStatus(segment)}
+                                                    disabled={!canModify}
                                                     className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm border ${segment.status === 'Active'
                                                         ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
                                                         : 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100'}`}
@@ -198,12 +205,16 @@ const SegmentMaster = () => {
                                             </td>
                                             <td className="p-4 text-right">
                                                 <div className="flex justify-end gap-2">
-                                                    <button onClick={() => openModal(segment)} className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all" title="Edit">
-                                                        <MdEdit size={18} />
-                                                    </button>
-                                                    <button onClick={() => handleDelete(segment)} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all" title="Delete">
-                                                        <MdDelete size={18} />
-                                                    </button>
+                                                    {canModify && (
+                                                        <button onClick={() => openModal(segment)} className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all" title="Edit">
+                                                            <MdEdit size={18} />
+                                                        </button>
+                                                    )}
+                                                    {canDelete && (
+                                                        <button onClick={() => handleDelete(segment)} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all" title="Delete">
+                                                            <MdDelete size={18} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

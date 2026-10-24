@@ -13,8 +13,10 @@ import ImportModal from '../components/ImportModal';
 import * as XLSX from 'xlsx';
 import { formatDate, formatDateTime } from '../utils/helpers';
 import DateInput from '../components/DateInput';
+import usePermission from '../hooks/usePermission';
 
 const Contracts = ({ mode = 'dashboard' }) => {
+    const { canCreate, canModify } = usePermission('sales_contracts');
     // Current CLM view selection: 'dashboard' | 'contracts' | 'templates' | 'clauses' | 'approvals' | 'renewals' | 'reports' | 'settings'
     const [currentTab, setCurrentTab] = useState(mode);
 
@@ -1022,12 +1024,12 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                     <div className="space-y-3">
                                         <div className="flex justify-between items-center">
                                             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Document Editor</h4>
-                                            <button 
+                                            {canCreate && <button
                                                 onClick={handleCompileDocument}
                                                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95"
                                             >
                                                 Generate PDF Snapshot
-                                            </button>
+                                            </button>}
                                         </div>
                                         <div className="flex flex-col border border-slate-200 rounded-[2rem] overflow-hidden bg-white shadow-sm focus-within:ring-2 focus-within:ring-primary-500 transition-all">
                                             {/* Rich text editing toolbar */}
@@ -1195,8 +1197,8 @@ const Contracts = ({ mode = 'dashboard' }) => {
                             <div className="space-y-8 animate-in fade-in-30">
                                 <div className="flex justify-between items-center">
                                     <h3 className="text-lg font-black text-slate-900">Multi-Stage Approval Pipeline</h3>
-                                    <div className="flex gap-2">
-                                        <button 
+                                    {canModify && <div className="flex gap-2">
+                                        <button
                                             onClick={() => handleTriggerApproval('Approved')}
                                             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md"
                                         >
@@ -1208,7 +1210,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                         >
                                             Reject
                                         </button>
-                                    </div>
+                                    </div>}
                                 </div>
                                 
                                 <div className="flex flex-col md:flex-row justify-between items-center gap-6">
@@ -1440,20 +1442,20 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                             <MdFileDownload size={18} />
                                             Export
                                         </button>
-                                        <button
+                                        {canCreate && <button
                                             onClick={() => setIsImportModalOpen(true)}
                                             className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs uppercase px-5 py-3 rounded-2xl tracking-widest active:scale-95 transition-all shadow-sm flex items-center gap-2"
                                             title="Import from Excel"
                                         >
                                             <MdFileUpload size={18} />
                                             Import
-                                        </button>
-                                        <button 
+                                        </button>}
+                                        {canCreate && <button
                                             onClick={() => setIsCreateModalOpen(true)}
                                             className="bg-primary-600 hover:bg-primary-700 text-white font-bold text-xs uppercase px-5 py-3 rounded-2xl tracking-widest active:scale-95 transition-all shadow-md shadow-primary-600/20"
                                         >
                                             Add Agreement
-                                        </button>
+                                        </button>}
                                     </div>
                                 </div>
 
@@ -1561,12 +1563,12 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                         <h1 className="text-3xl font-black text-slate-900 tracking-tight">Document Templates</h1>
                                         <p className="text-slate-500 font-medium">Create and customize A4 layouts, styles, and headers</p>
                                     </div>
-                                    <button 
+                                    {canCreate && <button
                                         onClick={() => setIsTemplateModalOpen(true)}
                                         className="bg-primary-600 hover:bg-primary-700 text-white font-bold text-xs uppercase px-5 py-3 rounded-2xl tracking-widest active:scale-95 transition-all shadow-md shadow-primary-600/20"
                                     >
                                         New Template
-                                    </button>
+                                    </button>}
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1581,7 +1583,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                                 <span className="text-[9px] font-black uppercase text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
                                                     Active
                                                 </span>
-                                                <button 
+                                                {canCreate && <button
                                                     onClick={() => {
                                                         setTemplateForm({ name: t.name, category: t.category, htmlContent: t.htmlContent, cssContent: t.cssContent || '' });
                                                         setIsTemplateModalOpen(true);
@@ -1589,7 +1591,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                                     className="text-xs font-black text-indigo-600 hover:underline"
                                                 >
                                                     Edit Layout
-                                                </button>
+                                                </button>}
                                             </div>
                                         </div>
                                     ))}
@@ -1605,12 +1607,12 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                         <h1 className="text-3xl font-black text-slate-900 tracking-tight">Clauses Library</h1>
                                         <p className="text-slate-500 font-medium">Standard legal clause snippets ready to drag/insert</p>
                                     </div>
-                                    <button 
+                                    {canCreate && <button
                                         onClick={() => setIsClauseModalOpen(true)}
                                         className="bg-primary-600 hover:bg-primary-700 text-white font-bold text-xs uppercase px-5 py-3 rounded-2xl tracking-widest active:scale-95 transition-all shadow-md"
                                     >
                                         Create Clause
-                                    </button>
+                                    </button>}
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

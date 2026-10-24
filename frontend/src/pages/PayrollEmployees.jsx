@@ -13,10 +13,14 @@ import {
     MdPhotoCamera, MdContactPhone, MdCheck, MdFormatListBulleted, MdGridView, MdLocationOn, MdHelpOutline, MdClose
 } from 'react-icons/md';
 import DateInput from '../components/DateInput';
+import usePermission from '../hooks/usePermission';
+import { useAuth } from '../context/AuthContext';
 
 const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
     const { id: routeId } = useParams();
+    const { can } = useAuth();
+    const { canCreate, canModify, canDelete } = usePermission('payroll_employees');
     const [employees, setEmployees] = useState([]);
     const [allEmployees, setAllEmployees] = useState([]);
     const [branches, setBranches] = useState([]);
@@ -625,6 +629,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                         <MdDownload size={20} />
                         Export
                     </button>
+                    {canCreate && (
                     <button
                         onClick={() => setIsImportModalOpen(true)}
                         className="flex items-center justify-center gap-2 px-5 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold transition-all shadow-sm"
@@ -633,6 +638,8 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                         <MdUploadFile size={20} />
                         Import
                     </button>
+                    )}
+                    {canCreate && (
                     <button
                         onClick={handleOpenAdd}
                         className="flex items-center justify-center gap-2 px-5 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-primary-600/20"
@@ -640,6 +647,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                         <MdAdd size={20} />
                         Add Employee Profile
                     </button>
+                    )}
                 </div>
             </div>
 
@@ -817,6 +825,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
 
                                 {/* Actions */}
                                 <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                                    {canModify && (
                                     <button
                                         type="button"
                                         onClick={() => handleOpenStructure(emp)}
@@ -825,6 +834,8 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                         <MdAssignment size={15} />
                                         Structure
                                     </button>
+                                    )}
+                                    {canModify && (
                                     <button
                                         type="button"
                                         onClick={() => handleOpenEdit(emp)}
@@ -833,6 +844,8 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                         <MdEdit size={15} />
                                         Edit
                                     </button>
+                                    )}
+                                    {canDelete && (
                                     <button
                                         type="button"
                                         onClick={() => handleDeleteEmployee(emp._id)}
@@ -841,6 +854,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                     >
                                         <MdDelete size={16} />
                                     </button>
+                                    )}
                                 </div>
                             </div>
                         );
@@ -975,6 +989,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center justify-center gap-2">
+                                                    {canModify && (
                                                     <button
                                                         onClick={() => handleOpenStructure(emp)}
                                                         title="Configure Base Structure"
@@ -982,6 +997,8 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                     >
                                                         <MdAssignment size={16} />
                                                     </button>
+                                                    )}
+                                                    {canModify && (
                                                     <button
                                                         onClick={() => handleOpenEdit(emp)}
                                                         title="Edit Basic details"
@@ -989,6 +1006,8 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                     >
                                                         <MdEdit size={16} />
                                                     </button>
+                                                    )}
+                                                    {canDelete && (
                                                     <button
                                                         onClick={() => handleDeleteEmployee(emp._id)}
                                                         title="Delete Profile"
@@ -996,6 +1015,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                     >
                                                         <MdDelete size={16} />
                                                     </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -1169,7 +1189,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                             <div>
                                                 <div className="flex items-center justify-between gap-2 mb-1.5">
                                                     <label className={labelClass} style={{ marginBottom: 0 }}>Employee ID (Auto Generated)</label>
-                                                    {modalMode === 'add' && basicForm.branchId && (
+                                                    {modalMode === 'add' && basicForm.branchId && can('master_branches', 'modify') && (
                                                         <button
                                                             type="button"
                                                             onClick={handleOpenSeqModal}

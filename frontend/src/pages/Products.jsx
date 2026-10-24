@@ -12,6 +12,7 @@ import TypeTestHistory from '../components/TypeTestHistory';
 import { resolveImageUrl, getPlaceholderImage } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
+import usePermission from '../hooks/usePermission';
 
 const LIST_PAGE_SIZE = 20;
 
@@ -35,6 +36,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
     const { user } = useAuth();
     const isVendorUser = user?.role === 'vendor' || String(user?.role || '').toLowerCase() === 'vendor';
     const { id: routeId } = useParams();
+    const { canCreate, canModify, canDelete } = usePermission('master_products');
     const [activeTab, setActiveTab] = useState(initialTab);
     const [products, setProducts] = useState([]);
     const [vendors, setVendors] = useState([]);
@@ -992,33 +994,39 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                         <MdFileDownload size={20} />
                         <span>Export</span>
                     </button>
-                    <button
-                        onClick={() => setIsImportModalOpen(true)}
-                        className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-emerald-600/20 uppercase text-xs tracking-widest active:scale-95"
-                    >
-                        <MdFileUpload size={20} />
-                        <span>Import</span>
-                    </button>
-                    <button
-                        onClick={() => setIsAttrImportModalOpen(true)}
-                        className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-indigo-600/20 uppercase text-xs tracking-widest active:scale-95"
-                    >
-                        <MdFileUpload size={20} />
-                        <span>Import Attributes</span>
-                    </button>
-                    <button
+                    {canCreate && (
+                        <button
+                            onClick={() => setIsImportModalOpen(true)}
+                            className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-emerald-600/20 uppercase text-xs tracking-widest active:scale-95"
+                        >
+                            <MdFileUpload size={20} />
+                            <span>Import</span>
+                        </button>
+                    )}
+                    {(canCreate || canModify) && (
+                        <button
+                            onClick={() => setIsAttrImportModalOpen(true)}
+                            className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-indigo-600/20 uppercase text-xs tracking-widest active:scale-95"
+                        >
+                            <MdFileUpload size={20} />
+                            <span>Import Attributes</span>
+                        </button>
+                    )}
+                    {canCreate && (
+                        <button
 
-                        onClick={() => handleOpenModal()}
-                        className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
-                    >
-                        <MdAdd size={20} />
-                        <span>Add New Product</span>
-                    </button>
+                            onClick={() => handleOpenModal()}
+                            className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                        >
+                            <MdAdd size={20} />
+                            <span>Add New Product</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
             {/* Bulk Action Toolbar */}
-            {selectedIds.length > 0 && (
+            {(canModify || canDelete) && selectedIds.length > 0 && (
                 <div className="bg-slate-900 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-xl animate-in slide-in-from-top-2">
                     <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center">
@@ -1030,30 +1038,36 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => handleBulkStatusUpdate('Active')}
-                            disabled={isBulkActionLoading}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-50"
-                        >
-                            <MdSync size={16} />
-                            Set Active
-                        </button>
-                        <button
-                            onClick={() => handleBulkStatusUpdate('Inactive')}
-                            disabled={isBulkActionLoading}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-50"
-                        >
-                            <MdSync size={16} />
-                            Set Inactive
-                        </button>
-                        <button
-                            onClick={handleBulkDelete}
-                            disabled={isBulkActionLoading}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-50"
-                        >
-                            <MdDeleteSweep size={16} />
-                            Delete All
-                        </button>
+                        {canModify && (
+                            <>
+                                <button
+                                    onClick={() => handleBulkStatusUpdate('Active')}
+                                    disabled={isBulkActionLoading}
+                                    className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-50"
+                                >
+                                    <MdSync size={16} />
+                                    Set Active
+                                </button>
+                                <button
+                                    onClick={() => handleBulkStatusUpdate('Inactive')}
+                                    disabled={isBulkActionLoading}
+                                    className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-50"
+                                >
+                                    <MdSync size={16} />
+                                    Set Inactive
+                                </button>
+                            </>
+                        )}
+                        {canDelete && (
+                            <button
+                                onClick={handleBulkDelete}
+                                disabled={isBulkActionLoading}
+                                className="flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-50"
+                            >
+                                <MdDeleteSweep size={16} />
+                                Delete All
+                            </button>
+                        )}
                         <button
                             onClick={() => setSelectedIds([])}
                             className="px-4 py-2.5 text-slate-400 hover:text-white transition-colors font-bold text-xs uppercase tracking-widest"
@@ -1200,7 +1214,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                         <div className="p-4 flex gap-4">
                                             <div
                                                 className="h-20 w-20 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-center flex-shrink-0 cursor-pointer overflow-hidden"
-                                                onClick={() => handleOpenModal(p)}
+                                                onClick={() => canModify && handleOpenModal(p)}
                                             >
                                                 {p.productImageUrl ? (
                                                     <img src={resolveImageUrl(p.productImageUrl)} alt={p.productName} className="h-full w-full object-contain" />
@@ -1258,18 +1272,22 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                                 HSN: {p.hsnCode || 'N/A'}
                                             </div>
                                             <div className="flex gap-1">
-                                                <button
-                                                    onClick={() => handleOpenModal(p)}
-                                                    className="p-2 text-slate-400 hover:text-primary-600 hover:bg-white rounded-lg transition-all"
-                                                >
-                                                    <MdEdit size={18} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(p._id)}
-                                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-white rounded-lg transition-all"
-                                                >
-                                                    <MdDelete size={18} />
-                                                </button>
+                                                {canModify && (
+                                                    <button
+                                                        onClick={() => handleOpenModal(p)}
+                                                        className="p-2 text-slate-400 hover:text-primary-600 hover:bg-white rounded-lg transition-all"
+                                                    >
+                                                        <MdEdit size={18} />
+                                                    </button>
+                                                )}
+                                                {canDelete && (
+                                                    <button
+                                                        onClick={() => handleDelete(p._id)}
+                                                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-white rounded-lg transition-all"
+                                                    >
+                                                        <MdDelete size={18} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -1427,19 +1445,23 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                                                         <MdVisibility size={18} />
                                                                     </button>
                                                                 )}
-                                                                <button
-                                                                    onClick={() => handleOpenModal(p)}
-                                                                    className="p-2.5 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                                    title="Edit Product"
-                                                                >
-                                                                    <MdEdit size={18} />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleDelete(p._id)}
-                                                                    className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                                >
-                                                                    <MdDelete size={18} />
-                                                                </button>
+                                                                {canModify && (
+                                                                    <button
+                                                                        onClick={() => handleOpenModal(p)}
+                                                                        className="p-2.5 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                                        title="Edit Product"
+                                                                    >
+                                                                        <MdEdit size={18} />
+                                                                    </button>
+                                                                )}
+                                                                {canDelete && (
+                                                                    <button
+                                                                        onClick={() => handleDelete(p._id)}
+                                                                        className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                                    >
+                                                                        <MdDelete size={18} />
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -1495,18 +1517,22 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                                             <div className="text-[10px] text-slate-400">Selling (Incl. GST): ₹{p.mrp?.toLocaleString()}</div>
                                                         </div>
                                                         <div className="flex gap-2">
-                                                            <button
-                                                                onClick={() => handleOpenModal(p)}
-                                                                className="p-2 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                            >
-                                                                <MdEdit size={18} />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDelete(p._id)}
-                                                                className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                            >
-                                                                <MdDelete size={18} />
-                                                            </button>
+                                                            {canModify && (
+                                                                <button
+                                                                    onClick={() => handleOpenModal(p)}
+                                                                    className="p-2 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                                >
+                                                                    <MdEdit size={18} />
+                                                                </button>
+                                                            )}
+                                                            {canDelete && (
+                                                                <button
+                                                                    onClick={() => handleDelete(p._id)}
+                                                                    className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                                >
+                                                                    <MdDelete size={18} />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1695,14 +1721,16 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                 <div className="mt-8">
                                     <div className="flex items-center justify-between mb-4">
                                         <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Attributes for MGR3</h5>
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsAttrImportModalOpen(true)}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-indigo-100"
-                                        >
-                                            <MdFileUpload size={14} />
-                                            Import Attributes
-                                        </button>
+                                        {(canCreate || canModify) && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsAttrImportModalOpen(true)}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-indigo-100"
+                                            >
+                                                <MdFileUpload size={14} />
+                                                Import Attributes
+                                            </button>
+                                        )}
                                     </div>
                                     <div className="flex flex-wrap gap-2">
                                         {availableAttributes.map(attr => (

@@ -8,6 +8,7 @@ import { toast } from 'react-toastify';
 import { stockAuditService } from '../../../services/api';
 import { formatDate, formatDateTime } from '../../../utils/helpers';
 import Modal from '../../../components/Modal';
+import usePermission from '../../../hooks/usePermission';
 import BatchFields from './BatchFields';
 import DashboardTab from './DashboardTab';
 import CountTab from './CountTab';
@@ -62,6 +63,7 @@ const Kpi = ({ label, value, title, className = 'text-slate-900' }) => (
 const StockAuditDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { canDelete } = usePermission('inventory_sap_audit');
     const [params, setParams] = useSearchParams();
     const [batch, setBatch] = useState(null);
     const [notFound, setNotFound] = useState(false);
@@ -216,7 +218,7 @@ const StockAuditDetail = () => {
                     {access.canManage && (
                         <button type="button" onClick={() => setEditing(batchFormFrom(batch))} className={SECONDARY}><MdEdit size={18} /> Edit</button>
                     )}
-                    {access.role === 'owner' && batch.status === 'Draft' && (
+                    {access.role === 'owner' && batch.status === 'Draft' && canDelete && (
                         <button type="button" onClick={deleteBatch} className={DANGER}><MdDelete size={18} /> Delete</button>
                     )}
                     <button type="button" onClick={exportBatch} className={SECONDARY}><MdDownload size={18} /> Export</button>

@@ -11,6 +11,8 @@ import SearchableSelect from '../components/SearchableSelect';
 import { BLOOD_GROUP_OPTIONS, isValidGSTIN, isValidMobile, isValidPincode } from '../utils/validation';
 import { formatDate } from '../utils/helpers';
 import DateInput from '../components/DateInput';
+import usePermission from '../hooks/usePermission';
+import { useAuth } from '../context/AuthContext';
 
 const LIST_PAGE_SIZE = 20;
 
@@ -66,6 +68,8 @@ const customerTypeBadge = (type) => {
 const Contacts = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
     const { id: routeId } = useParams();
+    const { canCreate, canModify, canDelete } = usePermission('master_contacts');
+    const { can } = useAuth();
     const [contacts, setContacts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -507,20 +511,24 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
                         <MdFileDownload size={18} />
                         <span>Export</span>
                     </button>
-                    <button
-                        onClick={() => setIsImportModalOpen(true)}
-                        className="flex items-center justify-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-5 py-3 rounded-2xl font-bold transition-all shadow-sm uppercase text-xs tracking-widest active:scale-95"
-                    >
-                        <MdFileDownload className="rotate-180" size={18} />
-                        <span>Import</span>
-                    </button>
-                    <button
-                        onClick={() => openModal()}
-                        className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
-                    >
-                        <MdAdd size={20} />
-                        <span>Add Contact</span>
-                    </button>
+                    {canCreate && (
+                        <>
+                            <button
+                                onClick={() => setIsImportModalOpen(true)}
+                                className="flex items-center justify-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-5 py-3 rounded-2xl font-bold transition-all shadow-sm uppercase text-xs tracking-widest active:scale-95"
+                            >
+                                <MdFileDownload className="rotate-180" size={18} />
+                                <span>Import</span>
+                            </button>
+                            <button
+                                onClick={() => openModal()}
+                                className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                            >
+                                <MdAdd size={20} />
+                                <span>Add Contact</span>
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -613,20 +621,24 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
                                         </td>
                                         <td className="px-6 py-5 text-right">
                                             <div className="flex items-center justify-end gap-2">
-                                                <button
-                                                    onClick={() => openModal(contact)}
-                                                    className="p-2.5 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                    title="Edit Contact"
-                                                >
-                                                    <MdEdit size={18} />
-                                                </button>
-                                                <button
-                                                    onClick={() => onDelete(contact._id)}
-                                                    className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                    title="Delete Contact"
-                                                >
-                                                    <MdDelete size={18} />
-                                                </button>
+                                                {canModify && (
+                                                    <button
+                                                        onClick={() => openModal(contact)}
+                                                        className="p-2.5 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                        title="Edit Contact"
+                                                    >
+                                                        <MdEdit size={18} />
+                                                    </button>
+                                                )}
+                                                {canDelete && (
+                                                    <button
+                                                        onClick={() => onDelete(contact._id)}
+                                                        className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                        title="Delete Contact"
+                                                    >
+                                                        <MdDelete size={18} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -805,13 +817,15 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
                                         <div className="space-y-2">
                                             <div className="flex justify-between items-center mb-1">
                                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Designation</label>
-                                                <button 
-                                                    type="button" 
-                                                    onClick={() => handleOpenMiniMaster('designation')}
-                                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
-                                                >
-                                                    + Quick Add
-                                                </button>
+                                                {can('csm_masters', 'create') && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleOpenMiniMaster('designation')}
+                                                        className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                                    >
+                                                        + Quick Add
+                                                    </button>
+                                                )}
                                             </div>
                                             <select
                                                 name="designation"
@@ -1183,22 +1197,26 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
                                                     >
                                                         Select
                                                     </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleStartEditMiniMaster(item)}
-                                                        className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-lg transition-all"
-                                                        title="Edit"
-                                                    >
-                                                        <MdEdit size={16} />
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleDeleteMiniMaster(item._id)}
-                                                        className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-all"
-                                                        title="Delete"
-                                                    >
-                                                        <MdDelete size={16} />
-                                                    </button>
+                                                    {can('csm_masters', 'modify') && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleStartEditMiniMaster(item)}
+                                                            className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-lg transition-all"
+                                                            title="Edit"
+                                                        >
+                                                            <MdEdit size={16} />
+                                                        </button>
+                                                    )}
+                                                    {can('csm_masters', 'delete') && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDeleteMiniMaster(item._id)}
+                                                            className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-all"
+                                                            title="Delete"
+                                                        >
+                                                            <MdDelete size={16} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}

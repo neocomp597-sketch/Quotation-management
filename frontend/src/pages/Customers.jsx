@@ -11,6 +11,7 @@ import { resolveImageUrl, formatDate } from '../utils/helpers';
 import { isValidGSTIN, isValidPAN, isValidMobile } from '../utils/validation';
 import CustomerPricingDashboard from './CustomerPricingDashboard';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
+import usePermission from '../hooks/usePermission';
 
 const LIST_PAGE_SIZE = 20;
 
@@ -19,6 +20,7 @@ const LIST_PAGE_SIZE = 20;
 const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCancel }) => {
     const navigate = useNavigate();
     const { id: routeId } = useParams();
+    const { canCreate, canModify, canDelete } = usePermission('master_customers');
     const [customers, setCustomers] = useState([]);
     const [activeProfileTab, setActiveProfileTab] = useState('details');
     const [loading, setLoading] = useState(true);
@@ -413,25 +415,29 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
                         <MdFileDownload size={20} />
                         <span>Export</span>
                     </button>
-                    <button
-                        onClick={() => setIsImportModalOpen(true)}
-                        className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-emerald-600/20 uppercase text-xs tracking-widest active:scale-95"
-                    >
-                        <MdFileUpload size={20} />
-                        <span>Import</span>
-                    </button>
-                    <button
-                        onClick={() => handleOpenModal()}
-                        className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
-                    >
-                        <MdAdd size={20} />
-                        <span>Add New Customer</span>
-                    </button>
+                    {canCreate && (
+                        <>
+                            <button
+                                onClick={() => setIsImportModalOpen(true)}
+                                className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-emerald-600/20 uppercase text-xs tracking-widest active:scale-95"
+                            >
+                                <MdFileUpload size={20} />
+                                <span>Import</span>
+                            </button>
+                            <button
+                                onClick={() => handleOpenModal()}
+                                className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                            >
+                                <MdAdd size={20} />
+                                <span>Add New Customer</span>
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
 
             {/* Bulk Action Toolbar */}
-            {selectedIds.length > 0 && (
+            {canDelete && selectedIds.length > 0 && (
                 <div className="bg-slate-900 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-xl">
                     <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center">
@@ -567,18 +573,22 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
                                             >
                                                 <MdVisibility size={18} />
                                             </button>
-                                            <button
-                                                onClick={() => handleOpenModal(c)}
-                                                className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
-                                            >
-                                                <MdEdit size={18} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(c._id)}
-                                                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                                            >
-                                                <MdDelete size={18} />
-                                            </button>
+                                            {canModify && (
+                                                <button
+                                                    onClick={() => handleOpenModal(c)}
+                                                    className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                                                >
+                                                    <MdEdit size={18} />
+                                                </button>
+                                            )}
+                                            {canDelete && (
+                                                <button
+                                                    onClick={() => handleDelete(c._id)}
+                                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                                >
+                                                    <MdDelete size={18} />
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -679,19 +689,23 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
                                                     >
                                                         <MdVisibility size={18} />
                                                     </button>
-                                                    <button
-                                                        onClick={() => handleOpenModal(c)}
-                                                        className="p-2.5 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                        title="Edit Customer"
-                                                    >
-                                                        <MdEdit size={18} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete(c._id)}
-                                                        className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                    >
-                                                        <MdDelete size={18} />
-                                                    </button>
+                                                    {canModify && (
+                                                        <button
+                                                            onClick={() => handleOpenModal(c)}
+                                                            className="p-2.5 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                            title="Edit Customer"
+                                                        >
+                                                            <MdEdit size={18} />
+                                                        </button>
+                                                    )}
+                                                    {canDelete && (
+                                                        <button
+                                                            onClick={() => handleDelete(c._id)}
+                                                            className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                        >
+                                                            <MdDelete size={18} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

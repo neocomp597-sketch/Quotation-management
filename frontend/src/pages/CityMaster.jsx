@@ -18,10 +18,12 @@ import {
     MdCheckCircle
 } from 'react-icons/md';
 import { DEFAULT_COUNTRIES, DEFAULT_STATES, getCitiesForState, getStatesForCountry } from '../constants/locationData';
+import usePermission from '../hooks/usePermission';
 
 const CityMaster = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
     const { id: routeId } = useParams();
+    const { canCreate, canModify, canDelete } = usePermission('city_master');
 
     const [cities, setCities] = useState([]);
     const [states, setStates] = useState([]);
@@ -320,22 +322,24 @@ const CityMaster = ({ isCreatePage, isEditPage }) => {
                                 Maintain Cities mapped with State (Short Code e.g. MH), District, Area & Pincode.
                             </p>
                         </div>
-                        <div className="flex items-center gap-3 flex-wrap">
-                            <button
-                                onClick={() => setShowUploadModal(true)}
-                                className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-black transition-all shadow-lg shadow-emerald-600/20 uppercase text-xs tracking-widest active:scale-95"
-                            >
-                                <MdFileUpload size={18} />
-                                <span>Upload Excel</span>
-                            </button>
-                            <button
-                                onClick={() => navigate('/city-master/new')}
-                                className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
-                            >
-                                <MdAdd size={18} />
-                                <span>Create City</span>
-                            </button>
-                        </div>
+                        {canCreate && (
+                            <div className="flex items-center gap-3 flex-wrap">
+                                <button
+                                    onClick={() => setShowUploadModal(true)}
+                                    className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-black transition-all shadow-lg shadow-emerald-600/20 uppercase text-xs tracking-widest active:scale-95"
+                                >
+                                    <MdFileUpload size={18} />
+                                    <span>Upload Excel</span>
+                                </button>
+                                <button
+                                    onClick={() => navigate('/city-master/new')}
+                                    className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                                >
+                                    <MdAdd size={18} />
+                                    <span>Create City</span>
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Search and Table */}
@@ -375,12 +379,14 @@ const CityMaster = ({ isCreatePage, isEditPage }) => {
                         ) : cities.length === 0 ? (
                             <div className="p-16 text-center text-slate-400 space-y-3">
                                 <p className="font-bold text-sm">No City entries found.</p>
-                                <button
-                                    onClick={() => setShowUploadModal(true)}
-                                    className="text-xs text-primary-600 font-bold hover:underline"
-                                >
-                                    Click here to upload City Master.xlsx
-                                </button>
+                                {canCreate && (
+                                    <button
+                                        onClick={() => setShowUploadModal(true)}
+                                        className="text-xs text-primary-600 font-bold hover:underline"
+                                    >
+                                        Click here to upload City Master.xlsx
+                                    </button>
+                                )}
                             </div>
                         ) : (
                             <>
@@ -432,20 +438,24 @@ const CityMaster = ({ isCreatePage, isEditPage }) => {
                                                     </td>
                                                     <td className="py-4 px-6 text-center">
                                                         <div className="flex items-center justify-center gap-2">
-                                                            <button
-                                                                onClick={() => navigate(`/city-master/edit/${item._id}`)}
-                                                                className="p-2 text-slate-400 hover:text-primary-600 hover:bg-slate-100 rounded-xl transition-all"
-                                                                title="Edit City"
-                                                            >
-                                                                <MdEdit size={18} />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDelete(item._id)}
-                                                                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
-                                                                title="Delete City"
-                                                            >
-                                                                <MdDelete size={18} />
-                                                            </button>
+                                                            {canModify && (
+                                                                <button
+                                                                    onClick={() => navigate(`/city-master/edit/${item._id}`)}
+                                                                    className="p-2 text-slate-400 hover:text-primary-600 hover:bg-slate-100 rounded-xl transition-all"
+                                                                    title="Edit City"
+                                                                >
+                                                                    <MdEdit size={18} />
+                                                                </button>
+                                                            )}
+                                                            {canDelete && (
+                                                                <button
+                                                                    onClick={() => handleDelete(item._id)}
+                                                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                                                                    title="Delete City"
+                                                                >
+                                                                    <MdDelete size={18} />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
