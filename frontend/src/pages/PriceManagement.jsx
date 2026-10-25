@@ -16,7 +16,7 @@ import {
     MdReceiptLong
 } from 'react-icons/md';
 import Modal from '../components/Modal';
-import ImportModal from '../components/ImportModal';
+import ImportWizard from '../components/import/ImportWizard';
 import usePermission from '../hooks/usePermission';
 
 // Sample fallback items matching "price book.html"
@@ -923,29 +923,24 @@ const PriceManagement = ({ mode = 'price-books' }) => {
             </Modal>
 
             {/* Import Price Books Modal */}
-            <ImportModal
+            <ImportWizard
                 isOpen={isImportModalOpen}
                 onClose={() => setIsImportModalOpen(false)}
                 title="Import Price Books"
-                onImport={async (file) => {
-                    const result = await importService.importPriceBooks(file);
-                    fetchTabContent();
-                    return result;
-                }}
+                module="price-books"
                 onDownloadTemplate={importService.getPriceBookTemplate}
+                onImported={fetchTabContent}
             />
 
             {/* Import Price Book Items Modal */}
-            <ImportModal
+            <ImportWizard
                 isOpen={isItemsImportModalOpen}
                 onClose={() => setIsItemsImportModalOpen(false)}
                 title={`Import Rates for: ${selectedBook?.name}`}
-                onImport={async (file) => {
-                    const result = await importService.importPriceBookItems(file, selectedBook?._id);
-                    if (selectedBook) {
-                        fetchPriceBookItems(selectedBook._id);
-                    }
-                    return result;
+                module="price-book-items"
+                params={{ priceBookId: selectedBook?._id }}
+                onImported={() => {
+                    if (selectedBook) fetchPriceBookItems(selectedBook._id);
                 }}
                 onDownloadTemplate={importService.getPriceBookItemTemplate}
             />

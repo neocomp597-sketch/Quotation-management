@@ -260,6 +260,19 @@ const parseTicketBranch = (raw) => {
 // Ownership, identity and history fields are maintained by the server only.
 const PROTECTED_TICKET_FIELDS = ['_id', 'companyId', 'createdBy', 'ticketNo', 'createdAt', 'timeline', 'reassignmentHistory', 'comments'];
 
+/**
+ * A complaint is assigned to one engineer at a time. Reads the engineer from a payload's
+ * assignedEngineerId / assignedEngineerIds: { engineerId } (null = unassigned), or
+ * { error } when more than one engineer, or an invalid id, is sent.
+ */
+const readSingleEngineer = (body) => {
+    const sent = [].concat(body.assignedEngineerIds ?? [], body.assignedEngineerId ?? []).filter(Boolean);
+    const ids = [...new Set(sent.map(id => String(id._id || id)))];
+    if (ids.length > 1) return { error: 'A complaint can be assigned to only one engineer.' };
+    if (ids.length === 1 && !mongoose.Types.ObjectId.isValid(ids[0])) return { error: 'Invalid engineer selected' };
+    return { engineerId: ids[0] || null };
+};
+
 const getEngineerForUser = async (user) => {
     if (!user || !user.email) return null;
     return await Engineer.findOne({
@@ -429,6 +442,28 @@ const getHierarchyUserAndStaffIds = async (user) => {
     };
 };
 
+/** Tickets raised by or assigned to the user or anyone reporting to them. */
+const hierarchyTicketCondition = (hierarchyInfo) => {
+    const allUserObjIds = [...hierarchyInfo.selfUserIds, ...hierarchyInfo.teamUserIds].map(id => new mongoose.Types.ObjectId(id));
+    const allEngIds = [...hierarchyInfo.selfEngineerIds, ...hierarchyInfo.teamEngineerIds];
+    const allSalesIds = [...hierarchyInfo.selfSalespersonIds, ...hierarchyInfo.teamSalespersonIds];
+    const visibilityOr = [{ createdBy: { $in: allUserObjIds } }];
+    if (allEngIds.length > 0) {
+        visibilityOr.push({ assignedEngineerId: { $in: allEngIds } });
+        visibilityOr.push({ assignedEngineerIds: { $in: allEngIds } });
+    }
+    if (allSalesIds.length > 0) visibilityOr.push({ assignedSalespersonId: { $in: allSalesIds } });
+    return { $or: visibilityOr };
+};
+
+/**
+ * The tickets the user sees in the register: null for admins and managers (every ticket),
+ * otherwise a filter for those raised by or assigned to them or their team.
+ */
+exports.getVisibleTicketsFilter = async (user) => (
+    isAdminOrManagerUser(user) ? null : hierarchyTicketCondition(await getHierarchyUserAndStaffIds(user))
+);
+
 exports.getTickets = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
@@ -515,16 +550,7 @@ exports.getTickets = async (req, res) => {
             }
         } else if (tab === 'all') {
             if (!isAdminOrManagerUser(req.user)) {
-                const allUserObjIds = [...hierarchyInfo.selfUserIds, ...hierarchyInfo.teamUserIds].map(id => new mongoose.Types.ObjectId(id));
-                const allEngIds = [...hierarchyInfo.selfEngineerIds, ...hierarchyInfo.teamEngineerIds];
-                const allSalesIds = [...hierarchyInfo.selfSalespersonIds, ...hierarchyInfo.teamSalespersonIds];
-                const allOr = [{ createdBy: { $in: allUserObjIds } }];
-                if (allEngIds.length > 0) {
-                    allOr.push({ assignedEngineerId: { $in: allEngIds } });
-                    allOr.push({ assignedEngineerIds: { $in: allEngIds } });
-                }
-                if (allSalesIds.length > 0) allOr.push({ assignedSalespersonId: { $in: allSalesIds } });
-                andConditions.push({ $or: allOr });
+                andConditions.push(hierarchyTicketCondition(hierarchyInfo));
             } else if (req.query.assignedEngineerId) {
                 filter.$or = [
                     { assignedEngineerId: req.query.assignedEngineerId },
@@ -534,16 +560,7 @@ exports.getTickets = async (req, res) => {
         } else {
             // Default handling when no tab specified
             if (!isAdminOrManagerUser(req.user)) {
-                const allUserObjIds = [...hierarchyInfo.selfUserIds, ...hierarchyInfo.teamUserIds].map(id => new mongoose.Types.ObjectId(id));
-                const allEngIds = [...hierarchyInfo.selfEngineerIds, ...hierarchyInfo.teamEngineerIds];
-                const allSalesIds = [...hierarchyInfo.selfSalespersonIds, ...hierarchyInfo.teamSalespersonIds];
-                const visibilityOr = [{ createdBy: { $in: allUserObjIds } }];
-                if (allEngIds.length > 0) {
-                    visibilityOr.push({ assignedEngineerId: { $in: allEngIds } });
-                    visibilityOr.push({ assignedEngineerIds: { $in: allEngIds } });
-                }
-                if (allSalesIds.length > 0) visibilityOr.push({ assignedSalespersonId: { $in: allSalesIds } });
-                andConditions.push({ $or: visibilityOr });
+                andConditions.push(hierarchyTicketCondition(hierarchyInfo));
             } else if (req.query.assignedEngineerId) {
                 filter.$or = [
                     { assignedEngineerId: req.query.assignedEngineerId },
@@ -810,13 +827,11 @@ exports.updateTicket = async (req, res) => {
             }
         }
 
-        if (Array.isArray(ticketBody.assignedEngineerIds)) {
-            ticketBody.assignedEngineerIds = ticketBody.assignedEngineerIds.filter(Boolean);
-            if (!ticketBody.assignedEngineerId && ticketBody.assignedEngineerIds.length > 0) {
-                ticketBody.assignedEngineerId = ticketBody.assignedEngineerIds[0];
-            }
-        } else if (ticketBody.assignedEngineerId) {
-            ticketBody.assignedEngineerIds = [ticketBody.assignedEngineerId];
+        if (ticketBody.assignedEngineerIds !== undefined || ticketBody.assignedEngineerId !== undefined) {
+            const { engineerId, error } = readSingleEngineer(ticketBody);
+            if (error) return res.status(400).json({ message: error });
+            ticketBody.assignedEngineerId = engineerId;
+            ticketBody.assignedEngineerIds = engineerId ? [engineerId] : [];
         }
 
         // Validate the pincode if provided. Changing it never changes who is assigned.
@@ -859,22 +874,21 @@ exports.updateTicket = async (req, res) => {
 
 exports.assignTicket = async (req, res) => {
     try {
-        const { assignedTeamId, assignedEngineerId, assignedEngineerIds } = req.body;
+        const { assignedTeamId } = req.body;
         const companyId = req.user?.companyId;
+
+        const { engineerId, error } = readSingleEngineer(req.body);
+        if (error) return res.status(400).json({ message: error });
 
         const ticket = await Ticket.findOne({ _id: req.params.id, companyId });
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 
         const Engineer = require('../models/Engineer');
-
-        let rawEngIds = [];
-        if (Array.isArray(assignedEngineerIds)) {
-            rawEngIds = assignedEngineerIds.filter(Boolean);
-        } else if (assignedEngineerId) {
-            rawEngIds = [assignedEngineerId];
+        if (engineerId && !(await Engineer.exists({ _id: engineerId, companyId }))) {
+            return res.status(400).json({ message: 'Selected engineer not found' });
         }
 
-        const validEngIds = [...new Set(rawEngIds)].filter(id => mongoose.Types.ObjectId.isValid(id));
+        const validEngIds = engineerId ? [engineerId] : [];
         const oldPrimaryEngineerId = ticket.assignedEngineerId;
 
         ticket.assignedTeamId = assignedTeamId || null;
@@ -996,6 +1010,8 @@ exports.reassignTicket = async (req, res) => {
 
         const fromEngineerId = ticket.assignedEngineerId;
         ticket.assignedEngineerId = targetEng._id;
+        // One engineer at a time: the new engineer replaces everyone on the ticket.
+        ticket.assignedEngineerIds = [targetEng._id];
         ticket.status = 'Assigned';
 
         const validUserId = mongoose.Types.ObjectId.isValid(req.user?.id) ? req.user.id : null;

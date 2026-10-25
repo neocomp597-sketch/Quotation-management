@@ -9,7 +9,7 @@ import {
     MdFileDownload, MdFileUpload
 } from 'react-icons/md';
 import Modal from '../components/Modal';
-import ImportModal from '../components/ImportModal';
+import ImportWizard from '../components/import/ImportWizard';
 import * as XLSX from 'xlsx';
 import { formatDate, formatDateTime } from '../utils/helpers';
 import DateInput from '../components/DateInput';
@@ -2327,18 +2327,16 @@ const Contracts = ({ mode = 'dashboard' }) => {
             </Modal>
 
             {/* Import Modal */}
-            <ImportModal
+            <ImportWizard
                 isOpen={isImportModalOpen}
                 onClose={() => setIsImportModalOpen(false)}
                 title="Import Contracts"
-                type="contracts"
-                onImport={async (file) => {
-                    const result = await importService.importContracts(file);
-                    fetchContracts(); // Refresh contracts after import
-                    fetchDashboard(); // Refresh dashboard counts
-                    return result;
-                }}
+                module="contracts"
                 onDownloadTemplate={importService.getContractTemplate}
+                onImported={() => {
+                    fetchContracts();
+                    fetchDashboard(); // dashboard counts
+                }}
             />
         </div>
     );

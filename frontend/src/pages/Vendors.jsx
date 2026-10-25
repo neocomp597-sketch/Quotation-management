@@ -4,7 +4,7 @@ import { MdAdd, MdDelete, MdEdit, MdSearch, MdStorefront, MdFileDownload, MdFile
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import Modal from '../components/Modal';
-import ImportModal from '../components/ImportModal';
+import ImportWizard from '../components/import/ImportWizard';
 import PaginationControls from '../components/PaginationControls';
 import { vendorService, importService } from '../services/api';
 import { isValidGSTIN, isValidMobile } from '../utils/validation';
@@ -534,16 +534,13 @@ const Vendors = ({ isCreatePage, isEditPage }) => {
             )}
 
             {/* Import Modal */}
-            <ImportModal
+            <ImportWizard
                 isOpen={isImportModalOpen}
                 onClose={() => setIsImportModalOpen(false)}
                 title="Import Vendors"
-                onImport={async (file) => {
-                    const result = await importService.importVendors(file);
-                    fetchVendors();
-                    return result;
-                }}
+                module="vendors"
                 onDownloadTemplate={importService.getVendorTemplate}
+                onImported={fetchVendors}
             />
         </div>
     );

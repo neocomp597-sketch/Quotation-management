@@ -14,6 +14,26 @@ const getEffectiveCompanyId = async (req) => {
     return companyId?.toString ? companyId.toString() : companyId;
 };
 
+const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// Branch names are compared ignoring case and extra spaces, so "Nashik Office" and
+// "nashik  office" count as the same branch.
+const cleanBranchName = (value) => String(value || '').trim().replace(/\s+/g, ' ');
+const buildNameMatch = (name) => new RegExp(`^\\s*${cleanBranchName(name).split(' ').map(escapeRegex).join('\\s+')}\\s*$`, 'i');
+
+const DUPLICATE_FIELD_MESSAGES = {
+    code: 'Branch Code already exists',
+    branchPrefix: 'Branch Prefix already exists'
+};
+
+// Two saves that pass the checks at the same moment (a double click on Save) are
+// stopped by the unique indexes; report that like the checks do, not as a raw E11000.
+const duplicateKeyMessage = (error) => {
+    if (error?.code !== 11000) return null;
+    const field = Object.keys(error.keyPattern || error.keyValue || {}).find(key => DUPLICATE_FIELD_MESSAGES[key]);
+    return DUPLICATE_FIELD_MESSAGES[field] || 'A branch with these details already exists';
+};
+
 exports.getAllBranches = async (req, res) => {
     try {
         const companyId = await getEffectiveCompanyId(req);
@@ -61,7 +81,8 @@ exports.createBranch = async (req, res) => {
 
         const { name, code, branchPrefix, address, country, city, state, stateShortCode, countryDialCode, pincode, contactNo, email, gstNo, logoUrl, managerName, status, startEmployeeSeq } = req.body;
 
-        if (!name || !code || !branchPrefix) {
+        const cleanName = cleanBranchName(name);
+        if (!cleanName || !code || !branchPrefix) {
             return res.status(400).json({ message: 'Branch Name, Branch Code, and Branch Prefix are required' });
         }
 
@@ -81,6 +102,11 @@ exports.createBranch = async (req, res) => {
             }
         }
 
+        const existingName = await Branch.findOne({ companyId, name: buildNameMatch(cleanName) }).lean();
+        if (existingName) {
+            return res.status(400).json({ message: `Branch Name "${existingName.name}" already exists` });
+        }
+
         const existingCode = await Branch.findOne({ companyId, code: cleanCode }).lean();
         if (existingCode) {
             return res.status(400).json({ message: 'Branch Code already exists' });
@@ -92,7 +118,7 @@ exports.createBranch = async (req, res) => {
         }
 
         const branch = await Branch.create({
-            name: String(name).trim(),
+            name: cleanName,
             code: cleanCode,
             branchPrefix: cleanPrefix,
             address: address || '',
@@ -128,6 +154,10 @@ exports.createBranch = async (req, res) => {
 
         res.status(201).json(branch);
     } catch (error) {
+        const duplicateMessage = duplicateKeyMessage(error);
+        if (duplicateMessage) {
+            return res.status(400).json({ message: duplicateMessage });
+        }
         console.error('[createBranch] Error:', error);
         res.status(500).json({ message: error.message || 'Failed to create branch', error: error.message });
     }
@@ -172,7 +202,16 @@ exports.updateBranch = async (req, res) => {
             branch.branchPrefix = cleanPrefix;
         }
 
-        if (name) branch.name = name.trim();
+        const cleanName = cleanBranchName(name);
+        if (cleanName && cleanName !== branch.name) {
+            const q = { name: buildNameMatch(cleanName), _id: { $ne: id } };
+            if (companyId) q.companyId = companyId;
+            const existing = await Branch.findOne(q).lean();
+            if (existing) {
+                return res.status(400).json({ message: `Branch Name "${existing.name}" already exists` });
+            }
+            branch.name = cleanName;
+        }
         if (address !== undefined) branch.address = address;
         if (country !== undefined) branch.country = country || 'India';
         if (city !== undefined) branch.city = city;
@@ -217,6 +256,10 @@ exports.updateBranch = async (req, res) => {
         const updatedBranch = await branch.save();
         res.json(updatedBranch);
     } catch (error) {
+        const duplicateMessage = duplicateKeyMessage(error);
+        if (duplicateMessage) {
+            return res.status(400).json({ message: duplicateMessage });
+        }
         console.error('[updateBranch] Error:', error);
         res.status(500).json({ message: error.message || 'Failed to update branch', error: error.message });
     }

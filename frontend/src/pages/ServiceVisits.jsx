@@ -895,7 +895,10 @@ const ServiceVisits = () => {
                                                 </div>
                                                 <div className="space-y-1 mb-3 text-xs font-semibold">
                                                     <p className="font-black text-slate-800">{v.ticketId?.ticketNo || 'N/A'} - {v.ticketId?.issueTitle}</p>
-                                                    <p className="text-slate-500">{v.ticketId?.customerId?.customerName}</p>
+                                                    <p className="text-slate-500">
+                                                        {v.ticketId?.customerId?.customerName}
+                                                        {v.branchId?.name && <span className="ml-1.5 text-[9px] px-2 py-0.5 rounded-full font-black tracking-wider bg-purple-50 text-purple-700 border border-purple-200">📍 {v.branchId.name}</span>}
+                                                    </p>
                                                     <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-100 mt-2">
                                                         <span>Eng: {v.engineerId?.name || 'Unassigned'}</span>
                                                         <span>{formatDate(v.scheduledDate)}</span>
@@ -939,7 +942,14 @@ const ServiceVisits = () => {
                                                         }`}
                                                         onClick={() => handleSelectVisit(v)}
                                                     >
-                                                        <td className="px-6 py-4 font-black text-slate-900 whitespace-nowrap">{v.visitNo}</td>
+                                                        <td className="px-6 py-4 font-black text-slate-900 whitespace-nowrap">
+                                                            {v.visitNo}
+                                                            {v.branchId?.name && (
+                                                                <span className="block w-fit mt-1 text-[9px] px-2 py-0.5 rounded-full font-black tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
+                                                                    📍 {v.branchId.name}
+                                                                </span>
+                                                            )}
+                                                        </td>
                                                         <td className="px-6 py-4">
                                                             <p className="font-bold text-slate-900">{v.ticketId?.ticketNo || 'N/A'}</p>
                                                             {v.ticketId?.issueTitle && (

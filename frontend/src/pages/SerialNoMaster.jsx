@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { csmService, productService, importService, divisionService, segmentService } from '../services/api';
+import { csmService, productService, importService, divisionService, segmentService, invalidateApiCache } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
@@ -9,7 +9,7 @@ import {
     MdFileUpload, MdFileDownload, MdAdd, MdUndo, MdHistory
 } from 'react-icons/md';
 import Modal from '../components/Modal';
-import ImportModal from '../components/ImportModal';
+import ImportWizard from '../components/import/ImportWizard';
 import PaginationControls from '../components/PaginationControls';
 import { formatDate } from '../utils/helpers';
 import DateInput from '../components/DateInput';
@@ -1140,17 +1140,19 @@ const SerialNoMaster = () => {
             </Modal>
 
             {/* Import Modal */}
-            <ImportModal
+            <ImportWizard
                 isOpen={isImportModalOpen}
-                onClose={() => {
-                    setIsImportModalOpen(false);
+                onClose={() => setIsImportModalOpen(false)}
+                title="Import Invoice Bulk Upload Records"
+                module="assets"
+                templateName="assets_import_template.xlsx"
+                onDownloadTemplate={importService.getAssetTemplate}
+                onImported={() => {
+                    // The upload can add products and customers that other screens list.
+                    invalidateApiCache('/products');
+                    invalidateApiCache('/customers');
                     fetchData();
                 }}
-                title="Import Invoice Bulk Upload Records"
-
-                type="assets"
-                onImport={importService.importAssets}
-                onDownloadTemplate={importService.getAssetTemplate}
             />
         </div>
     );

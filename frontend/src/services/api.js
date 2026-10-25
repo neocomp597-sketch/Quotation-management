@@ -521,59 +521,69 @@ export const uploadService = {
   },
 };
 
+// Imports save every row before they answer, which takes longer than the default 15 s timeout
+// for large files; the server reports progress meanwhile (GET /import/progress).
+const IMPORT_UPLOAD_TIMEOUT = 15 * 60 * 1000;
+
+// The import screen names the upload it is about to send (setNextImportId), so it can follow
+// that upload's progress with getProgressById; the next import request carries the name.
+let nextImportId = null;
+export const setNextImportId = (id) => {
+  nextImportId = id || null;
+};
+const nextImportHeaders = () => {
+  const id = nextImportId;
+  nextImportId = null;
+  return id ? { "X-Import-Id": id } : {};
+};
+
 export const importService = {
   importProducts: (file) => {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/products", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   importCustomers: (file) => {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/customers", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   importVendors: (file) => {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/vendors", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   importPriceBooks: (file) => {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/price-books", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   importPriceBookItems: (file, priceBookId) => {
     const formData = new FormData();
     formData.append("file", file);
     return api.post(`/import/price-book-items/${priceBookId}`, formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   importAttributes: (file) => {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/attributes", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   importAttributeMaster: (file, mgr3Id) => {
@@ -581,9 +591,8 @@ export const importService = {
     formData.append("file", file);
     if (mgr3Id) formData.append("mgr3Id", mgr3Id);
     return api.post("/import/attribute-master", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   importPlanning: (file, financialYear, onUploadProgress) => {
@@ -591,9 +600,8 @@ export const importService = {
     formData.append("file", file);
     if (financialYear) formData.append("financialYear", financialYear);
     return api.post("/import/planning", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
       onUploadProgress,
     });
   },
@@ -620,18 +628,16 @@ export const importService = {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/warranties", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   importAmcs: (file) => {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/amcs", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   getWarrantyTemplate: () =>
@@ -642,9 +648,8 @@ export const importService = {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/tickets", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   getTicketTemplate: () =>
@@ -653,9 +658,8 @@ export const importService = {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/employees", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   getEmployeeTemplate: () =>
@@ -664,9 +668,8 @@ export const importService = {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/contacts", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   getContactTemplate: () =>
@@ -675,9 +678,8 @@ export const importService = {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/contracts", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   getContractTemplate: () =>
@@ -686,9 +688,8 @@ export const importService = {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/tenders", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
       onUploadProgress,
     });
   },
@@ -698,14 +699,19 @@ export const importService = {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/assets", formData, {
-      timeout: 0,
-      headers: { "Content-Type": "multipart/form-data" },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
       onUploadProgress,
       signal,
     });
   },
   getAssetTemplate: () =>
     api.get("/import/template/assets", { responseType: "blob" }),
+  // Live counts of the latest import of a module, while its upload is still saving (404 when none).
+  getProgress: (module) =>
+    api.get("/import/progress", { params: { module }, timeout: 10000 }),
+  getProgressById: (id) =>
+    api.get(`/import/progress/${encodeURIComponent(id)}`, { timeout: 10000 }),
 };
 
 export const attributeService = {
@@ -1269,6 +1275,44 @@ export const developerService = {
   revokeKey: (id) => api.post(`/developer/keys/${id}/revoke`),
   getLogs: (params) => api.get("/developer/logs", { params }),
   getOpenApiSpec: () => api.get("/developer/openapi.json"),
+};
+
+// Staged bulk imports (backend/services/importEngine): preview -> fix -> import -> retry.
+// Reading a large file and importing it can take longer than the default timeout; the
+// screen polls getJob for progress meanwhile.
+export const importJobService = {
+  getModule: (module) => api.get(`/imports/modules/${module}`),
+  // params: settings chosen on the screen (financial year, price book...), sent as JSON.
+  listJobs: (module, params = {}) =>
+    api.get("/imports", { params: { module, params: JSON.stringify(params) } }),
+  preview: (module, file, { mode, params, onUploadProgress, signal } = {}) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (mode) formData.append("mode", mode);
+    if (params) formData.append("params", JSON.stringify(params));
+    return api.post("/imports/preview", formData, {
+      params: { module },
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 0,
+      onUploadProgress,
+      signal,
+    });
+  },
+  getJob: (jobId) => api.get(`/imports/${jobId}`),
+  updateJob: (jobId, data) => api.put(`/imports/${jobId}`, data, { timeout: 0 }),
+  getRows: (jobId, params) => api.get(`/imports/${jobId}/rows`, { params }),
+  correctRows: (jobId, rows) => api.patch(`/imports/${jobId}/rows`, { rows }, { timeout: 0 }),
+  uploadCorrections: (jobId, file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post(`/imports/${jobId}/corrections`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 0,
+    });
+  },
+  execute: (jobId) => api.post(`/imports/${jobId}/execute`, {}, { timeout: 0 }),
+  exportRows: (jobId, status) =>
+    api.get(`/imports/${jobId}/export`, { params: { status }, responseType: "blob", timeout: 0 }),
 };
 
 export default api;

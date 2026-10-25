@@ -10,7 +10,7 @@ import {
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
-import ImportModal from '../components/ImportModal';
+import ImportWizard from '../components/import/ImportWizard';
 import * as XLSX from 'xlsx';
 import DateInput from '../components/DateInput';
 import usePermission from '../hooks/usePermission';
@@ -692,16 +692,13 @@ const TenderRegister = () => {
             </Modal>
 
             {/* Import Modal */}
-            <ImportModal
+            <ImportWizard
                 isOpen={isImportModalOpen}
                 onClose={() => setIsImportModalOpen(false)}
                 title="Import Tenders Database"
-                onImport={async (file) => {
-                    const result = await importService.importTenders(file);
-                    loadTenders(false);
-                    return result;
-                }}
+                module="tenders"
                 onDownloadTemplate={importService.getTenderTemplate}
+                onImported={() => loadTenders(false)}
             />
         </div>
     );

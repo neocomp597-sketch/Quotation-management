@@ -3,9 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdPerson, MdEmail, MdPhone, MdLocationOn, MdBusiness, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdFileDownload, MdArrowBack } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
-import { customerService, uploadService, importService, territoryService, userService, csmService } from '../services/api';
+import { customerService, uploadService, importService, territoryService, userService, csmService, invalidateApiCache } from '../services/api';
 import Modal from '../components/Modal';
-import ImportModal from '../components/ImportModal';
+import ImportWizard from '../components/import/ImportWizard';
 import PaginationControls from '../components/PaginationControls';
 import { resolveImageUrl, formatDate } from '../utils/helpers';
 import { isValidGSTIN, isValidPAN, isValidMobile } from '../utils/validation';
@@ -1313,17 +1313,17 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
             </Modal>
 
             {/* Import Modal */}
-            <ImportModal
+            <ImportWizard
                 isOpen={isImportModalOpen}
                 onClose={() => setIsImportModalOpen(false)}
                 title="Import Customers"
-                type="customers"
-                onImport={async (file) => {
-                    const result = await importService.importCustomers(file);
-                    fetchCustomers(); // Refresh customers after import
-                    return result;
-                }}
+                module="customers"
                 onDownloadTemplate={importService.getCustomerTemplate}
+                onImported={() => {
+                    // The import writes through /imports, which does not drop the cached customer list.
+                    invalidateApiCache('/customers');
+                    fetchCustomers();
+                }}
             />
         </div>
     );

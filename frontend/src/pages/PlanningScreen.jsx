@@ -26,7 +26,7 @@ import {
   statusService,
 } from "../services/api";
 import * as XLSX from "xlsx";
-import ImportModal from "../components/ImportModal";
+import ImportWizard from "../components/import/ImportWizard";
 import PortalDropdown from "../components/PortalDropdown";
 import { formatToLakhs, formatToIndian } from "../utils/formatters";
 import { useAuth } from "../context/AuthContext";
@@ -3185,23 +3185,17 @@ const PlanningScreen = () => {
         </div>
       )}
 
-      <ImportModal
+      <ImportWizard
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         title={`Import Planning - FY ${financialYear}`}
-        type="planning"
-        onImport={async (file, onUploadProgress) => {
-          const result = await importService.importPlanning(
-            file,
-            financialYear,
-            onUploadProgress,
-          );
-          await fetchData();
-          return result;
-        }}
+        module="planning"
+        params={{ financialYear }}
+        templateName={`planning_import_template_${financialYear}.xlsx`}
         onDownloadTemplate={() =>
           importService.getPlanningTemplate(financialYear)
         }
+        onImported={fetchData}
       />
     </div>
   );

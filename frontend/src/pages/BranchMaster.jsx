@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
     MdAdd, MdSearch, MdEdit, MdDelete, MdBusiness, 
@@ -25,6 +25,9 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingBranch, setEditingBranch] = useState(null);
     const [submitting, setSubmitting] = useState(false);
+    // The disabled button only takes effect after a re-render, so a quick double
+    // click could still send two create requests; this ref blocks the second one.
+    const submittingRef = useRef(false);
 
     const initialFormState = {
         name: '',
@@ -149,8 +152,9 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
-        if (!formData.name || !formData.code || !formData.branchPrefix) {
+        if (submittingRef.current) return;
+
+        if (!formData.name.trim() || !formData.code.trim() || !formData.branchPrefix.trim()) {
             toast.error('Branch Name, Code, and Prefix are required!');
             return;
         }
@@ -168,6 +172,7 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
             return;
         }
 
+        submittingRef.current = true;
         setSubmitting(true);
         try {
             if (editingBranch) {
@@ -182,6 +187,7 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
         } catch (err) {
             toast.error(err.response?.data?.message || 'Error saving branch');
         } finally {
+            submittingRef.current = false;
             setSubmitting(false);
         }
     };

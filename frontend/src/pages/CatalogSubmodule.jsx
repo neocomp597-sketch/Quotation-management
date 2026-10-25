@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { productService, cpqService, importService } from '../services/api';
+import { productService, cpqService, importService, invalidateApiCache } from '../services/api';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdPayments, MdFolderOpen, MdStar, MdFileDownload, MdFileUpload } from 'react-icons/md';
 import Modal from '../components/Modal';
-import ImportModal from '../components/ImportModal';
+import ImportWizard from '../components/import/ImportWizard';
 
 const CatalogSubmodule = ({ mode = 'products' }) => {
     const [activeTab, setActiveTab] = useState(mode);
@@ -488,16 +488,16 @@ const CatalogSubmodule = ({ mode = 'products' }) => {
             </Modal>
 
             {/* Import Modal */}
-            <ImportModal
+            <ImportWizard
                 isOpen={isImportModalOpen}
                 onClose={() => setIsImportModalOpen(false)}
                 title="Import Products/Catalog"
-                onImport={async (file) => {
-                    const result = await importService.importProducts(file);
-                    fetchCatalogItems();
-                    return result;
-                }}
+                module="products"
                 onDownloadTemplate={importService.getProductTemplate}
+                onImported={() => {
+                    invalidateApiCache('/products');
+                    fetchCatalogItems();
+                }}
             />
         </div>
     );

@@ -4,7 +4,7 @@ import { MdAdd, MdEdit, MdDelete, MdArrowBack, MdFileUpload } from 'react-icons/
 import { toast } from 'react-toastify';
 import { mgrService, attributeService, importService } from '../services/api';
 import Modal from '../components/Modal';
-import ImportModal from '../components/ImportModal';
+import ImportWizard from '../components/import/ImportWizard';
 import usePermission from '../hooks/usePermission';
 
 import { useNavigate, useParams } from 'react-router-dom';
@@ -383,19 +383,16 @@ const Attributes = ({ isCreatePage, isEditPage }) => {
                 </div>
             )}
 
-            <ImportModal
+            <ImportWizard
                 isOpen={isImportModalOpen}
                 onClose={() => setIsImportModalOpen(false)}
                 title="Import Attributes Master"
-                type="attribute-master"
-                onImport={async (file) => {
-                    const result = await importService.importAttributeMaster(file, selectedMgr3);
-                    if (selectedMgr3) {
-                        fetchAttributes();
-                    }
-                    return result;
-                }}
+                module="attribute-master"
+                params={{ mgr3Id: selectedMgr3 || undefined }}
                 onDownloadTemplate={importService.getAttributeMasterTemplate}
+                onImported={() => {
+                    if (selectedMgr3) fetchAttributes();
+                }}
             />
 
         </div>

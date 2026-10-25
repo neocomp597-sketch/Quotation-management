@@ -1,11 +1,16 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
     MdCloudUpload, MdDownload, MdDescription, MdCheckCircle,
     MdError, MdWarning, MdTableChart, MdClose
 } from 'react-icons/md';
 import Modal from './Modal';
-import api from '../services/api';
+import api, { importService, setNextImportId } from '../services/api';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
+
+// Rows of the error table shown at a time; a 5,000-row file can return thousands of errors.
+const ERROR_PAGE_SIZE = 50;
+// How often the server is asked how far the import has got while it saves the rows.
+const PROGRESS_POLL_MS = 1500;
 
 /* -----------------------------------------------------------------------
  * ImportModal – shared upload UI for every master module.
@@ -69,9 +74,37 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
     const [dragActive, setDragActive]           = useState(false);
     const [importProgress, setImportProgress]   = useState({ processed: 0, total: 0 });
     const [importStage, setImportStage]         = useState('idle'); // idle | uploading | processing
-    const [showAllErrors, setShowAllErrors]     = useState(false);
+    const [errorPage, setErrorPage]             = useState(0);
+    // Counts the server reports while it saves the rows: { stage, total, processed, created, ... }
+    const [liveProgress, setLiveProgress]       = useState(null);
     const fileInputRef  = useRef(null);
     const abortCtrlRef  = useRef(null);          // AbortController for in-flight request
+    const inFlightRef   = useRef(false);         // a second click never starts a second import
+    const importIdRef   = useRef(null);          // the name this upload carries (X-Import-Id)
+
+    // While the upload request is open, ask the server how many rows it has saved so far: by
+    // the upload's own name, or - if the name did not reach the server - the screen's latest one.
+    useEffect(() => {
+        if (!isImporting) return undefined;
+        let stopped = false;
+        let timer;
+        const poll = async () => {
+            let data = null;
+            try {
+                data = (await importService.getProgressById(importIdRef.current)).data;
+            } catch {
+                try {
+                    data = (await importService.getProgress(type)).data;
+                    // A finished entry there is an earlier import of this screen.
+                    if (data?.stage === 'finished') data = null;
+                } catch { /* another server instance, or not started yet: keep the plain progress bar */ }
+            }
+            if (!stopped && data) setLiveProgress(data);
+            if (!stopped) timer = setTimeout(poll, PROGRESS_POLL_MS);
+        };
+        timer = setTimeout(poll, PROGRESS_POLL_MS);
+        return () => { stopped = true; clearTimeout(timer); };
+    }, [isImporting, type]);
 
     // ---------- drag-and-drop ----------
     const handleDrag = (e) => {
@@ -93,13 +126,14 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
         if (!ok) { alert('Please upload an Excel (.xlsx, .xls) or CSV file'); return; }
         setFile(selectedFile);
         setResult(null);
-        setShowAllErrors(false);
+        setErrorPage(0);
     };
     const handleFileChange = (e) => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); };
 
     // ---------- upload ----------
     const { execute: handleImport } = useSubmitGuard(async () => {
-        if (!file) return;
+        if (!file || inFlightRef.current) return;
+        inFlightRef.current = true;
 
         // Cancel any previous in-flight request.
         abortCtrlRef.current?.abort();
@@ -107,8 +141,12 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
 
         setIsImporting(true);
         setResult(null);
+        setErrorPage(0);
+        setLiveProgress(null);
         setImportProgress({ processed: 0, total: 0 });
         setImportStage('uploading');
+        importIdRef.current = `imp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+        setNextImportId(importIdRef.current);
 
         try {
             const response = await onImport(file, (event) => {
@@ -159,18 +197,32 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
                 missingMgr2Codes:     ed.missingMgr2Codes     || [],
             });
         } finally {
+            setNextImportId(null);
+            inFlightRef.current = false;
             setIsImporting(false);
             setImportStage('idle');
+            setLiveProgress(null);
         }
     });
 
     // ---------- cancel in-flight ----------
+    // Once the file has reached the server, cancelling only stops waiting: the server finishes
+    // saving the rows, so the message says so instead of claiming nothing was imported.
     const handleCancel = useCallback(() => {
         abortCtrlRef.current?.abort();
+        const serverHasFile = importStage === 'processing' || Boolean(liveProgress);
+        inFlightRef.current = false;
         setIsImporting(false);
         setImportStage('idle');
-        setResult({ status: 'failed', message: 'Upload cancelled by user.', errors: [], successCount: 0, failedCount: 0 });
-    }, []);
+        setLiveProgress(null);
+        setResult({
+            status: 'failed',
+            message: serverHasFile
+                ? 'Stopped waiting for the import. The server keeps saving the rows it received; refresh the list in a minute to see them. Importing the same file again updates them, it does not duplicate them.'
+                : 'Upload cancelled by user.',
+            errors: [], successCount: 0, failedCount: 0
+        });
+    }, [importStage, liveProgress]);
 
     // ---------- download missing codes ----------
     const handleDownloadMissingCodes = async (filename) => {
@@ -204,18 +256,23 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
         if (isImporting) { handleCancel(); return; }
         setFile(null); setResult(null);
         setImportProgress({ processed: 0, total: 0 });
-        setImportStage('idle'); setShowAllErrors(false);
+        setImportStage('idle'); setErrorPage(0);
         onClose();
     };
 
     // ---------- derived values ----------
     const normErrors   = result?.errors || [];
-    const visibleErrors = showAllErrors ? normErrors : normErrors.slice(0, 10);
+    const errorPageCount = Math.max(1, Math.ceil(normErrors.length / ERROR_PAGE_SIZE));
+    const shownErrorPage = Math.min(errorPage, errorPageCount - 1);
+    const visibleErrors = normErrors.slice(shownErrorPage * ERROR_PAGE_SIZE, (shownErrorPage + 1) * ERROR_PAGE_SIZE);
     const statusColor  = STATUS_COLOR[result?.status] || 'rose';
+    const serverCounting = liveProgress && liveProgress.total > 0;
 
-    const progressPct = importProgress.total > 0
-        ? Math.min(Math.round((importProgress.processed / importProgress.total) * 100), 100)
-        : (importStage === 'processing' ? 99 : 20);
+    const progressPct = serverCounting
+        ? Math.min(Math.round((liveProgress.processed / liveProgress.total) * 100), 100)
+        : importProgress.total > 0
+            ? Math.min(Math.round((importProgress.processed / importProgress.total) * 100), 100)
+            : (importStage === 'processing' ? 99 : 20);
 
     return (
         <Modal isOpen={isOpen} onClose={handleClose} title={title} maxWidth="max-w-2xl">
@@ -291,7 +348,9 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
                     <div className="rounded-2xl p-4 bg-blue-50 border border-blue-100">
                         <div className="flex items-center justify-between mb-2">
                             <p className="text-sm font-bold text-blue-900">
-                                {importStage === 'uploading' ? 'Uploading file…' : 'Processing records…'}
+                                {liveProgress?.stage === 'queued'
+                                    ? 'Waiting for another import to finish…'
+                                    : liveProgress || importStage === 'processing' ? 'Saving rows…' : 'Uploading file…'}
                             </p>
                             <div className="flex items-center gap-3">
                                 <span className="text-xs font-bold text-blue-600">{progressPct}%</span>
@@ -309,11 +368,22 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
                                 style={{ width: `${progressPct}%` }}
                             />
                         </div>
-                        {importProgress.total > 0 && (
+                        {serverCounting ? (
+                            <p className="text-xs text-blue-600 mt-2 font-medium">
+                                {`${liveProgress.processed.toLocaleString()} of ${liveProgress.total.toLocaleString()} rows processed`}
+                                {` · ${liveProgress.created.toLocaleString()} created · ${liveProgress.updated.toLocaleString()} updated`}
+                                {` · ${liveProgress.skipped.toLocaleString()} skipped · ${liveProgress.failed.toLocaleString()} failed`}
+                            </p>
+                        ) : importProgress.total > 0 && (
                             <p className="text-xs text-blue-600 mt-2 font-medium">
                                 {importStage === 'uploading'
                                     ? `${Math.round(importProgress.processed / 1024)} KB / ${Math.round(importProgress.total / 1024)} KB uploaded`
                                     : `${importProgress.processed} / ${importProgress.total} entries`}
+                            </p>
+                        )}
+                        {isImporting && (
+                            <p className="text-[11px] text-blue-500 mt-1">
+                                You can keep working in other tabs; large files can take a minute.
                             </p>
                         )}
                     </div>
@@ -426,16 +496,23 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
                                         </tbody>
                                     </table>
                                 </div>
-                                {normErrors.length > 10 && (
-                                    <div className="px-4 py-2 border-t border-slate-100 text-center">
-                                        <button
-                                            onClick={() => setShowAllErrors(v => !v)}
-                                            className="text-xs text-primary-600 font-bold hover:underline"
-                                        >
-                                            {showAllErrors
-                                                ? 'Show fewer errors'
-                                                : `Show all ${normErrors.length} errors`}
-                                        </button>
+                                {normErrors.length > ERROR_PAGE_SIZE && (
+                                    <div className="px-4 py-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                                        <span className="text-slate-500">
+                                            {`Rows ${(shownErrorPage * ERROR_PAGE_SIZE + 1).toLocaleString()}–${Math.min((shownErrorPage + 1) * ERROR_PAGE_SIZE, normErrors.length).toLocaleString()} of ${normErrors.length.toLocaleString()}`}
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => setErrorPage(shownErrorPage - 1)}
+                                                disabled={shownErrorPage === 0}
+                                                className="px-3 py-1 rounded-lg border border-slate-200 font-bold text-primary-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                            >Previous</button>
+                                            <button
+                                                onClick={() => setErrorPage(shownErrorPage + 1)}
+                                                disabled={shownErrorPage >= errorPageCount - 1}
+                                                className="px-3 py-1 rounded-lg border border-slate-200 font-bold text-primary-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                            >Next</button>
+                                        </div>
                                     </div>
                                 )}
                             </div>

@@ -474,6 +474,13 @@ exports.createSingleAsset = async (req, res) => {
                     { companyName: buildExactRegex(searchTarget) }
                 ]
             });
+            if (!customer) {
+                // Customer codes are unique in the whole company: a customer of another branch
+                // with this code is the same customer (creating it again would be refused).
+                customer = await Customer.findOne({ companyId, externalCode: searchTarget })
+                    .collation(Customer.CUSTOMER_CODE_COLLATION)
+                    .setOptions({ bypassBranch: true });
+            }
 
             if (!customer) {
                 customer = await Customer.create({

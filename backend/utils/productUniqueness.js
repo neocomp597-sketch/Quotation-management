@@ -95,11 +95,112 @@ const createBatchTracker = () => {
     };
 };
 
+/**
+ * The company's products in memory, for imports that check thousands of codes and names: one
+ * query instead of several per row. Lookups follow the same rules as the queries they replace:
+ *   findByCode / findByName / findByCodeOrName - exact match on the stored value, ignoring case
+ *     (like a `^value$` / `i` regex), first product in load order
+ *   findDuplicate - the uniqueness rule above (ignores case and runs of spaces)
+ * Products the import saves or renames must be passed to add() / update(), so later rows see
+ * them exactly as they would see them in the database.
+ */
+const createProductIndex = (products = []) => {
+    const exactKey = (value) => String(value ?? '').trim().replace(/\s+/g, ' ').toUpperCase();
+    const storedKey = (value) => String(value ?? '').toUpperCase();
+    const maps = { code: new Map(), name: new Map(), codeKey: new Map(), nameKey: new Map() };
+    const order = new Map();
+    let nextOrder = 0;
+
+    const keysOf = (product) => ({
+        code: storedKey(product.productCode),
+        name: storedKey(product.productName),
+        codeKey: normalizeProductKey(product.productCode),
+        nameKey: normalizeProductKey(product.productName)
+    });
+    const link = (product) => {
+        Object.entries(keysOf(product)).forEach(([map, key]) => {
+            if (!key) return;
+            const list = maps[map].get(key);
+            if (list) list.push(product);
+            else maps[map].set(key, [product]);
+        });
+    };
+    const unlink = (product) => {
+        Object.entries(keysOf(product)).forEach(([map, key]) => {
+            const list = maps[map].get(key);
+            if (!list) return;
+            const rest = list.filter((item) => item !== product);
+            if (rest.length) maps[map].set(key, rest);
+            else maps[map].delete(key);
+        });
+    };
+    const add = (product) => {
+        if (!order.has(product)) order.set(product, nextOrder++);
+        link(product);
+        return product;
+    };
+    const first = (map, key) => {
+        const list = key ? maps[map].get(key) : null;
+        if (!list) return null;
+        return list.reduce((best, product) => (order.get(product) < order.get(best) ? product : best));
+    };
+
+    products.forEach(add);
+
+    return {
+        add,
+        /** Applies saved changes (code, name) to an indexed product. */
+        update(product, changes) {
+            unlink(product);
+            Object.assign(product, changes);
+            link(product);
+        },
+        remove(product) {
+            unlink(product);
+            order.delete(product);
+        },
+        findByCode: (value) => first('code', exactKey(value)),
+        findByName: (value) => first('name', exactKey(value)),
+        findByCodeOrName(value) {
+            const byCode = first('code', exactKey(value));
+            const byName = first('name', exactKey(value));
+            if (!byCode || !byName) return byCode || byName;
+            return order.get(byCode) <= order.get(byName) ? byCode : byName;
+        },
+        findDuplicate(field, value, excludeId) {
+            const key = normalizeProductKey(value);
+            if (!key) return null;
+            const list = maps[field === 'productCode' ? 'codeKey' : 'nameKey'].get(key) || [];
+            const exclude = excludeId ? String(excludeId) : null;
+            const matches = list.filter((product) => String(product._id) !== exclude);
+            if (!matches.length) return null;
+            return matches.reduce((best, product) => (order.get(product) < order.get(best) ? product : best));
+        }
+    };
+};
+
+/**
+ * createProductIndex over the company's Product Master (id, code and name only). Built in slices
+ * with a pause in between, so a large catalog does not hold up other requests while it is indexed.
+ */
+const loadProductIndex = async ({ companyId } = {}) => {
+    const query = companyId ? { companyId } : {};
+    const products = await Product.find(query).select('_id productCode productName').lean();
+    const index = createProductIndex();
+    for (let start = 0; start < products.length; start += 2000) {
+        if (start) await new Promise((resolve) => setImmediate(resolve));
+        products.slice(start, start + 2000).forEach(index.add);
+    }
+    return index;
+};
+
 module.exports = {
     normalizeProductKey,
     exactKeyRegex,
     findDuplicate,
     assertProductUnique,
     createBatchTracker,
+    createProductIndex,
+    loadProductIndex,
     DuplicateProductError
 };

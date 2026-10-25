@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { csmService, customerService, importService, voucherService } from '../services/api';
-import { formatDate, formatDateTime } from '../utils/helpers';
+import { formatDate } from '../utils/helpers';
 import { toast } from 'react-toastify';
 import { 
     MdSecurity, MdAssignmentTurnedIn, MdCheckCircle, 
@@ -12,6 +12,7 @@ import SearchableSelect from '../components/SearchableSelect';
 import SerialSearchInput from '../components/bom/SerialSearchInput';
 import DateInput from '../components/DateInput';
 import usePermission from '../hooks/usePermission';
+import ImportWizard from '../components/import/ImportWizard';
 
 const EMPTY_FORM = {
     customerId: '',
@@ -67,8 +68,8 @@ const WarrantyAMC = () => {
     const [scheduledVisits, setScheduledVisits] = useState([]);
 
     // Import Summary Modal states
-    const [importResult, setImportResult] = useState(null);
-    const [showImportResultModal, setShowImportResultModal] = useState(false);
+    // Which import window is open: 'warranties', 'amcs' or null.
+    const [importModule, setImportModule] = useState(null);
 
     // List dependencies for forms
     const [customers, setCustomers] = useState([]);
@@ -363,58 +364,6 @@ const WarrantyAMC = () => {
         }
     };
 
-    const handleImportFile = async (e, type) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        setLoading(true);
-        try {
-            let res;
-            if (type === 'warranty') {
-                res = await importService.importWarranties(file);
-            } else {
-                res = await importService.importAmcs(file);
-            }
-
-            setImportResult({
-                type,
-                imported: res.data.imported || 0,
-                updated: res.data.updated || 0,
-                skipped: res.data.skipped || 0,
-                failed: res.data.failed || 0,
-                errors: res.data.errors || []
-            });
-            setShowImportResultModal(true);
-
-            // Reload tables
-            fetchLists();
-
-            if (res.data.success) {
-                toast.success('Import completed successfully!');
-            } else {
-                toast.warning('Import completed with some errors. Please check the summary report.');
-            }
-        } catch (error) {
-            console.error('Import error:', error);
-            toast.error(error.response?.data?.message || 'Error occurred during import');
-        } finally {
-            setLoading(false);
-            e.target.value = ''; // Reset file input
-        }
-    };
-
-    const downloadErrorReport = () => {
-        if (!importResult || !importResult.errors || importResult.errors.length === 0) return;
-        const blobContent = `Import Error Report for ${importResult.type === 'warranty' ? 'Warranties' : 'AMCs'}\nGenerated on: ${formatDateTime(new Date())}\n\nFailed rows details:\n` + importResult.errors.join('\n');
-        const url = window.URL.createObjectURL(new Blob([blobContent], { type: 'text/plain' }));
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `${importResult.type}_import_errors.txt`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
-
     return (
         <div className="p-6 space-y-6 max-w-7xl mx-auto animate-fade-in-up">
             {/* Header */}
@@ -447,26 +396,22 @@ const WarrantyAMC = () => {
                             </button>
 
                             {/* Import Buttons */}
-                            <label className="flex items-center gap-1.5 px-4 py-3 bg-slate-800 hover:bg-slate-950 text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-md cursor-pointer active:scale-95">
+                            <button
+                                type="button"
+                                onClick={() => setImportModule('warranties')}
+                                className="flex items-center gap-1.5 px-4 py-3 bg-slate-800 hover:bg-slate-950 text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-md active:scale-95"
+                            >
                                 <MdPublish size={16} />
                                 Import Warranty
-                                <input
-                                    type="file"
-                                    accept=".xlsx, .xls, .csv"
-                                    onChange={(e) => handleImportFile(e, 'warranty')}
-                                    className="hidden"
-                                />
-                            </label>
-                            <label className="flex items-center gap-1.5 px-4 py-3 bg-slate-800 hover:bg-slate-950 text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-md cursor-pointer active:scale-95">
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setImportModule('amcs')}
+                                className="flex items-center gap-1.5 px-4 py-3 bg-slate-800 hover:bg-slate-950 text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-md active:scale-95"
+                            >
                                 <MdPublish size={16} />
                                 Import AMC
-                                <input
-                                    type="file"
-                                    accept=".xlsx, .xls, .csv"
-                                    onChange={(e) => handleImportFile(e, 'amc')}
-                                    className="hidden"
-                                />
-                            </label>
+                            </button>
                         </>
                     )}
 
@@ -952,63 +897,16 @@ const WarrantyAMC = () => {
                 </form>
             </Modal>
 
-            {/* Import Summary Modal */}
-            {showImportResultModal && importResult && (
-                <Modal
-                    isOpen={showImportResultModal}
-                    onClose={() => setShowImportResultModal(false)}
-                    title="📊 Upload Summary"
-                    maxWidth="max-w-md"
-                    footer={
-                        <button
-                            onClick={() => setShowImportResultModal(false)}
-                            className="w-full py-3.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg"
-                        >
-                            Close Summary
-                        </button>
-                    }
-                >
-                    <div className="space-y-6">
-                        <p className="text-sm font-semibold text-slate-600">
-                            Import results for <span className="text-slate-900 font-bold uppercase">{importResult.type === 'warranty' ? 'Warranties' : 'AMCs'}</span>:
-                        </p>
-                        
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-center">
-                                <span className="block text-[10px] font-black uppercase text-emerald-500 tracking-wider">Imported</span>
-                                <span className="text-2xl font-black text-emerald-600">{importResult.imported}</span>
-                            </div>
-                            <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl text-center">
-                                <span className="block text-[10px] font-black uppercase text-blue-500 tracking-wider">Updated</span>
-                                <span className="text-2xl font-black text-blue-600">{importResult.updated}</span>
-                            </div>
-                            <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-center">
-                                <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">Skipped</span>
-                                <span className="text-2xl font-black text-slate-500">{importResult.skipped}</span>
-                            </div>
-                            <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-center">
-                                <span className="block text-[10px] font-black uppercase text-rose-500 tracking-wider">Failed</span>
-                                <span className="text-2xl font-black text-rose-600">{importResult.failed}</span>
-                            </div>
-                        </div>
-
-                        {importResult.failed > 0 && (
-                            <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl space-y-3">
-                                <p className="text-xs font-bold text-rose-700">
-                                    ⚠️ The import encountered {importResult.failed} errors. You can download the error log report to debug rows.
-                                </p>
-                                <button
-                                    onClick={downloadErrorReport}
-                                    className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-1.5"
-                                >
-                                    <MdFileDownload size={16} />
-                                    Download Error Report
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </Modal>
-            )}
+            <ImportWizard
+                key={importModule || 'closed'}
+                isOpen={Boolean(importModule)}
+                onClose={() => setImportModule(null)}
+                module={importModule || 'warranties'}
+                title={importModule === 'amcs' ? 'Import AMC Contracts' : 'Import Warranties'}
+                templateName={importModule === 'amcs' ? 'amc_import_template.xlsx' : 'warranty_import_template.xlsx'}
+                onDownloadTemplate={importModule === 'amcs' ? importService.getAmcTemplate : importService.getWarrantyTemplate}
+                onImported={fetchLists}
+            />
         </div>
     );
 };

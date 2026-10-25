@@ -1,8 +1,14 @@
+const mongoose = require('mongoose');
 const ServiceVisit = require('../models/ServiceVisit');
 const { formatDateTime } = require('../utils/dateFormat');
 const Ticket = require('../models/Ticket');
 const Counter = require('../models/Counter');
 const AMC = require('../models/AMC');
+const { getVisibleTicketsFilter } = require('./ticketController');
+const { getScopedBranches } = require('../middlewares/tenantContext');
+
+// A ticket's customer and serial can belong to another branch than the visit list's.
+const CROSS_BRANCH = { bypassBranch: true };
 
 const generateVisitNumber = async (companyId) => {
     const year = new Date().getFullYear();
@@ -105,27 +111,46 @@ exports.getVisits = async (req, res) => {
         if (req.query.ticketId) filter.ticketId = req.query.ticketId;
         if (req.query.engineerId) filter.engineerId = req.query.engineerId;
         if (req.query.status) filter.status = req.query.status;
+        if (req.query.branchId && mongoose.Types.ObjectId.isValid(req.query.branchId)) filter.branchId = req.query.branchId;
 
         if (req.query.customerId) {
             const customerTickets = await Ticket.find({ customerId: req.query.customerId, companyId }).select('_id').lean();
             filter.ticketId = { $in: customerTickets.map(t => t._id) };
         }
 
-        // Support Tickets are visible from every branch, so the visits of one ticket are
-        // shown with it wherever it is opened. The general visit list stays branch scoped.
-        const singleTicket = Boolean(req.query.ticketId) && !req.query.customerId;
+        // Support Tickets are one company-wide register and a visit lives in its ticket's
+        // branch, so a visit is listed wherever its ticket is: the visits of one ticket from
+        // any branch, and in the list the active branch's visits plus the visits of every
+        // ticket the user sees in the register (admins and managers: every ticket).
+        // ?branchId= narrows the list on request, as it does the register.
+        let crossBranch = Boolean(req.query.ticketId) && !req.query.customerId;
+        if (!crossBranch) {
+            const visibleTickets = await getVisibleTicketsFilter(req.user);
+            if (!visibleTickets) {
+                crossBranch = true;
+            } else if (getScopedBranches()) {
+                const [branchVisits, ticketIds] = await Promise.all([
+                    ServiceVisit.find(filter).select('_id').lean(),
+                    Ticket.find({ ...visibleTickets, companyId }).distinct('_id')
+                ]);
+                filter.$or = [{ _id: { $in: branchVisits.map(v => v._id) } }, { ticketId: { $in: ticketIds } }];
+                crossBranch = true;
+            }
+        }
+
         const visits = await ServiceVisit.find(filter)
-            .setOptions(singleTicket ? { bypassBranch: true } : {})
+            .setOptions(crossBranch ? CROSS_BRANCH : {})
             .populate({
                 path: 'ticketId',
                 select: 'ticketNo issueTitle customerId status invoiceId manualInvoiceNo assetId pincode',
                 populate: [
-                    { path: 'customerId', select: 'customerName companyName', options: singleTicket ? { bypassBranch: true } : {} },
+                    { path: 'customerId', select: 'customerName companyName', options: CROSS_BRANCH },
                     { path: 'invoiceId', select: 'voucherNumber invoiceNumber' },
-                    { path: 'assetId', select: 'serialNumber', options: singleTicket ? { bypassBranch: true } : {} }
+                    { path: 'assetId', select: 'serialNumber', options: CROSS_BRANCH }
                 ]
             })
             .populate('engineerId', 'name email')
+            .populate({ path: 'branchId', select: 'name code', options: { bypassTenant: true } })
             .sort({ scheduledDate: -1 })
             .lean();
 

@@ -4,7 +4,7 @@ import { MdAdd, MdDelete, MdEdit, MdSearch, MdContactPhone, MdFileDownload, MdAr
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import Modal from '../components/Modal';
-import ImportModal from '../components/ImportModal';
+import ImportWizard from '../components/import/ImportWizard';
 import PaginationControls from '../components/PaginationControls';
 import { contactService, customerService, csmService, importService } from '../services/api';
 import SearchableSelect from '../components/SearchableSelect';
@@ -1229,17 +1229,13 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
             </Modal>
 
             {/* Import Modal */}
-            <ImportModal
+            <ImportWizard
                 isOpen={isImportModalOpen}
                 onClose={() => setIsImportModalOpen(false)}
                 title="Import Contacts"
-                type="contacts"
-                onImport={async (file) => {
-                    const result = await importService.importContacts(file);
-                    fetchContacts(); // Refresh contacts after import
-                    return result;
-                }}
+                module="contacts"
                 onDownloadTemplate={importService.getContactTemplate}
+                onImported={fetchContacts}
             />
         </div>
     );

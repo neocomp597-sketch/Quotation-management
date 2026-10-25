@@ -5,6 +5,9 @@ const path = require('path');
 const fs = require('fs');
 const { protect } = require('../middlewares/authMiddleware');
 const { enforceImportRowLimit } = require('../middlewares/importRowLimit');
+const { limitImportConcurrency } = require('../middlewares/importConcurrency');
+const { keepTenantContext } = require('../middlewares/tenantContext');
+const { getImportProgress, getLatestImportProgress } = require('../utils/importProgress');
 const {
     importProducts,
     importCustomers,
@@ -61,24 +64,42 @@ const upload = multer({
     }
 });
 
-// Import routes
-router.post('/products', protect, upload.single('file'), enforceImportRowLimit, importProducts);
-router.post('/customers', protect, upload.single('file'), enforceImportRowLimit, importCustomers);
-router.post('/attributes', protect, upload.single('file'), enforceImportRowLimit, importAttributes);
-router.post('/attribute-master', protect, upload.single('file'), enforceImportRowLimit, importAttributeMaster);
-router.post('/planning', protect, upload.single('file'), enforceImportRowLimit, importPlanning);
-router.post('/warranties', protect, upload.single('file'), enforceImportRowLimit, importWarranties);
-router.post('/amcs', protect, upload.single('file'), enforceImportRowLimit, importAmcs);
-router.post('/tickets', protect, upload.single('file'), enforceImportRowLimit, importTickets);
-router.post('/vendors', protect, upload.single('file'), enforceImportRowLimit, importVendors);
-router.post('/price-books', protect, upload.single('file'), enforceImportRowLimit, importPriceBooks);
-router.post('/price-book-items/:priceBookId', protect, upload.single('file'), enforceImportRowLimit, importPriceBookItems);
+// The upload keeps the tenant context protect opened (multer finishes outside it), so the
+// importers run with the company and branch filters of the user who uploads.
+const uploadFile = keepTenantContext(upload.single('file'));
 
-router.post('/employees', protect, upload.single('file'), enforceImportRowLimit, importEmployees);
-router.post('/contacts', protect, upload.single('file'), enforceImportRowLimit, importContacts);
-router.post('/contracts', protect, upload.single('file'), enforceImportRowLimit, importContracts);
-router.post('/tenders', protect, upload.single('file'), enforceImportRowLimit, importTenders);
-router.post('/assets', protect, upload.single('file'), enforceImportRowLimit, importAssets);
+// Live progress of the user's latest import, optionally of one module (?module=products).
+router.get('/progress', protect, (req, res) => {
+    const progress = getLatestImportProgress(req.user, String(req.query.module || '') || null);
+    if (!progress) return res.status(404).json({ message: 'No import is running on this server.' });
+    return res.json(progress);
+});
+
+// Live progress of an import started with an X-Import-Id header (see utils/importProgress).
+router.get('/progress/:id', protect, (req, res) => {
+    const progress = getImportProgress(req.params.id, req.user);
+    if (!progress) return res.status(404).json({ message: 'No import with this id is running on this server.' });
+    return res.json(progress);
+});
+
+// Import routes
+router.post('/products', protect, uploadFile, enforceImportRowLimit, limitImportConcurrency, importProducts);
+router.post('/customers', protect, uploadFile, enforceImportRowLimit, limitImportConcurrency, importCustomers);
+router.post('/attributes', protect, uploadFile, enforceImportRowLimit, limitImportConcurrency, importAttributes);
+router.post('/attribute-master', protect, uploadFile, enforceImportRowLimit, limitImportConcurrency, importAttributeMaster);
+router.post('/planning', protect, uploadFile, enforceImportRowLimit, limitImportConcurrency, importPlanning);
+router.post('/warranties', protect, uploadFile, enforceImportRowLimit, limitImportConcurrency, importWarranties);
+router.post('/amcs', protect, uploadFile, enforceImportRowLimit, limitImportConcurrency, importAmcs);
+router.post('/tickets', protect, uploadFile, enforceImportRowLimit, limitImportConcurrency, importTickets);
+router.post('/vendors', protect, uploadFile, enforceImportRowLimit, limitImportConcurrency, importVendors);
+router.post('/price-books', protect, uploadFile, enforceImportRowLimit, limitImportConcurrency, importPriceBooks);
+router.post('/price-book-items/:priceBookId', protect, uploadFile, enforceImportRowLimit, limitImportConcurrency, importPriceBookItems);
+
+router.post('/employees', protect, uploadFile, enforceImportRowLimit, limitImportConcurrency, importEmployees);
+router.post('/contacts', protect, uploadFile, enforceImportRowLimit, limitImportConcurrency, importContacts);
+router.post('/contracts', protect, uploadFile, enforceImportRowLimit, limitImportConcurrency, importContracts);
+router.post('/tenders', protect, uploadFile, enforceImportRowLimit, limitImportConcurrency, importTenders);
+router.post('/assets', protect, uploadFile, enforceImportRowLimit, limitImportConcurrency, importAssets);
 
 router.get('/cleanup-rr-techgrove', async (req, res) => {
     const { cleanupRRTechgroveEmployees } = require('../services/cleanupRRTechgroveEmployees');
@@ -276,6 +297,7 @@ router.get('/template/tickets', protect, getTicketTemplate);
 router.get('/template/assets', protect, getAssetTemplate);
 router.get('/template/vendors', getVendorTemplate);
 router.get('/template/price-books', getPriceBookTemplate);
+router.get('/template/price-book-items', getPriceBookItemTemplate);
 router.get('/template/employees', getEmployeeTemplate);
 router.get('/template/contacts', getContactTemplate);
 router.get('/template/contracts', getContractTemplate);

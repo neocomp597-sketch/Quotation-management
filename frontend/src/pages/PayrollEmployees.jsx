@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { payrollService, importService, branchService, territoryService } from '../services/api';
+import { payrollService, importService, branchService, territoryService, invalidateApiCache } from '../services/api';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
-import ImportModal from '../components/ImportModal';
+import ImportWizard from '../components/import/ImportWizard';
 import SearchableSelect from '../components/SearchableSelect';
 import { formatDate } from '../utils/helpers';
 import * as XLSX from 'xlsx';
@@ -2011,17 +2011,18 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
             )}
 
             {/* Import Modal */}
-            <ImportModal
+            <ImportWizard
                 isOpen={isImportModalOpen}
                 onClose={() => setIsImportModalOpen(false)}
                 title="Import Employees"
-                type="employees"
-                onImport={async (file) => {
-                    const result = await importService.importEmployees(file);
-                    fetchEmployees(); // Refresh employees after import
-                    return result;
-                }}
+                module="employees"
                 onDownloadTemplate={importService.getEmployeeTemplate}
+                onImported={() => {
+                    // New employees get logins and engineer records (cached user and payroll lists).
+                    invalidateApiCache('/payroll');
+                    invalidateApiCache('/users');
+                    fetchEmployees();
+                }}
             />
 
             {/* Custom Sequence Setup Modal using Modal.jsx Portal */}

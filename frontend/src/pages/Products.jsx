@@ -3,10 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdQrCode, MdPayments, MdProductionQuantityLimits, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdSync, MdImage, MdFileDownload, MdArrowBack, MdPictureAsPdf, MdDescription } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
-import { productService, uploadService, importService, mgrService, attributeService, productAttributeService, vendorService, categoryService, vendorCatalogService } from '../services/api';
+import { productService, uploadService, importService, mgrService, attributeService, productAttributeService, vendorService, categoryService, vendorCatalogService, invalidateApiCache } from '../services/api';
 
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
+import ImportWizard from '../components/import/ImportWizard';
 import PaginationControls from '../components/PaginationControls';
 import TypeTestHistory from '../components/TypeTestHistory';
 import { resolveImageUrl, getPlaceholderImage } from '../utils/helpers';
@@ -2154,45 +2155,51 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
             </Modal>
 
             {/* Import Modal */}
-            <ImportModal
-                isOpen={isImportModalOpen}
-                onClose={() => setIsImportModalOpen(false)}
-                title={isVendorUser ? "Import Vendor Product Catalog" : "Import Products"}
-                type="products"
-                onImport={async (file) => {
-                    if (isVendorUser) {
+            {/* Vendor logins import into their own catalog; everyone else uses the staged product import. */}
+            {isVendorUser ? (
+                <ImportModal
+                    isOpen={isImportModalOpen}
+                    onClose={() => setIsImportModalOpen(false)}
+                    title="Import Vendor Product Catalog"
+                    type="products"
+                    onImport={async (file) => {
                         const result = await vendorCatalogService.importCatalog(user?.vendorId, file);
                         fetchProducts();
                         return result;
-                    } else {
-                        const result = await importService.importProducts(file);
+                    }}
+                    onDownloadTemplate={importService.getProductTemplate}
+                />
+            ) : (
+                <ImportWizard
+                    isOpen={isImportModalOpen}
+                    onClose={() => setIsImportModalOpen(false)}
+                    title="Import Products"
+                    module="products"
+                    onDownloadTemplate={importService.getProductTemplate}
+                    onImported={() => {
+                        invalidateApiCache('/products');
                         fetchProducts();
-                        return result;
-                    }
-                }}
-                onDownloadTemplate={importService.getProductTemplate}
-            />
+                    }}
+                />
+            )}
 
             {/* Import Attributes Modal */}
-            <ImportModal
+            <ImportWizard
                 isOpen={isAttrImportModalOpen}
                 onClose={() => setIsAttrImportModalOpen(false)}
                 title="Import Product Attributes"
-                type="attributes"
-                onImport={async (file) => {
-                    const result = await importService.importAttributes(file);
+                module="attributes"
+                templateName="attributes_import_template.xlsx"
+                onDownloadTemplate={importService.getAttributeTemplate}
+                onImported={() => {
                     if (editingProduct && editingProduct.productCode) {
                         fetchCustomAttributes(editingProduct.productCode);
                     }
                     fetchAllAttributes(); // Refresh the list view attributes too
                     if (formData.mgr3) {
-
                         fetchAvailableAttributes(formData.mgr3._id || formData.mgr3);
                     }
-                    return result;
                 }}
-
-                onDownloadTemplate={importService.getAttributeTemplate}
             />
 
         </div >
