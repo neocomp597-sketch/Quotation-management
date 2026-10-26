@@ -164,6 +164,14 @@ api.interceptors.response.use(
 
     if (
       error.response?.status === 403 &&
+      error.response?.data?.code === "PERMISSION_DENIED"
+    ) {
+      // The user's permissions changed since they were loaded; AuthContext reloads them.
+      window.dispatchEvent(new CustomEvent("onPermissionDenied", { detail: error.response.data.permission }));
+    }
+
+    if (
+      error.response?.status === 403 &&
       /account deactivated|company account is suspended/i.test(message)
     ) {
       setAccessToken(null);
@@ -184,11 +192,17 @@ api.interceptors.response.use(
         await refreshAccessToken();
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return api(originalRequest);
-      } catch {
-        setAccessToken(null);
-        localStorage.removeItem("user");
-        if (window.location.pathname !== "/login") {
-          window.location.assign("/login");
+      } catch (refreshError) {
+        // Only a definite "session is no longer valid" signs the user out. A timeout,
+        // network drop or server error leaves the session alone so the next request
+        // can refresh again.
+        const refreshStatus = refreshError?.response?.status;
+        if (refreshStatus === 401 || refreshStatus === 403) {
+          setAccessToken(null);
+          localStorage.removeItem("user");
+          if (window.location.pathname !== "/login") {
+            window.location.assign("/login");
+          }
         }
       }
     }
@@ -349,7 +363,8 @@ export const userService = {
   updateRole: (id, role, params) => api.patch(`/users/${id}/role`, { role }, { params }),
   update: (id, data, params) => api.put(`/users/${id}`, data, { params }),
   delete: (id, params) => api.delete(`/users/${id}`, { params }),
-  updatePermissions: (id, customPermissions, params) => api.put(`/users/${id}/permissions`, { customPermissions }, { params }),
+  // payload: { permissions } (the full set the user should have) or { customPermissions: {} } (back to role defaults)
+  updatePermissions: (id, payload, params) => api.put(`/users/${id}/permissions`, payload, { params }),
 };
 
 export const branchService = {
@@ -364,8 +379,8 @@ export const branchService = {
 export const authorizationService = {
   getAll: (params) => api.get("/authorization", { params }),
   getMy: () => api.get("/authorization/me"),
-  update: (role, permissions, params) =>
-    api.put(`/authorization/${role}`, { permissions }, { params }),
+  update: (role, permissions, params, extra = {}) =>
+    api.put(`/authorization/${role}`, { permissions, ...extra }, { params }),
   initialize: (params) => api.post("/authorization/initialize", {}, { params }),
   createRole: (label, description, params) =>
     api.post("/authorization/roles", { label, description }, { params }),
@@ -457,7 +472,6 @@ export const bomService = {
     return api.post(`/bom/${id}/components/import`, form, { headers: { "Content-Type": "multipart/form-data" } });
   },
   getBySerial: (serialNumber) => api.get(`/bom/serial/${encodeURIComponent(serialNumber)}`),
-  getForTicket: (ticketId) => api.get(`/bom/ticket/${ticketId}`),
 };
 
 // Serial No Transfer: customer-wise ownership history of sold serial numbers.
@@ -507,59 +521,69 @@ export const uploadService = {
   },
 };
 
+// Imports save every row before they answer, which takes longer than the default 15 s timeout
+// for large files; the server reports progress meanwhile (GET /import/progress).
+const IMPORT_UPLOAD_TIMEOUT = 15 * 60 * 1000;
+
+// The import screen names the upload it is about to send (setNextImportId), so it can follow
+// that upload's progress with getProgressById; the next import request carries the name.
+let nextImportId = null;
+export const setNextImportId = (id) => {
+  nextImportId = id || null;
+};
+const nextImportHeaders = () => {
+  const id = nextImportId;
+  nextImportId = null;
+  return id ? { "X-Import-Id": id } : {};
+};
+
 export const importService = {
   importProducts: (file) => {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/products", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   importCustomers: (file) => {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/customers", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   importVendors: (file) => {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/vendors", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   importPriceBooks: (file) => {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/price-books", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   importPriceBookItems: (file, priceBookId) => {
     const formData = new FormData();
     formData.append("file", file);
     return api.post(`/import/price-book-items/${priceBookId}`, formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   importAttributes: (file) => {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/attributes", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   importAttributeMaster: (file, mgr3Id) => {
@@ -567,9 +591,8 @@ export const importService = {
     formData.append("file", file);
     if (mgr3Id) formData.append("mgr3Id", mgr3Id);
     return api.post("/import/attribute-master", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   importPlanning: (file, financialYear, onUploadProgress) => {
@@ -577,9 +600,8 @@ export const importService = {
     formData.append("file", file);
     if (financialYear) formData.append("financialYear", financialYear);
     return api.post("/import/planning", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
       onUploadProgress,
     });
   },
@@ -606,18 +628,16 @@ export const importService = {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/warranties", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   importAmcs: (file) => {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/amcs", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   getWarrantyTemplate: () =>
@@ -628,9 +648,8 @@ export const importService = {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/tickets", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   getTicketTemplate: () =>
@@ -639,9 +658,8 @@ export const importService = {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/employees", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   getEmployeeTemplate: () =>
@@ -650,9 +668,8 @@ export const importService = {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/contacts", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   getContactTemplate: () =>
@@ -661,9 +678,8 @@ export const importService = {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/contracts", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
     });
   },
   getContractTemplate: () =>
@@ -672,26 +688,30 @@ export const importService = {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/tenders", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
       onUploadProgress,
     });
   },
   getTenderTemplate: () =>
     api.get("/import/template/tenders", { responseType: "blob" }),
-  importAssets: (file) => {
+  importAssets: (file, onUploadProgress, signal) => {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/import/assets", formData, {
-      timeout: 0,
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      timeout: IMPORT_UPLOAD_TIMEOUT,
+      headers: { "Content-Type": "multipart/form-data", ...nextImportHeaders() },
+      onUploadProgress,
+      signal,
     });
   },
   getAssetTemplate: () =>
     api.get("/import/template/assets", { responseType: "blob" }),
+  // Live counts of the latest import of a module, while its upload is still saving (404 when none).
+  getProgress: (module) =>
+    api.get("/import/progress", { params: { module }, timeout: 10000 }),
+  getProgressById: (id) =>
+    api.get(`/import/progress/${encodeURIComponent(id)}`, { timeout: 10000 }),
 };
 
 export const attributeService = {
@@ -938,6 +958,7 @@ export const csmService = {
   getTicketById: (id) => api.get(`/csm/tickets/${id}`),
   createTicket: (data) => api.post("/csm/tickets", data),
   updateTicket: (id, data) => api.put(`/csm/tickets/${id}`, data),
+  getTicketBranchOptions: () => api.get('/csm/tickets/branch-options', { cache: false }),
   assignTicket: (id, data) => api.patch(`/csm/tickets/${id}/assign`, data),
   updateTicketStatus: (id, status, isFirstCallResolved) => api.patch(`/csm/tickets/${id}/status`, { status, isFirstCallResolved }),
   getReportData: (params = {}) => api.get("/csm/reports", { params }),
@@ -1043,6 +1064,8 @@ export const csmService = {
   createEngineer: (data) => api.post("/csm/masters/engineers", data),
   updateEngineer: (id, data) => api.put(`/csm/masters/engineers/${id}`, data),
   deleteEngineer: (id) => api.delete(`/csm/masters/engineers/${id}`),
+  getEngineerSettings: () => api.get("/csm/masters/engineer-settings"),
+  updateEngineerSettings: (data) => api.put("/csm/masters/engineer-settings", data),
 };
 
 export const cpqService = {
@@ -1151,6 +1174,44 @@ export const tenderService = {
   getDashboard: (params) => api.get("/tenders/dashboard/data", { params }),
 };
 
+export const typeTestService = {
+  getAll: (params) => api.get("/type-tests", { params }),
+  getById: (id) => api.get(`/type-tests/${id}`),
+  getSummary: () => api.get("/type-tests/summary/data"),
+  getPending: () => api.get("/type-tests/pending/products"),
+  create: (data) => api.post("/type-tests", data),
+  update: (id, data) => api.put(`/type-tests/${id}`, data),
+  delete: (id) => api.delete(`/type-tests/${id}`),
+  recordCertificate: (id, data) => api.post(`/type-tests/${id}/certificate`, data),
+  startRenewal: (id, data) => api.post(`/type-tests/${id}/renewal/start`, data),
+  recordProgress: (id, data) => api.post(`/type-tests/${id}/progress`, data),
+  setActive: (id, isActive, reason) => api.post(`/type-tests/${id}/active`, { isActive, reason }),
+};
+
+export const stockAuditService = {
+  getMeta: () => api.get("/stock-audits/meta"),
+  getAssignedCount: () => api.get("/stock-audits/assigned-count"),
+  checkName: (params) => api.get("/stock-audits/name-check", { params }),
+  searchUsers: (search) => api.get("/stock-audits/users", { params: { search } }),
+  getAll: (params) => api.get("/stock-audits", { params }),
+  getById: (id) => api.get(`/stock-audits/${id}`),
+  create: (data) => api.post("/stock-audits", data),
+  update: (id, data) => api.put(`/stock-audits/${id}`, data),
+  delete: (id) => api.delete(`/stock-audits/${id}`),
+  changeStatus: (id, action, reason) => api.post(`/stock-audits/${id}/status`, { action, reason }),
+  getAccess: (id) => api.get(`/stock-audits/${id}/access`),
+  updateAccess: (id, data) => api.put(`/stock-audits/${id}/access`, data),
+  getDashboard: (id) => api.get(`/stock-audits/${id}/dashboard`),
+  getLogs: (id, params) => api.get(`/stock-audits/${id}/logs`, { params }),
+  exportBatch: (id) => api.get(`/stock-audits/${id}/export`, { responseType: "blob" }),
+  getItems: (id, params) => api.get(`/stock-audits/${id}/items`, { params }),
+  addItem: (id, data) => api.post(`/stock-audits/${id}/items`, data),
+  importItems: (id, data) => api.post(`/stock-audits/${id}/items/import`, data),
+  deleteItem: (id, itemId) => api.delete(`/stock-audits/${id}/items/${itemId}`),
+  recordCount: (id, itemId, data) => api.put(`/stock-audits/${id}/items/${itemId}/count`, data),
+  updateMismatch: (id, itemId, data) => api.put(`/stock-audits/${id}/items/${itemId}/mismatch`, data),
+};
+
 export const stateMasterService = {
   getAll: () => api.get("/state-master"),
   create: (data) => api.post("/state-master", data),
@@ -1215,6 +1276,44 @@ export const developerService = {
   revokeKey: (id) => api.post(`/developer/keys/${id}/revoke`),
   getLogs: (params) => api.get("/developer/logs", { params }),
   getOpenApiSpec: () => api.get("/developer/openapi.json"),
+};
+
+// Staged bulk imports (backend/services/importEngine): preview -> fix -> import -> retry.
+// Reading a large file and importing it can take longer than the default timeout; the
+// screen polls getJob for progress meanwhile.
+export const importJobService = {
+  getModule: (module) => api.get(`/imports/modules/${module}`),
+  // params: settings chosen on the screen (financial year, price book...), sent as JSON.
+  listJobs: (module, params = {}) =>
+    api.get("/imports", { params: { module, params: JSON.stringify(params) } }),
+  preview: (module, file, { mode, params, onUploadProgress, signal } = {}) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (mode) formData.append("mode", mode);
+    if (params) formData.append("params", JSON.stringify(params));
+    return api.post("/imports/preview", formData, {
+      params: { module },
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 0,
+      onUploadProgress,
+      signal,
+    });
+  },
+  getJob: (jobId) => api.get(`/imports/${jobId}`),
+  updateJob: (jobId, data) => api.put(`/imports/${jobId}`, data, { timeout: 0 }),
+  getRows: (jobId, params) => api.get(`/imports/${jobId}/rows`, { params }),
+  correctRows: (jobId, rows) => api.patch(`/imports/${jobId}/rows`, { rows }, { timeout: 0 }),
+  uploadCorrections: (jobId, file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post(`/imports/${jobId}/corrections`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 0,
+    });
+  },
+  execute: (jobId) => api.post(`/imports/${jobId}/execute`, {}, { timeout: 0 }),
+  exportRows: (jobId, status) =>
+    api.get(`/imports/${jobId}/export`, { params: { status }, responseType: "blob", timeout: 0 }),
 };
 
 export default api;

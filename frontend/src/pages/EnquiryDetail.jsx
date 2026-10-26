@@ -13,6 +13,7 @@ import Modal from '../components/Modal';
 import { formatDate, formatDateTime, buildSalesExecutiveList } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
 import DateInput from '../components/DateInput';
+import usePermission from '../hooks/usePermission';
 
 const StatusPill = ({ status }) => {
     const styles = {
@@ -83,6 +84,7 @@ const EnquiryDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
+    const { canModify, canDelete } = usePermission('enquiry_leads');
 
     const [enquiry, setEnquiry] = useState(null);
     const [users, setUsers] = useState([]);
@@ -477,20 +479,20 @@ const EnquiryDetail = () => {
                         <MdPrint size={18} /> Print
                     </button>
                     
-                    <Link
+                    {canModify && <Link
                         to={`/enquiries/edit/${id}`}
                         className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl text-xs font-bold transition-all shadow-md shadow-teal-600/20 flex items-center gap-2"
                     >
                         <MdEdit size={18} /> Edit Enquiry
-                    </Link>
+                    </Link>}
 
-                    <button
+                    {canDelete && <button
                         onClick={() => setDeleteModalOpen(true)}
                         className="p-2.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-2xl transition-colors"
                         title="Delete Enquiry"
                     >
                         <MdDelete size={20} />
-                    </button>
+                    </button>}
                 </div>
             </div>
 
@@ -535,6 +537,7 @@ const EnquiryDetail = () => {
                                 <select
                                     value={selectedStatus}
                                     onChange={(e) => setSelectedStatus(e.target.value)}
+                                    disabled={!canModify}
                                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none text-xs font-bold text-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10"
                                 >
                                     {['Open', 'Assigned', 'In Progress', 'Pending Customer', 'Resolved', 'Closed', 'Cancelled', 'Contacted', 'Quotation Pending', 'Quotation Received', 'Negotiation', 'Finalized', 'PO Received', 'Lost'].map(s => (
@@ -559,13 +562,13 @@ const EnquiryDetail = () => {
                                 </div>
                             )}
 
-                            <button
+                            {canModify && <button
                                 onClick={handleSaveStatus}
                                 disabled={updatingStatus}
                                 className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl text-xs font-bold transition-all shadow-md shadow-teal-600/15 flex items-center justify-center gap-2"
                             >
                                 <MdSave size={18} /> {updatingStatus ? 'Saving Status...' : 'Save Status'}
-                            </button>
+                            </button>}
                         </div>
                     </div>
 
@@ -580,6 +583,7 @@ const EnquiryDetail = () => {
                                 <select
                                     value={selectedAssignee}
                                     onChange={(e) => setSelectedAssignee(e.target.value)}
+                                    disabled={!canModify}
                                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none text-xs font-bold text-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10"
                                 >
                                     <option value="">Unassigned</option>
@@ -589,13 +593,13 @@ const EnquiryDetail = () => {
                                 </select>
                             </div>
 
-                            <button
+                            {canModify && <button
                                 onClick={handleSaveAssignee}
                                 disabled={updatingAssignee}
                                 className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl text-xs font-bold transition-all shadow-md shadow-teal-600/15 flex items-center justify-center gap-2"
                             >
                                 <MdPerson size={18} /> {updatingAssignee ? 'Saving...' : 'Update Sales Executive'}
-                            </button>
+                            </button>}
                         </div>
                     </div>
 
@@ -615,12 +619,12 @@ const EnquiryDetail = () => {
                                 </div>
                             </div>
                         )}
-                        <button
+                        {canModify && <button
                             onClick={handleOpenNewVisitModal}
                             className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl text-xs font-bold transition-all shadow-md shadow-teal-600/15 flex items-center justify-center gap-2"
                         >
                             <MdCalendarMonth size={18} /> + Schedule / Log Field Visit
-                        </button>
+                        </button>}
                     </div>
 
                     {/* Card 4: Customer Details Summary */}
@@ -842,7 +846,7 @@ const EnquiryDetail = () => {
                     {activeTab === 'timeline' && (
                         <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-6 animate-in fade-in duration-200">
                             {/* Follow up log form */}
-                            <form onSubmit={handleAddFollowUp} className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 p-5 rounded-2xl space-y-3">
+                            {canModify && <form onSubmit={handleAddFollowUp} className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 p-5 rounded-2xl space-y-3">
                                 <h4 className="text-xs font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider">Log New Communication / Follow-up</h4>
                                 <div className="flex flex-col sm:flex-row gap-3">
                                     <select
@@ -872,7 +876,7 @@ const EnquiryDetail = () => {
                                         {addingFollowUp ? 'Logging...' : 'Add Note'}
                                     </button>
                                 </div>
-                            </form>
+                            </form>}
 
                             {/* Timeline display */}
                             <div className="space-y-3">
@@ -907,12 +911,12 @@ const EnquiryDetail = () => {
                                     <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">Field Visits & Site Appointments</h3>
                                     <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Track customer visits, GPS locations, statuses, and field feedback</p>
                                 </div>
-                                <button
+                                {canModify && <button
                                     onClick={handleOpenNewVisitModal}
                                     className="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shadow-md shadow-teal-600/15"
                                 >
                                     <MdCalendarMonth size={18} /> + Schedule Visit
-                                </button>
+                                </button>}
                             </div>
 
                             <div className="space-y-4">
@@ -921,12 +925,12 @@ const EnquiryDetail = () => {
                                         <MdCalendarMonth size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-2" />
                                         <p className="text-xs font-bold text-slate-700 dark:text-slate-300">No field visits recorded yet.</p>
                                         <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Schedule visits to track site visits, product demos, and client meetings.</p>
-                                        <button
+                                        {canModify && <button
                                             onClick={handleOpenNewVisitModal}
                                             className="mt-4 px-5 py-2.5 bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-300 border border-teal-300 dark:border-teal-700 rounded-xl text-xs font-bold hover:bg-teal-100 dark:hover:bg-teal-900/60 transition-all"
                                         >
                                             + Schedule First Visit
-                                        </button>
+                                        </button>}
                                     </div>
                                 ) : (
                                     enquiry.visits.slice().reverse().map((visit, idx) => {
@@ -940,12 +944,12 @@ const EnquiryDetail = () => {
                                                             {visit.purpose || 'Site Visit'}
                                                         </span>
                                                     </div>
-                                                    <button
+                                                    {canModify && <button
                                                         onClick={() => handleOpenEditVisitModal(visit, originalIdx)}
                                                         className="px-3.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-teal-50 dark:hover:bg-teal-950/40 hover:border-teal-300 dark:hover:border-teal-700 text-slate-700 dark:text-slate-200 hover:text-teal-900 dark:hover:text-teal-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs"
                                                     >
                                                         <MdEdit size={14} className="text-teal-600 dark:text-teal-400" /> Edit Visit
-                                                    </button>
+                                                    </button>}
                                                 </div>
 
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 text-xs">

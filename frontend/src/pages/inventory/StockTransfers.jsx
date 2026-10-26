@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import usePermission from '../../hooks/usePermission';
 import {
     MdCompareArrows,
     MdAdd,
@@ -18,6 +19,7 @@ const API_BASE = '/inventory';
 
 const StockTransfers = () => {
     const navigate = useNavigate();
+    const { canCreate, canModify } = usePermission('inventory_transfers');
     const [transfers, setTransfers] = useState([]);
     const [warehouses, setWarehouses] = useState([]);
     const [products, setProducts] = useState([]);
@@ -194,12 +196,14 @@ const StockTransfers = () => {
                         Request, approve, dispatch, and receive stock between warehouses with full ledger verification.
                     </p>
                 </div>
-                <button
-                    onClick={() => navigate('/inventory/transfers/new')}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-xl transition-all shadow-md text-sm"
-                >
-                    <MdAdd className="text-lg" /> New Transfer Request
-                </button>
+                {canCreate && (
+                    <button
+                        onClick={() => navigate('/inventory/transfers/new')}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-xl transition-all shadow-md text-sm"
+                    >
+                        <MdAdd className="text-lg" /> New Transfer Request
+                    </button>
+                )}
             </div>
 
             {/* Filters */}
@@ -272,7 +276,7 @@ const StockTransfers = () => {
                                             {tr.requestedBy?.name || 'Manager'}
                                         </td>
                                         <td className="px-5 py-4 text-right space-x-2">
-                                            {tr.status === 'PENDING_APPROVAL' && (
+                                            {canModify && tr.status === 'PENDING_APPROVAL' && (
                                                 <>
                                                     <button
                                                         onClick={() => handleApprove(tr._id)}
@@ -289,7 +293,7 @@ const StockTransfers = () => {
                                                 </>
                                             )}
 
-                                            {tr.status === 'APPROVED' && (
+                                            {canModify && tr.status === 'APPROVED' && (
                                                 <button
                                                     onClick={() => handleOpenDispatch(tr)}
                                                     className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1 ml-auto"
@@ -298,7 +302,7 @@ const StockTransfers = () => {
                                                 </button>
                                             )}
 
-                                            {['DISPATCHED', 'PARTIALLY_RECEIVED'].includes(tr.status) && (
+                                            {canModify && ['DISPATCHED', 'PARTIALLY_RECEIVED'].includes(tr.status) && (
                                                 <button
                                                     onClick={() => handleOpenReceive(tr)}
                                                     className="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1 ml-auto"

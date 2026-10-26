@@ -5,10 +5,12 @@ import { toast } from 'react-toastify';
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdArrowBack, MdPublic, MdLocationCity, MdPhoneInTalk } from 'react-icons/md';
 import { DEFAULT_COUNTRIES, DEFAULT_STATES, getCitiesForState, getDialCodeForCountry } from '../constants/locationData';
 import { formatGstPrefix } from '../utils/helpers';
+import usePermission from '../hooks/usePermission';
 
 const StateMaster = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
     const { id: routeId } = useParams();
+    const { canCreate, canModify, canDelete } = usePermission('state_master_create');
 
     const [states, setStates] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -306,13 +308,15 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
                         Manage Country, Dial Codes, State & Short Codes, GST Codes & Cities.
                     </p>
                 </div>
-                <button
-                    onClick={() => navigate('/state-master/new')}
-                    className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3.5 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95 self-start md:self-auto"
-                >
-                    <MdAdd size={18} />
-                    <span>New State Entry</span>
-                </button>
+                {canCreate && (
+                    <button
+                        onClick={() => navigate('/state-master/new')}
+                        className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3.5 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95 self-start md:self-auto"
+                    >
+                        <MdAdd size={18} />
+                        <span>New State Entry</span>
+                    </button>
+                )}
             </div>
 
             {/* Search and Table */}
@@ -379,20 +383,24 @@ const StateMaster = ({ isCreatePage, isEditPage }) => {
                                         </td>
                                         <td className="py-4 px-6 text-center">
                                             <div className="flex items-center justify-center gap-2">
-                                                <button
-                                                    onClick={() => navigate(`/state-master/edit/${item._id}`)}
-                                                    className="p-2 text-slate-400 hover:text-primary-600 hover:bg-slate-100 rounded-xl transition-all"
-                                                    title="Edit State"
-                                                >
-                                                    <MdEdit size={18} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(item._id)}
-                                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
-                                                    title="Delete State"
-                                                >
-                                                    <MdDelete size={18} />
-                                                </button>
+                                                {canModify && (
+                                                    <button
+                                                        onClick={() => navigate(`/state-master/edit/${item._id}`)}
+                                                        className="p-2 text-slate-400 hover:text-primary-600 hover:bg-slate-100 rounded-xl transition-all"
+                                                        title="Edit State"
+                                                    >
+                                                        <MdEdit size={18} />
+                                                    </button>
+                                                )}
+                                                {canDelete && (
+                                                    <button
+                                                        onClick={() => handleDelete(item._id)}
+                                                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                                                        title="Delete State"
+                                                    >
+                                                        <MdDelete size={18} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

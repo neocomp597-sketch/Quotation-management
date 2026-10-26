@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { payrollService, salespersonService } from '../services/api';
 import Modal from '../components/Modal';
+import usePermission from '../hooks/usePermission';
+import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import { 
     MdCategory as IconCategory, 
@@ -117,6 +119,8 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
     const { id: routeId } = useParams();
     const location = useLocation();
+    const { can } = useAuth();
+    const { canCreate, canModify, canDelete } = usePermission('payroll_employees');
     const queryParams = new URLSearchParams(location.search);
     const initialTab = queryParams.get('tab') || 'departments';
 
@@ -470,7 +474,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
 
     const handleOpenAssignModal = (deptName) => {
         setAssignDeptName(deptName);
-        setAssignPersonType('new');
+        setAssignPersonType(canCreate ? 'new' : 'existing');
         setNewPersonName('');
         setSelectedPersonId('');
         setShowAssignModal(true);
@@ -579,6 +583,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
+                    {canCreate && (
                     <button
                         onClick={() => handleOpenModal()}
                         className="flex items-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-lg shadow-primary-600/20 active:scale-95"
@@ -586,6 +591,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                         <IconAdd size={18} />
                         Add New {activeTab === 'departments' ? 'Department' : 'Designation'}
                     </button>
+                    )}
                 </div>
             </div>
 
@@ -811,6 +817,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                 /* TAB 2: DEPARTMENT MASTER (Form + Department List from depart2.html) */
                 <div className="space-y-6">
                     {/* Add / Edit Department Card Form */}
+                    {(canCreate || editingMasterDeptId) && (
                     <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
                         <div className="bg-emerald-600 text-white px-6 py-4 flex items-center justify-between">
                             <h3 className="text-base font-black uppercase font-outfit flex items-center gap-2">
@@ -1000,12 +1007,14 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                                         >
                                             <IconEdit size={16} /> Update
                                         </button>
+                                        {canDelete && (
                                         <button
                                             onClick={() => handleDelete(editingMasterDeptId)}
                                             className="flex items-center gap-2 px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow transition-all"
                                         >
                                             <IconDelete size={16} /> Delete
                                         </button>
+                                        )}
                                     </>
                                 )}
                                 <button
@@ -1017,6 +1026,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                             </div>
                         </div>
                     </div>
+                    )}
 
                     {/* Department List Table */}
                     <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
@@ -1064,18 +1074,22 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                                                 </td>
                                                 <td className="px-6 py-4 text-center">
                                                     <div className="flex items-center justify-center gap-2">
+                                                        {canModify && (
                                                         <button
                                                             onClick={() => handleEditMasterDept(dept)}
                                                             className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm"
                                                         >
                                                             Edit
                                                         </button>
+                                                        )}
+                                                        {canDelete && (
                                                         <button
                                                             onClick={() => handleDelete(dept._id)}
                                                             className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm"
                                                         >
                                                             Delete
                                                         </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -1123,6 +1137,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                                                             </div>
                                                         </div>
 
+                                                        {(canCreate || canModify) && (
                                                         <button
                                                             onClick={() => handleOpenAssignModal(dept.name)}
                                                             className="flex items-center justify-center gap-1.5 w-full py-2 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
@@ -1130,6 +1145,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                                                             <IconPersonAdd size={15} />
                                                             + Add Person
                                                         </button>
+                                                        )}
                                                     </div>
                                                 </th>
                                             );
@@ -1157,7 +1173,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                                                                         {person.name}
                                                                     </span>
                                                                 </div>
-                                                                {!person.isSample && (
+                                                                {!person.isSample && (person.source === 'salesperson' ? can('admin_salespersons', 'modify') : canModify) && (
                                                                     <button
                                                                         onClick={() => handleUnassignPerson(person, dept.name)}
                                                                         className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
@@ -1228,6 +1244,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center justify-center gap-3">
+                                                    {canModify && (
                                                     <button
                                                         onClick={() => handleOpenModal(item)}
                                                         className="p-2 rounded-xl text-slate-400 hover:text-primary-600 hover:bg-slate-50 transition-all"
@@ -1235,6 +1252,8 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                                                     >
                                                         <IconEdit size={18} />
                                                     </button>
+                                                    )}
+                                                    {canDelete && (
                                                     <button
                                                         onClick={() => handleDelete(item._id)}
                                                         className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50/50 transition-all"
@@ -1242,6 +1261,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                                                     >
                                                         <IconDelete size={18} />
                                                     </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -1377,6 +1397,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                             Assignment Type
                         </label>
                         <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl border border-slate-200">
+                            {canCreate && (
                             <button
                                 type="button"
                                 onClick={() => setAssignPersonType('new')}
@@ -1388,6 +1409,8 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                             >
                                 + Add New Person
                             </button>
+                            )}
+                            {canModify && (
                             <button
                                 type="button"
                                 onClick={() => setAssignPersonType('existing')}
@@ -1399,6 +1422,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                             >
                                 Select Existing
                             </button>
+                            )}
                         </div>
                     </div>
 
@@ -1435,6 +1459,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                                         </option>
                                     ))}
                                 </optgroup>
+                                {can('admin_salespersons', 'modify') && (
                                 <optgroup label="Salespersons">
                                     {salespersons.map(sp => (
                                         <option key={sp._id} value={sp._id}>
@@ -1442,6 +1467,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                                         </option>
                                     ))}
                                 </optgroup>
+                                )}
                             </select>
                         </div>
                     )}

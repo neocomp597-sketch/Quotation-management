@@ -3,8 +3,10 @@ import { orderService } from '../services/api';
 import { formatDate } from '../utils/helpers';
 import { toast } from 'react-toastify';
 import { MdReceipt, MdAssignment, MdShoppingCart, MdOutlineLocalAtm } from 'react-icons/md';
+import usePermission from '../hooks/usePermission';
 
 const Orders = () => {
+    const { canModify } = usePermission('sales_orders');
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -76,7 +78,7 @@ const Orders = () => {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             {o.status !== 'Completed' ? (
-                                                <button
+                                                canModify && <button
                                                     onClick={() => handleConvertToInvoice(o._id, o.orderNumber)}
                                                     className="flex items-center gap-1 text-xs font-black text-primary-600 hover:text-primary-700 uppercase tracking-wider ml-auto"
                                                 >

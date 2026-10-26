@@ -150,57 +150,44 @@ exports.createTicket = async (req, res) => {
             ticketBody.contactEmail = contact.email || '';
         }
 
-        // Auto-Assignment Logic: Pincode > Engineer OR Pincode > Territory > Engineer
-        let assignedEngineerId = null;
-        const Territory = require('../models/Territory');
-        const Engineer = require('../models/Engineer');
-        
-        console.log(`[DEBUG Auto-Assign Engineer] Starting lookup for pincode: "${cleanPincode}" under companyId: "${companyId}"`);
-        
-        // 1. Try direct matching: find active engineer who has this pincode directly assigned
-        let matchedEngineer = await Engineer.findOne({
-            companyId,
-            pincodes: cleanPincode,
-            status: 'Active'
-        }).lean();
-        
-        if (matchedEngineer) {
-            console.log(`[DEBUG Auto-Assign Engineer] Matched Engineer directly: "${matchedEngineer.name}" (${matchedEngineer._id})`);
-            assignedEngineerId = matchedEngineer._id;
-        } else {
-            // 2. Fallback matching: find territory that matches pincode, then active engineer assigned to that territory
-            const territory = await Territory.findOne({
-                companyId,
-                'rules.pincodes': cleanPincode
-            }).lean();
-            
-            console.log('[DEBUG Auto-Assign Engineer] Matched Territory:', territory ? `${territory.name} (${territory._id})` : 'NONE');
-            
-            if (territory) {
-                if (territory.engineerId) {
-                    matchedEngineer = await Engineer.findOne({
-                        _id: territory.engineerId,
-                        status: 'Active'
-                    }).lean();
-                } else {
-                    matchedEngineer = await Engineer.findOne({
-                        companyId,
-                        territoryId: territory._id,
-                        status: 'Active'
-                    }).lean();
-                }
-                
-                console.log('[DEBUG Auto-Assign Engineer] Matched Engineer by Territory:', matchedEngineer ? `${matchedEngineer.name} (${matchedEngineer._id})` : 'NONE');
-                
-                if (matchedEngineer) {
-                    assignedEngineerId = matchedEngineer._id;
-                }
+        // Branch: the one picked on the form (checked against the user's branch access), else
+        // the active branch. "All Branches" is stored as no branch.
+        const requestedBranch = parseTicketBranch(ticketBody.branchId);
+        let ticketBranchId = req.user?.activeBranchId || req.user?.branchId || null;
+        if (requestedBranch.given) {
+            if (requestedBranch.invalid) {
+                return res.status(400).json({ message: 'Invalid branch selected' });
             }
+            if (!(await canUseTicketBranch(req.user, requestedBranch.branchId))) {
+                return res.status(403).json({
+                    message: requestedBranch.branchId
+                        ? 'You do not have access to the selected branch.'
+                        : 'Only users with access to every branch can raise a ticket for All Branches.'
+                });
+            }
+            ticketBranchId = requestedBranch.branchId;
+        }
+        PROTECTED_TICKET_FIELDS.forEach(field => delete ticketBody[field]);
+
+        // The manual complaint register files complaints under a fixed category and type,
+        // sent by name. The first complaint creates them, as part of logging it, so this
+        // needs only the permission to log complaints (not CSM Config).
+        const namedMasters = [
+            ['categoryId', 'categoryName', require('../models/TicketCategory')],
+            ['typeId', 'typeName', require('../models/TicketType')]
+        ];
+        for (const [idField, nameField, Model] of namedMasters) {
+            const name = String(ticketBody[nameField] || '').trim();
+            delete ticketBody[nameField];
+            if (ticketBody[idField] || !name) continue;
+            const pattern = new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+            const existing = await Model.findOne({ name: pattern, companyId }).select('_id').lean();
+            ticketBody[idField] = existing ? existing._id : (await Model.create({ name, companyId }))._id;
         }
 
         const timelineEntry = {
             activityType: 'Created',
-            description: `Ticket created via ${ticketBody.source || 'Web Portal'}` + (assignedEngineerId ? ' & Auto-assigned to Engineer' : ''),
+            description: `Ticket created via ${ticketBody.source || 'Web Portal'}`,
             performedBy: req.user?.id
         };
 
@@ -209,11 +196,14 @@ exports.createTicket = async (req, res) => {
             ticketNo,
             companyId,
             createdBy: req.user?.id,
-            branchId: ticketBody.branchId || req.user?.activeBranchId || req.user?.branchId || null,
+            branchId: ticketBranchId,
             pincode: cleanPincode,
             assignedSalespersonId: null, // Stop salesperson auto-assignment
-            assignedEngineerId,
-            status: ticketBody.status || (assignedEngineerId ? 'Assigned' : 'Open'),
+            // A new complaint is never assigned automatically (not by PIN code, territory or
+            // location): it stays unassigned until someone picks the engineers on the ticket.
+            assignedEngineerId: null,
+            assignedEngineerIds: [],
+            status: ticketBody.status && ticketBody.status !== 'Assigned' ? ticketBody.status : 'Open',
             slaResponseDue: responseDue,
             slaResolutionDue: resolutionDue,
             timeline: [timelineEntry]
@@ -236,6 +226,53 @@ const isAdminOrManagerUser = (user) => {
     return role === 'admin' || role === 'manager' || role === 'super_admin' || role === 'superadmin';
 };
 
+const { canUseBranch, getSelectableBranchIds, listSelectableBranches } = require('../utils/branchScope');
+
+const isTicketCreator = (user, ticket) => {
+    const creatorId = ticket?.createdBy?._id?.toString() || ticket?.createdBy?.toString();
+    return Boolean(creatorId && user?.id && creatorId === String(user.id));
+};
+
+/**
+ * "All Branches" (no branch on the ticket) is only for users who may work in every
+ * branch. Tickets are a company-wide register anyway, so it never widens access.
+ */
+const canUseAllBranches = (user) => getSelectableBranchIds(user) === null;
+
+/** Whether the user may file a ticket under `branchId` (null = All Branches). */
+const canUseTicketBranch = async (user, branchId) => {
+    if (!branchId) return canUseAllBranches(user);
+    return canUseBranch(user, String(branchId), user?.companyId?.toString());
+};
+
+/**
+ * Reads the requested branch from a ticket payload: undefined/'' = not given,
+ * null/'all' = All Branches, otherwise a branch id.
+ */
+const parseTicketBranch = (raw) => {
+    if (raw === undefined || raw === '') return { given: false };
+    if (raw === null || String(raw).toLowerCase() === 'all') return { given: true, branchId: null };
+    const id = String(raw._id || raw);
+    if (!mongoose.Types.ObjectId.isValid(id)) return { given: true, invalid: true };
+    return { given: true, branchId: id };
+};
+
+// Ownership, identity and history fields are maintained by the server only.
+const PROTECTED_TICKET_FIELDS = ['_id', 'companyId', 'createdBy', 'ticketNo', 'createdAt', 'timeline', 'reassignmentHistory', 'comments'];
+
+/**
+ * A complaint is assigned to one engineer at a time. Reads the engineer from a payload's
+ * assignedEngineerId / assignedEngineerIds: { engineerId } (null = unassigned), or
+ * { error } when more than one engineer, or an invalid id, is sent.
+ */
+const readSingleEngineer = (body) => {
+    const sent = [].concat(body.assignedEngineerIds ?? [], body.assignedEngineerId ?? []).filter(Boolean);
+    const ids = [...new Set(sent.map(id => String(id._id || id)))];
+    if (ids.length > 1) return { error: 'A complaint can be assigned to only one engineer.' };
+    if (ids.length === 1 && !mongoose.Types.ObjectId.isValid(ids[0])) return { error: 'Invalid engineer selected' };
+    return { engineerId: ids[0] || null };
+};
+
 const getEngineerForUser = async (user) => {
     if (!user || !user.email) return null;
     return await Engineer.findOne({
@@ -250,6 +287,7 @@ const getEngineerForUser = async (user) => {
  */
 const canViewTicketDetails = async (user, ticket) => {
     if (isAdminOrManagerUser(user)) return true;
+    if (isTicketCreator(user, ticket)) return true;
     const engineer = await getEngineerForUser(user);
     if (!engineer) return false;
     const engIdStr = engineer._id.toString();
@@ -258,6 +296,32 @@ const canViewTicketDetails = async (user, ticket) => {
     return primaryEngIdStr === engIdStr || assignedEngIdsStr.includes(engIdStr);
 };
 exports.canViewTicketDetails = canViewTicketDetails;
+
+/**
+ * Whether the user may edit a ticket: admins and managers, the user who raised it, and the
+ * engineers it is assigned to (the existing support workflow). Everyone else is refused.
+ */
+const canEditTicket = async (user, ticket) => {
+    if (isAdminOrManagerUser(user)) return true;
+    if (isTicketCreator(user, ticket)) return true;
+    const engineer = await getEngineerForUser(user);
+    if (!engineer) return false;
+    const engIdStr = engineer._id.toString();
+    const primaryEngIdStr = ticket.assignedEngineerId?._id?.toString() || ticket.assignedEngineerId?.toString();
+    const assignedEngIdsStr = (ticket.assignedEngineerIds || []).map(e => e._id?.toString() || e.toString());
+    return primaryEngIdStr === engIdStr || assignedEngIdsStr.includes(engIdStr);
+};
+
+/** Branches the user may raise a ticket under, and whether "All Branches" is offered. */
+exports.getTicketBranchOptions = async (req, res) => {
+    try {
+        const branches = await listSelectableBranches(req.user, req.user?.companyId?.toString());
+        res.json({ branches, allowAllBranches: canUseAllBranches(req.user) });
+    } catch (error) {
+        console.error('Ticket branch options error:', error);
+        res.status(500).json({ message: error.message || 'Error loading branches' });
+    }
+};
 
 const EmployeeProfile = require('../models/EmployeeProfile');
 
@@ -378,6 +442,28 @@ const getHierarchyUserAndStaffIds = async (user) => {
     };
 };
 
+/** Tickets raised by or assigned to the user or anyone reporting to them. */
+const hierarchyTicketCondition = (hierarchyInfo) => {
+    const allUserObjIds = [...hierarchyInfo.selfUserIds, ...hierarchyInfo.teamUserIds].map(id => new mongoose.Types.ObjectId(id));
+    const allEngIds = [...hierarchyInfo.selfEngineerIds, ...hierarchyInfo.teamEngineerIds];
+    const allSalesIds = [...hierarchyInfo.selfSalespersonIds, ...hierarchyInfo.teamSalespersonIds];
+    const visibilityOr = [{ createdBy: { $in: allUserObjIds } }];
+    if (allEngIds.length > 0) {
+        visibilityOr.push({ assignedEngineerId: { $in: allEngIds } });
+        visibilityOr.push({ assignedEngineerIds: { $in: allEngIds } });
+    }
+    if (allSalesIds.length > 0) visibilityOr.push({ assignedSalespersonId: { $in: allSalesIds } });
+    return { $or: visibilityOr };
+};
+
+/**
+ * The tickets the user sees in the register: null for admins and managers (every ticket),
+ * otherwise a filter for those raised by or assigned to them or their team.
+ */
+exports.getVisibleTicketsFilter = async (user) => (
+    isAdminOrManagerUser(user) ? null : hierarchyTicketCondition(await getHierarchyUserAndStaffIds(user))
+);
+
 exports.getTickets = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
@@ -390,11 +476,32 @@ exports.getTickets = async (req, res) => {
             filter.status = req.query.status;
         }
         if (req.query.priorityId) filter.priorityId = req.query.priorityId;
-        if (req.query.unassigned === 'true') filter.assignedEngineerId = null;
+        if (req.query.unassigned === 'true') {
+            filter.assignedEngineerId = null;
+            // Same tickets as the dashboard's Unassigned card: still open, nobody assigned.
+            if (!filter.status) {
+                filter.status = { $nin: ['Resolved', 'Closed', 'Cancelled'] };
+            }
+        }
+        if (req.query.createdOn === 'today') {
+            const startOfToday = new Date();
+            startOfToday.setHours(0, 0, 0, 0);
+            filter.createdAt = { $gte: startOfToday };
+        }
         if (req.query.slaBreached === 'true') {
             filter.slaResolutionDue = { $lt: new Date() };
             if (!filter.status) {
                 filter.status = { $nin: ['Closed', 'Cancelled'] };
+            }
+        }
+        if (req.query.resolvedOn === 'yesterday') {
+            const startOfToday = new Date();
+            startOfToday.setHours(0, 0, 0, 0);
+            const startOfYesterday = new Date(startOfToday);
+            startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+            filter.resolvedAt = { $gte: startOfYesterday, $lt: startOfToday };
+            if (!filter.status) {
+                filter.status = { $in: ['Resolved', 'Closed'] };
             }
         }
 
@@ -443,16 +550,7 @@ exports.getTickets = async (req, res) => {
             }
         } else if (tab === 'all') {
             if (!isAdminOrManagerUser(req.user)) {
-                const allUserObjIds = [...hierarchyInfo.selfUserIds, ...hierarchyInfo.teamUserIds].map(id => new mongoose.Types.ObjectId(id));
-                const allEngIds = [...hierarchyInfo.selfEngineerIds, ...hierarchyInfo.teamEngineerIds];
-                const allSalesIds = [...hierarchyInfo.selfSalespersonIds, ...hierarchyInfo.teamSalespersonIds];
-                const allOr = [{ createdBy: { $in: allUserObjIds } }];
-                if (allEngIds.length > 0) {
-                    allOr.push({ assignedEngineerId: { $in: allEngIds } });
-                    allOr.push({ assignedEngineerIds: { $in: allEngIds } });
-                }
-                if (allSalesIds.length > 0) allOr.push({ assignedSalespersonId: { $in: allSalesIds } });
-                andConditions.push({ $or: allOr });
+                andConditions.push(hierarchyTicketCondition(hierarchyInfo));
             } else if (req.query.assignedEngineerId) {
                 filter.$or = [
                     { assignedEngineerId: req.query.assignedEngineerId },
@@ -462,16 +560,7 @@ exports.getTickets = async (req, res) => {
         } else {
             // Default handling when no tab specified
             if (!isAdminOrManagerUser(req.user)) {
-                const allUserObjIds = [...hierarchyInfo.selfUserIds, ...hierarchyInfo.teamUserIds].map(id => new mongoose.Types.ObjectId(id));
-                const allEngIds = [...hierarchyInfo.selfEngineerIds, ...hierarchyInfo.teamEngineerIds];
-                const allSalesIds = [...hierarchyInfo.selfSalespersonIds, ...hierarchyInfo.teamSalespersonIds];
-                const visibilityOr = [{ createdBy: { $in: allUserObjIds } }];
-                if (allEngIds.length > 0) {
-                    visibilityOr.push({ assignedEngineerId: { $in: allEngIds } });
-                    visibilityOr.push({ assignedEngineerIds: { $in: allEngIds } });
-                }
-                if (allSalesIds.length > 0) visibilityOr.push({ assignedSalespersonId: { $in: allSalesIds } });
-                andConditions.push({ $or: visibilityOr });
+                andConditions.push(hierarchyTicketCondition(hierarchyInfo));
             } else if (req.query.assignedEngineerId) {
                 filter.$or = [
                     { assignedEngineerId: req.query.assignedEngineerId },
@@ -622,6 +711,7 @@ exports.getTicketById = async (req, res) => {
             .populate('assignedEngineerIds', 'name email mobile status')
             .populate('assignedSalespersonId')
             .populate('timeline.performedBy', 'name email role')
+            .populate({ path: 'branchId', select: 'name code branchPrefix', options: { bypassTenant: true } })
             .lean();
 
         if (!ticket) {
@@ -630,6 +720,19 @@ exports.getTicketById = async (req, res) => {
 
         if (!(await canViewTicketDetails(req.user, ticket))) {
             return res.status(403).json({ message: 'Access denied: You can only view complaints assigned to you.' });
+        }
+
+        // Lets the UI show Edit / branch controls; the server re-checks on every update.
+        const canEdit = await canEditTicket(req.user, ticket);
+        const currentBranchId = ticket.branchId?._id?.toString() || null;
+        ticket.permissions = {
+            canEdit,
+            canChangeBranch: canEdit && (await canUseTicketBranch(req.user, currentBranchId)),
+        };
+        // Creator name for display; looked up after the ownership checks, which use the raw id.
+        if (ticket.createdBy) {
+            const creator = await User.findById(ticket.createdBy).select('name email').setOptions({ bypassBranch: true }).lean();
+            ticket.createdBy = creator || { _id: ticket.createdBy };
         }
 
         res.json(ticket);
@@ -647,14 +750,52 @@ exports.updateTicket = async (req, res) => {
         const existingTicket = await Ticket.findOne({ _id: req.params.id, companyId });
         if (!existingTicket) return res.status(404).json({ message: 'Ticket not found' });
 
-        if (!isAdminOrManagerUser(req.user)) {
-            const engineer = await getEngineerForUser(req.user);
-            const ticketEngineerId = existingTicket.assignedEngineerId?.toString();
-            const assignedEngIdsStr = (existingTicket.assignedEngineerIds || []).map(e => e.toString());
-            const isAssigned = engineer && (ticketEngineerId === engineer._id.toString() || assignedEngIdsStr.includes(engineer._id.toString()));
-            if (!isAssigned) {
-                return res.status(403).json({ message: 'Access denied: You can only update complaints assigned to you.' });
+        if (!(await canEditTicket(req.user, existingTicket))) {
+            return res.status(403).json({ message: 'Access denied: You can only edit tickets you raised or that are assigned to you.' });
+        }
+
+        // The creator, company, ticket number and history cannot be changed through this API.
+        PROTECTED_TICKET_FIELDS.forEach(field => delete ticketBody[field]);
+
+        // Branch change: the user needs access to both the current and the new branch.
+        const timelineEntries = [];
+        const requestedBranch = parseTicketBranch(ticketBody.branchId);
+        delete ticketBody.branchId;
+        const previousBranchId = existingTicket.branchId ? existingTicket.branchId.toString() : null;
+        if (requestedBranch.given && requestedBranch.invalid) {
+            return res.status(400).json({ message: 'Invalid branch selected' });
+        }
+        if (requestedBranch.given && requestedBranch.branchId !== previousBranchId) {
+            const [mayLeave, mayEnter] = await Promise.all([
+                canUseTicketBranch(req.user, previousBranchId),
+                canUseTicketBranch(req.user, requestedBranch.branchId),
+            ]);
+            if (!mayLeave || !mayEnter) {
+                return res.status(403).json({
+                    code: 'TICKET_BRANCH_CHANGE_DENIED',
+                    message: !mayLeave
+                        ? 'You do not have permission to move this ticket out of its current branch.'
+                        : (requestedBranch.branchId
+                            ? 'You do not have access to the selected branch.'
+                            : 'Only users with access to every branch can set a ticket to All Branches.')
+                });
             }
+            const Branch = require('../models/Branch');
+            const branchDocs = await Branch.find({ _id: { $in: [previousBranchId, requestedBranch.branchId].filter(Boolean) } })
+                .select('name').setOptions({ bypassTenant: true }).lean();
+            const branchName = (id) => (id ? (branchDocs.find(b => b._id.toString() === id)?.name || id) : 'All Branches');
+            ticketBody.branchId = requestedBranch.branchId;
+            timelineEntries.push({
+                activityType: 'BranchChanged',
+                description: `Branch changed from ${branchName(previousBranchId)} to ${branchName(requestedBranch.branchId)} by ${req.user?.name || 'user'}`,
+                performedBy: mongoose.Types.ObjectId.isValid(req.user?.id) ? req.user.id : null,
+                createdAt: new Date()
+            });
+        }
+
+        // An unchanged PIN code is left out of the update.
+        if (ticketBody.pincode !== undefined && String(ticketBody.pincode || '').trim() === String(existingTicket.pincode || '').trim()) {
+            delete ticketBody.pincode;
         }
 
         const optionalObjectIdFields = ['contactId', 'contactDesignationId', 'productId', 'assetId', 'invoiceId', 'categoryId', 'typeId', 'problemId', 'assignedTeamId', 'assignedEngineerId', 'assignedSalespersonId'];
@@ -664,73 +805,49 @@ exports.updateTicket = async (req, res) => {
             }
         }
 
-        if (Array.isArray(ticketBody.assignedEngineerIds)) {
-            ticketBody.assignedEngineerIds = ticketBody.assignedEngineerIds.filter(Boolean);
-            if (!ticketBody.assignedEngineerId && ticketBody.assignedEngineerIds.length > 0) {
-                ticketBody.assignedEngineerId = ticketBody.assignedEngineerIds[0];
+        // Contact person is optional: a selected contact refreshes the stored details,
+        // clearing it removes them.
+        if (ticketBody.contactId !== undefined) {
+            if (ticketBody.contactId) {
+                const contact = await CustomerContact.findOne({
+                    _id: ticketBody.contactId,
+                    customerId: ticketBody.customerId || existingTicket.customerId,
+                    companyId
+                }).setOptions(CROSS_BRANCH).populate('designationId', 'name').lean();
+                if (!contact) {
+                    return res.status(400).json({ message: 'Invalid contact person selected' });
+                }
+                ticketBody.contactName = contact.contactName || '';
+                ticketBody.contactDesignationId = contact.designationId?._id || null;
+                ticketBody.contactDesignation = contact.designationId?.name || '';
+                ticketBody.contactPhone = contact.mobileNo || '';
+                ticketBody.contactEmail = contact.email || '';
+            } else {
+                Object.assign(ticketBody, { contactName: '', contactDesignationId: null, contactDesignation: '', contactPhone: '', contactEmail: '' });
             }
-        } else if (ticketBody.assignedEngineerId) {
-            ticketBody.assignedEngineerIds = [ticketBody.assignedEngineerId];
         }
 
-        // Validate pincode if provided and run auto-assignment
+        if (ticketBody.assignedEngineerIds !== undefined || ticketBody.assignedEngineerId !== undefined) {
+            const { engineerId, error } = readSingleEngineer(ticketBody);
+            if (error) return res.status(400).json({ message: error });
+            ticketBody.assignedEngineerId = engineerId;
+            ticketBody.assignedEngineerIds = engineerId ? [engineerId] : [];
+        }
+
+        // Validate the pincode if provided. Changing it never changes who is assigned.
         if (ticketBody.pincode !== undefined) {
             if (!ticketBody.pincode || !String(ticketBody.pincode).trim()) {
                 return res.status(400).json({ message: 'Pincode is a mandatory field' });
             }
             ticketBody.pincode = String(ticketBody.pincode).trim();
-
-            const Territory = require('../models/Territory');
-            const Engineer = require('../models/Engineer');
-            console.log(`[DEBUG Auto-Assign Update] Starting lookup for pincode: "${ticketBody.pincode}" under companyId: "${companyId}"`);
-            
-            let assignedEngineerId = null;
-            
-            // 1. Direct match
-            let matchedEngineer = await Engineer.findOne({
-                companyId,
-                pincodes: ticketBody.pincode,
-                status: 'Active'
-            }).lean();
-            
-            if (matchedEngineer) {
-                console.log(`[DEBUG Auto-Assign Update] Matched Engineer directly: "${matchedEngineer.name}" (${matchedEngineer._id})`);
-                assignedEngineerId = matchedEngineer._id;
-            } else {
-                // 2. Fallback match to territory
-                const territory = await Territory.findOne({
-                    companyId,
-                    'rules.pincodes': ticketBody.pincode
-                }).lean();
-
-                console.log('[DEBUG Auto-Assign Update] Matched Territory:', territory ? `${territory.name} (${territory._id})` : 'NONE');
-
-                if (territory) {
-                    matchedEngineer = await Engineer.findOne({
-                        companyId,
-                        territoryId: territory._id,
-                        status: 'Active'
-                    }).lean();
-                    
-                    console.log('[DEBUG Auto-Assign Update] Matched Engineer by Territory:', matchedEngineer ? `${matchedEngineer.name} (${matchedEngineer._id})` : 'NONE');
-                    
-                    if (matchedEngineer) {
-                        assignedEngineerId = matchedEngineer._id;
-                    }
-                }
-            }
-            
-            ticketBody.assignedEngineerId = assignedEngineerId;
-            ticketBody.assignedEngineerIds = assignedEngineerId ? [assignedEngineerId] : [];
-            if (assignedEngineerId) {
-                ticketBody.status = 'Assigned';
-            }
-            ticketBody.assignedSalespersonId = null; // Salesperson is not auto-assigned
         }
 
+        const update = timelineEntries.length
+            ? { $set: ticketBody, $push: { timeline: { $each: timelineEntries } } }
+            : { $set: ticketBody };
         const ticket = await Ticket.findOneAndUpdate(
             { _id: req.params.id, companyId },
-            ticketBody,
+            update,
             { new: true, runValidators: true }
         );
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
@@ -757,22 +874,21 @@ exports.updateTicket = async (req, res) => {
 
 exports.assignTicket = async (req, res) => {
     try {
-        const { assignedTeamId, assignedEngineerId, assignedEngineerIds } = req.body;
+        const { assignedTeamId } = req.body;
         const companyId = req.user?.companyId;
+
+        const { engineerId, error } = readSingleEngineer(req.body);
+        if (error) return res.status(400).json({ message: error });
 
         const ticket = await Ticket.findOne({ _id: req.params.id, companyId });
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 
         const Engineer = require('../models/Engineer');
-
-        let rawEngIds = [];
-        if (Array.isArray(assignedEngineerIds)) {
-            rawEngIds = assignedEngineerIds.filter(Boolean);
-        } else if (assignedEngineerId) {
-            rawEngIds = [assignedEngineerId];
+        if (engineerId && !(await Engineer.exists({ _id: engineerId, companyId }))) {
+            return res.status(400).json({ message: 'Selected engineer not found' });
         }
 
-        const validEngIds = [...new Set(rawEngIds)].filter(id => mongoose.Types.ObjectId.isValid(id));
+        const validEngIds = engineerId ? [engineerId] : [];
         const oldPrimaryEngineerId = ticket.assignedEngineerId;
 
         ticket.assignedTeamId = assignedTeamId || null;
@@ -894,6 +1010,8 @@ exports.reassignTicket = async (req, res) => {
 
         const fromEngineerId = ticket.assignedEngineerId;
         ticket.assignedEngineerId = targetEng._id;
+        // One engineer at a time: the new engineer replaces everyone on the ticket.
+        ticket.assignedEngineerIds = [targetEng._id];
         ticket.status = 'Assigned';
 
         const validUserId = mongoose.Types.ObjectId.isValid(req.user?.id) ? req.user.id : null;
@@ -1279,28 +1397,3 @@ exports.getTicketCustomers = async (req, res) => {
     }
 };
 
-exports.debugAutoAssign = async (req, res) => {
-    try {
-        const companyId = req.user?.companyId || req.query.companyId;
-        const Territory = require('../models/Territory');
-        const Salesperson = require('../models/Salesperson');
-        const Ticket = require('../models/Ticket');
-        
-        const filter = companyId ? { companyId } : {};
-        const territories = await Territory.find(filter).lean();
-        const salespeople = await Salesperson.find().lean();
-        const tickets = await Ticket.find(filter).sort({ createdAt: -1 }).limit(10).lean();
-        
-        res.json({
-            companyId: companyId || 'All',
-            territoriesCount: territories.length,
-            salespeopleCount: salespeople.length,
-            ticketsCount: tickets.length,
-            territories,
-            salespeople,
-            tickets
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-};

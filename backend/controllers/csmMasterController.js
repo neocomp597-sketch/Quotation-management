@@ -127,6 +127,7 @@ exports.seedMhData = async (req, res) => {
 
         const Customer = require('../models/Customer');
         const Product = require('../models/Product');
+        const { findDuplicate } = require('../utils/productUniqueness');
         const User = require('../models/User');
         const Ticket = require('../models/Ticket');
         const ServiceVisit = require('../models/ServiceVisit');
@@ -210,6 +211,10 @@ exports.seedMhData = async (req, res) => {
         const products = [];
         for (const p of productsData) {
             let dbProd = await Product.findOne({ productCode: p.productCode, companyId });
+            if (!dbProd) {
+                const sameName = await findDuplicate('productName', p.productName, { companyId });
+                if (sameName) dbProd = await Product.findById(sameName._id);
+            }
             if (!dbProd) {
                 dbProd = await Product.create({ ...p, companyId });
             }
@@ -983,6 +988,10 @@ exports.problems = {
     }
 };
 
+// Employee fields the engineer lists need. The list covers every employee when the company
+// assigns from all employees, so payroll, bank and identity fields stay out of it.
+const ENGINEER_EMPLOYEE_FIELDS = 'employeeId externalEmployeeCode name email mobile designation department location branchId status';
+
 exports.engineers = {
     create: async (req, res) => {
         return res.status(403).json({
@@ -999,21 +1008,41 @@ exports.engineers = {
             }
 
             const docs = await Engineer.find({ companyId })
-                .populate('employeeId')
+                .populate('employeeId', ENGINEER_EMPLOYEE_FIELDS)
                 .populate('territoryId', 'name rules')
                 .sort({ createdAt: -1 })
                 .lean();
 
+            // PIN codes each engineer covers, by the same rules ticket auto-assignment uses:
+            // the engineer's own PINs, their territory's PINs, and PINs of any territory that
+            // names them as its Assigned Engineer in Territory Master.
+            const Territory = require('../models/Territory');
+            const assignedTerritories = await Territory.find({ companyId, engineerId: { $ne: null } })
+                .select('engineerId rules.pincodes')
+                .lean();
+            const territoryPinsByEngineer = new Map();
+            assignedTerritories.forEach(t => {
+                const key = String(t.engineerId);
+                const pins = territoryPinsByEngineer.get(key) || [];
+                territoryPinsByEngineer.set(key, pins.concat(t.rules?.pincodes || []));
+            });
+
             const mapped = docs.map(doc => {
+                const coveredPincodes = [...new Set([
+                    ...(doc.pincodes || []),
+                    ...(doc.territoryId?.rules?.pincodes || []),
+                    ...(territoryPinsByEngineer.get(String(doc._id)) || []),
+                ].map(p => String(p).trim()).filter(Boolean))];
                 if (doc.employeeId) {
                     return {
                         ...doc,
+                        coveredPincodes,
                         name: doc.employeeId.name,
                         email: doc.employeeId.email,
                         mobile: doc.employeeId.mobile || ''
                     };
                 }
-                return doc;
+                return { ...doc, coveredPincodes };
             });
 
             res.json(mapped);
@@ -1024,7 +1053,7 @@ exports.engineers = {
     getById: async (req, res) => {
         try {
             const doc = await Engineer.findOne({ _id: req.params.id, companyId: req.user?.companyId })
-                .populate('employeeId')
+                .populate('employeeId', ENGINEER_EMPLOYEE_FIELDS)
                 .populate('territoryId', 'name rules')
                 .lean();
             if (!doc) return res.status(404).json({ message: 'Engineer not found' });
@@ -1068,7 +1097,7 @@ exports.engineers = {
                 { _id: req.params.id, companyId: req.user?.companyId },
                 updateData,
                 { new: true, runValidators: true }
-            ).populate('employeeId').populate('territoryId', 'name rules');
+            ).populate('employeeId', ENGINEER_EMPLOYEE_FIELDS).populate('territoryId', 'name rules');
 
             if (!doc) return res.status(404).json({ message: 'Engineer not found' });
 
@@ -1095,5 +1124,47 @@ exports.engineers = {
         return res.status(403).json({
             message: 'Manual deletion of Engineers is disabled. Engineer records are managed via Employee Master.'
         });
+    }
+};
+
+// Whether every active employee or only Service Engineers can be assigned tickets and visits.
+exports.engineerSettings = {
+    get: async (req, res) => {
+        try {
+            const { getEngineerSource } = require('../services/engineerSyncService');
+            res.json({ engineerSource: await getEngineerSource(req.user?.companyId) });
+        } catch (error) {
+            res.status(500).json({ message: 'Error fetching engineer settings: ' + error.message });
+        }
+    },
+    update: async (req, res) => {
+        try {
+            const { ENGINEER_SOURCES, syncAllEngineers } = require('../services/engineerSyncService');
+            const { engineerSource } = req.body;
+            if (!ENGINEER_SOURCES.includes(engineerSource)) {
+                return res.status(400).json({ message: `engineerSource must be one of: ${ENGINEER_SOURCES.join(', ')}` });
+            }
+            const companyId = req.user?.companyId;
+            const CompanySettings = require('../models/CompanySettings');
+            const settings = await CompanySettings.findOne({ companyId });
+            if (settings) {
+                settings.csmEngineerSource = engineerSource;
+                await settings.save();
+            } else {
+                const Company = require('../models/Company');
+                const company = await Company.findById(companyId).select('name').lean();
+                await CompanySettings.create({
+                    companyId,
+                    userId: req.user.id,
+                    companyName: company?.name || 'Company',
+                    csmEngineerSource: engineerSource
+                });
+            }
+            // Apply at once: switching to Service Engineers retires the other records.
+            await syncAllEngineers(companyId, { returnEngineers: false });
+            res.json({ engineerSource });
+        } catch (error) {
+            res.status(400).json({ message: 'Error updating engineer settings: ' + error.message });
+        }
     }
 };

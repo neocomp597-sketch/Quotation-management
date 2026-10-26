@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { formatDate } from '../../utils/helpers';
+import usePermission from '../../hooks/usePermission';
 import {
     MdNotificationsActive,
     MdWarning,
@@ -12,6 +13,7 @@ import {
 const API_BASE = '/inventory';
 
 const StockAlertsPage = () => {
+    const { canModify } = usePermission('inventory_alerts');
     const [alerts, setAlerts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isResolved, setIsResolved] = useState('false');
@@ -114,7 +116,7 @@ const StockAlertsPage = () => {
                                 <span className="text-slate-600 dark:text-slate-300 font-medium">
                                     Current Stock: <strong className="text-slate-900 dark:text-white">{alert.currentStock}</strong> (Min: {alert.minStock})
                                 </span>
-                                {!alert.isResolved && (
+                                {canModify && !alert.isResolved && (
                                     <button
                                         onClick={() => handleResolve(alert._id)}
                                         className="px-3 py-1.5 bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300 font-semibold rounded-lg hover:bg-teal-100 flex items-center gap-1"

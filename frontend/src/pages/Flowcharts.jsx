@@ -23,9 +23,11 @@ import AutoFlowchartGenerator from '../components/AutoFlowchartGenerator';
 import Modal from '../components/Modal';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
+import usePermission from '../hooks/usePermission';
 
 const Flowcharts = () => {
     const { hasAccess } = useAuth();
+    const { canCreate, canModify, canDelete } = usePermission('flowchart_view');
     const [flowcharts, setFlowcharts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -202,6 +204,7 @@ const Flowcharts = () => {
                         <span className="text-xs font-bold text-slate-500">Status:</span>
                         <select
                             value={activeFlowchart.status || 'Draft'}
+                            disabled={!canModify}
                             onChange={async (e) => {
                                 const newStatus = e.target.value;
                                 try {
@@ -225,6 +228,7 @@ const Flowcharts = () => {
                     flowchartData={activeFlowchart}
                     onSave={handleSaveCanvas}
                     onAutoSave={handleSaveCanvas}
+                    readOnly={!canModify}
                 />
             </div>
         );
@@ -248,6 +252,7 @@ const Flowcharts = () => {
                     </div>
                 </div>
 
+                {canCreate && (
                 <div className="flex flex-wrap items-center gap-3">
                     <button
                         onClick={() => setShowTemplatesModal(true)}
@@ -274,6 +279,7 @@ const Flowcharts = () => {
                         <MdAdd size={20} /> Create Flowchart
                     </button>
                 </div>
+                )}
             </div>
 
             {/* Filter & Search Bar */}
@@ -318,12 +324,14 @@ const Flowcharts = () => {
                             Create a blank diagram, load a pre-built template, or auto-generate from plain text steps.
                         </p>
                     </div>
-                    <button
-                        onClick={() => setShowTemplatesModal(true)}
-                        className="px-5 py-2.5 rounded-xl bg-primary-600 text-white font-extrabold text-xs shadow-md"
-                    >
-                        Browse Process Templates
-                    </button>
+                    {canCreate && (
+                        <button
+                            onClick={() => setShowTemplatesModal(true)}
+                            className="px-5 py-2.5 rounded-xl bg-primary-600 text-white font-extrabold text-xs shadow-md"
+                        >
+                            Browse Process Templates
+                        </button>
+                    )}
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -359,13 +367,15 @@ const Flowcharts = () => {
                                 </div>
 
                                 <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={(e) => handleDeleteFlowchart(fc._id, e)}
-                                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
-                                        title="Delete flowchart"
-                                    >
-                                        <MdDelete size={18} />
-                                    </button>
+                                    {canDelete && (
+                                        <button
+                                            onClick={(e) => handleDeleteFlowchart(fc._id, e)}
+                                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
+                                            title="Delete flowchart"
+                                        >
+                                            <MdDelete size={18} />
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>

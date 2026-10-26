@@ -16,7 +16,8 @@ import {
     MdReceiptLong
 } from 'react-icons/md';
 import Modal from '../components/Modal';
-import ImportModal from '../components/ImportModal';
+import ImportWizard from '../components/import/ImportWizard';
+import usePermission from '../hooks/usePermission';
 
 // Sample fallback items matching "price book.html"
 const SAMPLE_PRICE_BOOK_ITEMS = [
@@ -57,6 +58,7 @@ const DEFAULT_SAMPLE_CATALOGS = [
 ];
 
 const PriceManagement = ({ mode = 'price-books' }) => {
+    const { canCreate, canModify, canDelete } = usePermission('sales_price_management');
     const [activeTab, setActiveTab] = useState(mode);
     const [loading, setLoading] = useState(true);
 
@@ -458,22 +460,22 @@ const PriceManagement = ({ mode = 'price-books' }) => {
                                 <MdFileDownload size={18} />
                                 Export
                             </button>
-                            <button
+                            {canCreate && <button
                                 onClick={() => setIsImportModalOpen(true)}
                                 className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-md active:scale-95"
                             >
                                 <MdFileUpload size={18} />
                                 Import
-                            </button>
+                            </button>}
                         </>
                     )}
-                    <button
+                    {canCreate && <button
                         onClick={handleOpenCreateModal}
                         className="flex items-center gap-2 px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md active:scale-95"
                     >
                         <MdAdd size={18} />
                         Add {activeTab === 'price-books' ? 'Catalog' : 'Config'}
-                    </button>
+                    </button>}
                 </div>
             </div>
 
@@ -539,7 +541,7 @@ const PriceManagement = ({ mode = 'price-books' }) => {
                                                 </span>
                                             </div>
                                             
-                                            <button
+                                            {canDelete && <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     handleDeleteBook(catalog._id);
@@ -552,19 +554,19 @@ const PriceManagement = ({ mode = 'price-books' }) => {
                                                 title="Delete Catalog"
                                             >
                                                 <MdDelete size={16} />
-                                            </button>
+                                            </button>}
                                         </div>
                                     );
                                 })}
                             </div>
 
-                            <button
+                            {canCreate && <button
                                 onClick={handleOpenCreateModal}
                                 className="w-full mt-4 flex items-center justify-center gap-2 py-3 px-4 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all active:scale-95"
                             >
                                 <MdAdd size={18} />
                                 + Add Catalog
-                            </button>
+                            </button>}
                         </div>
                     </div>
 
@@ -583,12 +585,12 @@ const PriceManagement = ({ mode = 'price-books' }) => {
                                     >
                                         <MdFileDownload size={14} /> Export
                                     </button>
-                                    <button
+                                    {canModify && <button
                                         onClick={() => setIsItemsImportModalOpen(true)}
                                         className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold transition-all flex items-center gap-1"
                                     >
                                         <MdFileUpload size={14} /> Import
-                                    </button>
+                                    </button>}
                                 </div>
                             </div>
 
@@ -642,18 +644,18 @@ const PriceManagement = ({ mode = 'price-books' }) => {
                                                         </td>
                                                         <td className="px-4 py-3.5 text-center">
                                                             <div className="flex items-center justify-center gap-2">
-                                                                <button
+                                                                {canModify && <button
                                                                     onClick={() => handleOpenAddProductModal(item)}
                                                                     className="px-3 py-1 bg-sky-500 hover:bg-sky-600 text-white rounded-md text-xs font-bold transition-all shadow-sm"
                                                                 >
                                                                     Edit
-                                                                </button>
-                                                                <button
+                                                                </button>}
+                                                                {canDelete && <button
                                                                     onClick={() => handleRemoveBookItem(item._id)}
                                                                     className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-all"
                                                                 >
                                                                     <MdDelete size={16} />
-                                                                </button>
+                                                                </button>}
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -664,13 +666,13 @@ const PriceManagement = ({ mode = 'price-books' }) => {
                                 </table>
                             </div>
 
-                            <button
+                            {canCreate && <button
                                 onClick={() => handleOpenAddProductModal()}
                                 className="mt-4 flex items-center justify-center gap-2 py-3 px-5 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all active:scale-95"
                             >
                                 <MdAdd size={18} />
                                 + Add Product to Price Book
-                            </button>
+                            </button>}
                         </div>
                     </div>
                 </div>
@@ -706,9 +708,9 @@ const PriceManagement = ({ mode = 'price-books' }) => {
                                                     </span>
                                                 </td>
                                                 <td className="py-3.5 text-right">
-                                                    <button onClick={() => cpqService.deletePricingRule(rule._id).then(() => fetchTabContent())} className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors">
+                                                    {canDelete && <button onClick={() => cpqService.deletePricingRule(rule._id).then(() => fetchTabContent())} className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors">
                                                         <MdDelete size={18} />
-                                                    </button>
+                                                    </button>}
                                                 </td>
                                             </tr>
                                         ))}
@@ -739,9 +741,9 @@ const PriceManagement = ({ mode = 'price-books' }) => {
                                                     </span>
                                                 </td>
                                                 <td className="py-3.5 text-right">
-                                                    <button onClick={() => cpqService.deleteDiscountPolicy(policy._id).then(() => fetchTabContent())} className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors">
+                                                    {canDelete && <button onClick={() => cpqService.deleteDiscountPolicy(policy._id).then(() => fetchTabContent())} className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors">
                                                         <MdDelete size={18} />
-                                                    </button>
+                                                    </button>}
                                                 </td>
                                             </tr>
                                         ))}
@@ -770,9 +772,9 @@ const PriceManagement = ({ mode = 'price-books' }) => {
                                                 </td>
                                                 <td className="py-3.5 text-slate-500 font-bold">{promo.usageCount} / {promo.usageLimit || '∞'}</td>
                                                 <td className="py-3.5 text-right">
-                                                    <button onClick={() => cpqService.deletePromotion(promo._id).then(() => fetchTabContent())} className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors">
+                                                    {canDelete && <button onClick={() => cpqService.deletePromotion(promo._id).then(() => fetchTabContent())} className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors">
                                                         <MdDelete size={18} />
-                                                    </button>
+                                                    </button>}
                                                 </td>
                                             </tr>
                                         ))}
@@ -921,29 +923,24 @@ const PriceManagement = ({ mode = 'price-books' }) => {
             </Modal>
 
             {/* Import Price Books Modal */}
-            <ImportModal
+            <ImportWizard
                 isOpen={isImportModalOpen}
                 onClose={() => setIsImportModalOpen(false)}
                 title="Import Price Books"
-                onImport={async (file) => {
-                    const result = await importService.importPriceBooks(file);
-                    fetchTabContent();
-                    return result;
-                }}
+                module="price-books"
                 onDownloadTemplate={importService.getPriceBookTemplate}
+                onImported={fetchTabContent}
             />
 
             {/* Import Price Book Items Modal */}
-            <ImportModal
+            <ImportWizard
                 isOpen={isItemsImportModalOpen}
                 onClose={() => setIsItemsImportModalOpen(false)}
                 title={`Import Rates for: ${selectedBook?.name}`}
-                onImport={async (file) => {
-                    const result = await importService.importPriceBookItems(file, selectedBook?._id);
-                    if (selectedBook) {
-                        fetchPriceBookItems(selectedBook._id);
-                    }
-                    return result;
+                module="price-book-items"
+                params={{ priceBookId: selectedBook?._id }}
+                onImported={() => {
+                    if (selectedBook) fetchPriceBookItems(selectedBook._id);
                 }}
                 onDownloadTemplate={importService.getPriceBookItemTemplate}
             />

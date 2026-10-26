@@ -5,11 +5,13 @@ import { toast } from 'react-toastify';
 import { bomService } from '../services/api';
 import { formatDate } from '../utils/helpers';
 import PaginationControls from '../components/PaginationControls';
+import usePermission from '../hooks/usePermission';
 
 const LIST_PAGE_SIZE = 20;
 
 const BOMMaster = () => {
     const navigate = useNavigate();
+    const { canCreate, canModify } = usePermission('master_bom');
     const [boms, setBoms] = useState([]);
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState('');
@@ -106,11 +108,14 @@ const BOMMaster = () => {
                     <MdFileDownload size={18} />
                     <span>Template</span>
                 </button>
+                {canCreate && (
                 <label className={`flex items-center justify-center gap-2 bg-slate-900 hover:bg-black text-white px-5 py-3 rounded-2xl font-bold transition-all uppercase text-xs tracking-widest active:scale-95 ${uploading ? 'opacity-60 pointer-events-none' : 'cursor-pointer'}`}>
                     <MdPublish size={18} />
                     <span>{uploading ? 'Uploading…' : 'Upload'}</span>
                     <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} disabled={uploading} />
                 </label>
+                )}
+                {canCreate && (
                 <button
                     onClick={() => navigate('/bom-master/new')}
                     className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
@@ -118,6 +123,7 @@ const BOMMaster = () => {
                     <MdAdd size={20} />
                     <span>New BOM</span>
                 </button>
+                )}
                 </div>
             </div>
 
@@ -220,6 +226,7 @@ const BOMMaster = () => {
                                                     >
                                                         <MdVisibility size={18} />
                                                     </button>
+                                                    {canModify && (
                                                     <button
                                                         type="button"
                                                         onClick={(e) => { e.stopPropagation(); navigate(`/bom-master/${bom._id}/edit`); }}
@@ -228,13 +235,14 @@ const BOMMaster = () => {
                                                     >
                                                         <MdEdit size={18} />
                                                     </button>
+                                                    )}
                                                 </td>
                                             </tr>
                                         ))}
                                         {boms.length === 0 && (
                                             <tr>
                                                 <td colSpan={7} className="p-8 text-center text-slate-400 text-sm font-medium">
-                                                    {debouncedSearch ? 'No products match your search. Assemblies are listed inside their product.' : 'No products yet. Click New BOM to add one.'}
+                                                    {debouncedSearch ? 'No products match your search. Assemblies are listed inside their product.' : (canCreate ? 'No products yet. Click New BOM to add one.' : 'No products yet.')}
                                                 </td>
                                             </tr>
                                         )}

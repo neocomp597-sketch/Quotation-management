@@ -136,12 +136,12 @@ const moduleSubmodulesMap = {
     ],
     '/invoices': [
         { label: 'Sales Invoices Register', path: '/invoices' },
-        { label: 'Create New Invoice', path: '/invoices/new' },
+        { label: 'Create New Invoice', path: '/invoices/new', createKey: 'sale_invoices' },
         { label: 'Sales Orders', path: '/sales/orders' }
     ],
     '/grn': [
         { label: 'Goods Received Note (GRN)', path: '/grn' },
-        { label: 'Create New GRN Receipt', path: '/grn/new' },
+        { label: 'Create New GRN Receipt', path: '/grn/new', createKey: 'purchase_grn' },
         { label: 'Vendor Material Delivery', path: '/vendors' }
     ],
     '/mgrs': [
@@ -166,7 +166,7 @@ const moduleSubmodulesMap = {
     ],
     '/meetings': [
         { label: 'Appointments Register', path: '/meetings' },
-        { label: 'Schedule New Appointment', path: '/meetings/new' },
+        { label: 'Schedule New Appointment', path: '/meetings/new', createKey: 'meetings_list' },
         { label: 'Follow-up Tasks', path: '/planning' }
     ],
     '/sales/dashboard': [
@@ -178,7 +178,7 @@ const moduleSubmodulesMap = {
     ],
     '/sales/deals': [
         { label: 'Kanban Deal Board', path: '/sales/deals' },
-        { label: 'Create New Deal', path: '/sales/deals/new' },
+        { label: 'Create New Deal', path: '/sales/deals/new', createKey: 'sales_deals' },
         { label: 'Sales Pipeline Stages', path: '/sales/pipelines' }
     ],
     '/sales/pipelines': [
@@ -236,7 +236,7 @@ const moduleSubmodulesMap = {
     ],
     '/quotations': [
         { label: 'Quotations Register', path: '/quotations' },
-        { label: 'Create New Quotation', path: '/quotations/new' },
+        { label: 'Create New Quotation', path: '/quotations/new', createKey: 'quotation_list' },
         { label: 'Quote Conversion Report', path: '/quotations/conversion-report' },
         { label: 'Approvals Queue', path: '/sales/approvals' }
     ],
@@ -380,7 +380,7 @@ const moduleSubmodulesMap = {
 
 const Header = ({ sidebarOpen, toggleSidebar }) => {
     const navigate = useNavigate();
-    const { user, logout, isAdmin, isSuperAdmin, hasAccess, updateUser, activeBranch, activeBranchId, setActiveBranch, assignedBranches } = useAuth();
+    const { user, logout, isAdmin, isSuperAdmin, hasAccess, can, updateUser, activeBranch, activeBranchId, setActiveBranch, assignedBranches } = useAuth();
     const { isDarkMode, toggleTheme } = useTheme();
     const { isReconnecting } = useSocket();
 
@@ -547,6 +547,10 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                 else navigate('/quotations');
             } else if (n.type === 'Planning') {
                 navigate('/planning');
+            } else if (n.type === 'TypeTest') {
+                navigate(n.relatedId ? `/type-tests?open=${n.relatedId}` : '/type-tests');
+            } else if (n.type === 'StockAudit') {
+                navigate(n.relatedId ? `/inventory/stock-audit/${n.relatedId}` : '/inventory/stock-audit');
             } else if (n.type.startsWith('MEETING_')) {
                 navigate('/meetings');
             } else {
@@ -681,7 +685,7 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                                      </div>
                                      {searchMatches.length > 0 ? (
                                          searchMatches.map((page) => {
-                                             const submodules = moduleSubmodulesMap[page.path] || [];
+                                             const submodules = (moduleSubmodulesMap[page.path] || []).filter((sub) => !sub.createKey || can(sub.createKey, 'create'));
                                              const isExpanded = expandedPagePath === page.path || searchMatches.length === 1;
 
                                              return (

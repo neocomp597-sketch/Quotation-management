@@ -5,10 +5,12 @@ import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import { MdBook, MdSearch, MdAdd, MdRemoveRedEye, MdEdit, MdDelete, MdStorage } from 'react-icons/md';
 import Modal from '../components/Modal';
+import usePermission from '../hooks/usePermission';
 
 const KnowledgeBase = () => {
     const { isAdmin, isSuperAdmin } = useAuth();
     const isExecutive = isAdmin || isSuperAdmin;
+    const { canCreate, canModify, canDelete } = usePermission('csm_kb');
 
     const [loading, setLoading] = useState(false);
     const [seeding, setSeeding] = useState(false);
@@ -156,7 +158,7 @@ const KnowledgeBase = () => {
                         Access solutions, hardware guides, billing policies, and self-help files.
                     </p>
                 </div>
-                {isExecutive && (
+                {isExecutive && canCreate && (
                     <div className="flex items-center gap-2 self-start md:self-auto">
                         <button
                             onClick={() => handleOpenForm()}
@@ -183,12 +185,14 @@ const KnowledgeBase = () => {
                     </div>
                     {isExecutive && (
                         <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
-                            <button
-                                onClick={() => handleOpenForm()}
-                                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white text-slate-900 font-black px-6 py-4 rounded-2xl hover:bg-slate-50 transition-all text-xs uppercase tracking-wider"
-                            >
-                                <MdAdd size={16} /> Create Article
-                            </button>
+                            {canCreate && (
+                                <button
+                                    onClick={() => handleOpenForm()}
+                                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white text-slate-900 font-black px-6 py-4 rounded-2xl hover:bg-slate-50 transition-all text-xs uppercase tracking-wider"
+                                >
+                                    <MdAdd size={16} /> Create Article
+                                </button>
+                            )}
                             <button
                                 onClick={handleSeedKb}
                                 disabled={seeding}
@@ -297,18 +301,22 @@ const KnowledgeBase = () => {
                                         </div>
                                         {isExecutive && (
                                             <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={() => handleOpenForm(selectedArticle)}
-                                                    className="p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-primary-600 rounded-xl transition-all border border-slate-100"
-                                                >
-                                                    <MdEdit size={16} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(selectedArticle._id)}
-                                                    className="p-2.5 bg-rose-50 hover:bg-rose-100/50 text-rose-500 rounded-xl transition-all border border-rose-100"
-                                                >
-                                                    <MdDelete size={16} />
-                                                </button>
+                                                {canModify && (
+                                                    <button
+                                                        onClick={() => handleOpenForm(selectedArticle)}
+                                                        className="p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-primary-600 rounded-xl transition-all border border-slate-100"
+                                                    >
+                                                        <MdEdit size={16} />
+                                                    </button>
+                                                )}
+                                                {canDelete && (
+                                                    <button
+                                                        onClick={() => handleDelete(selectedArticle._id)}
+                                                        className="p-2.5 bg-rose-50 hover:bg-rose-100/50 text-rose-500 rounded-xl transition-all border border-rose-100"
+                                                    >
+                                                        <MdDelete size={16} />
+                                                    </button>
+                                                )}
                                             </div>
                                         )}
                                     </div>

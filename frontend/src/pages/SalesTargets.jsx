@@ -3,6 +3,7 @@ import { salesService, userService } from '../services/api';
 import { toast } from 'react-toastify';
 import { MdAdd, MdClose, MdFlag, MdEdit, MdDelete } from 'react-icons/md';
 import Modal from '../components/Modal';
+import usePermission from '../hooks/usePermission';
 
 const formatCurrency = (val) => {
     if (!val) return '₹0';
@@ -14,6 +15,7 @@ const formatCurrency = (val) => {
 const PERIODS = ['monthly', 'quarterly', 'yearly'];
 
 const SalesTargets = () => {
+    const { canCreate, canModify, canDelete } = usePermission('sales_targets');
     const [targets, setTargets] = useState([]);
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -121,10 +123,10 @@ const SalesTargets = () => {
                                 filterPeriod === p ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-600'
                             }`}>{p}</button>
                     ))}
-                    <button onClick={openCreate}
+                    {canCreate && <button onClick={openCreate}
                         className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-600/25 flex items-center gap-1.5">
                         <MdAdd size={18} /> Set Target
-                    </button>
+                    </button>}
                 </div>
             </div>
 
@@ -142,8 +144,8 @@ const SalesTargets = () => {
                                         <p className="text-xs text-slate-400 font-bold">{t.periodLabel} • {t.period}</p>
                                     </div>
                                     <div className="flex items-center gap-1">
-                                        <button onClick={() => openEdit(t)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><MdEdit size={16} /></button>
-                                        <button onClick={() => handleDelete(t._id)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600"><MdDelete size={16} /></button>
+                                        {canModify && <button onClick={() => openEdit(t)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><MdEdit size={16} /></button>}
+                                        {canDelete && <button onClick={() => handleDelete(t._id)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600"><MdDelete size={16} /></button>}
                                     </div>
                                 </div>
                                 <div className="flex items-end justify-between mb-3">
@@ -176,7 +178,7 @@ const SalesTargets = () => {
             {targets.length === 0 && !loading && (
                 <div className="text-center py-20 text-slate-400">
                     <p className="text-lg font-bold mb-2">No targets set</p>
-                    <button onClick={openCreate} className="text-indigo-600 font-bold hover:underline">Set your first target</button>
+                    {canCreate && <button onClick={openCreate} className="text-indigo-600 font-bold hover:underline">Set your first target</button>}
                 </div>
             )}
 

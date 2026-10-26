@@ -7,7 +7,7 @@ const NotificationSchema = new mongoose.Schema({
     type: { 
         type: String, 
         enum: [
-            'Reminder', 'Alert', 'Overdue', 'Quotation', 'Planning',
+            'Reminder', 'Alert', 'Overdue', 'Quotation', 'Planning', 'TypeTest', 'StockAudit',
             'MEETING_CREATED', 'MEETING_REMINDER_1_DAY', 'MEETING_REMINDER_30_MIN', 
             'MEETING_UPDATED', 'MEETING_CANCELLED', 'MEETING_RESCHEDULED'
         ], 

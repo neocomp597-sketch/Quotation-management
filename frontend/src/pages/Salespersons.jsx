@@ -5,12 +5,14 @@ import PaginationControls from '../components/PaginationControls';
 import { salespersonService, territoryService } from '../services/api';
 import Modal from '../components/Modal';
 import { toast } from 'react-toastify';
+import usePermission from '../hooks/usePermission';
 
 const LIST_PAGE_SIZE = 20;
 
 const Salespersons = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
     const { id: routeId } = useParams();
+    const { canCreate, canModify } = usePermission('admin_salespersons');
     const [salespersons, setSalespersons] = useState([]);
     const [territories, setTerritories] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -156,13 +158,15 @@ const Salespersons = ({ isCreatePage, isEditPage }) => {
                                 Manage sales staff, profiles, and their territory mapping.
                             </p>
                         </div>
-                        <button
-                            onClick={() => navigate('/salespersons/new')}
-                            className="flex items-center gap-2 px-6 py-4 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-lg shadow-primary-600/20 active:scale-95 self-start md:self-auto animate-fade-in-up cursor-pointer"
-                        >
-                            <MdAdd size={18} />
-                            New Salesperson
-                        </button>
+                        {canCreate && (
+                            <button
+                                onClick={() => navigate('/salespersons/new')}
+                                className="flex items-center gap-2 px-6 py-4 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-lg shadow-primary-600/20 active:scale-95 self-start md:self-auto animate-fade-in-up cursor-pointer"
+                            >
+                                <MdAdd size={18} />
+                                New Salesperson
+                            </button>
+                        )}
                     </div>
 
                     {/* Filter & View Mode Toggle Bar */}
@@ -219,7 +223,7 @@ const Salespersons = ({ isCreatePage, isEditPage }) => {
                         ) : filteredSalespersons.length === 0 ? (
                             <div className="text-center py-20 text-slate-400">
                                 <p className="text-lg font-bold">No salespersons found.</p>
-                                <p className="text-sm">Try adjusting search or click "New Salesperson" to add one.</p>
+                                <p className="text-sm">{canCreate ? 'Try adjusting search or click "New Salesperson" to add one.' : 'Try adjusting search.'}</p>
                             </div>
                         ) : viewMode === 'card' ? (
                             /* CARD VIEW */
@@ -258,13 +262,15 @@ const Salespersons = ({ isCreatePage, isEditPage }) => {
                                                 </div>
                                             </div>
                                             
-                                            <button
-                                                onClick={() => navigate(`/salespersons/edit/${user._id}`)}
-                                                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all cursor-pointer"
-                                                title="Edit Salesperson"
-                                            >
-                                                <MdEdit size={16} />
-                                            </button>
+                                            {canModify && (
+                                                <button
+                                                    onClick={() => navigate(`/salespersons/edit/${user._id}`)}
+                                                    className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all cursor-pointer"
+                                                    title="Edit Salesperson"
+                                                >
+                                                    <MdEdit size={16} />
+                                                </button>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -327,13 +333,15 @@ const Salespersons = ({ isCreatePage, isEditPage }) => {
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-4 text-center">
-                                                        <button
-                                                            onClick={() => navigate(`/salespersons/edit/${user._id}`)}
-                                                            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
-                                                            title="Edit Salesperson"
-                                                        >
-                                                            <MdEdit size={16} />
-                                                        </button>
+                                                        {canModify && (
+                                                            <button
+                                                                onClick={() => navigate(`/salespersons/edit/${user._id}`)}
+                                                                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+                                                                title="Edit Salesperson"
+                                                            >
+                                                                <MdEdit size={16} />
+                                                            </button>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             ))}

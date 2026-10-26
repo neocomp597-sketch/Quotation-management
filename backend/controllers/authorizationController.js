@@ -1,12 +1,19 @@
 const RolePermission = require('../models/RolePermission');
 const User = require('../models/User');
 const Company = require('../models/Company');
+const AuditLog = require('../models/AuditLog');
 const { getTenantId } = require('../middlewares/tenantContext');
+const { invalidateRolePermissionCache, getRolePermissions } = require('../middlewares/permissionMiddleware');
+const { broadcastCrmUpdate } = require('../config/socket');
 const {
     MENU_GROUPS,
     ROLE_OPTIONS,
     ROLE_LABELS,
     DEFAULT_ROLE_PERMISSIONS,
+    PERMISSION_ACTIONS,
+    getPermissionActionMap,
+    getLockedViewKeys,
+    mergeUserPermissions,
     sanitizePermissions,
     resolvePermissions,
     buildPermissions
@@ -40,6 +47,9 @@ const toPermissionObject = (menuVisibility) => {
     return {};
 };
 
+// What "Reset Role Defaults" restores: the built-in defaults, or nothing for a custom role.
+const getRoleDefaults = (roleKey) => resolvePermissions(roleKey, DEFAULT_ROLE_PERMISSIONS[roleKey] || buildPermissions([]));
+
 const buildRolePayload = (doc) => {
     const roleKey = doc.role;
     const rawPerms = toPermissionObject(doc.menuVisibility);
@@ -49,8 +59,48 @@ const buildRolePayload = (doc) => {
         description: doc.description || '',
         locked:      false,
         isCustom:    doc.isCustom || false,
-        permissions: resolvePermissions(roleKey, rawPerms)
+        permissions: resolvePermissions(roleKey, rawPerms),
+        defaults:    getRoleDefaults(roleKey),
+        lockedViewKeys: getLockedViewKeys(roleKey),
+        updatedAt:   doc.updatedAt || null
     };
+};
+
+/** The flags that differ between two permission objects, as { key: [before, after] }. */
+const changedFlags = (before = {}, after = {}) => Array.from(new Set([...Object.keys(before), ...Object.keys(after)]))
+    .filter((key) => Boolean(before[key]) !== Boolean(after[key]))
+    .reduce((changes, key) => {
+        changes[key] = [Boolean(before[key]), Boolean(after[key])];
+        return changes;
+    }, {});
+
+/** Records a permission change; a failure here never fails the save itself. */
+const recordPermissionAudit = async ({ req, companyId, entityType, entityId, action, changes, reason }) => {
+    if (!Object.keys(changes).length) return;
+    try {
+        await AuditLog.create({
+            action,
+            entityType,
+            entityId,
+            userId: req.user.id,
+            userName: req.user.name,
+            oldValue: Object.fromEntries(Object.entries(changes).map(([key, [before]]) => [key, before])),
+            newValue: Object.fromEntries(Object.entries(changes).map(([key, [, after]]) => [key, after])),
+            reason,
+            companyId
+        });
+    } catch (error) {
+        console.warn('Permission audit log failed:', error.message);
+    }
+};
+
+/** Tells open browser sessions to reload their permissions. */
+const announcePermissionChange = (data) => {
+    try {
+        broadcastCrmUpdate('PERMISSIONS', 'UPDATE', data);
+    } catch (error) {
+        console.warn('Permission change broadcast failed:', error.message);
+    }
 };
 
 // ─── GET /authorization ────────────────────────────────────────────────────
@@ -80,7 +130,12 @@ exports.getAuthorizationMatrix = async (req, res) => {
         const allDocs = [...syntheticBuiltIns, ...documents];
         const roles   = allDocs.map(buildRolePayload);
 
-        res.json({ menuGroups: MENU_GROUPS, roles });
+        res.json({
+            menuGroups: MENU_GROUPS,
+            roles,
+            actions: PERMISSION_ACTIONS,
+            permissionActions: getPermissionActionMap()
+        });
     } catch (error) {
         console.error('getAuthorizationMatrix error:', error);
         res.status(500).json({ message: 'Failed to load authorization matrix', error: error.message });
@@ -92,8 +147,7 @@ exports.getMyPermissions = async (req, res) => {
     try {
         const companyId = await getEffectiveCompanyId(req);
         const role     = req.user?.role || 'sales';
-        const document = await RolePermission.findOne({ role, ...(companyId ? { companyId } : {}) }).select('menuVisibility').lean();
-        const rolePerms = resolvePermissions(role, toPermissionObject(document?.menuVisibility));
+        const rolePerms = await getRolePermissions(companyId, role);
 
         let userCustom = {};
         if (req.user?.id) {
@@ -101,12 +155,11 @@ exports.getMyPermissions = async (req, res) => {
             userCustom = toPermissionObject(userDoc?.customPermissions);
         }
 
-        const mergedPermissions = { ...rolePerms, ...userCustom };
-
         res.json({
             role,
             menuGroups:  MENU_GROUPS,
-            permissions: mergedPermissions
+            permissions: mergeUserPermissions(role, rolePerms, userCustom),
+            permissionActions: getPermissionActionMap()
         });
     } catch (error) {
         console.error('getMyPermissions error:', error);
@@ -123,14 +176,40 @@ exports.updateRolePermissions = async (req, res) => {
             return res.status(400).json({ message: 'Company context missing' });
         }
 
-        const sanitizedPermissions = sanitizePermissions(req.body?.permissions || {});
+        const permissionsInput = req.body?.permissions;
+        if (!permissionsInput || typeof permissionsInput !== 'object' || Array.isArray(permissionsInput)) {
+            return res.status(400).json({ message: 'Permissions are required' });
+        }
+
+        const previous = await RolePermission.findOne({ role, companyId }).select('menuVisibility').lean();
+        const previousPermissions = resolvePermissions(role, toPermissionObject(previous?.menuVisibility));
+
+        // One document holds the whole role, so the update is applied all at once or not at all.
+        // A new document takes companyId from the filter (and from tenantPlugin's $setOnInsert).
+        const sanitizedPermissions = sanitizePermissions(permissionsInput);
         const doc = await RolePermission.findOneAndUpdate(
             { role, companyId },
-            { $set: { menuVisibility: sanitizedPermissions, companyId } },
+            {
+                $set: { menuVisibility: sanitizedPermissions, updatedBy: req.user?.id || null },
+                $setOnInsert: { createdBy: req.user?.id || null }
+            },
             { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true, runValidators: false }
         );
 
-        res.json(buildRolePayload(doc));
+        await invalidateRolePermissionCache(companyId, role);
+        const payload = buildRolePayload(doc);
+        await recordPermissionAudit({
+            req,
+            companyId,
+            entityType: 'RolePermission',
+            entityId: doc._id,
+            action: req.body?.reason === 'reset' ? 'ROLE_PERMISSIONS_RESET' : 'ROLE_PERMISSIONS_UPDATED',
+            changes: changedFlags(previousPermissions, payload.permissions),
+            reason: `Role: ${role}`
+        });
+        announcePermissionChange({ companyId, role });
+
+        res.json(payload);
     } catch (error) {
         console.error('updateRolePermissions error:', error);
         res.status(500).json({ message: 'Failed to update permissions', error: error.message });
@@ -169,7 +248,9 @@ exports.createRole = async (req, res) => {
             description:   (description || '').trim(),
             isCustom:      true,
             menuVisibility: defaultPerms,
-            companyId
+            companyId,
+            createdBy:     req.user?.id || null,
+            updatedBy:     req.user?.id || null
         });
 
         res.status(201).json(buildRolePayload(doc));
@@ -211,6 +292,8 @@ exports.deleteRole = async (req, res) => {
             return res.status(400).json({ message: 'Built-in roles cannot be deleted' });
         }
         await RolePermission.deleteOne({ role, ...(companyId ? { companyId } : {}) });
+        await invalidateRolePermissionCache(companyId, role);
+        announcePermissionChange({ companyId, role });
         res.json({ message: `Role "${role}" deleted` });
     } catch (error) {
         console.error('deleteRole error:', error);

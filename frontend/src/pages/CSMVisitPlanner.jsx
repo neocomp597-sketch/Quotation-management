@@ -10,8 +10,10 @@ import {
 import Modal from '../components/Modal';
 import { formatDate, formatDateTime } from '../utils/helpers';
 import DateInput from '../components/DateInput';
+import usePermission from '../hooks/usePermission';
 
 const CSMVisitPlanner = () => {
+    const { canCreate, canModify } = usePermission('csm_visits');
     const [loading, setLoading] = useState(false);
     const [visits, setVisits] = useState([]);
     const [engineers, setEngineers] = useState([]);
@@ -243,13 +245,15 @@ const CSMVisitPlanner = () => {
                     >
                         <MdRefresh size={20} />
                     </button>
-                    <button
-                        onClick={handleOpenScheduleModal}
-                        className="px-5 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-xs tracking-wider rounded-2xl transition-all shadow-md flex items-center gap-2 active:scale-95"
-                    >
-                        <MdAdd size={20} />
-                        Schedule New Visit
-                    </button>
+                    {canCreate && (
+                        <button
+                            onClick={handleOpenScheduleModal}
+                            className="px-5 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-xs tracking-wider rounded-2xl transition-all shadow-md flex items-center gap-2 active:scale-95"
+                        >
+                            <MdAdd size={20} />
+                            Schedule New Visit
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -397,17 +401,19 @@ const CSMVisitPlanner = () => {
                                                                 {dayVisits.length} {dayVisits.length === 1 ? 'visit' : 'visits'}
                                                             </span>
                                                         )}
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleOpenScheduleModal(day);
-                                                            }}
-                                                            title={`Schedule visit for ${formatDate(day)}`}
-                                                            className="hidden text-primary-600 hover:text-white transition-all"
-                                                        >
-                                                            <MdAdd size={14} />
-                                                        </button>
+                                                        {canCreate && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleOpenScheduleModal(day);
+                                                                }}
+                                                                title={`Schedule visit for ${formatDate(day)}`}
+                                                                className="hidden text-primary-600 hover:text-white transition-all"
+                                                            >
+                                                                <MdAdd size={14} />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
 
@@ -462,17 +468,19 @@ const CSMVisitPlanner = () => {
                                                     }`}>
                                                         {day.getDate()}
                                                     </span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleOpenScheduleModal(day);
-                                                        }}
-                                                        title={`Schedule visit for ${formatDate(day)}`}
-                                                        className="hidden text-primary-600 hover:text-white transition-all"
-                                                    >
-                                                        <MdAdd size={14} />
-                                                    </button>
+                                                    {canCreate && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleOpenScheduleModal(day);
+                                                            }}
+                                                            title={`Schedule visit for ${formatDate(day)}`}
+                                                            className="hidden text-primary-600 hover:text-white transition-all"
+                                                        >
+                                                            <MdAdd size={14} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
 
@@ -647,17 +655,19 @@ const CSMVisitPlanner = () => {
                         )}
 
                         <div className="flex gap-3 pt-2">
-                            <button
-                                onClick={() => {
-                                    setRescheduleDate(selectedVisit.scheduledDate ? new Date(selectedVisit.scheduledDate).toISOString().slice(0, 16) : '');
-                                    setRescheduleEngineer(selectedVisit.engineerId?._id || selectedVisit.engineerId || '');
-                                    setRescheduleTicketType(selectedVisit.ticketType || '');
-                                    setShowRescheduleModal(true);
-                                }}
-                                className="flex-1 py-3 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all"
-                            >
-                                Reschedule Visit
-                            </button>
+                            {canModify && (
+                                <button
+                                    onClick={() => {
+                                        setRescheduleDate(selectedVisit.scheduledDate ? new Date(selectedVisit.scheduledDate).toISOString().slice(0, 16) : '');
+                                        setRescheduleEngineer(selectedVisit.engineerId?._id || selectedVisit.engineerId || '');
+                                        setRescheduleTicketType(selectedVisit.ticketType || '');
+                                        setShowRescheduleModal(true);
+                                    }}
+                                    className="flex-1 py-3 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all"
+                                >
+                                    Reschedule Visit
+                                </button>
+                            )}
                             <button
                                 onClick={() => setShowDetailModal(false)}
                                 className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold uppercase transition-all"

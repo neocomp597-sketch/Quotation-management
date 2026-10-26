@@ -6,8 +6,10 @@ import { formatDate } from '../utils/helpers';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 import DateInput from '../components/DateInput';
+import usePermission from '../hooks/usePermission';
 
 const CustomerPricingDashboard = ({ customerId: propCustomerId, inlineMode = false }) => {
+    const { canCreate } = usePermission('master_customers');
     const [customers, setCustomers] = useState([]);
     const [selectedCustomerId, setSelectedCustomerId] = useState(propCustomerId || '');
     const [loading, setLoading] = useState(true);
@@ -297,24 +299,26 @@ const CustomerPricingDashboard = ({ customerId: propCustomerId, inlineMode = fal
                                     <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
                                     Rate Agreements
                                 </h3>
-                                <button 
-                                    onClick={() => {
-                                        setNewContract({
-                                            contractNumber: `CTR-${Math.floor(1000 + Math.random() * 9000)}`,
-                                            title: 'Active Project Rate Agreement',
-                                            priceBookId: '',
-                                            startDate: new Date().toISOString().split('T')[0],
-                                            endDate: new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0],
-                                            terms: '',
-                                            status: 'Active'
-                                        });
-                                        setIsContractModalOpen(true);
-                                    }}
-                                    className="p-1.5 bg-primary-50 text-primary-600 rounded-lg hover:bg-primary-100 transition-colors"
-                                    title="Add Contract"
-                                >
-                                    <MdAdd size={16} />
-                                </button>
+                                {canCreate && (
+                                    <button
+                                        onClick={() => {
+                                            setNewContract({
+                                                contractNumber: `CTR-${Math.floor(1000 + Math.random() * 9000)}`,
+                                                title: 'Active Project Rate Agreement',
+                                                priceBookId: '',
+                                                startDate: new Date().toISOString().split('T')[0],
+                                                endDate: new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0],
+                                                terms: '',
+                                                status: 'Active'
+                                            });
+                                            setIsContractModalOpen(true);
+                                        }}
+                                        className="p-1.5 bg-primary-50 text-primary-600 rounded-lg hover:bg-primary-100 transition-colors"
+                                        title="Add Contract"
+                                    >
+                                        <MdAdd size={16} />
+                                    </button>
+                                )}
                             </div>
 
                             <div className="flex-1 overflow-y-auto space-y-3 pr-1 max-h-60">

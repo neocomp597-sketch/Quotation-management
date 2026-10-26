@@ -26,11 +26,12 @@ import {
   statusService,
 } from "../services/api";
 import * as XLSX from "xlsx";
-import ImportModal from "../components/ImportModal";
+import ImportWizard from "../components/import/ImportWizard";
 import PortalDropdown from "../components/PortalDropdown";
 import { formatToLakhs, formatToIndian } from "../utils/formatters";
 import { useAuth } from "../context/AuthContext";
 import { useSubmitGuard } from "../hooks/useSubmitGuard";
+import usePermission from "../hooks/usePermission";
 
 // Financial year months (Apr-Mar)
 const FY_MONTHS = [
@@ -206,6 +207,7 @@ const getReportYearOptions = (financialYear) => {
 
 const PlanningScreen = () => {
   const { hasAccess } = useAuth();
+  const { canCreate, canModify, canDelete } = usePermission("planning_screen");
   const [financialYear, setFinancialYear] = useState(getFinancialYears()[1]);
 
   const isSelectedYearPrevious = useMemo(() => {
@@ -1642,7 +1644,7 @@ const PlanningScreen = () => {
               ⚠️ Read-only (Previous Year)
             </span>
           )}
-          {canEdit && (
+          {canEdit && canCreate && (
             <button
               onClick={() => setIsImportModalOpen(true)}
               className="px-5 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center gap-2"
@@ -1826,7 +1828,7 @@ const PlanningScreen = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 dark:divide-slate-800/60">
-                {canEdit && (
+                {canEdit && (editingId ? canModify : canCreate) && (
                   <tr className="bg-primary-50/40 dark:bg-primary-950/40 border-b border-primary-100 dark:border-primary-900/50 align-top">
                     <td className="py-2 px-2 border border-slate-200 dark:border-slate-800">
                       {editingId ? (
@@ -2313,20 +2315,20 @@ const PlanningScreen = () => {
                           <div className="flex items-center gap-1">
                             {canEdit && (
                               <>
-                                <button
+                                {canModify && <button
                                   onClick={() => handleEditEntry(entry)}
                                   className={`p-1.5 rounded-lg transition-all ${editingId === entry._id ? "text-primary-600 bg-primary-50 dark:bg-primary-950/50" : "text-slate-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-slate-800"}`}
                                   title="Edit Entry"
                                 >
                                   <MdEdit size={16} />
-                                </button>
-                                <button
+                                </button>}
+                                {canDelete && <button
                                   onClick={() => handleDeleteEntry(entry._id)}
                                   className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-all"
                                   title="Delete Entry"
                                 >
                                   <MdDelete size={16} />
-                                </button>
+                                </button>}
                               </>
                             )}
                           </div>
@@ -3183,23 +3185,17 @@ const PlanningScreen = () => {
         </div>
       )}
 
-      <ImportModal
+      <ImportWizard
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         title={`Import Planning - FY ${financialYear}`}
-        type="planning"
-        onImport={async (file, onUploadProgress) => {
-          const result = await importService.importPlanning(
-            file,
-            financialYear,
-            onUploadProgress,
-          );
-          await fetchData();
-          return result;
-        }}
+        module="planning"
+        params={{ financialYear }}
+        templateName={`planning_import_template_${financialYear}.xlsx`}
         onDownloadTemplate={() =>
           importService.getPlanningTemplate(financialYear)
         }
+        onImported={fetchData}
       />
     </div>
   );

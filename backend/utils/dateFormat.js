@@ -31,7 +31,13 @@ const formatDateTime = (value, fallback = '-') => {
     return `${formatDate(value)}, ${pad2(hours % 12 || 12)}:${pad2(d.getUTCMinutes())} ${hours < 12 ? 'AM' : 'PM'}`;
 };
 
-const fullYear = (text) => (text.length === 2 ? 2000 + Number(text) : Number(text));
+// Two-digit years: up to 20 years ahead are this century (26 -> 2026), older ones the last
+// (90 -> 1990), so a date of birth exported as 20.MAY.90 reads back as 1990, not 2090.
+const fullYear = (text) => {
+    if (text.length !== 2) return Number(text);
+    const year = 2000 + Number(text);
+    return year > new Date().getFullYear() + 20 ? year - 100 : year;
+};
 
 // UTC midnight of the day, or null when the day does not exist (31.02).
 const utcDay = (year, monthIndex, day) => {

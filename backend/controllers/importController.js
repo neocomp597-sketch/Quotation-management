@@ -72,7 +72,20 @@ const Contact = require('../models/Contact');
 const Contract = require('../models/Contract');
 const Asset = require('../models/Asset');
 const { deriveBasePriceFromVendors } = require('../utils/vendorSelection');
-const { invalidateCustomerCaches, invalidateProductCaches } = require('../utils/cacheInvalidation');
+const { invalidateCustomerCaches, invalidateProductCaches, invalidateAssetCaches } = require('../utils/cacheInvalidation');
+const { assertProductUnique, findDuplicate, createBatchTracker, loadProductIndex } = require('../utils/productUniqueness');
+const mongoose = require('mongoose');
+const {
+    getImportBatchSize,
+    chunk,
+    readUploadedSheet,
+    yieldToEventLoop,
+    insertRows,
+    writeRows,
+    describeWriteError,
+    reserveSequence
+} = require('../utils/importBatch');
+const { reportImportProgress } = require('../utils/importProgress');
 
 const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const toBoolean = (value) => {
@@ -293,18 +306,80 @@ const getCurrentFinancialYear = () => {
     return `${startYear}-${String(startYear + 1).slice(-2)}`;
 };
 
+// Customers whose code, customer name or company name equals one of `values` - the match
+// findCustomerByLookup makes (exact, ignoring case) - for many values in one query, in the
+// tenant and branch scope of the request. Map: value in capitals -> the first such customer in
+// collection order, which is the one findOne would return.
+const CUSTOMER_LOOKUP_FIELDS = ['externalCode', 'customerName', 'companyName'];
+const loadCustomersByLookup = async (values, { filter = {}, select = '' } = {}) => {
+    const lookups = [...new Set(values.map((value) => cleanCellValue(value)).filter(Boolean))];
+    const found = new Map();
+    for (const part of chunk(lookups, 1000)) {
+        const wanted = new Set(part.map((value) => value.toUpperCase()));
+        const docs = await Customer.find({
+            ...filter,
+            $or: CUSTOMER_LOOKUP_FIELDS.map((field) => ({ [field]: { $in: part } }))
+        })
+            .collation({ locale: 'en', strength: 2 })
+            .select(select ? `${select} ${CUSTOMER_LOOKUP_FIELDS.join(' ')}` : '')
+            .lean();
+        docs.forEach((doc) => {
+            CUSTOMER_LOOKUP_FIELDS.forEach((field) => {
+                const key = String(doc[field] ?? '').toUpperCase();
+                if (wanted.has(key) && !found.has(key)) found.set(key, doc);
+            });
+        });
+    }
+    return found;
+};
+
+// Products saved before tenancy carry no companyId and may be reused by an import (see
+// importAssets). Each value is looked up once (prefetch, per batch) and kept for the import.
+const createLegacyProductLookup = (companyId) => {
+    const cache = new Map();
+    const legacy = new Set();
+    const keyOf = (field, value) => `${field}:${cleanCellValue(value).toUpperCase()}`;
+    return {
+        has: (product) => legacy.has(product),
+        get: (field, value) => (companyId ? cache.get(keyOf(field, value)) || null : null),
+        async prefetch(pairs) {
+            if (!companyId) return;
+            const missing = { productCode: new Set(), productName: new Set() };
+            pairs.forEach(([field, value]) => {
+                const cleaned = cleanCellValue(value);
+                if (cleaned && !cache.has(keyOf(field, cleaned))) missing[field].add(cleaned);
+            });
+            for (const field of Object.keys(missing)) {
+                const fieldValues = [...missing[field]];
+                fieldValues.forEach((value) => cache.set(keyOf(field, value), null));
+                for (const part of chunk(fieldValues, 1000)) {
+                    const docs = await Product.find({ $or: [{ companyId: null }, { companyId: { $exists: false } }], [field]: { $in: part } })
+                        .collation({ locale: 'en', strength: 2 })
+                        .setOptions({ bypassTenant: true })
+                        .lean();
+                    docs.forEach((doc) => {
+                        const key = keyOf(field, doc[field]);
+                        if (cache.get(key) === null) {
+                            cache.set(key, doc);
+                            legacy.add(doc);
+                        }
+                    });
+                }
+            }
+        }
+    };
+};
+
 const importProducts = async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet);
+        const sheet = readUploadedSheet(req);
+        const data = sheet.rows;
 
-        const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
+        const headers = sheet.headerRow;
         const cleanHeaders = headers.map(h => String(h || '').trim().toLowerCase());
         
         const hasProductCode = cleanHeaders.some(h => ['product code', 'productcode', 'code'].includes(h));
@@ -329,9 +404,7 @@ const importProducts = async (req, res) => {
             errors: []
         };
 
-        const seenCodesInFile = new Set();
-        const seenNamesInFile = new Set();
-
+        const importBatch = createBatchTracker();
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
             try {
@@ -344,11 +417,22 @@ const importProducts = async (req, res) => {
                 const uom = pickFirstNonEmpty(row.UOM ?? row.uom ?? row.Unit ?? row.unit, 'Nos');
                 const productImageUrl = pickFirstNonEmpty(row['Image URL'] ?? row.productImageUrl ?? row.imageUrl ?? row.image, '');
                 const status = pickFirstNonEmpty(row.Status ?? row.status, 'Active');
+                const vendorName = pickFirstNonEmpty(row['Vendor Name'] ?? row.vendorName);
+                const vendorPrice = toSafeNumber(row['Vendor Price'] ?? row.vendorPrice);
+                const vendorStock = toSafeNumber(row['Vendor Stock'] ?? row.vendorStock ?? row.stock);
+                const isPrimary = toBoolean(row['Is Primary'] ?? row.isPrimary ?? true);
+                // Test Type (Yes/No) lists the product in the Type Test product dropdown.
+                // A blank cell keeps the stored setting; a new product defaults to No.
+                const testTypeRaw = String(pickFirstNonEmpty(row['Test Type'], row['Applicable for Test Type'], row.testType) ?? '').trim().toLowerCase();
+                if (testTypeRaw && !['yes', 'y', 'no', 'n', 'true', 'false'].includes(testTypeRaw)) {
+                    throw new Error(`Test Type must be Yes or No (got "${testTypeRaw}")`);
+                }
 
                 if (!productName && productCode) {
                     productName = productCode;
                 }
 
+                const codeSupplied = Boolean(productCode);
                 if (!productCode) {
                     if (productName) {
                         productCode = productName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30);
@@ -358,37 +442,37 @@ const importProducts = async (req, res) => {
                     }
                 }
 
-                const cleanCode = String(productCode).trim();
-                const cleanName = String(productName).trim();
-                const normCode = cleanCode.toLowerCase();
-                const normName = cleanName.toLowerCase();
-
-                // Disallow duplicate codes or names within the uploaded file
-                if (seenCodesInFile.has(normCode)) {
-                    results.skipped++;
-                    results.errors.push(`Row ${i + 2}: Duplicate Product Code "${cleanCode}" in uploaded file. Duplicate products are not allowed.`);
-                    continue;
-                }
-                if (seenNamesInFile.has(normName)) {
-                    results.skipped++;
-                    results.errors.push(`Row ${i + 2}: Duplicate Product Name "${cleanName}" in uploaded file. Duplicate products are not allowed.`);
-                    continue;
-                }
-                seenCodesInFile.add(normCode);
-                seenNamesInFile.add(normName);
-
-                const companyId = req.user?.companyId;
-                const companyFilter = companyId ? { companyId } : {};
+                const batchError = importBatch.check({ productCode, productName });
+                if (batchError) throw new Error(batchError);
+                importBatch.add({ productCode, productName }, i + 2);
 
                 let existing = null;
                 if (cleanCode) {
                     existing = await Product.findOne({ ...companyFilter, productCode: buildExactRegex(cleanCode) });
                 }
-                
-                if (!existing && cleanName) {
-                    existing = await Product.findOne({ ...companyFilter, productName: buildExactRegex(cleanName) });
+
+                // A row without a code updates the product with that name. A row with a code
+                // that is new but a name that is taken is a duplicate: updating the named
+                // product would silently change its code under existing invoices.
+                if (!existing && productName) {
+                    const sameName = await findDuplicate('productName', productName, { companyId: req.user?.companyId });
+                    if (sameName && codeSupplied) {
+                        throw new Error(`Product Name "${productName}" already exists under code ${sameName.productCode}. Product names must be unique.`);
+                    }
+                    if (sameName) {
+                        existing = sameName;
+                        productCode = sameName.productCode;
+                    }
                 }
-                
+
+                await assertProductUnique({
+                    productCode,
+                    productName,
+                    companyId: req.user?.companyId,
+                    excludeId: existing?._id,
+                    previous: existing
+                });
+
                 const productData = {
                     productCode,
                     productName,
@@ -401,6 +485,9 @@ const importProducts = async (req, res) => {
                     status,
                     companyId: req.user?.companyId
                 };
+                if (testTypeRaw) {
+                    productData.applicableForTypeTest = ['yes', 'y', 'true'].includes(testTypeRaw);
+                }
 
                 const isVendorUser = req.user?.role === 'vendor' || String(req.user?.role || '').toLowerCase() === 'vendor';
                 if (isVendorUser && req.user?.vendorId) {
@@ -478,12 +565,10 @@ const importCustomers = async (req, res) => {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet);
+        const sheet = readUploadedSheet(req);
+        const data = sheet.rows;
 
-        const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
+        const headers = sheet.headerRow;
         const cleanHeaders = headers.map(h => String(h || '').trim().toLowerCase());
         
         const hasCustomerName = cleanHeaders.some(h => [
@@ -532,6 +617,7 @@ const importCustomers = async (req, res) => {
         });
 
         const bulkOps = [];
+        const opRows = [];
 
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
@@ -627,13 +713,17 @@ const importCustomers = async (req, res) => {
                             }
                         }
                     });
+                    opRows.push({ rowNumber: i + 2, action: 'updated' });
                     results.updated++;
                 } else {
                     bulkOps.push({
                         insertOne: {
-                            document: customerData
+                            // A new customer belongs to the branch selected in the header: Customer
+                            // Master lists a branch's customers by exact branchId (customerController).
+                            document: { ...customerData, branchId: req.user?.activeBranchId || null }
                         }
                     });
+                    opRows.push({ rowNumber: i + 2, action: 'created' });
                     results.created++;
                 }
             } catch (err) {
@@ -642,9 +732,15 @@ const importCustomers = async (req, res) => {
             }
         }
 
-        if (bulkOps.length > 0) {
-            await Customer.bulkWrite(bulkOps, { ordered: false });
-        }
+        // A row the database refuses (e.g. a customer code another customer has) is reported on
+        // its own; the other rows are saved.
+        const writeFailures = await writeRows(Customer, bulkOps);
+        writeFailures.forEach((error, index) => {
+            const { rowNumber, action } = opRows[index];
+            results[action]--;
+            results.failed++;
+            results.errors.push(`Row ${rowNumber}: ${describeWriteError(error, 'customer')}`);
+        });
 
         await invalidateCustomerCaches();
 
@@ -690,10 +786,8 @@ const importPlanning = async (req, res) => {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet);
+        const sheet = readUploadedSheet(req);
+        const data = sheet.rows;
 
         if (data.length === 0) {
             return res.status(400).json({ message: 'No data found in file' });
@@ -702,7 +796,7 @@ const importPlanning = async (req, res) => {
         const selectedFinancialYear = normalizeFinancialYear(cleanCellValue(req.body.financialYear || req.query.financialYear));
 
         // Pre-validate headers for Planning sheet
-        const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
+        const headers = sheet.headerRow;
         const cleanHeaders = headers.map(h => String(h || '').trim().toLowerCase());
         
         const hasMonthYear = cleanHeaders.some(h => ['month & year', 'monthyear', 'month', 'year'].includes(h));
@@ -765,6 +859,13 @@ const importPlanning = async (req, res) => {
             loadPlanningMgrs(mgr2Lookups, 'MGR2')
         ]);
 
+        const missingCustomerCodes = customerLookups.filter(code => !customerMap.has(normalizeKey(code)));
+        const missingProductCodes = productLookups.filter(code => !productMap.has(normalizeKey(code)));
+        const missingMgr1Codes = mgr1Lookups.filter(code => !mgr1Map.has(normalizeKey(code)));
+        const missingMgr2Codes = mgr2Lookups.filter(code => !mgr2Map.has(normalizeKey(code)));
+        // Entries belong to the branch selected in the header, as on the Planning screen.
+        const activeBranchId = req.user?.activeBranchId || null;
+
         // Dynamically create missing master records on the fly
         if (missingCustomerCodes.length > 0) {
             for (const code of missingCustomerCodes) {
@@ -782,6 +883,13 @@ const importPlanning = async (req, res) => {
 
         if (missingProductCodes.length > 0) {
             for (const code of missingProductCodes) {
+                // Reuse a product whose code or name only differs in case / spacing.
+                const dup = await findDuplicate('productCode', code, { companyId: req.user?.companyId })
+                    || await findDuplicate('productName', code, { companyId: req.user?.companyId });
+                if (dup) {
+                    productMap.set(normalizeKey(code), await Product.findById(dup._id));
+                    continue;
+                }
                 const newProduct = new Product({
                     companyId: req.user?.companyId,
                     productCode: code,
@@ -840,6 +948,14 @@ const importPlanning = async (req, res) => {
 
         const bulkOps = [];
         const BATCH_SIZE = 1000;
+        // The previous-year permission depends only on the year: checked once per year, not per row.
+        const yearPermissions = new Map();
+        const canEditYear = (financialYear) => {
+            if (!yearPermissions.has(financialYear)) {
+                yearPermissions.set(financialYear, checkPrevYearEditPermission(req.user, financialYear));
+            }
+            return yearPermissions.get(financialYear);
+        };
 
         const executeBatch = async () => {
             if (bulkOps.length === 0) return;
@@ -860,7 +976,7 @@ const importPlanning = async (req, res) => {
                 const financialYear = normalizeFinancialYear(cleanCellValue(
                     row['Financial Year'] || row.financialYear || row.FY || selectedFinancialYear
                 ));
-                const canEdit = await checkPrevYearEditPermission(req.user, financialYear);
+                const canEdit = await canEditYear(financialYear);
                 if (!canEdit) {
                     throw new Error(`You do not have permission to import entries for previous financial year (${financialYear})`);
                 }
@@ -1061,7 +1177,8 @@ const getProductTemplate = async (req, res) => {
                 'Vendor Stock': 25,
                 'Is Primary': true,
                 'Image URL': '',
-                'Status': 'Active'
+                'Status': 'Active',
+                'Test Type': 'Yes'
             }
         ];
 
@@ -1073,7 +1190,7 @@ const getProductTemplate = async (req, res) => {
         worksheet['!cols'] = [
             { wch: 15 }, { wch: 30 }, { wch: 12 }, { wch: 8 },
             { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 24 },
-            { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 40 }, { wch: 10 }
+            { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 40 }, { wch: 10 }, { wch: 10 }
         ];
 
         const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
@@ -1153,10 +1270,8 @@ const importAttributes = async (req, res) => {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet);
+        const sheet = readUploadedSheet(req);
+        const data = sheet.rows;
 
         if (data.length === 0) {
             return res.status(400).json({ message: 'No data found in file' });
@@ -1214,10 +1329,8 @@ const importAttributeMaster = async (req, res) => {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet);
+        const sheet = readUploadedSheet(req);
+        const data = sheet.rows;
 
         if (data.length === 0) {
             return res.status(400).json({ message: 'No data found in file' });
@@ -1250,7 +1363,7 @@ const importAttributeMaster = async (req, res) => {
 
                 // If MGR3 Code is provided, try to find the MGR3 record
                 if (attrData.mgr3Code) {
-                    const mgr3 = await MGR.findOne({ code: attrData.mgr3Code, type: 'MGR3' });
+                    const mgr3 = await MGR.findOne({ code: attrData.mgr3Code, mgrType: 'MGR3' });
                     if (mgr3) {
                         targetMgr3Id = mgr3._id;
                     }
@@ -1377,10 +1490,8 @@ const importWarranties = async (req, res) => {
         const Warranty = require('../models/Warranty');
         const Product = require('../models/Product');
 
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet);
+        const sheet = readUploadedSheet(req);
+        const data = sheet.rows;
 
         if (data.length === 0) {
             return res.status(400).json({ message: 'No data found in file' });
@@ -1395,6 +1506,8 @@ const importWarranties = async (req, res) => {
         };
 
         const companyId = req.user?.companyId;
+        // New assets and warranties belong to the branch selected in the header.
+        const activeBranchId = req.user?.activeBranchId || null;
 
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
@@ -1502,10 +1615,8 @@ const importAmcs = async (req, res) => {
 
         const AMC = require('../models/AMC');
 
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet);
+        const sheet = readUploadedSheet(req);
+        const data = sheet.rows;
 
         if (data.length === 0) {
             return res.status(400).json({ message: 'No data found in file' });
@@ -1689,10 +1800,8 @@ const importTickets = async (req, res) => {
         const Asset = require('../models/Asset');
         const Product = require('../models/Product');
 
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet);
+        const sheet = readUploadedSheet(req);
+        const data = sheet.rows;
 
         if (data.length === 0) {
             return res.status(400).json({ message: 'No data found in file' });
@@ -1707,6 +1816,8 @@ const importTickets = async (req, res) => {
         };
 
         const companyId = req.user?.companyId;
+        // Assets registered from a ticket row belong to the branch selected in the header.
+        const activeBranchId = req.user?.activeBranchId || null;
 
         // Pre-fetch/create default categories, types, priorities to speed things up
         const defaultCategory = await TicketCategory.findOne({ companyId }) || await TicketCategory.create({ companyId, name: 'General', description: 'General Tickets' });
@@ -1847,6 +1958,13 @@ const importTickets = async (req, res) => {
                     throw new Error(`Contact Phone / Mobile Number is mandatory and must be a valid 10-digit number. (Got: "${contactPhone || 'blank'}")`);
                 }
 
+                // Pincode is mandatory on a ticket (as on the ticket form): the sheet's Pincode
+                // column, else the pincode of the customer in Customer Master.
+                const pincode = cleanCellValue(row['Pincode'] || row['Pin Code'] || row['PIN Code'] || row['Postal Code'] || row.pincode || row.pinCode || customer?.billingAddress?.pincode || customer?.pincode || '');
+                if (!pincode) {
+                    throw new Error('Pincode is mandatory: fill the Pincode column, or the pincode of this customer in Customer Master.');
+                }
+
                 // Create the ticket
                 const ticketData = {
                     companyId,
@@ -1854,6 +1972,7 @@ const importTickets = async (req, res) => {
                     customerId: customer._id,
                     contactPhone,
                     contactAlternatePhone,
+                    pincode,
                     productId: product ? product._id : null,
                     assetId: asset ? asset._id : null,
                     issueTitle,
@@ -1908,6 +2027,7 @@ const getTicketTemplate = async (req, res) => {
                 'Customer Code': customer?.externalCode || customer?.customerName || 'CUST001',
                 'Contact Phone *': customer?.mobile || '9876543210',
                 'Alternate Mobile Number': '9876543211',
+                'Pincode': customer?.billingAddress?.pincode || customer?.pincode || '403001',
                 'Product Code': product?.productCode || 'PROD001',
                 'Product Serial No.': 'SN-GEN-908123',
                 'Issue Title': 'Hose leakage at joint',
@@ -1923,7 +2043,7 @@ const getTicketTemplate = async (req, res) => {
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Tickets');
 
         worksheet['!cols'] = [
-            { wch: 15 }, { wch: 18 }, { wch: 15 }, { wch: 22 }, { wch: 15 }, { wch: 18 },
+            { wch: 15 }, { wch: 18 }, { wch: 15 }, { wch: 22 }, { wch: 10 }, { wch: 15 }, { wch: 18 },
             { wch: 25 }, { wch: 45 }, { wch: 10 }, { wch: 10 }, { wch: 12 }
         ];
 
@@ -1945,12 +2065,10 @@ const importVendors = async (req, res) => {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet);
+        const sheet = readUploadedSheet(req);
+        const data = sheet.rows;
 
-        const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
+        const headers = sheet.headerRow;
         const cleanHeaders = headers.map(h => String(h || '').trim().toLowerCase());
 
         if (data.length === 0) {
@@ -2076,12 +2194,10 @@ const importPriceBooks = async (req, res) => {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet);
+        const sheet = readUploadedSheet(req);
+        const data = sheet.rows;
 
-        const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
+        const headers = sheet.headerRow;
         const cleanHeaders = headers.map(h => String(h || '').trim().toLowerCase());
         
         const hasBookName = cleanHeaders.some(h => [
@@ -2243,12 +2359,10 @@ const importPriceBookItems = async (req, res) => {
             return res.status(404).json({ message: 'Price Book not found' });
         }
 
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet);
+        const sheet = readUploadedSheet(req);
+        const data = sheet.rows;
 
-        const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
+        const headers = sheet.headerRow;
         const cleanHeaders = headers.map(h => String(h || '').trim().toLowerCase());
         
         const hasProductCode = cleanHeaders.some(h => [
@@ -2406,12 +2520,10 @@ const importEmployees = async (req, res) => {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet);
+        const sheet = readUploadedSheet(req);
+        const data = sheet.rows;
 
-        const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
+        const headers = sheet.headerRow;
         const cleanHeaders = headers.map(h => String(h || '').trim().toLowerCase());
         
         const hasEmployeeName = cleanHeaders.some(h => ['employee name', 'employeename', 'name'].includes(h));
@@ -2654,12 +2766,10 @@ const importContacts = async (req, res) => {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet);
+        const sheet = readUploadedSheet(req);
+        const data = sheet.rows;
 
-        const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
+        const headers = sheet.headerRow;
         const cleanHeaders = headers.map(h => String(h || '').trim().toLowerCase());
         
         const hasContactName = cleanHeaders.some(h => ['contact name', 'contactname', 'name'].includes(h));
@@ -2780,12 +2890,10 @@ const importContracts = async (req, res) => {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet);
+        const sheet = readUploadedSheet(req);
+        const data = sheet.rows;
 
-        const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
+        const headers = sheet.headerRow;
         const cleanHeaders = headers.map(h => String(h || '').trim().toLowerCase());
         
         const hasContractNumber = cleanHeaders.some(h => ['contract number', 'contractnumber', 'contract no', 'contractno'].includes(h));
@@ -2933,10 +3041,8 @@ const importTenders = async (req, res) => {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet);
+        const sheet = readUploadedSheet(req);
+        const data = sheet.rows;
 
         const results = {
             created: 0,
@@ -3161,17 +3267,15 @@ const importAssets = async (req, res) => {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet);
+        const sheet = readUploadedSheet(req);
+        const data = sheet.rows;
 
 
-        const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
+        const headers = sheet.headerRow;
         const cleanHeaders = headers.map(h => String(h || '').trim().toLowerCase());
-        
+
         const hasSerial = cleanHeaders.some(h => ['serial number', 'serialnumber', 'serial', 'serial no', 'serialno', 'sn'].includes(h));
-        
+
         if (!hasSerial) {
             return res.status(400).json({
                 message: `Missing required column headers: The sheet must contain a 'Serial Number' column.`,
@@ -3213,229 +3317,365 @@ const importAssets = async (req, res) => {
         // Division / Segment Master, loaded once for the whole file.
         const divisionSegmentLookup = await loadDivisionSegmentLookup(companyId);
 
-        for (let i = 0; i < data.length; i++) {
-            const row = data[i];
-            try {
-                // Priority 1 Validation: Serial Number
-                const rawSerial = pickFirstNonEmpty(
-                    row['Serial Number'], row.serialNumber, row['Serial No'], row.serialNo, row.Serial, row.serial, row.SN, row.sn, row['Serial Num'], row['Serial num']
-                );
+        // The rows are saved in batches: the products, customers and serials a batch refers to are
+        // looked up together, then the batch is written with one bulk write per collection. Each
+        // row still gets the outcome it would get on its own, and a product or customer created
+        // by one row is the one the rows after it use.
+        const productIndex = await loadProductIndex({ companyId });
+        const legacyProducts = createLegacyProductLookup(companyId);
+        const customerSelect = '_id externalCode customerName companyName mobile pincode billingAddress.pincode';
 
-                if (!rawSerial || !String(rawSerial).trim()) {
-                    throw new Error('Serial Number is mandatory and missing.');
+        const parseAssetRow = (row) => {
+            // Priority 1 Validation: Serial Number
+            const rawSerial = pickFirstNonEmpty(
+                row['Serial Number'], row.serialNumber, row['Serial No'], row.serialNo, row.Serial, row.serial, row.SN, row.sn, row['Serial Num'], row['Serial num']
+            );
+
+            if (!rawSerial || !String(rawSerial).trim()) {
+                throw new Error('Serial Number is mandatory and missing.');
+            }
+
+            const serialNumber = String(rawSerial).trim();
+            const normSerial = serialNumber.toLowerCase();
+
+            // Check for duplicate Serial Number within the uploaded file
+            if (seenSerialsInFile.has(normSerial)) {
+                // Duplicate rows in a source workbook are ignored; the serial is imported once.
+                return { duplicateSerial: serialNumber };
+            }
+            seenSerialsInFile.add(normSerial);
+
+            // Priority 2 Validation: Product Code / Product Name
+            const productCode = getFlexibleRowValue(row, 'Product Code', 'productCode', 'code', 'Code', 'ProductCode', 'Item Code', 'ItemCode');
+            const productName = getFlexibleRowValue(row, 'Product Name', 'productName', 'name', 'Name', 'ProductName', 'Item Name', 'ItemName', 'Description', 'Product Description');
+
+            if (!productCode && !productName) {
+                throw new Error('Product Code or Product Name is mandatory and missing.');
+            }
+            const rawStatus = pickFirstNonEmpty(row.Status, row.status, 'IN_STOCK');
+            const customerCodeInput = pickFirstNonEmpty(
+                row['Customer Code'], row.customerCode, row['Customer External Code'], row.externalCode
+            );
+            const customerLookup = pickFirstNonEmpty(
+                row['Customer Code'], row.customerCode, row['Customer Name'], row.customerName, row['Company Name'], row.companyName, row['Customer']
+            );
+            const customerNameInput = pickFirstNonEmpty(
+                row['Customer Name'], row.customerName, row['Company Name'], row.companyName, row['Customer']
+            );
+            // Mobile is optional on the sheet: a blank value falls back to the Customer
+            // Master further down. A value that is present must be a 10-digit number.
+            const customerMobile = pickFirstNonEmpty(
+                row['Mobile Number *'], row['Mobile Number'], row.mobileNumber, row['Mobile No'], row.mobileNo, row['Phone Number'], row.phoneNumber, row['Mobile'], row.mobile, row['Phone'], row.phone, ''
+            );
+            if (customerMobile && !/^\d{10}$/.test(String(customerMobile).trim())) {
+                throw new Error(`Mobile Number must be a valid 10-digit number when provided. (Got: "${customerMobile}")`);
+            }
+            const invoiceNumber = getFlexibleRowValue(
+                row, 'Invoice Ref', 'invoiceRef', 'Invoice Ref No', 'Invoice Number', 'invoiceNumber', 'Invoice No', 'Invoice'
+            );
+            const rawSaleDate = row['Sale Date'] || row.saleDate || row['Invoice Date'] || row.invoiceDate;
+            const location = pickFirstNonEmpty(row.Location, row.location, row.Branch, row.branch, defaultLocation);
+            const projectCode = getFlexibleRowValue(row, 'Project Code', 'ProjectCode', 'projectCode');
+            const projectName = getFlexibleRowValue(row, 'Project Name', 'ProjectName', 'projectName');
+            const rawIndicator = pickFirstNonEmpty(
+                row['Indicator_Field'], row.indicator_field, row.indicatorField, row.Indicator, row.indicator, ''
+            );
+            const indicatorField = String(rawIndicator).trim().slice(0, 20);
+
+            // Division_Code / Segment_Code are optional on a row, but when given they must
+            // exist and the segment must belong to the division (whatever the Excel
+            // dropdowns allowed).
+            const divisionCodeInput = getFlexibleRowValue(row, 'Division_Code', 'Division Code', 'DivisionCode', 'Division');
+            const segmentCodeInput = getFlexibleRowValue(row, 'Segment_Code', 'Segment Code', 'SegmentCode', 'Segment');
+            const { division, segment } = resolveDivisionSegment(divisionSegmentLookup, {
+                divisionCode: divisionCodeInput,
+                segmentCode: segmentCodeInput
+            });
+            const divisionSegmentFields = (division || segment)
+                ? { divisionId: division ? division._id : null, segmentId: segment ? segment._id : null }
+                : {};
+
+            // Map status
+            let status = 'IN_STOCK';
+            const normStatus = String(rawStatus).toUpperCase().replace(/[\s\-_]+/g, '');
+            if (normStatus.includes('STOCK')) status = 'IN_STOCK';
+            else if (normStatus.includes('ALLOCAT')) status = 'ALLOCATED';
+            else if (normStatus.includes('SOLD')) status = 'SOLD';
+            else if (normStatus.includes('RETURN')) status = 'RETURN';
+            else if (normStatus.includes('SCRAP')) status = 'SCRAPPED';
+
+            // Parse saleDate
+            let saleDate = null;
+            if (rawSaleDate) {
+                if (typeof rawSaleDate === 'number' && Number.isFinite(rawSaleDate)) {
+                    saleDate = excelSerialDateToDate(rawSaleDate);
+                } else {
+                    saleDate = parseDateValue(rawSaleDate);
                 }
+            }
 
-                const serialNumber = String(rawSerial).trim();
-                const normSerial = serialNumber.toLowerCase();
+            return {
+                serialNumber, productCode, productName, status, customerCodeInput, customerLookup, customerNameInput,
+                customerMobile, invoiceNumber, saleDate, location, projectCode, projectName, indicatorField, divisionSegmentFields
+            };
+        };
 
-                // Check for duplicate Serial Number within the uploaded file
-                if (seenSerialsInFile.has(normSerial)) {
-                    // Duplicate rows in a source workbook are ignored; the serial is imported once.
-                    results.skipped++;
-                    continue;
+        // Resolve product. The Product Code is the identifier: when the sheet gives one
+        // we match on it alone and create the product if it is new. Falling back to the
+        // name would merge different codes that share one description (common in
+        // switchgear registers). Name matching is used only when no code is given.
+        // Products saved before tenancy carry no companyId and may be reused; another
+        // company's product is never borrowed just because the code matches.
+        const findProductBy = (field, value) => (
+            (field === 'productCode' ? productIndex.findByCode(value) : productIndex.findByName(value))
+            || legacyProducts.get(field, value)
+        );
+
+        const resolveProduct = (plan, writes) => {
+            let { productCode, productName } = plan;
+            let product = null;
+            if (productCode) {
+                product = findProductBy('productCode', productCode);
+            } else if (productName) {
+                product = findProductBy('productName', productName);
+            }
+
+            if (!product) {
+                // Product names are unique: a new code whose description already belongs
+                // to another code is rejected instead of creating a same-name product.
+                const newName = productName || productCode;
+                const sameName = newName ? productIndex.findDuplicate('productName', newName) : null;
+                if (sameName) {
+                    throw new Error(`Product Code "${productCode}" is not in Product Master and its name "${newName}" already belongs to code ${sameName.productCode}. Product names must be unique - use code ${sameName.productCode} or add the product with a distinct name first.`);
                 }
-                seenSerialsInFile.add(normSerial);
-
-                // Priority 2 Validation: Product Code / Product Name
-                let productCode = getFlexibleRowValue(row, 'Product Code', 'productCode', 'code', 'Code', 'ProductCode', 'Item Code', 'ItemCode');
-                let productName = getFlexibleRowValue(row, 'Product Name', 'productName', 'name', 'Name', 'ProductName', 'Item Name', 'ItemName', 'Description', 'Product Description');
-
-                if (!productCode && !productName) {
-                    throw new Error('Product Code or Product Name is mandatory and missing.');
+                const code = productCode || 'PROD-001';
+                // (companyId, productCode) is unique: a product that already has this exact code
+                // is the one a create would collide with, so it is reused.
+                const sameCode = productIndex.findByCode(code);
+                if (sameCode && sameCode.productCode === code) {
+                    product = sameCode;
+                } else {
+                    product = productIndex.add({
+                        _id: new mongoose.Types.ObjectId(),
+                        ...companyFilter,
+                        productCode: code,
+                        productName: productName || productCode || 'General Product',
+                        hsnCode: 'N/A',
+                        gstPercentage: 18,
+                        basePrice: 0,
+                        mrp: 0,
+                        uom: 'Nos',
+                        status: 'Active',
+                        updatedAt: new Date()
+                    });
+                    writes.newProducts.push(product);
                 }
-                const rawStatus = pickFirstNonEmpty(row.Status, row.status, 'IN_STOCK');
-                const customerCodeInput = pickFirstNonEmpty(
-                    row['Customer Code'], row.customerCode, row['Customer External Code'], row.externalCode
-                );
-                const customerLookup = pickFirstNonEmpty(
-                    row['Customer Code'], row.customerCode, row['Customer Name'], row.customerName, row['Company Name'], row.companyName, row['Customer']
-                );
-                const customerNameInput = pickFirstNonEmpty(
-                    row['Customer Name'], row.customerName, row['Company Name'], row.companyName, row['Customer']
-                );
-                // Mobile is optional on the sheet: a blank value falls back to the Customer
-                // Master further down. A value that is present must be a 10-digit number.
-                let customerMobile = pickFirstNonEmpty(
-                    row['Mobile Number *'], row['Mobile Number'], row.mobileNumber, row['Mobile No'], row.mobileNo, row['Phone Number'], row.phoneNumber, row['Mobile'], row.mobile, row['Phone'], row.phone, ''
-                );
-                if (customerMobile && !/^\d{10}$/.test(String(customerMobile).trim())) {
-                    throw new Error(`Mobile Number must be a valid 10-digit number when provided. (Got: "${customerMobile}")`);
-                }
-                const invoiceNumber = getFlexibleRowValue(
-                    row, 'Invoice Ref', 'invoiceRef', 'Invoice Ref No', 'Invoice Number', 'invoiceNumber', 'Invoice No', 'Invoice'
-                );
-                const rawSaleDate = row['Sale Date'] || row.saleDate || row['Invoice Date'] || row.invoiceDate;
-                const location = pickFirstNonEmpty(row.Location, row.location, row.Branch, row.branch, defaultLocation);
-                const projectCode = getFlexibleRowValue(row, 'Project Code', 'ProjectCode', 'projectCode');
-                const projectName = getFlexibleRowValue(row, 'Project Name', 'ProjectName', 'projectName');
-                const rawIndicator = pickFirstNonEmpty(
-                    row['Indicator_Field'], row.indicator_field, row.indicatorField, row.Indicator, row.indicator, ''
-                );
-                const indicatorField = String(rawIndicator).trim().slice(0, 20);
+            }
 
-                // Division_Code / Segment_Code are optional on a row, but when given they must
-                // exist and the segment must belong to the division (whatever the Excel
-                // dropdowns allowed).
-                const divisionCodeInput = getFlexibleRowValue(row, 'Division_Code', 'Division Code', 'DivisionCode', 'Division');
-                const segmentCodeInput = getFlexibleRowValue(row, 'Segment_Code', 'Segment Code', 'SegmentCode', 'Segment');
-                const { division, segment } = resolveDivisionSegment(divisionSegmentLookup, {
-                    divisionCode: divisionCodeInput,
-                    segmentCode: segmentCodeInput
-                });
-                const divisionSegmentFields = (division || segment)
-                    ? { divisionId: division ? division._id : null, segmentId: segment ? segment._id : null }
-                    : {};
-
-                // Map status
-                let status = 'IN_STOCK';
-                const normStatus = String(rawStatus).toUpperCase().replace(/[\s\-_]+/g, '');
-                if (normStatus.includes('STOCK')) status = 'IN_STOCK';
-                else if (normStatus.includes('ALLOCAT')) status = 'ALLOCATED';
-                else if (normStatus.includes('SOLD')) status = 'SOLD';
-                else if (normStatus.includes('RETURN')) status = 'RETURN';
-                else if (normStatus.includes('SCRAP')) status = 'SCRAPPED';
-
-                // Resolve product. The Product Code is the identifier: when the sheet gives one
-                // we match on it alone and create the product if it is new. Falling back to the
-                // name would merge different codes that share one description (common in
-                // switchgear registers). Name matching is used only when no code is given.
-                // Products saved before tenancy carry no companyId and may be reused; another
-                // company's product is never borrowed just because the code matches.
-                const legacyProductFilter = { $or: [{ companyId: null }, { companyId: { $exists: false } }] };
-                const findProductBy = async (field, value) => {
-                    let found = await Product.findOne({ ...companyFilter, [field]: buildExactRegex(value) });
-                    if (!found && companyId) {
-                        found = await Product.findOne({ ...legacyProductFilter, [field]: buildExactRegex(value) }).setOptions({ bypassTenant: true });
-                    }
-                    return found;
-                };
-
-                let product = null;
-                if (productCode) {
-                    product = await findProductBy('productCode', productCode);
-                } else if (productName) {
-                    product = await findProductBy('productName', productName);
-                }
-
-                if (!product) {
-                    try {
-                        product = await Product.create({
-                            ...companyFilter,
-                            productCode: productCode || 'PROD-001',
-                            productName: productName || productCode || 'General Product',
-                            hsnCode: 'N/A',
-                            gstPercentage: 18,
-                            basePrice: 0,
-                            mrp: 0,
-                            uom: 'Nos',
-                            status: 'Active'
-                        });
-                    } catch (createErr) {
-                        // (companyId, productCode) is unique: another row may have created it first.
-                        product = await findProductBy('productCode', productCode || 'PROD-001');
-                        if (!product) {
-                            throw createErr;
+            if (product) {
+                if (productName && productName.trim() !== '') {
+                    if (!product.productName || product.productName === product.productCode || product.productName === 'General Product' || product.productName.trim().toLowerCase() !== productName.trim().toLowerCase()) {
+                        // Keep the stored name when the sheet's name is already used by another product.
+                        const nameTaken = productIndex.findDuplicate('productName', productName, product._id);
+                        if (!nameTaken) {
+                            if (legacyProducts.has(product)) product.productName = productName;
+                            else productIndex.update(product, { productName });
+                            if (!writes.newProducts.includes(product)) writes.renamedProducts.set(String(product._id), product);
                         }
                     }
+                } else {
+                    productName = product.productName || product.productCode || '';
                 }
-
-                if (product) {
-                    if (productName && productName.trim() !== '') {
-                        if (!product.productName || product.productName === product.productCode || product.productName === 'General Product' || product.productName.trim().toLowerCase() !== productName.trim().toLowerCase()) {
-                            product.productName = productName;
-                            await Product.findByIdAndUpdate(product._id, { productName }).setOptions({ bypassTenant: true });
-                        }
-                    } else {
-                        productName = product.productName || product.productCode || '';
-                    }
-                    productCode = product.productCode || productCode;
-                    if (!productName || productName === productCode) {
-                        productName = product.productName || productName || productCode;
-                    }
+                productCode = product.productCode || productCode;
+                if (!productName || productName === productCode) {
+                    productName = product.productName || productName || productCode;
                 }
-                // MGR 1-5 are never copied onto the record. The Product Master is the source of
-                // truth and every read of an asset derives them from the linked product, so an
-                // MGR assigned or changed later shows on this record without re-uploading.
+            }
+            // MGR 1-5 are never copied onto the record. The Product Master is the source of
+            // truth and every read of an asset derives them from the linked product, so an
+            // MGR assigned or changed later shows on this record without re-uploading.
+            return { product, productCode, productName };
+        };
 
-                // Resolve customer from Customer Master using Customer Code or Customer Name
-                let customer = null;
-                let customerCodeVal = customerCodeInput || '';
-                let customerPostalCode = '';
+        // Resolve customer from Customer Master using Customer Code or Customer Name.
+        // `found` holds what the database had for this batch's values; `created` the customers
+        // created by earlier rows of the batch (they are in the database for later batches).
+        const resolveCustomer = (plan, found, created, writes) => {
+            const { customerCodeInput, customerLookup, customerNameInput } = plan;
+            let { customerMobile } = plan;
+            let customer = null;
+            let customerCodeVal = customerCodeInput || '';
+            let customerPostalCode = '';
 
-                if (customerCodeInput || customerLookup) {
-                    const searchTarget = customerCodeInput || customerLookup;
-                    customer = await Customer.findOne({
+            if (customerCodeInput || customerLookup) {
+                const searchTarget = customerCodeInput || customerLookup;
+                const targetKey = searchTarget.toUpperCase();
+                customer = found.get(targetKey) || created.get(targetKey) || null;
+
+                if (!customer) {
+                    // A customer missing from the master is created from the sheet: the
+                    // code becomes its external code and the sheet's name becomes its name.
+                    customer = {
+                        _id: new mongoose.Types.ObjectId(),
                         ...companyFilter,
                         branchId: activeBranchId,
-                        $or: [
-                            { externalCode: buildExactRegex(searchTarget) },
-                            { customerName: buildExactRegex(searchTarget) },
-                            { companyName: buildExactRegex(searchTarget) }
-                        ]
+                        externalCode: searchTarget,
+                        customerName: customerNameInput || customerLookup || searchTarget,
+                        companyName: customerNameInput || customerLookup || searchTarget,
+                        mobile: customerMobile || '',
+                        createdBy: req.user?.id || null
+                    };
+                    writes.newCustomers.push(customer);
+                    [customer.externalCode, customer.customerName, customer.companyName].forEach((value) => {
+                        const key = String(value || '').toUpperCase();
+                        if (key && !created.has(key)) created.set(key, customer);
                     });
-
-                    if (!customer) {
-                        try {
-                            // A customer missing from the master is created from the sheet: the
-                            // code becomes its external code and the sheet's name becomes its name.
-                            customer = await Customer.create({
-                                ...companyFilter,
-                                branchId: activeBranchId,
-                                externalCode: searchTarget,
-                                customerName: customerNameInput || customerLookup || searchTarget,
-                                companyName: customerNameInput || customerLookup || searchTarget,
-                                mobile: customerMobile || '',
-                                createdBy: req.user?.id || null
-                            });
-                        } catch (custErr) {
-                            customer = await Customer.findOne({
-                                ...companyFilter,
-                                branchId: activeBranchId,
-                                $or: [
-                                    { externalCode: buildExactRegex(searchTarget) },
-                                    { customerName: buildExactRegex(searchTarget) },
-                                    { companyName: buildExactRegex(searchTarget) }
-                                ]
-                            });
-                            if (!customer) throw custErr;
-                        }
-                    } else if (customerMobile && !customer.mobile) {
-                        customer.mobile = customerMobile;
-                        await customer.save();
-                    }
-
-                    if (customer) {
-                        if (!customerMobile && customer.mobile) {
-                            customerMobile = String(customer.mobile).trim();
-                        }
-                        if (!customer.externalCode && customerCodeInput) {
-                            customer.externalCode = String(customerCodeInput).trim();
-                            await customer.save();
-                        }
-                        customerCodeVal = customer.externalCode || customerCodeInput || searchTarget;
-                        // Postal Code is strictly derived/fetched from Customer Master
-                        customerPostalCode = customer.billingAddress?.pincode || customer.pincode || '';
-                    }
+                } else if (customerMobile && !customer.mobile) {
+                    customer.mobile = customerMobile;
+                    writes.customerChanges(customer).mobile = customerMobile;
                 }
 
-                // Parse saleDate
-                let saleDate = null;
-                if (rawSaleDate) {
-                    if (typeof rawSaleDate === 'number' && Number.isFinite(rawSaleDate)) {
-                        saleDate = excelSerialDateToDate(rawSaleDate);
+                if (customer) {
+                    if (!customerMobile && customer.mobile) {
+                        customerMobile = String(customer.mobile).trim();
+                    }
+                    if (!customer.externalCode && customerCodeInput) {
+                        customer.externalCode = String(customerCodeInput).trim();
+                        writes.customerChanges(customer).externalCode = customer.externalCode;
+                        const key = customer.externalCode.toUpperCase();
+                        if (!found.has(key) && !created.has(key)) created.set(key, customer);
+                    }
+                    customerCodeVal = customer.externalCode || customerCodeInput || searchTarget;
+                    // Postal Code is strictly derived/fetched from Customer Master
+                    customerPostalCode = customer.billingAddress?.pincode || customer.pincode || '';
+                }
+            }
+            return { customer, customerCodeVal, customerPostalCode, customerMobile };
+        };
+
+        const failedSerialOf = (row) => pickFirstNonEmpty(
+            row['Serial Number'], row.serialNumber, row['Serial No'], row.serialNo, row.Serial, row.serial, row.SN, row.sn, ''
+        );
+
+        const importBatch = async (batch) => {
+            const plans = batch.map(({ row, rowNumber }) => {
+                const plan = { row, rowNumber };
+                try {
+                    const parsed = parseAssetRow(row);
+                    if (parsed.duplicateSerial) {
+                        plan.outcome = 'skipped';
+                        plan.error = { row: rowNumber, serialNo: parsed.duplicateSerial, reason: 'Duplicate Serial Number within the uploaded file — only the first occurrence is imported.' };
                     } else {
-                        saleDate = parseDateValue(rawSaleDate);
+                        Object.assign(plan, parsed);
                     }
+                } catch (err) {
+                    plan.outcome = 'failed';
+                    plan.reason = err.message;
                 }
+                return plan;
+            });
+            const pending = () => plans.filter((plan) => !plan.outcome);
+            const failPlan = (plan, reason) => {
+                plan.outcome = 'failed';
+                plan.reason = reason;
+            };
 
-                // A serial is unique within the company. Query across branches so a user cannot
-                // accidentally create the same serial in another branch.
-                const existingAssets = await Asset.find({
-                    ...companyFilter,
-                    serialNumberKey: serialNumber.toUpperCase()
-                }).setOptions({ bypassBranch: true }).populate('productId');
+            const writes = {
+                newProducts: [],
+                renamedProducts: new Map(),
+                newCustomers: [],
+                customerUpdates: new Map(),
+                customerChanges(customer) {
+                    const id = String(customer._id);
+                    if (!this.customerUpdates.has(id)) this.customerUpdates.set(id, { customer, set: {} });
+                    return this.customerUpdates.get(id).set;
+                }
+            };
 
-                const matchedActiveAsset = existingAssets.find((asset) => asset.status !== 'RETURN' && asset.status !== 'RETURNED');
+            // Products: legacy (pre-tenancy) products are only looked up for values the company
+            // catalog does not have.
+            await legacyProducts.prefetch(pending().flatMap((plan) => (
+                plan.productCode
+                    ? (productIndex.findByCode(plan.productCode) ? [] : [['productCode', plan.productCode]])
+                    : (productIndex.findByName(plan.productName) ? [] : [['productName', plan.productName]])
+            )));
+            pending().forEach((plan) => {
+                try {
+                    Object.assign(plan, resolveProduct(plan, writes));
+                } catch (err) {
+                    failPlan(plan, err.message);
+                }
+            });
+
+            const productFailures = new Map();
+            const insertFailures = await insertRows(Product, writes.newProducts);
+            insertFailures.forEach((error, index) => {
+                const product = writes.newProducts[index];
+                productIndex.remove(product);
+                productFailures.set(product, error.message || describeWriteError(error, 'product'));
+            });
+            const renames = [...writes.renamedProducts.values()];
+            const renameFailures = await writeRows(Product, renames.map((product) => ({
+                updateOne: { filter: { _id: product._id }, update: { $set: { productName: product.productName } } }
+            })));
+            renameFailures.forEach((error, index) => productFailures.set(renames[index], describeWriteError(error, 'product')));
+            pending().forEach((plan) => {
+                if (productFailures.has(plan.product)) failPlan(plan, productFailures.get(plan.product));
+            });
+
+            // Customers of this batch, in one query.
+            const targets = pending()
+                .filter((plan) => plan.customerCodeInput || plan.customerLookup)
+                .map((plan) => plan.customerCodeInput || plan.customerLookup);
+            const found = await loadCustomersByLookup(targets, {
+                filter: { ...companyFilter, branchId: activeBranchId },
+                select: customerSelect
+            });
+            const created = new Map();
+            pending().forEach((plan) => {
+                Object.assign(plan, resolveCustomer(plan, found, created, writes));
+            });
+
+            const customerFailures = new Map();
+            (await insertRows(Customer, writes.newCustomers)).forEach((error, index) => {
+                customerFailures.set(writes.newCustomers[index], error.message || describeWriteError(error, 'customer'));
+            });
+            const customerUpdates = [...writes.customerUpdates.values()];
+            (await writeRows(Customer, customerUpdates.map(({ customer, set }) => ({
+                updateOne: { filter: { _id: customer._id, ...companyFilter }, update: { $set: set } }
+            })))).forEach((error, index) => {
+                customerFailures.set(customerUpdates[index].customer, describeWriteError(error, 'customer'));
+            });
+            pending().forEach((plan) => {
+                if (plan.customer && customerFailures.has(plan.customer)) failPlan(plan, customerFailures.get(plan.customer));
+            });
+
+            // A serial is unique within the company. Query across branches so a user cannot
+            // accidentally create the same serial in another branch.
+            const serialKeys = [...new Set(pending().map((plan) => plan.serialNumber.toUpperCase()))];
+            const existingAssets = serialKeys.length
+                ? await Asset.find({ ...companyFilter, serialNumberKey: { $in: serialKeys } })
+                    .select('_id status branchId serialNumberKey')
+                    .setOptions({ bypassBranch: true })
+                    .lean()
+                : [];
+            const assetsByKey = new Map();
+            existingAssets.forEach((asset) => {
+                const list = assetsByKey.get(asset.serialNumberKey) || [];
+                list.push(asset);
+                assetsByKey.set(asset.serialNumberKey, list);
+            });
+
+            const assetUpdates = [];
+            const assetInserts = [];
+            pending().forEach((plan) => {
+                const {
+                    serialNumber, product, productCode, productName, status, customer, customerCodeVal, customerPostalCode,
+                    customerMobile, customerLookup, invoiceNumber, saleDate, location, indicatorField, divisionSegmentFields,
+                    projectCode, projectName
+                } = plan;
+                const existing = assetsByKey.get(serialNumber.toUpperCase()) || [];
+                const matchedActiveAsset = existing.find((asset) => asset.status !== 'RETURN' && asset.status !== 'RETURNED');
                 const assetPayload = {
                     branchId: activeBranchId,
                     productId: product._id,
@@ -3460,20 +3700,22 @@ const importAssets = async (req, res) => {
                 // and do not create a second asset or history row.
                 if (matchedActiveAsset) {
                     if (String(matchedActiveAsset.branchId || '') !== activeBranchId) {
-                        throw new Error(`Serial Number (${serialNumber}) already belongs to another branch.`);
+                        failPlan(plan, `Serial Number (${serialNumber}) already belongs to another branch.`);
+                        return;
                     }
-                    await Asset.findByIdAndUpdate(matchedActiveAsset._id, assetPayload);
-                    results.updated++;
-                    continue;
+                    plan.action = 'updated';
+                    assetUpdates.push({ plan, op: { updateOne: { filter: { _id: matchedActiveAsset._id, ...companyFilter }, update: { $set: assetPayload } } } });
+                    return;
                 }
-                const matchedReturnedAsset = existingAssets.find(a => {
+                const matchedReturnedAsset = existing.find(a => {
                     const isReturn = a.status === 'RETURN' || a.status === 'RETURNED';
                     return isReturn;
                 });
 
                 if (matchedReturnedAsset) {
                     if (String(matchedReturnedAsset.branchId || '') !== activeBranchId) {
-                        throw new Error(`Serial Number (${serialNumber}) already belongs to another branch.`);
+                        failPlan(plan, `Serial Number (${serialNumber}) already belongs to another branch.`);
+                        return;
                     }
                     const updatePayload = {
                         branchId: activeBranchId,
@@ -3497,11 +3739,11 @@ const importAssets = async (req, res) => {
                         returnedAt: null
                     };
 
-                    await Asset.findByIdAndUpdate(matchedReturnedAsset._id, updatePayload);
-                    results.updated++;
+                    plan.action = 'updated';
+                    assetUpdates.push({ plan, op: { updateOne: { filter: { _id: matchedReturnedAsset._id, ...companyFilter }, update: { $set: updatePayload } } } });
 
                     // Add history record for the resold asset
-                    await AssetHistory.create({
+                    plan.history = {
                         ...(companyId ? { companyId } : {}),
                         assetId: matchedReturnedAsset._id,
                         serialNumber,
@@ -3523,36 +3765,41 @@ const importAssets = async (req, res) => {
                         transactionType: 'IMPORT_RESELL',
                         status: status === 'RETURN' ? 'SOLD' : status,
                         createdBy: req.user?.id || null
-                    });
+                    };
                 } else {
                     // Case 1 / Case 3: Completely new combination or different product
-                    const newAsset = await Asset.create({
-                        ...(companyId ? { companyId } : {}),
-                        branchId: activeBranchId,
-                        productId: product._id,
-                        productCode: product.productCode || productCode || '',
-                        productName: product.productName || productName || '',
-                        serialNumber,
-                        status,
-                        customerId: customer ? customer._id : null,
-                        customerCode: customerCodeVal,
-                        customerNameStr: customer ? (customer.companyName || customer.customerName) : (customerLookup || ''),
-                        customerPostalCode,
-                        customerMobile: customerMobile || '',
-                        invoiceNumber: invoiceNumber || '',
-                        saleDate: saleDate || (status === 'SOLD' ? new Date() : null),
-                        location: location || '',
-                        indicatorField,
-                        ...divisionSegmentFields,
-                        projectCode,
-                        projectName,
-                        createdBy: req.user?.id || null
+                    const newAssetId = new mongoose.Types.ObjectId();
+                    plan.action = 'created';
+                    assetInserts.push({
+                        plan,
+                        doc: {
+                            _id: newAssetId,
+                            ...(companyId ? { companyId } : {}),
+                            branchId: activeBranchId,
+                            productId: product._id,
+                            productCode: product.productCode || productCode || '',
+                            productName: product.productName || productName || '',
+                            serialNumber,
+                            status,
+                            customerId: customer ? customer._id : null,
+                            customerCode: customerCodeVal,
+                            customerNameStr: customer ? (customer.companyName || customer.customerName) : (customerLookup || ''),
+                            customerPostalCode,
+                            customerMobile: customerMobile || '',
+                            invoiceNumber: invoiceNumber || '',
+                            saleDate: saleDate || (status === 'SOLD' ? new Date() : null),
+                            location: location || '',
+                            indicatorField,
+                            ...divisionSegmentFields,
+                            projectCode,
+                            projectName,
+                            createdBy: req.user?.id || null
+                        }
                     });
-                    results.created++;
 
-                    await AssetHistory.create({
+                    plan.history = {
                         ...(companyId ? { companyId } : {}),
-                        assetId: newAsset._id,
+                        assetId: newAssetId,
                         serialNumber,
                         productCode,
                         productName,
@@ -3572,18 +3819,66 @@ const importAssets = async (req, res) => {
                         transactionType: 'IMPORT',
                         status,
                         createdBy: req.user?.id || null
-                    });
+                    };
                 }
+            });
+
+            (await writeRows(Asset, assetUpdates.map(({ op }) => op))).forEach((error, index) => {
+                failPlan(assetUpdates[index].plan, describeWriteError(error, 'serial'));
+            });
+            (await insertRows(Asset, assetInserts.map(({ doc }) => doc))).forEach((error, index) => {
+                failPlan(assetInserts[index].plan, describeWriteError(error, 'serial'));
+            });
+
+            const saved = plans.filter((plan) => !plan.outcome && plan.action);
+            saved.forEach((plan) => { plan.outcome = plan.action; });
+            const withHistory = saved.filter((plan) => plan.history);
+            (await insertRows(AssetHistory, withHistory.map((plan) => plan.history))).forEach((error, index) => {
+                const plan = withHistory[index];
+                plan.historyError = `Saved, but its history entry could not be recorded: ${describeWriteError(error, 'history entry')}`;
+            });
+
+            return plans;
+        };
+
+        const batchSize = getImportBatchSize('assets');
+        let processed = 0;
+        for (const batch of chunk(data.map((row, index) => ({ row, rowNumber: index + 2 })), batchSize)) {
+            let plans;
+            try {
+                plans = await importBatch(batch);
             } catch (err) {
-                results.failed++;
-                results.errors.push(`Row ${i + 2}: ${err.message}`);
+                // The database did not answer: the rows of this batch are reported, the next batch is tried.
+                console.error('Import assets batch error:', err);
+                plans = batch.map(({ row, rowNumber }) => ({ row, rowNumber, outcome: 'failed', reason: `The batch could not be saved: ${err.message}. Import the file again; rows already saved are updated, not duplicated.` }));
             }
+            plans.forEach((plan) => {
+                if (plan.outcome === 'created') results.created++;
+                else if (plan.outcome === 'updated') results.updated++;
+                else if (plan.outcome === 'skipped') {
+                    results.skipped++;
+                    results.errors.push(plan.error);
+                } else {
+                    results.failed++;
+                    results.errors.push({ row: plan.rowNumber, serialNo: String(failedSerialOf(plan.row) || '').trim() || '—', reason: plan.reason });
+                }
+                if (plan.historyError) {
+                    results.errors.push({ row: plan.rowNumber, serialNo: plan.serialNumber, reason: plan.historyError });
+                }
+            });
+            processed += batch.length;
+            reportImportProgress(req, { total: data.length, processed, created: results.created, updated: results.updated, skipped: results.skipped, failed: results.failed });
+            await yieldToEventLoop();
         }
 
         const successCount = results.created + results.updated;
 
         if (successCount > 0) {
-            await Promise.all([invalidateCustomerCaches(), invalidateProductCaches()]);
+            await Promise.all([
+                invalidateCustomerCaches(),
+                invalidateProductCaches(),
+                invalidateAssetCaches(req.user?.companyId)
+            ]);
         }
 
         if (successCount > 0) {
@@ -3607,6 +3902,7 @@ const importAssets = async (req, res) => {
         }
 
         res.status(200).json({
+            status: successCount === results.failed + successCount && results.failed === 0 ? 'completed' : (successCount === 0 ? 'failed' : 'partial'),
             message: `Import completed. Created: ${results.created}, Updated: ${results.updated}, Skipped: ${results.skipped}, Failed: ${results.failed}.`,
             success: successCount,
             ...results

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { csmService, productService, importService, divisionService, segmentService } from '../services/api';
+import { csmService, productService, importService, divisionService, segmentService, invalidateApiCache } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
@@ -9,10 +9,11 @@ import {
     MdFileUpload, MdFileDownload, MdAdd, MdUndo, MdHistory
 } from 'react-icons/md';
 import Modal from '../components/Modal';
-import ImportModal from '../components/ImportModal';
+import ImportWizard from '../components/import/ImportWizard';
 import PaginationControls from '../components/PaginationControls';
 import { formatDate } from '../utils/helpers';
 import DateInput from '../components/DateInput';
+import usePermission from '../hooks/usePermission';
 
 const PAGE_SIZE = 15;
 
@@ -93,6 +94,7 @@ const MgrLine = ({ record }) => {
 
 const SerialNoMaster = () => {
     const navigate = useNavigate();
+    const { canCreate, canModify } = usePermission('master_serials');
     const [assets, setAssets] = useState([]);
     const [assetPagination, setAssetPagination] = useState({ page: 1, limit: PAGE_SIZE, total: 0, pages: 1 });
     const [assetSummary, setAssetSummary] = useState({ total: 0, inStock: 0, sold: 0, returned: 0 });
@@ -151,6 +153,7 @@ const SerialNoMaster = () => {
 
     useEffect(() => {
         fetchData();
+        loadReferenceData();
     }, []);
 
     const loadReferenceData = async () => {
@@ -228,95 +231,118 @@ const SerialNoMaster = () => {
         }
     };
 
-    // Standardized 15-Column Export (Requirement #2) - Exports ALL records, not just 15 per page
+    // Standardized Export — fetches ALL matching records from the backend (not just the current page)
     const handleExport = async () => {
-        setIsExporting(true);
-        try {
-            if (activeTab === 'returns') {
-                let dataToExport = returnHistory;
-                if (!dataToExport || dataToExport.length === 0) {
-                    const res = await csmService.getReturnHistory();
-                    dataToExport = res.data || [];
-                    setReturnHistory(dataToExport);
-                }
-                if (!dataToExport || dataToExport.length === 0) {
-                    toast.error('No return records to export');
-                    return;
-                }
-                const exportData = dataToExport.map(asset => {
-                    const prodName = asset.productId?.productName || asset.productName || '';
-                    const prodCode = asset.productId?.productCode || asset.productCode || '';
-                    const custName = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || asset.customerName || (asset.customerId ? 'Customer' : 'Stock (Unsold)');
-                    const sDate = asset.saleDate || asset.invoiceDate;
-
-                    return {
-                        'Serial Number': asset.serialNumber || '',
-                        'Product Name': prodName,
-                        'Product Code': prodCode,
-                        'Status': asset.status || 'RETURN',
-                        'Customer Code': asset.customerCode || asset.customerId?.externalCode || '',
-                        'Customer': custName,
-                        'Customer Postal Code': asset.customerPostalCode || '',
-                        'Invoice Ref': asset.invoiceNumber || '',
-                        'Sale Date': formatDate(sDate, ''),
-                        'Location': asset.location || '',
-                        'Division_Code': asset.divisionId?.code || '',
-                        'Division_Desc': asset.divisionId?.description || '',
-                        'Segment_Code': asset.segmentId?.code || '',
-                        'Segment_Desc': asset.segmentId?.description || '',
-                        'Mgr 1': resolveAssetMgr(asset, 'mgr1'),
-                        'Mgr 2': resolveAssetMgr(asset, 'mgr2'),
-                        'Mgr 3': resolveAssetMgr(asset, 'mgr3'),
-                        'Mgr 4': resolveAssetMgr(asset, 'mgr4'),
-                        'Mgr 5': resolveAssetMgr(asset, 'mgr5'),
-                        'Indicator_Field': asset.indicatorField || '',
-                        'Project Code': asset.projectCode || '',
-                        'Project Name': asset.projectName || '',
-                        'Return Reason': asset.returnReason || '',
-                        'Returned At': formatDate(asset.returnedAt || asset.createdAt, '')
-                    };
-                });
-
-                const ws = XLSX.utils.json_to_sheet(exportData);
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, 'Return History');
-                XLSX.writeFile(wb, `Return_History_${new Date().toISOString().slice(0, 10)}.xlsx`);
-                toast.success(`Exported ${exportData.length} return history records`);
-            } else {
-                toast.info('Exporting all records, please wait...');
-                const params = {
-                    q: searchQuery.trim() || undefined,
-                    status: selectedStatus !== 'ALL' ? selectedStatus : undefined
-                };
-                MGR_FIELDS.forEach(({ key }) => {
-                    if (mgrFilters[key] === 'ALL') return;
-                    const matchingProduct = products.find((product) => formatMgrVal(product[key]) === mgrFilters[key]);
-                    const mgrId = idOf(matchingProduct?.[key]);
-                    if (mgrId) params[key] = mgrId;
-                });
-
-                const res = await csmService.exportAssets(params);
-                const fileName = /filename="([^"]+)"/.exec(res.headers?.['content-disposition'] || '')?.[1]
-                    || `Invoice_Bulk_Upload_${new Date().toISOString().slice(0, 10)}.xlsx`;
-
-                const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = fileName;
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
-                window.URL.revokeObjectURL(url);
-
-                const count = res.headers?.['x-total-count'];
-                toast.success(`Exported successfully${count ? ` (${count} records)` : ''}`);
+        if (activeTab === 'returns') {
+            const dataToExport = filteredReturns;
+            if (!dataToExport || dataToExport.length === 0) {
+                toast.error('No return history records to export');
+                return;
             }
+            const buildRow = (asset) => {
+                const prodName = asset.productId?.productName || asset.productName || '';
+                const prodCode = asset.productId?.productCode || asset.productCode || '';
+                const custName = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || asset.customerName || (asset.customerId ? 'Customer' : 'Stock (Unsold)');
+                const sDate = asset.saleDate || asset.invoiceDate;
+                return {
+                    'Serial Number': asset.serialNumber || '',
+                    'Product Name': prodName,
+                    'Product Code': prodCode,
+                    'Status': asset.status || 'IN_STOCK',
+                    'Customer Code': asset.customerCode || asset.customerId?.externalCode || '',
+                    'Customer': custName,
+                    'Customer Postal Code': asset.customerPostalCode || '',
+                    'Invoice Ref': asset.invoiceNumber || '',
+                    'Sale Date': formatDate(sDate, ''),
+                    'Location': asset.location || '',
+                    'Division_Code': asset.divisionId?.code || '',
+                    'Division_Desc': asset.divisionId?.description || '',
+                    'Segment_Code': asset.segmentId?.code || '',
+                    'Segment_Desc': asset.segmentId?.description || '',
+                    'Mgr 1': resolveAssetMgr(asset, 'mgr1'),
+                    'Mgr 2': resolveAssetMgr(asset, 'mgr2'),
+                    'Mgr 3': resolveAssetMgr(asset, 'mgr3'),
+                    'Mgr 4': resolveAssetMgr(asset, 'mgr4'),
+                    'Mgr 5': resolveAssetMgr(asset, 'mgr5'),
+                    'Indicator_Field': asset.indicatorField || '',
+                    'Project Code': asset.projectCode || '',
+                    'Project Name': asset.projectName || ''
+                };
+            };
+            const exportData = dataToExport.map(buildRow);
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Return History');
+            XLSX.writeFile(wb, `Invoice_Bulk_Upload_Returns_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            toast.success(`Exported ${exportData.length} return records`);
+            return;
+        }
+
+        // Active inventory: fetch ALL records from backend (bypassing page-size cap)
+        setLoading(true);
+        try {
+            const params = {
+                export: 'true',
+                limit: 50000,
+                q: searchQuery.trim() || undefined,
+                status: selectedStatus !== 'ALL' ? selectedStatus : undefined
+            };
+            MGR_FIELDS.forEach(({ key }) => {
+                if (mgrFilters[key] === 'ALL') return;
+                const matchingProduct = products.find((product) => formatMgrVal(product[key]) === mgrFilters[key]);
+                const mgrId = idOf(matchingProduct?.[key]);
+                if (mgrId) params[key] = mgrId;
+            });
+
+            const result = await csmService.getAssets(params);
+            const allAssets = result.data?.data || [];
+
+            if (!allAssets.length) {
+                toast.error('No records to export');
+                return;
+            }
+
+            const exportData = allAssets.map(asset => {
+                const prodName = asset.productId?.productName || asset.productName || '';
+                const prodCode = asset.productId?.productCode || asset.productCode || '';
+                const custName = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || asset.customerName || (asset.customerId ? 'Customer' : 'Stock (Unsold)');
+                const sDate = asset.saleDate || asset.invoiceDate;
+                return {
+                    'Serial Number': asset.serialNumber || '',
+                    'Product Name': prodName,
+                    'Product Code': prodCode,
+                    'Status': asset.status || 'IN_STOCK',
+                    'Customer Code': asset.customerCode || asset.customerId?.externalCode || '',
+                    'Customer': custName,
+                    'Customer Postal Code': asset.customerPostalCode || '',
+                    'Invoice Ref': asset.invoiceNumber || '',
+                    'Sale Date': formatDate(sDate, ''),
+                    'Location': asset.location || '',
+                    'Division_Code': asset.divisionId?.code || '',
+                    'Division_Desc': asset.divisionId?.description || '',
+                    'Segment_Code': asset.segmentId?.code || '',
+                    'Segment_Desc': asset.segmentId?.description || '',
+                    'Mgr 1': resolveAssetMgr(asset, 'mgr1'),
+                    'Mgr 2': resolveAssetMgr(asset, 'mgr2'),
+                    'Mgr 3': resolveAssetMgr(asset, 'mgr3'),
+                    'Mgr 4': resolveAssetMgr(asset, 'mgr4'),
+                    'Mgr 5': resolveAssetMgr(asset, 'mgr5'),
+                    'Indicator_Field': asset.indicatorField || '',
+                    'Project Code': asset.projectCode || '',
+                    'Project Name': asset.projectName || ''
+                };
+            });
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Invoice Bulk Upload');
+            XLSX.writeFile(wb, `Invoice_Bulk_Upload_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            toast.success(`Exported ${exportData.length} records`);
         } catch (err) {
             console.error('Export error:', err);
-            toast.error(err.response?.data?.message || 'Failed to export invoice bulk upload records');
+            toast.error('Failed to export records');
         } finally {
-            setIsExporting(false);
+            setLoading(false);
         }
     };
 
@@ -680,6 +706,7 @@ const SerialNoMaster = () => {
                     <p className="text-slate-500 font-semibold text-sm">Track serial numbers, invoice information, customers and product transactions.</p>
                 </div>
                 <div className="flex flex-wrap gap-3 items-center justify-start md:justify-end">
+                    {canCreate && (
                     <button
                         onClick={() => openSingleEntry()}
                         className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-black transition-all uppercase text-[10px] tracking-widest active:scale-95 shadow-md shadow-emerald-600/10 cursor-pointer"
@@ -688,6 +715,8 @@ const SerialNoMaster = () => {
                         <MdAdd size={18} />
                         <span>Add Single Entry</span>
                     </button>
+                    )}
+                    {canCreate && (
                     <button
                         onClick={() => setIsImportModalOpen(true)}
                         className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-black text-white px-5 py-3 rounded-2xl font-black transition-all uppercase text-[10px] tracking-widest active:scale-95 shadow-md shadow-slate-900/10"
@@ -696,6 +725,7 @@ const SerialNoMaster = () => {
                         <MdFileUpload size={18} />
                         <span>Import</span>
                     </button>
+                    )}
                     <button
                         onClick={handleExport}
                         disabled={isExporting}
@@ -1011,7 +1041,7 @@ const SerialNoMaster = () => {
                                                                         <MdInfoOutline size={16} />
                                                                         View details
                                                                     </button>
-                                                                    {asset.status === 'SOLD' && (
+                                                                    {asset.status === 'SOLD' && canModify && (
                                                                         <button
                                                                             onClick={() => {
                                                                                 setOpenActionMenuAssetId(null);
@@ -1112,17 +1142,19 @@ const SerialNoMaster = () => {
             </Modal>
 
             {/* Import Modal */}
-            <ImportModal
+            <ImportWizard
                 isOpen={isImportModalOpen}
-                onClose={() => {
-                    setIsImportModalOpen(false);
+                onClose={() => setIsImportModalOpen(false)}
+                title="Import Invoice Bulk Upload Records"
+                module="assets"
+                templateName="assets_import_template.xlsx"
+                onDownloadTemplate={importService.getAssetTemplate}
+                onImported={() => {
+                    // The upload can add products and customers that other screens list.
+                    invalidateApiCache('/products');
+                    invalidateApiCache('/customers');
                     fetchData();
                 }}
-                title="Import Invoice Bulk Upload Records"
-
-                type="assets"
-                onImport={importService.importAssets}
-                onDownloadTemplate={importService.getAssetTemplate}
             />
         </div>
     );

@@ -109,12 +109,40 @@ const findDuplicateCustomer = async (payload, excludeId) => {
     return Customer.findOne(query).select('companyName customerName gstin mobile email').lean();
 };
 
+/**
+ * The customer that already uses this code. Codes are unique in the whole company, ignoring
+ * case (models/Customer.js), so customers of other branches count too.
+ */
+const findCustomerWithCode = (code, excludeId) => {
+    const value = String(code || '').trim();
+    if (!value) return null;
+    const query = { externalCode: value };
+    if (excludeId) query._id = { $ne: excludeId };
+    return Customer.findOne(query)
+        .collation(Customer.CUSTOMER_CODE_COLLATION)
+        .setOptions({ bypassBranch: true })
+        .select('externalCode companyName customerName')
+        .lean();
+};
+
+const duplicateCodeResponse = (res, code, existing) => res.status(409).json({
+    code: 'DUPLICATE_CUSTOMER_CODE',
+    message: existing
+        ? `Customer code ${existing.externalCode || code} is already used by ${existing.companyName || existing.customerName}. Each customer needs its own code.`
+        : `Customer code ${code} is already used by another customer. Each customer needs its own code.`,
+    duplicate: existing || undefined
+});
+
+// Two people saving the same new code at once: the second save is refused by the unique index.
+const isDuplicateCodeError = (error) => error?.code === 11000 && Boolean(error?.keyPattern?.externalCode);
+
 // Create Customer
 const createCustomer = async (req, res) => {
+    let cleanExternalCode = '';
     try {
         const { externalCode, customerCode, code, customerName, companyName, gstin, billingAddress, shippingAddress, mobile, email, logoUrl, defaultDiscount, territory } = req.body;
-        
-        const cleanExternalCode = String(externalCode || customerCode || code || '').trim();
+
+        cleanExternalCode = String(externalCode || customerCode || code || '').trim();
 
         // Pincode validation helper
         const validatePincode = (addressObj, typeName) => {
@@ -140,6 +168,8 @@ const createCustomer = async (req, res) => {
                 duplicate
             });
         }
+        const sameCode = await findCustomerWithCode(cleanExternalCode);
+        if (sameCode) return duplicateCodeResponse(res, cleanExternalCode, sameCode);
         const targetCustName = customerName?.trim() || companyName?.trim() || cleanExternalCode;
         const uniqueCustomerName = await getUniqueCustomerName(targetCustName);
 
@@ -171,8 +201,9 @@ const createCustomer = async (req, res) => {
         invalidateCustomerCaches().catch(err => console.error("Cache invalidation error:", err));
         res.status(201).json(newCustomer);
     } catch (error) {
+        if (isDuplicateCodeError(error)) return duplicateCodeResponse(res, cleanExternalCode);
         console.error("Error in createCustomer:", error);
-        res.status(500).json({ 
+        res.status(500).json({
             message: `Error creating customer: ${error.message}`,
             error: error.message
         });
@@ -265,10 +296,11 @@ const getCustomerById = async (req, res) => {
 
 // Update Customer
 const updateCustomer = async (req, res) => {
+    let cleanExternalCode;
     try {
         const { externalCode, customerCode, code, customerName, companyName, gstin, billingAddress, shippingAddress, mobile, email, logoUrl, defaultDiscount, territory } = req.body;
-        
-        const cleanExternalCode = externalCode !== undefined || customerCode !== undefined || code !== undefined
+
+        cleanExternalCode = externalCode !== undefined || customerCode !== undefined || code !== undefined
             ? String(externalCode || customerCode || code || '').trim()
             : undefined;
 
@@ -295,6 +327,8 @@ const updateCustomer = async (req, res) => {
                 duplicate
             });
         }
+        const sameCode = await findCustomerWithCode(cleanExternalCode, req.params.id);
+        if (sameCode) return duplicateCodeResponse(res, cleanExternalCode, sameCode);
         const targetCustName = customerName?.trim() || companyName?.trim() || cleanExternalCode || 'Customer';
         const uniqueCustomerName = await getUniqueCustomerName(targetCustName, req.params.id);
 
@@ -330,6 +364,7 @@ const updateCustomer = async (req, res) => {
         invalidateCustomerCaches().catch(err => console.error("Cache invalidation error:", err));
         res.json(updatedCustomer);
     } catch (error) {
+        if (isDuplicateCodeError(error)) return duplicateCodeResponse(res, cleanExternalCode);
         console.error("Error in updateCustomer:", error);
         res.status(500).json({ 
             message: `Error updating customer: ${error.message}`,

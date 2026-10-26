@@ -3,6 +3,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState, use
 import { useDispatch } from "react-redux";
 import { authService, authorizationService, setAccessToken, clearApiCache } from "../services/api";
 import { MENU_PERMISSION_GROUPS } from "../constants/menuPermissions";
+import { permissionAllows } from "../utils/permissions";
 import { clearCredentials, setCredentials, setPermissions as setReduxPermissions } from "../store/authSlice";
 
 const AuthContext = createContext(null);
@@ -83,6 +84,9 @@ export const AuthProvider = ({ children }) => {
     const dispatch = useDispatch();
     const [user, setUser] = useState(() => readStoredUser());
     const [permissions, setPermissions] = useState({});
+    // Which actions (view/create/modify/delete) each screen has, as sent by the server
+    const [permissionActions, setPermissionActions] = useState({});
+    const permissionsLoadedAt = useRef(0);
     const [loading, setLoading] = useState(true);
 
     const [activeBranchId, setActiveBranchIdState] = useState(() => localStorage.getItem("activeBranchId") || null);
@@ -201,6 +205,7 @@ export const AuthProvider = ({ children }) => {
         storeActiveBranch(null);
         setUser(null);
         setPermissions({});
+        setPermissionActions({});
         dispatch(clearCredentials());
     }, [dispatch, storeActiveBranch]);
 
@@ -222,6 +227,8 @@ export const AuthProvider = ({ children }) => {
             try {
                 const permissionsRes = await authorizationService.getMy();
                 nextPermissions = permissionsRes.data?.permissions || {};
+                setPermissionActions(permissionsRes.data?.permissionActions || {});
+                permissionsLoadedAt.current = Date.now();
             } catch (permErr) {
                 console.warn("Failed to load permissions after refresh:", permErr);
             }
@@ -258,6 +265,8 @@ export const AuthProvider = ({ children }) => {
             try {
                 const permissionsRes = await authorizationService.getMy();
                 nextPermissions = permissionsRes.data?.permissions || {};
+                setPermissionActions(permissionsRes.data?.permissionActions || {});
+                permissionsLoadedAt.current = Date.now();
             } catch (permErr) {
                 console.warn("Failed to load permissions from stored session:", permErr);
             }
@@ -293,6 +302,8 @@ export const AuthProvider = ({ children }) => {
         const permissionsRes = await authorizationService.getMy();
         const nextPermissions = permissionsRes.data?.permissions || {};
         setPermissions(nextPermissions);
+        setPermissionActions(permissionsRes.data?.permissionActions || {});
+        permissionsLoadedAt.current = Date.now();
         dispatch(setCredentials({ user: normalizedUser, permissions: nextPermissions }));
         dispatch(setReduxPermissions(nextPermissions));
 
@@ -391,6 +402,73 @@ export const AuthProvider = ({ children }) => {
         return false;
     }, [permissions, user]);
 
+    /**
+     * True when the user may perform `action` ('view', 'create', 'modify' or
+     * 'delete') on the screen `permissionKey`. Use it to show or hide Add, Edit
+     * and Delete buttons; the server enforces the same rules on every request.
+     */
+    const can = useCallback((permissionKey, action = "view") => {
+        if (!hasAccess(permissionKey)) return false;
+        if (action === "view" || !permissionKey) return true;
+        if (user?.role === "SUPER_ADMIN" || user?.role === "super_admin") return true;
+        // hasAccess grants some screens by role alone (employees, vendors); their
+        // actions still follow the saved flags, which default to View.
+        return permissionAllows({ ...permissions, [permissionKey]: true }, permissionKey, action, permissionActions);
+    }, [hasAccess, permissions, permissionActions, user]);
+
+    /** Reads the user's permissions again, e.g. after an administrator changed them. */
+    const reloadPermissions = useCallback(async () => {
+        if (!readStoredAccessToken() && !user) return;
+        try {
+            const res = await authorizationService.getMy();
+            const nextPermissions = res.data?.permissions || {};
+            setPermissions(nextPermissions);
+            setPermissionActions(res.data?.permissionActions || {});
+            permissionsLoadedAt.current = Date.now();
+            dispatch(setReduxPermissions(nextPermissions));
+        } catch (err) {
+            console.warn("Could not reload permissions:", err);
+        }
+    }, [dispatch, user]);
+
+    // Permission changes reach open sessions: the server announces them over the
+    // socket, a refused request (403) means they changed, and coming back to the tab
+    // after a while re-reads them in case the socket was down.
+    useEffect(() => {
+        if (!user) return undefined;
+        const userId = String(user.id || user._id || "");
+        const companyId = String(user.companyId?._id || user.companyId || "");
+
+        const onSocketUpdate = (event) => {
+            const detail = event.detail || {};
+            if (detail.entity !== "PERMISSIONS") return;
+            const data = detail.data || {};
+            if (data.companyId && companyId && String(data.companyId) !== companyId) return;
+            if ((data.userId && String(data.userId) === userId) || (data.role && data.role === user.role)) {
+                reloadPermissions();
+            }
+        };
+        const onPermissionDenied = () => {
+            if (Date.now() - permissionsLoadedAt.current > 10 * 1000) reloadPermissions();
+        };
+        const onFocus = () => {
+            if (document.visibilityState === "visible" && Date.now() - permissionsLoadedAt.current > 60 * 1000) {
+                reloadPermissions();
+            }
+        };
+
+        window.addEventListener("onCrmSocketUpdate", onSocketUpdate);
+        window.addEventListener("onPermissionDenied", onPermissionDenied);
+        document.addEventListener("visibilitychange", onFocus);
+        window.addEventListener("focus", onFocus);
+        return () => {
+            window.removeEventListener("onCrmSocketUpdate", onSocketUpdate);
+            window.removeEventListener("onPermissionDenied", onPermissionDenied);
+            document.removeEventListener("visibilitychange", onFocus);
+            window.removeEventListener("focus", onFocus);
+        };
+    }, [user, reloadPermissions]);
+
     const updateUser = useCallback((updatedUserData) => {
         if (!updatedUserData) return;
         setUser((prev) => {
@@ -447,6 +525,9 @@ export const AuthProvider = ({ children }) => {
                 refreshSession,
                 updateUser,
                 hasAccess,
+                can,
+                permissionActions,
+                reloadPermissions,
                 activeBranch,
                 activeBranchId,
                 setActiveBranch,

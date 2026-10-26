@@ -50,6 +50,16 @@ const getActiveBranchId = () => {
 const runWithTenant = (companyId, callback, storeData = {}) =>
     tenantStorage.run({ companyId, ...storeData }, callback);
 
+/**
+ * Wraps a middleware that calls next() from stream events, such as multer's upload.single():
+ * busboy finishes from the socket's events, which run outside this request's tenant context, so
+ * without this the handler after the upload runs with no company or branch filter at all.
+ */
+const keepTenantContext = (middleware) => (req, res, next) => {
+    const store = tenantStorage.getStore();
+    middleware(req, res, (...args) => (store ? tenantStorage.run(store, () => next(...args)) : next(...args)));
+};
+
 module.exports = {
     tenantStorage,
     getTenantId,
@@ -57,5 +67,6 @@ module.exports = {
     isBranchBypassed,
     getScopedBranches,
     getActiveBranchId,
-    runWithTenant
+    runWithTenant,
+    keepTenantContext
 };

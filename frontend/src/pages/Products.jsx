@@ -3,14 +3,17 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdInventory, MdCategory, MdQrCode, MdPayments, MdProductionQuantityLimits, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdSync, MdImage, MdFileDownload, MdArrowBack, MdPictureAsPdf, MdDescription } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
-import { productService, uploadService, importService, mgrService, attributeService, productAttributeService, vendorService, categoryService, vendorCatalogService } from '../services/api';
+import { productService, uploadService, importService, mgrService, attributeService, productAttributeService, vendorService, categoryService, vendorCatalogService, invalidateApiCache } from '../services/api';
 
 import Modal from '../components/Modal';
 import ImportModal from '../components/ImportModal';
+import ImportWizard from '../components/import/ImportWizard';
 import PaginationControls from '../components/PaginationControls';
+import TypeTestHistory from '../components/TypeTestHistory';
 import { resolveImageUrl, getPlaceholderImage } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
+import usePermission from '../hooks/usePermission';
 
 const LIST_PAGE_SIZE = 20;
 
@@ -21,6 +24,11 @@ const emptyVendorRow = () => ({
     isPrimary: false
 });
 
+// Yes/No style choice buttons. The selected one must not carry bg-slate-50: index.css
+// forces that background with !important, which would leave white text on white.
+const SELECTED_CHOICE = 'bg-primary-600 border-primary-600 shadow-md';
+const UNSELECTED_CHOICE = 'bg-slate-50 border-slate-200 hover:border-primary-300';
+
 // Product warranty, counted from the sale date of a serial; stored as warrantyMonths.
 const DEFAULT_WARRANTY_YEARS = '3';
 
@@ -29,6 +37,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
     const { user } = useAuth();
     const isVendorUser = user?.role === 'vendor' || String(user?.role || '').toLowerCase() === 'vendor';
     const { id: routeId } = useParams();
+    const { canCreate, canModify, canDelete } = usePermission('master_products');
     const [activeTab, setActiveTab] = useState(initialTab);
     const [products, setProducts] = useState([]);
     const [vendors, setVendors] = useState([]);
@@ -104,7 +113,8 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
         technicalSpecificationUrl: '',
         operatingUserManualUrl: '',
         repairTroubleshootingUrl: '',
-        warrantyYears: DEFAULT_WARRANTY_YEARS
+        warrantyYears: DEFAULT_WARRANTY_YEARS,
+        applicableForTypeTest: false
     });
 
     const [uploadingPdf, setUploadingPdf] = useState({
@@ -330,7 +340,8 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                 technicalSpecificationUrl: '',
                 operatingUserManualUrl: '',
                 repairTroubleshootingUrl: '',
-                warrantyYears: DEFAULT_WARRANTY_YEARS
+                warrantyYears: DEFAULT_WARRANTY_YEARS,
+                applicableForTypeTest: false
             });
             setIsModalOpen(true);
         } else if (isEditPage && routeId) {
@@ -353,6 +364,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                     repairTroubleshootingUrl: item.repairTroubleshootingUrl || '',
                     // Stored in months; products saved before the field count as 3 years.
                     warrantyYears: String(Number.isFinite(item.warrantyMonths) ? item.warrantyMonths / 12 : DEFAULT_WARRANTY_YEARS),
+                    applicableForTypeTest: Boolean(item.applicableForTypeTest),
                     attributes: (item.attributes || []).map(a => a._id || a),
                     vendors: item.vendors?.length ? item.vendors.map(v => ({
                         vendorId: v.vendorId?._id || v.vendorId,
@@ -803,11 +815,15 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
         }
     };
 
+    // Same normalisation as the backend: copied names may carry extra or non-breaking spaces.
+    const normalizeText = (value) => String(value ?? '').replace(/[\s ]+/g, ' ').trim().toLowerCase();
+    const exactMatchCount = debouncedSearch ? (pagination.exactTotal ?? products.filter(p => p.isExactMatch).length) : 0;
+
     const filteredProducts = products.filter(p => {
-        const searchLower = searchTerm.toLowerCase();
+        const searchLower = normalizeText(searchTerm);
 
         // Search in basic info
-        const matchesBasic = p.productName?.toLowerCase().includes(searchLower) ||
+        const matchesBasic = p.isExactMatch || normalizeText(p.productName).includes(searchLower) ||
             p.productCode?.toLowerCase().includes(searchLower) ||
             p.hsnCode?.toLowerCase().includes(searchLower) ||
             p.uom?.toLowerCase().includes(searchLower);
@@ -934,6 +950,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
             const typeParam = catalogTypeMap[activeTab] || 'Product';
 
             const res = await productService.getAll({
+                export: 'true',
                 limit: 10000,
                 search: debouncedSearch || undefined,
                 catalogType: typeParam,
@@ -1001,33 +1018,39 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                         <MdFileDownload size={20} />
                         <span>Export</span>
                     </button>
-                    <button
-                        onClick={() => setIsImportModalOpen(true)}
-                        className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-emerald-600/20 uppercase text-xs tracking-widest active:scale-95"
-                    >
-                        <MdFileUpload size={20} />
-                        <span>Import</span>
-                    </button>
-                    <button
-                        onClick={() => setIsAttrImportModalOpen(true)}
-                        className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-indigo-600/20 uppercase text-xs tracking-widest active:scale-95"
-                    >
-                        <MdFileUpload size={20} />
-                        <span>Import Attributes</span>
-                    </button>
-                    <button
+                    {canCreate && (
+                        <button
+                            onClick={() => setIsImportModalOpen(true)}
+                            className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-emerald-600/20 uppercase text-xs tracking-widest active:scale-95"
+                        >
+                            <MdFileUpload size={20} />
+                            <span>Import</span>
+                        </button>
+                    )}
+                    {(canCreate || canModify) && (
+                        <button
+                            onClick={() => setIsAttrImportModalOpen(true)}
+                            className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-indigo-600/20 uppercase text-xs tracking-widest active:scale-95"
+                        >
+                            <MdFileUpload size={20} />
+                            <span>Import Attributes</span>
+                        </button>
+                    )}
+                    {canCreate && (
+                        <button
 
-                        onClick={() => handleOpenModal()}
-                        className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
-                    >
-                        <MdAdd size={20} />
-                        <span>Add New Product</span>
-                    </button>
+                            onClick={() => handleOpenModal()}
+                            className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                        >
+                            <MdAdd size={20} />
+                            <span>Add New Product</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
             {/* Bulk Action Toolbar */}
-            {selectedIds.length > 0 && (
+            {(canModify || canDelete) && selectedIds.length > 0 && (
                 <div className="bg-slate-900 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-xl animate-in slide-in-from-top-2">
                     <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center">
@@ -1039,30 +1062,36 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => handleBulkStatusUpdate('Active')}
-                            disabled={isBulkActionLoading}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-50"
-                        >
-                            <MdSync size={16} />
-                            Set Active
-                        </button>
-                        <button
-                            onClick={() => handleBulkStatusUpdate('Inactive')}
-                            disabled={isBulkActionLoading}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-50"
-                        >
-                            <MdSync size={16} />
-                            Set Inactive
-                        </button>
-                        <button
-                            onClick={handleBulkDelete}
-                            disabled={isBulkActionLoading}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-50"
-                        >
-                            <MdDeleteSweep size={16} />
-                            Delete All
-                        </button>
+                        {canModify && (
+                            <>
+                                <button
+                                    onClick={() => handleBulkStatusUpdate('Active')}
+                                    disabled={isBulkActionLoading}
+                                    className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-50"
+                                >
+                                    <MdSync size={16} />
+                                    Set Active
+                                </button>
+                                <button
+                                    onClick={() => handleBulkStatusUpdate('Inactive')}
+                                    disabled={isBulkActionLoading}
+                                    className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-50"
+                                >
+                                    <MdSync size={16} />
+                                    Set Inactive
+                                </button>
+                            </>
+                        )}
+                        {canDelete && (
+                            <button
+                                onClick={handleBulkDelete}
+                                disabled={isBulkActionLoading}
+                                className="flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-50"
+                            >
+                                <MdDeleteSweep size={16} />
+                                Delete All
+                            </button>
+                        )}
                         <button
                             onClick={() => setSelectedIds([])}
                             className="px-4 py-2.5 text-slate-400 hover:text-white transition-colors font-bold text-xs uppercase tracking-widest"
@@ -1179,6 +1208,21 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                     </div>
                 </div>
 
+                {debouncedSearch && !loading && (
+                    <div className="px-6 py-3 border-b border-slate-100 bg-white text-xs text-slate-600 font-medium">
+                        {exactMatchCount > 0 ? (
+                            <>
+                                <span className="font-bold text-emerald-700">{exactMatchCount} exact match{exactMatchCount === 1 ? '' : 'es'}</span>
+                                {' '}for "{debouncedSearch}" shown first
+                                {pagination.total > exactMatchCount && <>, followed by {pagination.total - exactMatchCount} partial match{pagination.total - exactMatchCount === 1 ? '' : 'es'}</>}.
+                                {exactMatchCount > 1 && <> Several products share this name. Use the Product Code to tell them apart.</>}
+                            </>
+                        ) : (
+                            <>No exact match for "{debouncedSearch}". Showing {pagination.total || 0} partial match{pagination.total === 1 ? '' : 'es'}.</>
+                        )}
+                    </div>
+                )}
+
                 <div>
                     {loading ? (
                         <div className="p-20 text-center text-slate-400 font-medium">
@@ -1194,7 +1238,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                         <div className="p-4 flex gap-4">
                                             <div
                                                 className="h-20 w-20 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-center flex-shrink-0 cursor-pointer overflow-hidden"
-                                                onClick={() => handleOpenModal(p)}
+                                                onClick={() => canModify && handleOpenModal(p)}
                                             >
                                                 {p.productImageUrl ? (
                                                     <img src={resolveImageUrl(p.productImageUrl)} alt={p.productName} className="h-full w-full object-contain" />
@@ -1206,6 +1250,9 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                                 <div className="flex justify-between items-start">
                                                     <div>
                                                         <h3 className="font-bold text-slate-900 truncate pr-2 text-sm">{p.productName}</h3>
+                                                        {p.isExactMatch && (
+                                                            <span className="inline-block px-1.5 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] font-black uppercase tracking-widest rounded border border-emerald-200">Exact match</span>
+                                                        )}
                                                         <div className="flex flex-wrap items-center gap-2 mt-0.5">
                                                             <p className="text-xs text-slate-500 font-mono">{p.productCode}</p>
                                                             {p.attributes && p.attributes.length > 0 && (
@@ -1249,18 +1296,22 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                                 HSN: {p.hsnCode || 'N/A'}
                                             </div>
                                             <div className="flex gap-1">
-                                                <button
-                                                    onClick={() => handleOpenModal(p)}
-                                                    className="p-2 text-slate-400 hover:text-primary-600 hover:bg-white rounded-lg transition-all"
-                                                >
-                                                    <MdEdit size={18} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(p._id)}
-                                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-white rounded-lg transition-all"
-                                                >
-                                                    <MdDelete size={18} />
-                                                </button>
+                                                {canModify && (
+                                                    <button
+                                                        onClick={() => handleOpenModal(p)}
+                                                        className="p-2 text-slate-400 hover:text-primary-600 hover:bg-white rounded-lg transition-all"
+                                                    >
+                                                        <MdEdit size={18} />
+                                                    </button>
+                                                )}
+                                                {canDelete && (
+                                                    <button
+                                                        onClick={() => handleDelete(p._id)}
+                                                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-white rounded-lg transition-all"
+                                                    >
+                                                        <MdDelete size={18} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -1328,7 +1379,12 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                                                     />
                                                                 </div>
                                                                 <div>
-                                                                    <div className="font-bold text-slate-900">{p.productName}</div>
+                                                                    <div className="font-bold text-slate-900">
+                                                                        {p.productName}
+                                                                        {p.isExactMatch && (
+                                                                            <span className="ml-2 align-middle px-1.5 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] font-black uppercase tracking-widest rounded border border-emerald-200">Exact match</span>
+                                                                        )}
+                                                                    </div>
                                                                     <div className="flex flex-wrap items-center gap-1.5 mt-1">
                                                                         <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{p.uom}</span>
                                                                         {p.attributes && p.attributes.length > 0 && (
@@ -1413,19 +1469,23 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                                                         <MdVisibility size={18} />
                                                                     </button>
                                                                 )}
-                                                                <button
-                                                                    onClick={() => handleOpenModal(p)}
-                                                                    className="p-2.5 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                                    title="Edit Product"
-                                                                >
-                                                                    <MdEdit size={18} />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleDelete(p._id)}
-                                                                    className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                                >
-                                                                    <MdDelete size={18} />
-                                                                </button>
+                                                                {canModify && (
+                                                                    <button
+                                                                        onClick={() => handleOpenModal(p)}
+                                                                        className="p-2.5 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                                        title="Edit Product"
+                                                                    >
+                                                                        <MdEdit size={18} />
+                                                                    </button>
+                                                                )}
+                                                                {canDelete && (
+                                                                    <button
+                                                                        onClick={() => handleDelete(p._id)}
+                                                                        className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                                    >
+                                                                        <MdDelete size={18} />
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -1469,6 +1529,9 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                                     <div className="mb-4 flex-1">
                                                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{p.productCode}</div>
                                                         <h3 className="font-bold text-slate-900 leading-tight mb-2 line-clamp-2">{p.productName}</h3>
+                                                        {p.isExactMatch && (
+                                                            <span className="inline-block mb-2 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] font-black uppercase tracking-widest rounded border border-emerald-200">Exact match</span>
+                                                        )}
                                                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">HSN: {p.hsnCode}</p>
                                                     </div>
                                                     <div className="flex items-end justify-between border-t border-slate-50 pt-4 mt-auto">
@@ -1478,18 +1541,22 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                                             <div className="text-[10px] text-slate-400">Selling (Incl. GST): ₹{p.mrp?.toLocaleString()}</div>
                                                         </div>
                                                         <div className="flex gap-2">
-                                                            <button
-                                                                onClick={() => handleOpenModal(p)}
-                                                                className="p-2 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                            >
-                                                                <MdEdit size={18} />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDelete(p._id)}
-                                                                className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                            >
-                                                                <MdDelete size={18} />
-                                                            </button>
+                                                            {canModify && (
+                                                                <button
+                                                                    onClick={() => handleOpenModal(p)}
+                                                                    className="p-2 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                                >
+                                                                    <MdEdit size={18} />
+                                                                </button>
+                                                            )}
+                                                            {canDelete && (
+                                                                <button
+                                                                    onClick={() => handleDelete(p._id)}
+                                                                    className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                                >
+                                                                    <MdDelete size={18} />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1678,14 +1745,16 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                 <div className="mt-8">
                                     <div className="flex items-center justify-between mb-4">
                                         <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Attributes for MGR3</h5>
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsAttrImportModalOpen(true)}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-indigo-100"
-                                        >
-                                            <MdFileUpload size={14} />
-                                            Import Attributes
-                                        </button>
+                                        {(canCreate || canModify) && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsAttrImportModalOpen(true)}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-indigo-100"
+                                            >
+                                                <MdFileUpload size={14} />
+                                                Import Attributes
+                                            </button>
+                                        )}
                                     </div>
                                     <div className="flex flex-wrap gap-2">
                                         {availableAttributes.map(attr => (
@@ -1899,7 +1968,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                             </h4>
                             <div className="flex gap-6 p-1">
                                 {['Active', 'Inactive'].map((st) => (
-                                    <label key={st} className="flex-1 flex items-center justify-center gap-2 cursor-pointer group bg-slate-50 py-3.5 rounded-2xl border border-slate-200 transition-all has-[:checked]:bg-primary-50 has-[:checked]:border-primary-200">
+                                    <label key={st} className={`flex-1 flex items-center justify-center gap-2 cursor-pointer group py-3.5 rounded-2xl border transition-all focus-within:ring-2 focus-within:ring-primary-500/30 ${formData.status === st ? SELECTED_CHOICE : UNSELECTED_CHOICE}`}>
                                         <input
                                             type="radio"
                                             name="status"
@@ -1908,10 +1977,36 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                             onChange={handleFormChange}
                                             className="sr-only"
                                         />
-                                        <span className={`text-[10px] font-black uppercase tracking-widest ${formData.status === st ? 'text-primary-600' : 'text-slate-400'}`}>{st}</span>
+                                        <span className={`text-[10px] font-black uppercase tracking-widest ${formData.status === st ? 'text-white' : 'text-slate-500'}`}>{st}</span>
                                     </label>
                                 ))}
                             </div>
+                        </div>
+
+                        <div>
+                            <h4 className="text-[10px] font-black text-primary-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
+                                <span className="h-px flex-1 bg-primary-100"></span>
+                                Applicable for Test Type
+                                <span className="h-px flex-1 bg-primary-100"></span>
+                            </h4>
+                            <div className="flex gap-6 p-1">
+                                {[{ label: 'Yes', value: true }, { label: 'No', value: false }].map((opt) => (
+                                    <label key={opt.label} className={`flex-1 flex items-center justify-center gap-2 cursor-pointer group py-3.5 rounded-2xl border transition-all focus-within:ring-2 focus-within:ring-primary-500/30 ${Boolean(formData.applicableForTypeTest) === opt.value ? SELECTED_CHOICE : UNSELECTED_CHOICE}`}>
+                                        <input
+                                            type="radio"
+                                            name="applicableForTypeTest"
+                                            checked={Boolean(formData.applicableForTypeTest) === opt.value}
+                                            onChange={() => setFormData(prev => ({ ...prev, applicableForTypeTest: opt.value }))}
+                                            className="sr-only"
+                                        />
+                                        <span className={`text-[10px] font-black uppercase tracking-widest ${Boolean(formData.applicableForTypeTest) === opt.value ? 'text-white' : 'text-slate-500'}`}>{opt.label}</span>
+                                    </label>
+                                ))}
+                            </div>
+                            <p className="mt-2 text-xs font-medium text-slate-500">
+                                Yes lists this product in the Type Test Register product dropdown.
+                            </p>
+                            {editingProduct?._id && <TypeTestHistory productId={editingProduct._id} />}
                         </div>
 
                         <div>
@@ -2083,45 +2178,51 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
             </Modal>
 
             {/* Import Modal */}
-            <ImportModal
-                isOpen={isImportModalOpen}
-                onClose={() => setIsImportModalOpen(false)}
-                title={isVendorUser ? "Import Vendor Product Catalog" : "Import Products"}
-                type="products"
-                onImport={async (file) => {
-                    if (isVendorUser) {
+            {/* Vendor logins import into their own catalog; everyone else uses the staged product import. */}
+            {isVendorUser ? (
+                <ImportModal
+                    isOpen={isImportModalOpen}
+                    onClose={() => setIsImportModalOpen(false)}
+                    title="Import Vendor Product Catalog"
+                    type="products"
+                    onImport={async (file) => {
                         const result = await vendorCatalogService.importCatalog(user?.vendorId, file);
                         fetchProducts();
                         return result;
-                    } else {
-                        const result = await importService.importProducts(file);
+                    }}
+                    onDownloadTemplate={importService.getProductTemplate}
+                />
+            ) : (
+                <ImportWizard
+                    isOpen={isImportModalOpen}
+                    onClose={() => setIsImportModalOpen(false)}
+                    title="Import Products"
+                    module="products"
+                    onDownloadTemplate={importService.getProductTemplate}
+                    onImported={() => {
+                        invalidateApiCache('/products');
                         fetchProducts();
-                        return result;
-                    }
-                }}
-                onDownloadTemplate={importService.getProductTemplate}
-            />
+                    }}
+                />
+            )}
 
             {/* Import Attributes Modal */}
-            <ImportModal
+            <ImportWizard
                 isOpen={isAttrImportModalOpen}
                 onClose={() => setIsAttrImportModalOpen(false)}
                 title="Import Product Attributes"
-                type="attributes"
-                onImport={async (file) => {
-                    const result = await importService.importAttributes(file);
+                module="attributes"
+                templateName="attributes_import_template.xlsx"
+                onDownloadTemplate={importService.getAttributeTemplate}
+                onImported={() => {
                     if (editingProduct && editingProduct.productCode) {
                         fetchCustomAttributes(editingProduct.productCode);
                     }
                     fetchAllAttributes(); // Refresh the list view attributes too
                     if (formData.mgr3) {
-
                         fetchAvailableAttributes(formData.mgr3._id || formData.mgr3);
                     }
-                    return result;
                 }}
-
-                onDownloadTemplate={importService.getAttributeTemplate}
             />
 
         </div >

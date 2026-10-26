@@ -1,18 +1,20 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { csmService, customerService, productService, voucherService, userService, importService, uploadService, branchService } from '../services/api';
-import { formatDate, formatDateTime } from '../utils/helpers';
+import { csmService, customerService, productService, voucherService, userService, importService, uploadService, branchService, invalidateApiCache } from '../services/api';
+import { formatDate } from '../utils/helpers';
 import { toast } from 'react-toastify';
-import { MdAdd, MdSearch, MdFilterList, MdArrowForward, MdEdit, MdDelete, MdPublish, MdFileDownload, MdWarning, MdInfoOutline, MdPhotoCamera, MdCloudUpload, MdPeople, MdAccountTree, MdCorporateFare } from 'react-icons/md';
+import { MdAdd, MdSearch, MdFilterList, MdArrowForward, MdEdit, MdDelete, MdPublish, MdFileDownload, MdInfoOutline, MdPhotoCamera, MdCloudUpload, MdPeople, MdAccountTree, MdCorporateFare } from 'react-icons/md';
 import PaginationControls from '../components/PaginationControls';
 import PortalDropdown from '../components/PortalDropdown';
 import Modal from '../components/Modal';
 import SearchableSelect from '../components/SearchableSelect';
 import ComplaintBOMPanel from '../components/bom/ComplaintBOMPanel';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
+import usePermission from '../hooks/usePermission';
 import { isValidMobile, isValidPincode, sanitizePhoneNumber } from '../utils/validation';
 import DateInput from '../components/DateInput';
+import ImportWizard from '../components/import/ImportWizard';
 
 const statusStyles = {
     'Open': 'bg-emerald-50 text-emerald-600 border-emerald-200',
@@ -66,7 +68,23 @@ const getManualImagesForTicket = (ticket) => {
 
 const CSMTickets = () => {
     const navigate = useNavigate();
-    const { user, isAdmin, isSuperAdmin } = useAuth();
+    const { user, isAdmin, isSuperAdmin, activeBranchId, can } = useAuth();
+    const { canCreate } = usePermission('csm_tickets');
+    // Branch the new ticket is raised under ('all' = All Branches). Options and whether
+    // "All Branches" is offered come from the server's branch-access rules.
+    const [ticketBranchOptions, setTicketBranchOptions] = useState({ branches: [], allowAllBranches: false });
+    const [ticketBranch, setTicketBranch] = useState('');
+    useEffect(() => {
+        csmService.getTicketBranchOptions()
+            .then(res => setTicketBranchOptions({
+                branches: Array.isArray(res.data?.branches) ? res.data.branches : [],
+                allowAllBranches: Boolean(res.data?.allowAllBranches),
+            }))
+            .catch(err => console.error('Error loading ticket branches:', err));
+    }, []);
+    useEffect(() => {
+        if (activeBranchId) setTicketBranch(prev => prev || String(activeBranchId));
+    }, [activeBranchId]);
     const isManagerOrAdmin = useMemo(() => {
         if (!user) return false;
         const role = String(user.role || '').toLowerCase();
@@ -74,7 +92,7 @@ const CSMTickets = () => {
     }, [user, isAdmin, isSuperAdmin]);
 
     const [searchParams, setSearchParams] = useSearchParams();
-    const hasMetricFilter = searchParams.has('status') || searchParams.has('unassigned') || searchParams.has('slaBreached');
+    const hasMetricFilter = searchParams.has('status') || searchParams.has('unassigned') || searchParams.has('slaBreached') || searchParams.has('resolvedOn') || searchParams.has('createdOn');
     const activeTab = searchParams.get('tab') || (hasMetricFilter || isManagerOrAdmin ? 'all' : 'my');
 
     const handleTabChange = (newTab) => {
@@ -114,8 +132,7 @@ const CSMTickets = () => {
     const [generatedSerial, setGeneratedSerial] = useState('');
     
     // Import tracking states
-    const [importResult, setImportResult] = useState(null);
-    const [showImportResultModal, setShowImportResultModal] = useState(false);
+    const [isImportOpen, setIsImportOpen] = useState(false);
 
     // Page View State: 'list' | 'standard' | 'manual'
     const [pageView, setPageView] = useState('list');
@@ -430,7 +447,7 @@ const CSMTickets = () => {
                         }
                     } catch (e) {}
                 }
-                toast.success(`SR. No. "${asset.serialNumber || cleanSN}" found! Auto-filled details from Invoice Bulk Upload.`);
+                toast.success(`SR. No. "${asset.serialNumber || cleanSN}" found! Auto-filled details from Invoice Bulk Upload.`, { toastId: 'serial-autofill' });
             } else {
                 toast.info('No matching serial number found in Invoice Bulk Upload. Continuing with manual entry.');
             }
@@ -468,6 +485,12 @@ const CSMTickets = () => {
             }
             if (searchParams.get('slaBreached') === 'true') {
                 queryParams.slaBreached = 'true';
+            }
+            if (searchParams.get('resolvedOn') === 'yesterday') {
+                queryParams.resolvedOn = 'yesterday';
+            }
+            if (searchParams.get('createdOn') === 'today') {
+                queryParams.createdOn = 'today';
             }
             if (filterInvoiceType === 'manual') {
                 queryParams.isManual = 'true';
@@ -1016,16 +1039,16 @@ const CSMTickets = () => {
             toast.error('Product is required');
             return;
         }
-        if (!formData.contactId) {
-            toast.error('Contact Person is required');
-            return;
-        }
         if (formData.contactPhone && !isValidMobile(formData.contactPhone)) {
             toast.error('Invalid Mobile Number. Please enter a valid 10-digit mobile number');
             return;
         }
         if (!formData.issueTitle.trim()) {
             toast.error('Subject is required');
+            return;
+        }
+        if (!ticketBranch) {
+            toast.error('Branch is required');
             return;
         }
         if (!formData.priorityId) {
@@ -1081,7 +1104,8 @@ const CSMTickets = () => {
             ...formData, 
             assetId: assetIdToSubmit,
             invoiceId: finalInvoiceId,
-            manualInvoiceNo: manualInvoiceNoToSubmit
+            manualInvoiceNo: manualInvoiceNoToSubmit,
+            branchId: ticketBranch
         };
         const optionalObjectIdFields = ['contactId', 'contactDesignationId', 'productId', 'assetId', 'invoiceId', 'categoryId', 'typeId', 'problemId'];
         optionalObjectIdFields.forEach(field => {
@@ -1200,17 +1224,10 @@ const CSMTickets = () => {
                 }
             }
 
-            // 2. Resolve Category
-            let categoryId = '';
+            // 2. Resolve Category (a missing one is created by the server with the ticket)
             const selectedCatName = manualFormData.category;
             const matchedCat = categories.find(c => c.name.toLowerCase() === selectedCatName.toLowerCase());
-            if (matchedCat) {
-                categoryId = matchedCat._id;
-            } else {
-                const newCatRes = await csmService.createCategory({ name: selectedCatName });
-                categoryId = newCatRes.data._id;
-                setCategories(prev => [...prev, newCatRes.data]);
-            }
+            const categoryId = matchedCat?._id || undefined;
 
             // 3. Resolve Priority
             let priorityId = '';
@@ -1224,17 +1241,10 @@ const CSMTickets = () => {
                 setPriorities(prev => [...prev, newPriRes.data]);
             }
 
-            // 4. Resolve Type
-            let typeId = '';
+            // 4. Resolve Type (a missing one is created by the server with the ticket)
             const selectedTypeName = manualFormData.type;
             const matchedType = types.find(t => t.name.toLowerCase() === selectedTypeName.toLowerCase());
-            if (matchedType) {
-                typeId = matchedType._id;
-            } else {
-                const newTypeRes = await csmService.createType({ name: selectedTypeName });
-                typeId = newTypeRes.data._id;
-                setTypes(prev => [...prev, newTypeRes.data]);
-            }
+            const typeId = matchedType?._id || undefined;
 
             // 5. Resolve Product (optional)
             let productId = (!isManualProductText && manualFormData.productId) ? manualFormData.productId : null;
@@ -1285,7 +1295,9 @@ const CSMTickets = () => {
                 source: manualFormData.source,
                 priorityId,
                 categoryId,
+                categoryName: categoryId ? undefined : selectedCatName,
                 typeId,
+                typeName: typeId ? undefined : selectedTypeName,
                 productId,
                 assetId,
                 issueTitle: manualFormData.issueTitle,
@@ -1585,8 +1597,7 @@ const CSMTickets = () => {
 
                 fetchProblems({ productId: targetProdId || '', mgr4Category: mgr4Val || '' });
                 
-                toast.success(`Asset found! Auto-filled details for Serial No: ${asset.serialNumber || cleanSN}`);
-                
+                toast.success(`Asset found! Auto-filled details for Serial No: ${asset.serialNumber || cleanSN}`, { toastId: 'serial-autofill' });
                 if (res.data) {
                     const hasCoverage = res.data.warranty?.status === 'Active' || res.data.amc?.status === 'Active';
                     if (!hasCoverage) {
@@ -1681,54 +1692,6 @@ const CSMTickets = () => {
             console.error('Error downloading template:', error);
             toast.error('Failed to download Excel template.');
         }
-    };
-
-    const handleImportFile = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        setLoading(true);
-        try {
-            const res = await importService.importTickets(file);
-            
-            setImportResult({
-                type: 'ticket',
-                imported: res.data.imported || 0,
-                updated: res.data.updated || 0,
-                skipped: res.data.skipped || 0,
-                failed: res.data.failed || 0,
-                errors: res.data.errors || []
-            });
-            setShowImportResultModal(true);
-
-            // Reload tickets
-            fetchTickets();
-            fetchTicketCustomers();
-
-            if (res.data.success) {
-                toast.success('Import completed successfully!');
-            } else {
-                toast.warning('Import completed with some errors. Please check the summary report.');
-            }
-        } catch (error) {
-            console.error('Import error:', error);
-            toast.error(error.response?.data?.message || 'Error occurred during import');
-        } finally {
-            setLoading(false);
-            e.target.value = ''; // Reset file input
-        }
-    };
-
-    const downloadErrorReport = () => {
-        if (!importResult || !importResult.errors || importResult.errors.length === 0) return;
-        const blobContent = `Import Error Report for Tickets\nGenerated on: ${formatDateTime(new Date())}\n\nFailed rows details:\n` + importResult.errors.join('\n');
-        const url = window.URL.createObjectURL(new Blob([blobContent], { type: 'text/plain' }));
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `ticket_import_errors.txt`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
     };
 
     const handleOpenMiniMaster = (type) => {
@@ -2251,39 +2214,41 @@ const CSMTickets = () => {
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                    <button
-                        onClick={() => {
-                            const lowPriority = priorities.find(p => p.name?.toLowerCase() === 'low');
-                            setFormData({
-                                customerId: '',
-                                contactId: '',
-                                contactName: '',
-                                contactDesignationId: '',
-                                contactDesignation: '',
-                                contactPhone: '',
-                                contactEmail: '',
-                                priorityId: lowPriority ? lowPriority._id : '',
-                                categoryId: '',
-                                typeId: '',
-                                productId: '',
-                                assetId: '',
-                                invoiceId: '',
-                                issueTitle: '',
-                                description: '',
-                                source: 'Web Portal',
-                                serialNumber: ''
-                            });
-                            setCustomerContacts([]);
-                            setAssetSummary(null);
-                            setShowAllProducts(false);
-                            setGeneratedSerial('');
-                            setPageView('standard');
-                        }}
-                        className="flex items-center gap-2 px-6 py-4 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-lg shadow-primary-600/20 active:scale-95 self-start md:self-auto"
-                    >
-                        <MdAdd size={18} />
-                        New Ticket
-                    </button>
+                    {canCreate && (
+                        <button
+                            onClick={() => {
+                                const lowPriority = priorities.find(p => p.name?.toLowerCase() === 'low');
+                                setFormData({
+                                    customerId: '',
+                                    contactId: '',
+                                    contactName: '',
+                                    contactDesignationId: '',
+                                    contactDesignation: '',
+                                    contactPhone: '',
+                                    contactEmail: '',
+                                    priorityId: lowPriority ? lowPriority._id : '',
+                                    categoryId: '',
+                                    typeId: '',
+                                    productId: '',
+                                    assetId: '',
+                                    invoiceId: '',
+                                    issueTitle: '',
+                                    description: '',
+                                    source: 'Web Portal',
+                                    serialNumber: ''
+                                });
+                                setCustomerContacts([]);
+                                setAssetSummary(null);
+                                setShowAllProducts(false);
+                                setGeneratedSerial('');
+                                setPageView('standard');
+                            }}
+                            className="flex items-center gap-2 px-6 py-4 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-lg shadow-primary-600/20 active:scale-95 self-start md:self-auto"
+                        >
+                            <MdAdd size={18} />
+                            New Ticket
+                        </button>
+                    )}
 
                     <button
                         onClick={exportToExcel}
@@ -2293,16 +2258,16 @@ const CSMTickets = () => {
                         Export
                     </button>
 
-                    <label className="flex items-center gap-2 px-5 py-4 bg-slate-800 hover:bg-slate-900 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-md cursor-pointer active:scale-95">
-                        <MdPublish size={18} />
-                        Import
-                        <input
-                            type="file"
-                            accept=".xlsx, .xls, .csv"
-                            onChange={handleImportFile}
-                            className="hidden"
-                        />
-                    </label>
+                    {canCreate && (
+                        <button
+                            type="button"
+                            onClick={() => setIsImportOpen(true)}
+                            className="flex items-center gap-2 px-5 py-4 bg-slate-800 hover:bg-slate-900 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-md active:scale-95"
+                        >
+                            <MdPublish size={18} />
+                            Import
+                        </button>
+                    )}
 
                     <button
                         onClick={handleDownloadTemplate}
@@ -2471,16 +2436,20 @@ const CSMTickets = () => {
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                                 <thead>
+                                    {/* Text columns wrap so the table fits wide screens. On narrower ones the
+                                        Engineer and Action columns stay pinned on the right (Engineer's offset is
+                                        the Action column's fixed width), so Details is reachable without
+                                        scrolling the table sideways. */}
                                     <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
-                                        <th className="px-4 py-3 whitespace-nowrap">Ticket No</th>
-                                        <th className="px-4 py-3 whitespace-nowrap">Customer & Contact</th>
-                                        <th className="px-4 py-3 whitespace-nowrap">Subject</th>
-                                        <th className="px-4 py-3 whitespace-nowrap">Invoice No.</th>
-                                        <th className="px-4 py-3 whitespace-nowrap">Product Sr. No.</th>
-                                        <th className="px-4 py-3 whitespace-nowrap">Priority</th>
-                                        <th className="px-4 py-3 whitespace-nowrap">Status</th>
-                                        <th className="px-4 py-3 whitespace-nowrap">Engineer</th>
-                                        <th className="px-4 py-3 text-center whitespace-nowrap">Action</th>
+                                        <th className="pl-3 pr-2.5 py-3 whitespace-nowrap">Ticket No</th>
+                                        <th className="px-2.5 py-3">Customer & Contact</th>
+                                        <th className="px-2.5 py-3">Subject</th>
+                                        <th className="px-2.5 py-3">Invoice No.</th>
+                                        <th className="px-2.5 py-3">Product Sr. No.</th>
+                                        <th className="px-2.5 py-3">Priority</th>
+                                        <th className="px-2.5 py-3">Status</th>
+                                        <th className="px-2.5 py-3 sticky right-[6.25rem] bg-slate-50 shadow-[-6px_0_6px_-6px_rgba(15,23,42,0.15)]">Engineer</th>
+                                        <th className="w-[6.25rem] min-w-[6.25rem] px-2 py-3 text-center whitespace-nowrap sticky right-0 bg-slate-50">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50 text-sm font-semibold text-slate-700">
@@ -2488,69 +2457,83 @@ const CSMTickets = () => {
                                         const isManual = t.isManual || !!t.manualInvoiceNo || (t.description && t.description.includes('--- Uploaded Images ---'));
                                         const invoiceNo = t.invoiceId?.voucherNumber || t.invoiceId?.invoiceNumber || t.manualInvoiceNo || 'N/A';
                                         const productSrNo = t.assetId?.serialNumber || 'N/A';
+                                        // A long invoice number breaks only after a "/" (never inside "STN-1327"); <wbr> is
+                                        // not copied with the text. Numbers without a "/" wrap normally.
+                                        const invoiceParts = !invoiceNo.includes('/') || invoiceNo === 'N/A' ? invoiceNo
+                                            : invoiceNo.split('/').flatMap((part, i, all) => (i < all.length - 1
+                                                ? [<span key={`p${i}`} className="whitespace-nowrap">{part}/</span>, <wbr key={`w${i}`} />]
+                                                : [<span key={`p${i}`} className="whitespace-nowrap">{part}</span>]));
                                         return (
                                             <tr key={t._id} className="hover:bg-slate-50/50 transition-colors">
-                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                <td className="pl-3 pr-2.5 py-3">
                                                     <div className="font-black text-slate-900 whitespace-nowrap">{t.ticketNo}</div>
                                                     <div className="flex items-center gap-1 mt-1">
-                                                        <span className={`inline-block text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider ${
+                                                        <span className={`inline-block whitespace-nowrap text-[9px] px-1.5 py-0.5 rounded-full font-black uppercase tracking-wide ${
                                                             isManual 
                                                                 ? 'bg-amber-100 text-amber-800 border border-amber-200' 
                                                                 : 'bg-blue-100 text-blue-800 border border-blue-200'
                                                         }`}>
                                                             {isManual ? 'Manual' : 'System'}
                                                         </span>
-                                                        {t.branchId?.name && (
-                                                            <span className="inline-block text-[9px] px-2 py-0.5 rounded-full font-black tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
-                                                                📍 {t.branchId.name}
-                                                            </span>
-                                                        )}
+                                                        <span className="inline-block whitespace-nowrap text-[9px] px-1.5 py-0.5 rounded-full font-black tracking-wide bg-purple-50 text-purple-700 border border-purple-200">
+                                                            📍 {t.branchId?.name || 'All Branches'}
+                                                        </span>
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-3">
-                                                    <p className="font-bold text-slate-900">{t.customerId?.customerName || 'N/A'}</p>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
-                                                        {t.contactName || t.contactPhone || 'No Contact'}
-                                                        {t.pincode ? ` | Pin: ${t.pincode}` : ''}
-                                                    </p>
+                                                <td className="px-2.5 py-3">
+                                                    {/* Bounded width: a long name wraps onto 2-3 lines instead of widening the column */}
+                                                    <div className="min-w-[10.5rem] max-w-[13.5rem] break-words">
+                                                        <p className="text-[13px] font-bold text-slate-900 leading-snug">{t.customerId?.customerName || 'N/A'}</p>
+                                                        <p className="mt-0.5 text-[10px] font-bold text-slate-400 uppercase tracking-tight leading-snug">
+                                                            {t.contactName || t.contactPhone || 'No Contact'}
+                                                            {t.pincode ? ` | Pin: ${t.pincode}` : ''}
+                                                        </p>
+                                                    </div>
                                                 </td>
-                                                <td className="px-4 py-3 max-w-xs truncate">{t.issueTitle}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap">
-                                                    <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                                                        {invoiceNo}
-                                                    </span>
+                                                <td className="px-2.5 py-3">
+                                                    <p className="min-w-[6.75rem] max-w-[15rem] line-clamp-3 break-words leading-snug" title={t.issueTitle}>{t.issueTitle}</p>
                                                 </td>
-                                                <td className="px-4 py-3 whitespace-nowrap">
-                                                    <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-teal-50 text-teal-700 border border-teal-200">
+                                                <td className="px-2.5 py-3">
+                                                    {/* At least ~3 lines' width, so a long number is not squeezed into 5-6 lines */}
+                                                    <div className="min-w-[8rem]">
+                                                        <span className="inline-block max-w-[11rem] px-2 py-1 rounded-lg text-xs font-mono font-bold leading-snug break-words bg-slate-100 text-slate-700 border border-slate-200">
+                                                            {invoiceParts}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-2.5 py-3 whitespace-nowrap">
+                                                    <span className="px-1.5 py-1 rounded-lg text-[11px] font-mono font-bold bg-teal-50 text-teal-700 border border-teal-200">
                                                         {productSrNo}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-3 whitespace-nowrap">
-                                                    <span 
-                                                        className="px-3 py-1 rounded-full text-xs font-bold text-white shadow-sm"
+                                                <td className="px-2.5 py-3 whitespace-nowrap">
+                                                    <span
+                                                        className="px-2 py-1 rounded-full text-xs font-bold text-white shadow-sm"
                                                         style={{ backgroundColor: t.priorityId?.color || '#64748b' }}
                                                     >
                                                         {t.priorityId?.name || 'Medium'}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-3 whitespace-nowrap">
-                                                    <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider whitespace-nowrap ${statusStyles[t.status] || 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                                <td className="px-2.5 py-3">
+                                                    <span className={`inline-block px-2 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider text-center leading-tight ${statusStyles[t.status] || 'bg-slate-50 text-slate-500 border-slate-200'}`}>
                                                         {t.status}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
-                                                    <div>{t.assignedEngineerId?.name || 'Unassigned'}</div>
-                                                    {t.assignedSalespersonId && (
-                                                        <div className="text-[10px] text-primary-600 font-black uppercase tracking-tight mt-1">
-                                                            Sales rep: {t.assignedSalespersonId.name}
-                                                        </div>
-                                                    )}
+                                                <td className="px-2.5 py-3 text-slate-500 sticky right-[6.25rem] bg-white shadow-[-6px_0_6px_-6px_rgba(15,23,42,0.15)]">
+                                                    <div className="min-w-[5.75rem] max-w-[10rem] break-words leading-snug">
+                                                        <div>{t.assignedEngineerId?.name || 'Unassigned'}</div>
+                                                        {t.assignedSalespersonId && (
+                                                            <div className="text-[10px] text-primary-600 font-black uppercase tracking-tight mt-1">
+                                                                Sales rep: {t.assignedSalespersonId.name}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </td>
-                                                <td className="px-4 py-3 text-center whitespace-nowrap">
+                                                <td className="w-[6.25rem] min-w-[6.25rem] px-2 py-3 text-center whitespace-nowrap sticky right-0 bg-white">
                                                     <div className="flex justify-center items-center gap-2">
                                                         <button
                                                             onClick={() => navigate(`/csm/tickets/${t._id}`)}
-                                                            className="flex items-center gap-1.5 px-4 py-2 hover:bg-primary-50 text-primary-600 rounded-xl transition-all hover:scale-105 active:scale-95"
+                                                            className="flex items-center gap-1 px-2 py-1.5 hover:bg-primary-50 text-primary-600 rounded-xl transition-all hover:scale-105 active:scale-95"
                                                         >
                                                             Details
                                                             <MdArrowForward />
@@ -2914,27 +2897,42 @@ const CSMTickets = () => {
                             </div>
                         )}
                         <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Branch *</label>
+                            <SearchableSelect
+                                options={[
+                                    ...(ticketBranchOptions.allowAllBranches ? [{ value: 'all', label: 'All Branches' }] : []),
+                                    ...ticketBranchOptions.branches.map(b => ({ value: String(b._id), label: b.code ? `${b.name} (${b.code})` : b.name })),
+                                ]}
+                                value={ticketBranch}
+                                onChange={(val) => setTicketBranch(val || '')}
+                                placeholder="Search & Select Branch..."
+                                noResultsText="No branches available"
+                            />
+                        </div>
+                        <div>
                             <div className="flex justify-between items-center mb-1">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Ticket Source</label>
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleOpenMiniMaster('source')}
-                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
-                                >
-                                    + Quick Add
-                                </button>
+                                {can('csm_masters', 'create') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOpenMiniMaster('source')}
+                                        className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                    >
+                                        + Quick Add
+                                    </button>
+                                )}
                             </div>
                             <SearchableSelect
                                 options={sources.map(s => ({ value: s.name, label: s.name, id: s._id }))}
                                 value={formData.source}
                                 onChange={(val) => setFormData({ ...formData, source: val })}
                                 placeholder="Select Source"
-                                onAddOption={handleAddSourceDropdown}
+                                onAddOption={can('csm_masters', 'create') ? handleAddSourceDropdown : undefined}
                             />
                         </div>
                         <div>
                             <div className="flex justify-between items-center mb-1">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Contact Person Name *</label>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Contact Person Name <span className="normal-case font-semibold">(optional)</span></label>
                                 <button
                                     type="button"
                                     onClick={() => setShowContactModal(true)}
@@ -2951,7 +2949,7 @@ const CSMTickets = () => {
                                 }))}
                                 value={formData.contactId}
                                 onChange={handleContactSelect}
-                                placeholder={formData.customerId ? "Search & Select Contact..." : "Select Customer First"}
+                                placeholder={formData.customerId ? "Search & Select Contact (optional)..." : "Select Customer First"}
                             />
                             {formData.customerId && customerContacts.length === 0 && (
                                 <p className="text-[10px] font-bold text-amber-600 mt-1">No contacts saved for this customer yet.</p>
@@ -2960,13 +2958,15 @@ const CSMTickets = () => {
                         <div>
                             <div className="flex justify-between items-center mb-1">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Designation</label>
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleOpenMiniMaster('designation')}
-                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
-                                >
-                                    + Quick Add
-                                </button>
+                                {can('csm_masters', 'create') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOpenMiniMaster('designation')}
+                                        className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                    >
+                                        + Quick Add
+                                    </button>
+                                )}
                             </div>
                             <SearchableSelect
                                 options={designations.map(d => ({ value: d._id, label: d.name, id: d._id }))}
@@ -2979,7 +2979,7 @@ const CSMTickets = () => {
                                     });
                                 }}
                                 placeholder="Select Designation"
-                                onAddOption={handleAddDesignationDropdown}
+                                onAddOption={can('csm_masters', 'create') ? handleAddDesignationDropdown : undefined}
                             />
                         </div>
                         <div>
@@ -3029,13 +3029,15 @@ const CSMTickets = () => {
                         <div>
                             <div className="flex justify-between items-center mb-1">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Problem List</label>
-                                <button 
-                                    type="button" 
-                                    onClick={() => setShowQuickAddProblemModal(true)}
-                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
-                                >
-                                    + Quick Add
-                                </button>
+                                {can('csm_masters', 'create') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowQuickAddProblemModal(true)}
+                                        className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                    >
+                                        + Quick Add
+                                    </button>
+                                )}
                             </div>
                             <SearchableSelect
                                 options={problems.map(p => ({ value: p._id, label: p.name, id: p._id }))}
@@ -3043,26 +3045,28 @@ const CSMTickets = () => {
                                 onChange={(val) => handleProblemChange(val)}
                                 placeholder="Select Problem..."
                                 noResultsText="No problems available"
-                                onAddOption={handleAddProblemDropdown}
+                                onAddOption={can('csm_masters', 'create') ? handleAddProblemDropdown : undefined}
                             />
                         </div>
                         <div>
                             <div className="flex justify-between items-center mb-1">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Priority *</label>
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleOpenMiniMaster('priority')}
-                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
-                                >
-                                    + Quick Add
-                                </button>
+                                {can('csm_masters', 'create') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOpenMiniMaster('priority')}
+                                        className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                    >
+                                        + Quick Add
+                                    </button>
+                                )}
                             </div>
                             <SearchableSelect
                                 options={priorities.map(p => ({ value: p._id, label: p.name, id: p._id }))}
                                 value={formData.priorityId}
                                 onChange={(val) => setFormData({ ...formData, priorityId: val })}
                                 placeholder="Select Priority"
-                                onAddOption={handleAddPriorityDropdown}
+                                onAddOption={can('csm_masters', 'create') ? handleAddPriorityDropdown : undefined}
                             />
                         </div>
                         
@@ -3627,22 +3631,26 @@ const CSMTickets = () => {
                                                     >
                                                         Select
                                                     </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleStartEditMiniMaster(item)}
-                                                        className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-lg transition-all"
-                                                        title="Edit"
-                                                    >
-                                                        <MdEdit size={16} />
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleDeleteMiniMaster(item._id)}
-                                                        className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-all"
-                                                        title="Delete"
-                                                    >
-                                                        <MdDelete size={16} />
-                                                    </button>
+                                                    {can('csm_masters', 'modify') && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleStartEditMiniMaster(item)}
+                                                            className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-lg transition-all"
+                                                            title="Edit"
+                                                        >
+                                                            <MdEdit size={16} />
+                                                        </button>
+                                                    )}
+                                                    {can('csm_masters', 'delete') && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDeleteMiniMaster(item._id)}
+                                                            className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-all"
+                                                            title="Delete"
+                                                        >
+                                                            <MdDelete size={16} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}
@@ -3787,16 +3795,18 @@ const CSMTickets = () => {
                         <div>
                             <div className="flex justify-between items-center mb-1.5">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer Name *</label>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIsManualCustomerText(!isManualCustomerText);
-                                        setManualFormData(prev => ({ ...prev, customerId: '', customerName: '' }));
-                                    }}
-                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
-                                >
-                                    {isManualCustomerText ? 'Select Existing' : '+ Enter Manually'}
-                                </button>
+                                {can('master_customers', 'create') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsManualCustomerText(!isManualCustomerText);
+                                            setManualFormData(prev => ({ ...prev, customerId: '', customerName: '' }));
+                                        }}
+                                        className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                    >
+                                        {isManualCustomerText ? 'Select Existing' : '+ Enter Manually'}
+                                    </button>
+                                )}
                             </div>
                             {isManualCustomerText ? (
                                 <input
@@ -3899,20 +3909,22 @@ const CSMTickets = () => {
                         <div>
                             <div className="flex justify-between items-center mb-1.5">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Ticket Source</label>
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleOpenMiniMaster('source')}
-                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
-                                >
-                                    + Quick Add
-                                </button>
+                                {can('csm_masters', 'create') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOpenMiniMaster('source')}
+                                        className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                    >
+                                        + Quick Add
+                                    </button>
+                                )}
                             </div>
                             <SearchableSelect
                                 options={sources.map(s => ({ value: s.name, label: s.name, id: s._id }))}
                                 value={manualFormData.source}
                                 onChange={(val) => setManualFormData({ ...manualFormData, source: val })}
                                 placeholder="Select Source"
-                                onAddOption={handleAddSourceDropdown}
+                                onAddOption={can('csm_masters', 'create') ? handleAddSourceDropdown : undefined}
                             />
                         </div>
 
@@ -3953,20 +3965,22 @@ const CSMTickets = () => {
                         <div>
                             <div className="flex justify-between items-center mb-1.5">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Priority</label>
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleOpenMiniMaster('priority')}
-                                    className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
-                                >
-                                    + Quick Add
-                                </button>
+                                {can('csm_masters', 'create') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOpenMiniMaster('priority')}
+                                        className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 tracking-wider flex items-center gap-0.5"
+                                    >
+                                        + Quick Add
+                                    </button>
+                                )}
                             </div>
                             <SearchableSelect
                                 options={priorities.map(p => ({ value: p.name, label: p.name, id: p._id }))}
                                 value={manualFormData.priority}
                                 onChange={(val) => setManualFormData({ ...manualFormData, priority: val })}
                                 placeholder="Select Priority"
-                                onAddOption={handleAddPriorityDropdown}
+                                onAddOption={can('csm_masters', 'create') ? handleAddPriorityDropdown : undefined}
                             />
                         </div>
 
@@ -4337,65 +4351,20 @@ const CSMTickets = () => {
                 })()}
             </Modal>
 
-            {/* Import Summary Modal */}
-            <Modal
-                isOpen={showImportResultModal}
-                onClose={() => setShowImportResultModal(false)}
-                title="Import Tickets Summary"
-                maxWidth="max-w-md"
-                footer={
-                    <div className="flex gap-2 w-full justify-end">
-                        {importResult?.errors?.length > 0 && (
-                            <button
-                                type="button"
-                                onClick={downloadErrorReport}
-                                className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                            >
-                                Download Error Report
-                            </button>
-                        )}
-                        <button
-                            type="button"
-                            onClick={() => setShowImportResultModal(false)}
-                            className="px-6 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                        >
-                            Close
-                        </button>
-                    </div>
-                }
-            >
-                {importResult && (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-3 text-center">
-                            <div className="p-3 bg-teal-50 border border-teal-100 rounded-2xl">
-                                <span className="block text-[10px] font-black uppercase tracking-widest text-teal-600">Imported</span>
-                                <span className="text-xl font-black text-teal-800">{importResult.imported}</span>
-                            </div>
-                            <div className="p-3 bg-rose-50 border border-rose-100 rounded-2xl">
-                                <span className="block text-[10px] font-black uppercase tracking-widest text-rose-500">Failed</span>
-                                <span className="text-xl font-black text-rose-800">{importResult.failed}</span>
-                            </div>
-                        </div>
-
-                        {importResult.errors?.length > 0 && (
-                            <div className="p-4 bg-amber-50/50 border border-amber-100 rounded-2xl space-y-2">
-                                <div className="flex items-center gap-1.5 text-amber-800 text-xs font-bold">
-                                    <MdWarning size={16} />
-                                    <span>Some rows failed to import:</span>
-                                </div>
-                                <div className="max-h-40 overflow-y-auto text-[11px] font-semibold text-slate-600 space-y-1 custom-scrollbar">
-                                    {importResult.errors.slice(0, 10).map((err, idx) => (
-                                        <p key={idx} className="leading-relaxed">• {err}</p>
-                                    ))}
-                                    {importResult.errors.length > 10 && (
-                                        <p className="text-slate-400 italic">And {importResult.errors.length - 10} more errors...</p>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </Modal>
+            <ImportWizard
+                isOpen={isImportOpen}
+                onClose={() => setIsImportOpen(false)}
+                title="Import Support Tickets"
+                module="tickets"
+                templateName="ticket_import_template.xlsx"
+                onDownloadTemplate={importService.getTicketTemplate}
+                onImported={() => {
+                    // The import can add priorities, categories and types (cached CSM masters).
+                    invalidateApiCache('/csm');
+                    fetchTickets();
+                    fetchTicketCustomers();
+                }}
+            />
         </div>
     );
 };

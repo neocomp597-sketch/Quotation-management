@@ -11,12 +11,14 @@ import {
     MdWarning, MdCheckCircleOutline, MdCheckCircle, MdChat,
     MdMyLocation, MdLocationOn, MdStar, MdStarBorder, MdMap, MdOpenInNew,
     MdPhotoCamera, MdCloudUpload, MdDelete, MdAssignmentTurnedIn,
-    MdZoomIn, MdClose, MdAccountTree, MdFileDownload
+    MdZoomIn, MdClose, MdFileDownload, MdEdit
 } from 'react-icons/md';
-import ComplaintBOMPanel from '../components/bom/ComplaintBOMPanel';
 import Modal from '../components/Modal';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
+import usePermission from '../hooks/usePermission';
+import { useAuth } from '../context/AuthContext';
 import DateInput from '../components/DateInput';
+import SearchableSelect from '../components/SearchableSelect';
 
 const parseDescriptionAndImages = (rawDesc = '') => {
     if (!rawDesc) return { text: '', images: [] };
@@ -62,6 +64,8 @@ const parseDescriptionAndImages = (rawDesc = '') => {
 const TicketDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { can } = useAuth();
+    const { canModify } = usePermission('csm_tickets');
     const [loading, setLoading] = useState(true);
     const [ticket, setTicket] = useState(null);
     const [activeTab, setActiveTab] = useState('communication');
@@ -76,7 +80,11 @@ const TicketDetail = () => {
     
     // Assignment Form State
     const [assignTeam, setAssignTeam] = useState('');
-    const [assignEngineers, setAssignEngineers] = useState([]);
+    // A complaint is assigned to one engineer at a time.
+    const [assignEngineer, setAssignEngineer] = useState('');
+    // 'all_employees' lists every active employee for assignment; 'service_engineers' only
+    // Service Engineers (CSM Config > Engineers Master). Assignment is always manual.
+    const [engineerSource, setEngineerSource] = useState('all_employees');
 
     // Operations states
     const [commentText, setCommentText] = useState('');
@@ -97,6 +105,13 @@ const TicketDetail = () => {
 
     // Ticket Reassignment Form
     const [showReassignModal, setShowReassignModal] = useState(false);
+    // Edit Ticket: allowed for admins/managers, the ticket's creator and its assigned
+    // engineers (ticket.permissions from the server, which re-checks every save).
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editForm, setEditForm] = useState({ issueTitle: '', description: '', contactId: '', pincode: '', branchId: '' });
+    const [editContacts, setEditContacts] = useState([]);
+    const [editBranchOptions, setEditBranchOptions] = useState({ branches: [], allowAllBranches: false });
+    const [savingEdit, setSavingEdit] = useState(false);
     const [reassignEngineer, setReassignEngineer] = useState('');
     const [reassignReason, setReassignReason] = useState('Leave');
     const [reassignNotes, setReassignNotes] = useState('');
@@ -296,6 +311,70 @@ const TicketDetail = () => {
             toast.error(err.response?.data?.message || 'Failed to update RCA report');
         } finally {
             setSavingRca(false);
+        }
+    };
+
+    const openEditModal = async () => {
+        setEditForm({
+            issueTitle: ticket.issueTitle || '',
+            description: ticket.description || '',
+            contactId: ticket.contactId?._id || ticket.contactId || '',
+            pincode: ticket.pincode || '',
+            branchId: ticket.branchId?._id || (ticket.branchId ? String(ticket.branchId) : 'all'),
+        });
+        setShowEditModal(true);
+        try {
+            const customerId = ticket.customerId?._id || ticket.customerId;
+            const [contactsRes, branchRes] = await Promise.all([
+                customerId ? csmService.getCustomerContacts({ customerId }) : Promise.resolve({ data: [] }),
+                ticket.permissions?.canChangeBranch ? csmService.getTicketBranchOptions() : Promise.resolve({ data: null }),
+            ]);
+            const contacts = contactsRes.data?.data || contactsRes.data || [];
+            setEditContacts(Array.isArray(contacts) ? contacts : []);
+            if (branchRes.data) {
+                setEditBranchOptions({
+                    branches: Array.isArray(branchRes.data.branches) ? branchRes.data.branches : [],
+                    allowAllBranches: Boolean(branchRes.data.allowAllBranches),
+                });
+            }
+        } catch (error) {
+            console.error('Error loading edit options:', error);
+        }
+    };
+
+    const handleEditSubmit = async (e) => {
+        if (e) e.preventDefault();
+        if (!editForm.issueTitle.trim()) {
+            toast.error('Subject is required');
+            return;
+        }
+        if (!/^\d{6}$/.test(String(editForm.pincode || '').trim())) {
+            toast.error('Pincode must be exactly 6 numeric digits');
+            return;
+        }
+        const payload = {
+            issueTitle: editForm.issueTitle.trim(),
+            description: editForm.description,
+            pincode: String(editForm.pincode).trim(),
+        };
+        // Only send the contact when it changed, so a typed contact name on a manual ticket survives.
+        const originalContactId = ticket.contactId?._id || ticket.contactId || '';
+        if (String(editForm.contactId || '') !== String(originalContactId)) {
+            payload.contactId = editForm.contactId || null;
+        }
+        if (ticket.permissions?.canChangeBranch && editForm.branchId) {
+            payload.branchId = editForm.branchId;
+        }
+        setSavingEdit(true);
+        try {
+            await csmService.updateTicket(id, payload);
+            toast.success('Ticket updated successfully!');
+            setShowEditModal(false);
+            fetchTicketDetails();
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to update ticket');
+        } finally {
+            setSavingEdit(false);
         }
     };
 
@@ -558,11 +637,8 @@ const TicketDetail = () => {
             if (ticketData.productImage) {
                 setCloseProductImage(ticketData.productImage);
             }
-            const currentEngIds = (ticketData.assignedEngineerIds || []).map(e => e._id || e);
-            if (currentEngIds.length === 0 && ticketData.assignedEngineerId) {
-                currentEngIds.push(ticketData.assignedEngineerId._id || ticketData.assignedEngineerId);
-            }
-            setAssignEngineers(currentEngIds);
+            const currentEng = ticketData.assignedEngineerId || ticketData.assignedEngineerIds?.[0];
+            setAssignEngineer(currentEng?._id || currentEng || '');
 
             // Verify entitlements if product is linked
             if (ticketData.customerId?._id && ticketData.productId?._id) {
@@ -598,6 +674,12 @@ const TicketDetail = () => {
         } catch (error) {
             console.error('Error loading assignments:', error);
         }
+        try {
+            const settingsRes = await csmService.getEngineerSettings();
+            if (settingsRes.data?.engineerSource) setEngineerSource(settingsRes.data.engineerSource);
+        } catch (error) {
+            console.error('Error loading engineer settings:', error);
+        }
     };
 
     useEffect(() => {
@@ -605,12 +687,39 @@ const TicketDetail = () => {
         loadAssignees();
     }, [id]);
 
+    const engineerCode = (eng) => eng.employeeId?.employeeId || eng.employeeId?.externalEmployeeCode || '';
+    // The engineer the ticket is assigned to, followed by anyone an older multi-engineer
+    // assignment put on it with them (a new assignment always replaces them). A list that
+    // does not contain the engineer is left over from before a reassignment.
+    const assignedEngineersOf = (t) => {
+        const lead = t.assignedEngineerId;
+        const list = t.assignedEngineerIds || [];
+        if (!lead) return list;
+        const isLead = (e) => String(e?._id || e) === String(lead._id || lead);
+        return list.some(isLead) ? [lead, ...list.filter(e => !isLead(e))] : [lead];
+    };
+    // Everyone who can be assigned, by name. No PIN code or location matching. `keep` lists
+    // engineers to offer even when inactive (the one already on the ticket).
+    const engineerOptions = ({ includeInactive = false, keep = [] } = {}) => engineers
+        .filter(eng => includeInactive || (eng.status || 'Active') === 'Active' || keep.includes(eng._id))
+        .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
+        .map(eng => ({
+            value: eng._id,
+            label: [
+                eng.name,
+                engineerCode(eng) && `[${engineerCode(eng)}]`,
+                eng.mobile,
+                eng.employeeId?.designation,
+                (eng.status || 'Active') !== 'Active' ? `(${eng.status})` : null,
+            ].filter(Boolean).join(' · '),
+        }));
+
     const { isSubmitting: isAssigning, execute: handleAssign } = useSubmitGuard(async () => {
         try {
             await csmService.assignTicket(id, {
                 assignedTeamId: assignTeam || null,
-                assignedEngineerIds: assignEngineers,
-                assignedEngineerId: assignEngineers.length > 0 ? assignEngineers[0] : null
+                assignedEngineerId: assignEngineer || null,
+                assignedEngineerIds: assignEngineer ? [assignEngineer] : []
             });
             toast.success('Assignments updated successfully');
             fetchTicketDetails();
@@ -685,16 +794,10 @@ const TicketDetail = () => {
                     ticketId: id,
                     engineerId: visitEngineer,
                     scheduledDate: visitDate,
-                    billingStatus: entitlements?.recommendedBillingType || 'Paid'
+                    billingStatus: entitlements?.recommendedBillingType || 'Paid',
+                    // A ticket with nobody assigned gets the engineer picked for this visit.
+                    assignTicketIfUnassigned: true
                 });
-
-                // Auto-assign engineer to ticket if unassigned
-                if (!ticket.assignedEngineerId) {
-                    await csmService.assignTicket(id, {
-                        assignedEngineerId: visitEngineer,
-                        assignedEngineerIds: [visitEngineer]
-                    });
-                }
                 toast.success('Service Visit scheduled successfully');
             }
             setShowVisitModal(false);
@@ -724,12 +827,21 @@ const TicketDetail = () => {
                 >
                     <MdArrowBack size={20} />
                 </button>
-                <div>
+                <div className="flex-1">
                     <span className="text-xs font-black uppercase text-teal-600 tracking-wider">Ticket Details</span>
                     <h1 className="text-2xl font-black text-slate-900 font-outfit uppercase -mt-1">
                         {ticket.ticketNo}
                     </h1>
                 </div>
+                {canModify && ticket.permissions?.canEdit && (
+                    <button
+                        type="button"
+                        onClick={openEditModal}
+                        className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-black uppercase text-xs tracking-widest transition-all"
+                    >
+                        <MdEdit size={16} /> Edit Ticket
+                    </button>
+                )}
             </div>
 
             {/* Main Grid */}
@@ -750,7 +862,18 @@ const TicketDetail = () => {
                                 <p className="text-xs text-slate-400">{ticket.customerId?.companyName}</p>
                             </div>
                             
-                            <div className="grid grid-cols-3 gap-2 pt-2">
+                            <div className="grid grid-cols-2 gap-2 pt-2">
+                                <div>
+                                    <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Branch</span>
+                                    <span className="truncate block">{ticket.branchId?.name || 'All Branches'}</span>
+                                </div>
+                                <div>
+                                    <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Raised By</span>
+                                    <span className="truncate block">{ticket.createdBy?.name || '-'}</span>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2">
                                 <div>
                                     <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Contact</span>
                                     <span className="truncate block">{ticket.contactName || '-'}</span>
@@ -889,9 +1012,7 @@ const TicketDetail = () => {
                             )}
 
                             {(() => {
-                                const assignedEngs = (ticket.assignedEngineerIds && ticket.assignedEngineerIds.length > 0)
-                                    ? ticket.assignedEngineerIds
-                                    : (ticket.assignedEngineerId ? [ticket.assignedEngineerId] : []);
+                                const assignedEngs = assignedEngineersOf(ticket);
 
                                 if (assignedEngs.length === 0) return null;
 
@@ -963,6 +1084,7 @@ const TicketDetail = () => {
                                 <select
                                     value={selectedStatus}
                                     onChange={(e) => setSelectedStatus(e.target.value)}
+                                    disabled={!canModify}
                                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold"
                                 >
                                     <option value="Open">Open</option>
@@ -982,6 +1104,7 @@ const TicketDetail = () => {
                                         id="fcr-checkbox"
                                         checked={isFirstCallResolved}
                                         onChange={(e) => setIsFirstCallResolved(e.target.checked)}
+                                        disabled={!canModify}
                                         className="h-4 w-4 rounded text-teal-600 focus:ring-teal-500 border-slate-300 cursor-pointer"
                                     />
                                     <label htmlFor="fcr-checkbox" className="text-xs font-bold text-teal-800 cursor-pointer select-none">
@@ -990,7 +1113,7 @@ const TicketDetail = () => {
                                 </div>
                             )}
 
-                            {(selectedStatus !== ticket.status || (selectedStatus === 'Resolved' && isFirstCallResolved !== ticket.isFirstCallResolved)) && (
+                            {canModify && (selectedStatus !== ticket.status || (selectedStatus === 'Resolved' && isFirstCallResolved !== ticket.isFirstCallResolved)) && (
                                 <button
                                     onClick={() => handleStatusChange(selectedStatus, isFirstCallResolved)}
                                     className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md animate-pulse"
@@ -999,7 +1122,7 @@ const TicketDetail = () => {
                                 </button>
                             )}
 
-                            {ticket.status !== 'Closed' ? (
+                            {ticket.status !== 'Closed' ? canModify && (
                                 <button
                                     onClick={() => {
                                         setCloseResolutionNotes('');
@@ -1025,13 +1148,15 @@ const TicketDetail = () => {
                                 </div>
                             )}
 
-                            <button
-                                onClick={handleEscalate}
-                                className="w-full flex items-center justify-center gap-2 py-3 bg-rose-50 hover:bg-rose-100/50 text-rose-600 border border-rose-200 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                            >
-                                <MdWarning size={16} />
-                                Escalate Ticket
-                            </button>
+                            {canModify && (
+                                <button
+                                    onClick={handleEscalate}
+                                    className="w-full flex items-center justify-center gap-2 py-3 bg-rose-50 hover:bg-rose-100/50 text-rose-600 border border-rose-200 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                >
+                                    <MdWarning size={16} />
+                                    Escalate Ticket
+                                </button>
+                            )}
                         </div>
                     </div>
 
@@ -1076,24 +1201,26 @@ const TicketDetail = () => {
                             <p className="text-xs text-slate-500 font-medium">No GPS location recorded for this ticket yet.</p>
                         )}
 
-                        <div className="space-y-2">
-                            <input
-                                type="text"
-                                placeholder="Optional address / location notes..."
-                                value={manualAddress}
-                                onChange={(e) => setManualAddress(e.target.value)}
-                                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl outline-none focus:border-emerald-600"
-                            />
-                            <button
-                                type="button"
-                                onClick={handleCaptureGps}
-                                disabled={isCapturingGps}
-                                className="w-full flex items-center justify-center gap-2 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm disabled:opacity-50"
-                            >
-                                <MdMyLocation size={14} className={isCapturingGps ? 'animate-spin' : ''} />
-                                {isCapturingGps ? 'Capturing Location...' : 'Capture GPS Location'}
-                            </button>
-                        </div>
+                        {canModify && (
+                            <div className="space-y-2">
+                                <input
+                                    type="text"
+                                    placeholder="Optional address / location notes..."
+                                    value={manualAddress}
+                                    onChange={(e) => setManualAddress(e.target.value)}
+                                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl outline-none focus:border-emerald-600"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleCaptureGps}
+                                    disabled={isCapturingGps}
+                                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm disabled:opacity-50"
+                                >
+                                    <MdMyLocation size={14} className={isCapturingGps ? 'animate-spin' : ''} />
+                                    {isCapturingGps ? 'Capturing Location...' : 'Capture GPS Location'}
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Reassign Team / Agent */}
@@ -1116,9 +1243,7 @@ const TicketDetail = () => {
                             )}
 
                             {(() => {
-                                const assignedEngs = (ticket.assignedEngineerIds && ticket.assignedEngineerIds.length > 0)
-                                    ? ticket.assignedEngineerIds
-                                    : (ticket.assignedEngineerId ? [ticket.assignedEngineerId] : []);
+                                const assignedEngs = assignedEngineersOf(ticket);
 
                                 if (assignedEngs.length === 0) return null;
 
@@ -1151,110 +1276,60 @@ const TicketDetail = () => {
                                 <select
                                     value={assignTeam}
                                     onChange={(e) => setAssignTeam(e.target.value)}
+                                    disabled={!canModify}
                                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold"
                                 >
                                     <option value="">Unassigned</option>
                                     {teams.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
                                 </select>
                             </div>
-                            <div>
-                                <div className="flex justify-between items-center mb-1">
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                        Assign Engineers ({assignEngineers.length} selected)
-                                    </label>
-                                    {ticket.pincode && (
-                                        <span className="text-[9px] font-bold text-slate-400 uppercase">PIN: {ticket.pincode}</span>
-                                    )}
+                            {canModify && (
+                                <div>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                            Assign {engineerSource === 'all_employees' ? 'Employee' : 'Engineer'}
+                                        </label>
+                                        {ticket.pincode && (
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase">PIN: {ticket.pincode}</span>
+                                        )}
+                                    </div>
+                                    {/* One engineer per complaint: picking another replaces the current one. */}
+                                    <SearchableSelect
+                                        options={engineerOptions({ keep: [assignEngineer, ticket.assignedEngineerId?._id || ticket.assignedEngineerId] })}
+                                        value={assignEngineer}
+                                        onChange={(val) => setAssignEngineer(val || '')}
+                                        placeholder="Unassigned"
+                                        noResultsText={`No matching ${engineerSource === 'all_employees' ? 'employees' : 'engineers'}`}
+                                    />
+                                    <p className="mt-1 text-[10px] font-bold text-slate-400">
+                                        Only one person can be assigned to a complaint. Search by name, code or mobile.
+                                    </p>
                                 </div>
-                                {(() => {
-                                    const ticketPincode = ticket.pincode ? String(ticket.pincode).trim() : '';
-                                    const currentEngIds = ticket.assignedEngineerIds?.map(e => e._id || e) || (ticket.assignedEngineerId ? [ticket.assignedEngineerId._id || ticket.assignedEngineerId] : []);
-
-                                    const eligibleEngineers = engineers.filter(eng => {
-                                        if (currentEngIds.includes(eng._id)) return true;
-                                        if (activeVisit && (activeVisit.engineerId?._id === eng._id || activeVisit.engineerId === eng._id)) return true;
-                                        if (!ticketPincode) return true;
-                                        if (Array.isArray(eng.pincodes) && eng.pincodes.includes(ticketPincode)) return true;
-                                        const terrPincodes = eng.territoryId?.rules?.pincodes;
-                                        if (Array.isArray(terrPincodes) && terrPincodes.includes(ticketPincode)) return true;
-                                        return false;
-                                    });
-
-                                    const toggleEngineer = (engId) => {
-                                        if (assignEngineers.includes(engId)) {
-                                            setAssignEngineers(assignEngineers.filter(id => id !== engId));
-                                        } else {
-                                            setAssignEngineers([...assignEngineers, engId]);
-                                        }
-                                    };
-
-                                    return (
-                                        <div className="space-y-2">
-                                            <div className="max-h-48 overflow-y-auto pr-1 space-y-1.5 custom-scrollbar border border-slate-200 rounded-xl p-2 bg-slate-50/50">
-                                                {eligibleEngineers.length === 0 ? (
-                                                    <p className="text-[11px] font-semibold text-slate-400 p-2 text-center">
-                                                        No eligible engineers for PIN {ticketPincode || 'N/A'}.
-                                                    </p>
-                                                ) : (
-                                                    eligibleEngineers.map(eng => {
-                                                        const isSelected = assignEngineers.includes(eng._id);
-                                                        return (
-                                                            <div
-                                                                key={eng._id}
-                                                                onClick={() => toggleEngineer(eng._id)}
-                                                                className={`flex items-center justify-between p-2.5 rounded-lg border text-xs font-bold cursor-pointer transition-all ${
-                                                                    isSelected
-                                                                        ? 'bg-primary-50 border-primary-300 text-primary-900 shadow-xs'
-                                                                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
-                                                                }`}
-                                                            >
-                                                                <div className="flex items-center gap-2">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={isSelected}
-                                                                        onChange={() => {}}
-                                                                        className="w-4 h-4 rounded text-primary-600 focus:ring-primary-500 border-slate-300 cursor-pointer"
-                                                                    />
-                                                                    <div>
-                                                                        <span className="font-bold">{eng.name}</span>
-                                                                        {eng.mobile && <span className="text-[10px] text-slate-400 block">{eng.mobile}</span>}
-                                                                    </div>
-                                                                </div>
-                                                                {isSelected && (
-                                                                    <span className="text-[10px] font-black text-primary-600 bg-primary-100/70 px-2 py-0.5 rounded-md">Selected</span>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    })
-                                                )}
-                                            </div>
-                                            {ticketPincode && eligibleEngineers.length === 0 && (
-                                                <p className="text-[10px] font-bold text-amber-600 mt-1">No engineers assigned for pincode {ticketPincode}.</p>
-                                            )}
-                                        </div>
-                                    );
-                                })()}
-                            </div>
-                            <button
-                                onClick={handleAssign}
-                                disabled={isAssigning}
-                                className="w-full flex items-center justify-center gap-2 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <MdSave size={16} />
-                                {isAssigning ? 'Updating...' : 'Update Assignees'}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setReassignEngineer(ticket.assignedEngineerId?._id || (ticket.assignedEngineerIds && ticket.assignedEngineerIds[0]?._id) || '');
-                                    setReassignReason('Leave');
-                                    setShowReassignModal(true);
-                                }}
-                                className="w-full flex items-center justify-center gap-2 py-3 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all mt-2"
-                            >
-                                <MdAssignment size={16} />
-                                <span>Reassign Ticket</span>
-                            </button>
+                            )}
+                            {canModify && (
+                                <>
+                                    <button
+                                        onClick={handleAssign}
+                                        disabled={isAssigning}
+                                        className="w-full flex items-center justify-center gap-2 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <MdSave size={16} />
+                                        {isAssigning ? 'Updating...' : 'Update Assignee'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setReassignEngineer(ticket.assignedEngineerId?._id || (ticket.assignedEngineerIds && ticket.assignedEngineerIds[0]?._id) || '');
+                                            setReassignReason('Leave');
+                                            setShowReassignModal(true);
+                                        }}
+                                        className="w-full flex items-center justify-center gap-2 py-3 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all mt-2"
+                                    >
+                                        <MdAssignment size={16} />
+                                        <span>Reassign Ticket</span>
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1295,17 +1370,6 @@ const TicketDetail = () => {
                         >
                             <MdFeedback size={18} />
                             Feedback Survey
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('bom')}
-                            className={`flex items-center gap-2 px-6 py-4 border-b-2 font-bold text-sm transition-all ${
-                                activeTab === 'bom'
-                                    ? 'border-primary-600 text-primary-600 font-black'
-                                    : 'border-transparent text-slate-500 hover:text-slate-700'
-                            }`}
-                        >
-                            <MdAccountTree size={18} />
-                            BOM
                         </button>
                     </div>
 
@@ -1482,21 +1546,23 @@ const TicketDetail = () => {
                                 </div>
 
                                 {/* Form */}
-                                <form onSubmit={handleAddComment} className="border-t border-slate-100 pt-4 flex gap-3">
-                                    <input
-                                        type="text"
-                                        placeholder="Type comment or support reply..."
-                                        value={commentText}
-                                        onChange={(e) => setCommentText(e.target.value)}
-                                        className="flex-1 px-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
-                                    />
-                                    <button
-                                        type="submit"
-                                        className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-md active:scale-95"
-                                    >
-                                        Post
-                                    </button>
-                                </form>
+                                {canModify && (
+                                    <form onSubmit={handleAddComment} className="border-t border-slate-100 pt-4 flex gap-3">
+                                        <input
+                                            type="text"
+                                            placeholder="Type comment or support reply..."
+                                            value={commentText}
+                                            onChange={(e) => setCommentText(e.target.value)}
+                                            className="flex-1 px-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
+                                        />
+                                        <button
+                                            type="submit"
+                                            className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-md active:scale-95"
+                                        >
+                                            Post
+                                        </button>
+                                    </form>
+                                )}
                             </div>
                         )}
 
@@ -1505,16 +1571,14 @@ const TicketDetail = () => {
                             <div className="space-y-6">
                                 <div className="flex items-center justify-between border-b border-slate-50 pb-2">
                                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Scheduled Actions</span>
-                                    {!activeVisit && (
+                                    {!activeVisit && can('csm_visits', 'create') && (
                                         <button
                                             onClick={() => {
                                                 const now = new Date(Date.now() + 2 * 3600 * 1000);
                                                 const pad = (n) => String(n).padStart(2, '0');
                                                 const defaultDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
                                                 setVisitDate(defaultDate);
-                                                const defaultEng = (assignEngineers && assignEngineers.length > 0)
-                                                    ? assignEngineers[0]
-                                                    : (ticket.assignedEngineerId?._id || ticket.assignedEngineerId || (engineers.length > 0 ? engineers[0]._id : ''));
+                                                const defaultEng = assignEngineer || ticket.assignedEngineerId?._id || ticket.assignedEngineerId || '';
                                                 setVisitEngineer(defaultEng);
                                                 setShowVisitModal(true);
                                             }}
@@ -1551,7 +1615,7 @@ const TicketDetail = () => {
                                             </div>
 
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
-                                                {['Scheduled', 'In Transit'].includes(activeVisit.status) && (
+                                                {can('csm_visits', 'modify') && ['Scheduled', 'In Transit'].includes(activeVisit.status) && (
                                                     <button
                                                         onClick={handleStampCheckInForTicket}
                                                         className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-1.5"
@@ -1560,17 +1624,19 @@ const TicketDetail = () => {
                                                         Stamp Check-In Location
                                                     </button>
                                                 )}
-                                                <button
-                                                    onClick={() => {
-                                                        setVisitDate(activeVisit.scheduledDate ? new Date(activeVisit.scheduledDate).toISOString().slice(0, 16) : '');
-                                                        setVisitEngineer(activeVisit.engineerId?._id || activeVisit.engineerId || '');
-                                                        setVisitTicketType(activeVisit.ticketType || '');
-                                                        setShowVisitModal(true);
-                                                    }}
-                                                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md"
-                                                >
-                                                    Reschedule Visit
-                                                </button>
+                                                {can('csm_visits', 'modify') && (
+                                                    <button
+                                                        onClick={() => {
+                                                            setVisitDate(activeVisit.scheduledDate ? new Date(activeVisit.scheduledDate).toISOString().slice(0, 16) : '');
+                                                            setVisitEngineer(activeVisit.engineerId?._id || activeVisit.engineerId || '');
+                                                            setVisitTicketType(activeVisit.ticketType || '');
+                                                            setShowVisitModal(true);
+                                                        }}
+                                                        className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md"
+                                                    >
+                                                        Reschedule Visit
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     ) : ticket.status === 'Resolved' || ticket.status === 'Closed' ? (
@@ -1588,22 +1654,22 @@ const TicketDetail = () => {
                                                     Schedule a field service visit to assign an engineer, specify visit dates, and track geofenced site check-ins.
                                                 </p>
                                             </div>
-                                            <button
-                                                onClick={() => {
-                                                    const now = new Date(Date.now() + 2 * 3600 * 1000);
-                                                    const pad = (n) => String(n).padStart(2, '0');
-                                                    const defaultDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
-                                                    setVisitDate(defaultDate);
-                                                    const defaultEng = (assignEngineers && assignEngineers.length > 0)
-                                                        ? assignEngineers[0]
-                                                        : (ticket.assignedEngineerId?._id || ticket.assignedEngineerId || (engineers.length > 0 ? engineers[0]._id : ''));
-                                                    setVisitEngineer(defaultEng);
-                                                    setShowVisitModal(true);
-                                                }}
-                                                className="px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white font-black uppercase text-xs tracking-wider rounded-xl transition-all shadow-md"
-                                            >
-                                                + Schedule Field Visit Now
-                                            </button>
+                                            {can('csm_visits', 'create') && (
+                                                <button
+                                                    onClick={() => {
+                                                        const now = new Date(Date.now() + 2 * 3600 * 1000);
+                                                        const pad = (n) => String(n).padStart(2, '0');
+                                                        const defaultDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+                                                        setVisitDate(defaultDate);
+                                                        const defaultEng = assignEngineer || ticket.assignedEngineerId?._id || ticket.assignedEngineerId || '';
+                                                        setVisitEngineer(defaultEng);
+                                                        setShowVisitModal(true);
+                                                    }}
+                                                    className="px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white font-black uppercase text-xs tracking-wider rounded-xl transition-all shadow-md"
+                                                >
+                                                    + Schedule Field Visit Now
+                                                </button>
+                                            )}
                                         </div>
                                     )}
 
@@ -1654,9 +1720,6 @@ const TicketDetail = () => {
                                 </div>
                             </div>
                         )}
-                        {activeTab === 'bom' && (
-                            <ComplaintBOMPanel ticketId={id} />
-                        )}
                         {activeTab === 'feedback' && (
                             <div className="max-w-md mx-auto space-y-6">
                                 <h3 className="font-outfit font-black text-lg text-slate-900 uppercase text-center">
@@ -1679,7 +1742,7 @@ const TicketDetail = () => {
                                         <p className="text-xs font-medium text-teal-700">"{ticket.feedback.comment || 'No comment provided.'}"</p>
                                         <span className="text-[10px] text-teal-600 block">{formatDate(ticket.feedback.submittedAt)}</span>
                                     </div>
-                                ) : (
+                                ) : canModify && (
                                     <form onSubmit={handleSubmitFeedback} className="space-y-4">
                                         <div className="flex items-center justify-center gap-2">
                                             {[1, 2, 3, 4, 5].map((star) => (
@@ -1766,44 +1829,114 @@ const TicketDetail = () => {
                     </div>
                     <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Assign Service Engineer *</label>
-                        {(() => {
-                            const ticketPincode = ticket?.pincode ? String(ticket.pincode).trim() : '';
-                            const displayEngineers = [...engineers].sort((a, b) => {
-                                const aMatch = ticketPincode && (
-                                    (Array.isArray(a.pincodes) && a.pincodes.includes(ticketPincode)) ||
-                                    (Array.isArray(a.territoryId?.rules?.pincodes) && a.territoryId.rules.pincodes.includes(ticketPincode))
-                                );
-                                const bMatch = ticketPincode && (
-                                    (Array.isArray(b.pincodes) && b.pincodes.includes(ticketPincode)) ||
-                                    (Array.isArray(b.territoryId?.rules?.pincodes) && b.territoryId.rules.pincodes.includes(ticketPincode))
-                                );
-                                if (aMatch && !bMatch) return -1;
-                                if (!aMatch && bMatch) return 1;
-                                return 0;
-                            });
+                        <SearchableSelect
+                            options={engineerOptions()}
+                            value={visitEngineer}
+                            onChange={(val) => setVisitEngineer(val || '')}
+                            placeholder="Search engineer by name, code or mobile..."
+                            noResultsText="No matching engineers"
+                        />
+                    </div>
+                </form>
+            </Modal>
 
-                            return (
-                                <select
-                                    required
-                                    value={visitEngineer}
-                                    onChange={(e) => setVisitEngineer(e.target.value)}
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold outline-none focus:border-teal-500"
-                                >
-                                    <option value="">-- Select Engineer --</option>
-                                    {displayEngineers.map(u => {
-                                        const isMatch = ticketPincode && (
-                                            (Array.isArray(u.pincodes) && u.pincodes.includes(ticketPincode)) ||
-                                            (Array.isArray(u.territoryId?.rules?.pincodes) && u.territoryId.rules.pincodes.includes(ticketPincode))
-                                        );
-                                        return (
-                                            <option key={u._id} value={u._id}>
-                                                {u.name} {isMatch ? '⭐ (Territory Match)' : ''}
-                                            </option>
-                                        );
-                                    })}
-                                </select>
-                            );
-                        })()}
+            {/* Edit Ticket Modal */}
+            <Modal
+                isOpen={showEditModal}
+                onClose={() => setShowEditModal(false)}
+                title="Edit Ticket"
+                footer={
+                    <div className="flex items-center justify-end gap-3 w-full">
+                        <button
+                            type="button"
+                            onClick={() => setShowEditModal(false)}
+                            className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold uppercase text-xs hover:bg-slate-50 transition-all"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            form="edit-ticket-form"
+                            disabled={savingEdit}
+                            className="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-black uppercase text-xs tracking-widest rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-60"
+                        >
+                            {savingEdit ? 'Saving...' : 'Save Changes'}
+                        </button>
+                    </div>
+                }
+            >
+                <form id="edit-ticket-form" onSubmit={handleEditSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Subject *</label>
+                        <input
+                            type="text"
+                            value={editForm.issueTitle}
+                            onChange={(e) => setEditForm({ ...editForm, issueTitle: e.target.value })}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Description</label>
+                        <textarea
+                            rows={4}
+                            value={editForm.description}
+                            onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium"
+                        />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Contact Person <span className="normal-case font-semibold">(optional)</span></label>
+                            <SearchableSelect
+                                options={[
+                                    { value: '', label: '— No contact person —' },
+                                    ...editContacts.map(c => ({ value: c._id, label: `${c.contactName}${c.isPrimary ? ' (Primary)' : ''}` })),
+                                ]}
+                                value={editForm.contactId}
+                                onChange={(val) => setEditForm({ ...editForm, contactId: val || '' })}
+                                placeholder="Search & Select Contact (optional)..."
+                                noResultsText="No contacts for this customer"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Pincode *</label>
+                            <input
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={6}
+                                value={editForm.pincode}
+                                onChange={(e) => setEditForm({ ...editForm, pincode: e.target.value.replace(/\D/g, '') })}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Branch</label>
+                        {ticket.permissions?.canChangeBranch ? (
+                            <SearchableSelect
+                                options={[
+                                    ...(editBranchOptions.allowAllBranches ? [{ value: 'all', label: 'All Branches' }] : []),
+                                    ...editBranchOptions.branches.map(b => ({ value: String(b._id), label: b.code ? `${b.name} (${b.code})` : b.name })),
+                                    // Keep the current branch selectable/visible even if it is outside the list.
+                                    ...(ticket.branchId?._id && !editBranchOptions.branches.some(b => String(b._id) === String(ticket.branchId._id))
+                                        ? [{ value: String(ticket.branchId._id), label: ticket.branchId.name }] : []),
+                                ]}
+                                value={editForm.branchId}
+                                onChange={(val) => setEditForm({ ...editForm, branchId: val || editForm.branchId })}
+                                placeholder="Search & Select Branch..."
+                                noResultsText="No branches available"
+                            />
+                        ) : (
+                            <>
+                                <input
+                                    type="text"
+                                    disabled
+                                    value={ticket.branchId?.name || 'All Branches'}
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-bold bg-slate-100 text-slate-600"
+                                />
+                                <p className="text-[10px] font-bold text-amber-600 mt-1">You do not have permission to change this ticket's branch.</p>
+                            </>
+                        )}
                     </div>
                 </form>
             </Modal>
@@ -1844,17 +1977,14 @@ const TicketDetail = () => {
                     </div>
                     <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Select New Service Engineer *</label>
-                        <select
-                            required
+                        <SearchableSelect
+                            options={engineerOptions({ includeInactive: true })
+                                .filter(o => o.value !== (ticket.assignedEngineerId?._id || ticket.assignedEngineerId))}
                             value={reassignEngineer}
-                            onChange={(e) => setReassignEngineer(e.target.value)}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                        >
-                            <option value="">-- Select New Engineer --</option>
-                            {engineers.map(u => (
-                                <option key={u._id} value={u._id}>{u.name} ({u.status || 'Active'})</option>
-                            ))}
-                        </select>
+                            onChange={(val) => setReassignEngineer(val || '')}
+                            placeholder="Search engineer by name, code or mobile..."
+                            noResultsText="No matching engineers"
+                        />
                     </div>
                     <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Reassignment Reason *</label>

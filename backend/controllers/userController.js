@@ -1,8 +1,12 @@
 const User = require('../models/User');
+const AuditLog = require('../models/AuditLog');
 const bcrypt = require('bcryptjs');
-const { ROLE_OPTIONS } = require('../config/authorization');
+const { ROLE_OPTIONS, mergeUserPermissions, diffUserPermissions } = require('../config/authorization');
 const RolePermission = require('../models/RolePermission');
 const { getTenantId } = require('../middlewares/tenantContext');
+const { getRolePermissions, toPlainObject } = require('../middlewares/permissionMiddleware');
+const { invalidateAuthUserCache, isSuperAdminRole } = require('../middlewares/authMiddleware');
+const { broadcastCrmUpdate } = require('../config/socket');
 
 const normalizeReportsTo = (reportsTo) => (reportsTo ? reportsTo : null);
 
@@ -333,25 +337,83 @@ exports.updateUser = async (req, res) => {
     }
 };
 
+/**
+ * Saves one user's individual permissions. The client sends the full set the user
+ * should end up with (`permissions`); only what differs from the role is stored,
+ * so later role changes still reach this user. `customPermissions` (the overrides
+ * themselves, `{}` = back to role defaults) is accepted from older clients.
+ */
 exports.updateUserPermissions = async (req, res) => {
     try {
         const { id } = req.params;
-        const { customPermissions } = req.body;
+        const { permissions, customPermissions } = req.body || {};
+        const isPlainObject = (value) => value && typeof value === 'object' && !Array.isArray(value);
+
+        if (!isPlainObject(permissions) && !isPlainObject(customPermissions)) {
+            return res.status(400).json({ message: 'Permissions are required' });
+        }
+
+        if (id === req.user.id && !isSuperAdminRole(req.user.role)) {
+            return res.status(403).json({ message: 'You cannot change your own permissions. Ask another administrator.' });
+        }
 
         const user = await User.findOne({ _id: id, companyId: req.user.companyId });
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        user.customPermissions = customPermissions || {};
+        const rolePermissions = await getRolePermissions(String(user.companyId), user.role);
+        const previousCustom = toPlainObject(user.customPermissions);
+        const previousEffective = mergeUserPermissions(user.role, rolePermissions, previousCustom);
+        const desired = isPlainObject(permissions)
+            ? permissions
+            : mergeUserPermissions(user.role, rolePermissions, customPermissions);
+        const nextCustom = diffUserPermissions(user.role, rolePermissions, desired);
+        const nextEffective = mergeUserPermissions(user.role, rolePermissions, nextCustom);
+
+        // One document holds all of the user's overrides, so they are saved all at once or not at all.
+        user.customPermissions = nextCustom;
+        user.customPermissionsUpdatedBy = req.user.id;
+        user.customPermissionsUpdatedAt = new Date();
         await user.save();
+
+        // protect caches the user (with these overrides) between requests
+        await invalidateAuthUserCache(user._id.toString());
+
+        const changes = Object.keys({ ...previousEffective, ...nextEffective })
+            .filter((key) => Boolean(previousEffective[key]) !== Boolean(nextEffective[key]));
+        if (changes.length) {
+            try {
+                await AuditLog.create({
+                    action: Object.keys(nextCustom).length ? 'USER_PERMISSIONS_UPDATED' : 'USER_PERMISSIONS_RESET',
+                    entityType: 'User',
+                    entityId: user._id,
+                    userId: req.user.id,
+                    userName: req.user.name,
+                    oldValue: Object.fromEntries(changes.map((key) => [key, Boolean(previousEffective[key])])),
+                    newValue: Object.fromEntries(changes.map((key) => [key, Boolean(nextEffective[key])])),
+                    reason: `Permissions of ${user.name}`,
+                    companyId: user.companyId
+                });
+            } catch (auditError) {
+                console.warn('[updateUserPermissions] Audit log failed:', auditError.message);
+            }
+        }
+
+        try {
+            broadcastCrmUpdate('PERMISSIONS', 'UPDATE', { companyId: String(user.companyId), userId: user._id.toString() });
+        } catch (broadcastError) {
+            console.warn('[updateUserPermissions] Broadcast failed:', broadcastError.message);
+        }
 
         res.json({
             _id: user._id,
             name: user.name,
             email: user.email,
             role: user.role,
-            customPermissions: user.customPermissions,
+            customPermissions: nextCustom,
+            effectivePermissions: nextEffective,
+            customPermissionsUpdatedAt: user.customPermissionsUpdatedAt,
             message: 'User permissions updated successfully'
         });
     } catch (error) {

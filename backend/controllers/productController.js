@@ -7,8 +7,9 @@ const {
     deriveBasePriceFromVendors,
     isVendorActive
 } = require('../utils/vendorSelection');
-const { invalidateProductCaches } = require('../utils/cacheInvalidation');
+const { invalidateProductCaches, invalidateAssetCaches } = require('../utils/cacheInvalidation');
 const { getCachedJson, makeCacheKey, setCachedJson } = require('../utils/apiCache');
+const { assertProductUnique } = require('../utils/productUniqueness');
 
 const PRODUCTS_CACHE_KEY = 'products:all';
 const PRODUCTS_CACHE_TTL_SECONDS = 10 * 60;
@@ -22,24 +23,47 @@ const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 const getPagination = (query) => {
     const page = Math.max(1, Number(query.page || 1));
-    const limit = Math.min(100, Math.max(1, Number(query.limit || 25)));
+    // When exporting, allow up to 50,000 records; otherwise cap at 100
+    const isExport = query.export === 'true';
+    const limit = isExport
+        ? Math.min(50000, Math.max(1, Number(query.limit || 10000)))
+        : Math.min(100, Math.max(1, Number(query.limit || 25)));
     return { page, limit, skip: (page - 1) * limit };
 };
 
-const hasListParams = (query) => Boolean(query.page || query.limit || query.search || query.mgr1 || query.mgr2 || query.mgr3 || query.mgr4 || query.mgr5 || query.catalogType);
+const hasListParams = (query) => Boolean(query.page || query.limit || query.search || query.mgr1 || query.mgr2 || query.mgr3 || query.mgr4 || query.mgr5 || query.catalogType || query.typeTest);
+
+// Names copied from other screens (e.g. Invoice Bulk Upload) can carry doubled or
+// non-breaking spaces, so any run of whitespace in the term matches any run in the field.
+const normalizeSearch = (value = '') => String(value).replace(/[\s ]+/g, ' ').trim();
+// The NBSP is embedded as a literal character: MongoDB's PCRE2 rejects the \u escape.
+const WS_CLASS = '[\\s ]';
+const toWhitespaceTolerantPattern = (search) => search.split(' ').map(escapeRegex).join(`${WS_CLASS}+`);
+
+// Product names are not unique (only productCode is), so an exact name/code match
+// is ranked ahead of partial matches rather than replacing them.
+const buildExactMatchClause = (search) => {
+    const regex = new RegExp(`^${WS_CLASS}*${toWhitespaceTolerantPattern(search)}${WS_CLASS}*$`, 'i');
+    return { $or: [{ productName: regex }, { productCode: regex }] };
+};
+
+// `searchIn` narrows the search to one field: the Type Test Register has separate
+// product code and product name boxes.
+const SEARCH_FIELDS = {
+    code: ['productCode'],
+    name: ['productName'],
+};
 
 const buildProductQuery = (queryParams = {}, user = null) => {
     const query = {};
-    const search = String(queryParams.search || '').trim();
+    const search = normalizeSearch(queryParams.search);
 
     if (search) {
-        const regex = new RegExp(escapeRegex(search), 'i');
-        query.$or = [
-            { productName: regex },
-            { productCode: regex },
-            { hsnCode: regex },
-            { uom: regex },
-        ];
+        const regex = new RegExp(toWhitespaceTolerantPattern(search), 'i');
+        const fields = Object.hasOwn(SEARCH_FIELDS, queryParams.searchIn || '')
+            ? SEARCH_FIELDS[queryParams.searchIn]
+            : ['productName', 'productCode', 'hsnCode', 'uom'];
+        query.$or = fields.map((field) => ({ [field]: regex }));
     }
 
     ['mgr1', 'mgr2', 'mgr3', 'mgr4', 'mgr5'].forEach((key) => {
@@ -47,6 +71,11 @@ const buildProductQuery = (queryParams = {}, user = null) => {
             query[key] = queryParams[key];
         }
     });
+
+    // Type Test Register product picker: only products marked "Applicable for Test Type".
+    if (queryParams.typeTest === 'true') {
+        query.applicableForTypeTest = true;
+    }
 
     if (queryParams.catalogType) {
         if (queryParams.catalogType === 'Product') {
@@ -199,7 +228,7 @@ const buildProductResponse = (productDoc) => {
 
 const fetchProductByIdWithRelations = (id) => {
     return Product.findById(id)
-        .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing technicalSpecificationUrl operatingUserManualUrl repairTroubleshootingUrl warrantyMonths createdAt updatedAt')
+        .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing technicalSpecificationUrl operatingUserManualUrl repairTroubleshootingUrl warrantyMonths applicableForTypeTest createdAt updatedAt')
         .populate('categoryId', 'name status')
         .populate('mgr1', 'code description status')
         .populate('mgr2', 'code description status')
@@ -249,33 +278,11 @@ const createProduct = async (req, res) => {
         const cleanProductCode = String(productCode).trim();
         const cleanProductName = String(productName).trim();
 
-        const companyFilter = req.user?.companyId ? { companyId: req.user.companyId } : {};
-
-        // Pre-check for duplicate product code within company
-        if (cleanProductCode) {
-            const existingCode = await Product.findOne({
-                ...companyFilter,
-                productCode: new RegExp(`^${cleanProductCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
-            });
-            if (existingCode) {
-                return res.status(400).json({
-                    message: `Product Code "${cleanProductCode}" already exists. Duplicate products are not allowed.`
-                });
-            }
-        }
-
-        // Pre-check for duplicate product name within company
-        if (cleanProductName) {
-            const existingName = await Product.findOne({
-                ...companyFilter,
-                productName: new RegExp(`^${cleanProductName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
-            });
-            if (existingName) {
-                return res.status(400).json({
-                    message: `Product Name "${cleanProductName}" already exists. Duplicate products are not allowed.`
-                });
-            }
-        }
+        await assertProductUnique({
+            productCode: cleanProductCode,
+            productName: cleanProductName,
+            companyId: req.user?.companyId
+        });
 
         if (catalogType === 'Product' && Object.prototype.hasOwnProperty.call(req.body, 'vendors') && Array.isArray(vendors) && vendors.length === 0) {
             return res.status(400).json({ message: 'At least one vendor is required when vendor mapping is provided' });
@@ -324,7 +331,8 @@ const createProduct = async (req, res) => {
             technicalSpecificationUrl: technicalSpecificationUrl || '',
             operatingUserManualUrl: operatingUserManualUrl || '',
             repairTroubleshootingUrl: repairTroubleshootingUrl || '',
-            warrantyMonths: parseWarrantyMonths(req.body.warrantyMonths)
+            warrantyMonths: parseWarrantyMonths(req.body.warrantyMonths),
+            applicableForTypeTest: toBoolean(req.body.applicableForTypeTest)
         });
 
         if (preparedVendors.length) {
@@ -362,8 +370,8 @@ const getAllProducts = async (req, res) => {
             return res.json(cachedProducts);
         }
 
-        let productsQuery = Product.find(query)
-            .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing technicalSpecificationUrl operatingUserManualUrl repairTroubleshootingUrl warrantyMonths updatedAt')
+        const findProducts = (filter) => Product.find(filter)
+            .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing technicalSpecificationUrl operatingUserManualUrl repairTroubleshootingUrl warrantyMonths applicableForTypeTest updatedAt')
             .populate('categoryId', 'name status')
             .populate('mgr1', 'code description status')
             .populate('mgr2', 'code description status')
@@ -373,6 +381,45 @@ const getAllProducts = async (req, res) => {
             .populate('attributes', 'code description status')
             .populate('vendors.vendorId', 'name isActive')
             .sort({ updatedAt: -1 });
+        let productsQuery = findProducts(query);
+
+        const search = normalizeSearch(req.query.search);
+        if (listParams && search) {
+            // Exact name/code matches come first across all pages, then partial matches.
+            const { page, limit, skip } = getPagination(req.query);
+            const exactClause = buildExactMatchClause(search);
+            const exactRegex = exactClause.$or[0].productName;
+            const exactQuery = { $and: [query, exactClause] };
+            const partialQuery = { $and: [query, { productName: { $not: exactRegex } }, { productCode: { $not: exactRegex } }] };
+
+            const [exactTotal, total] = await Promise.all([
+                Product.countDocuments(exactQuery),
+                Product.countDocuments(query),
+            ]);
+            const exactOnPage = skip < exactTotal
+                ? await findProducts(exactQuery).skip(skip).limit(limit).lean()
+                : [];
+            const remaining = limit - exactOnPage.length;
+            const partialOnPage = remaining > 0
+                ? await findProducts(partialQuery).skip(Math.max(0, skip - exactTotal)).limit(remaining).lean()
+                : [];
+
+            const response = {
+                data: [
+                    ...exactOnPage.map((p) => ({ ...buildProductResponse(p), isExactMatch: true })),
+                    ...partialOnPage.map((p) => ({ ...buildProductResponse(p), isExactMatch: false })),
+                ].filter((p) => p && p._id),
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    exactTotal,
+                    pages: Math.ceil(total / limit) || 1,
+                },
+            };
+            await setCachedJson(redis, cacheKey, response, PRODUCTS_LIST_CACHE_TTL_SECONDS, PRODUCT_CACHE_OPTIONS);
+            return res.json(response);
+        }
 
         if (listParams) {
             const { page, limit, skip } = getPagination(req.query);
@@ -557,6 +604,9 @@ const updateProduct = async (req, res) => {
         if (Object.prototype.hasOwnProperty.call(req.body, 'warrantyMonths')) {
             updateData.warrantyMonths = parseWarrantyMonths(req.body.warrantyMonths);
         }
+        if (Object.prototype.hasOwnProperty.call(req.body, 'applicableForTypeTest')) {
+            updateData.applicableForTypeTest = toBoolean(req.body.applicableForTypeTest);
+        }
 
         // MGR 1-5: a key sent in the body is always written, so changing an MGR stores the
         // new id and choosing "Select MGR n" (empty) clears it. A key left out of the body
@@ -584,12 +634,26 @@ const updateProduct = async (req, res) => {
             }
         }
 
+        const stored = await Product.findById(req.params.id).select('productCode productName').lean();
+        if (!stored) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+        if (typeof productCode === 'string') updateData.productCode = productCode.trim();
+        if (typeof productName === 'string') updateData.productName = productName.trim();
+        await assertProductUnique({
+            productCode: updateData.productCode,
+            productName: updateData.productName,
+            companyId: req.user?.companyId,
+            excludeId: req.params.id,
+            previous: stored
+        });
+
         const updatedProduct = await Product.findByIdAndUpdate(
             req.params.id,
             updateData,
             { new: true, runValidators: true }
         )
-            .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing technicalSpecificationUrl operatingUserManualUrl repairTroubleshootingUrl warrantyMonths createdAt updatedAt')
+            .select('productCode productName categoryId hsnCode gstPercentage basePrice mrp uom productImageUrl status mgr1 mgr2 mgr3 mgr4 mgr5 attributes vendors catalogType subscriptionDetails rentalDetails inventory pricing technicalSpecificationUrl operatingUserManualUrl repairTroubleshootingUrl warrantyMonths applicableForTypeTest createdAt updatedAt')
             .populate('categoryId', 'name status')
             .populate('mgr1', 'code description status')
             .populate('mgr2', 'code description status')
@@ -605,6 +669,9 @@ const updateProduct = async (req, res) => {
         }
 
         await clearProductsCache();
+        // MGR assignments on the product changed — asset/serial caches must be
+        // flushed so Invoice Bulk Upload reflects the new values immediately.
+        await invalidateAssetCaches(req.user?.companyId);
         res.json(buildProductResponse(updatedProduct));
     } catch (error) {
         console.error(error);
@@ -759,6 +826,8 @@ const bulkUpdateProducts = async (req, res) => {
             { $set: { ...updateData, updatedAt: new Date() } }
         );
         await clearProductsCache();
+        // Bulk MGR update: flush asset caches so Invoice Bulk Upload shows live values.
+        await invalidateAssetCaches(req.user?.companyId);
 
         res.json({
             message: `${result.modifiedCount} products updated successfully`,

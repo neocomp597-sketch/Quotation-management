@@ -6,8 +6,22 @@ const UserSchema = new mongoose.Schema({
     passwordHash: { type: String, required: true },
     passwordChangedAt: { type: Date },
     mustChangePassword: { type: Boolean, default: false },
+    // Legacy single-session fields: still accepted on refresh so existing logins survive.
     refreshTokenHash: { type: String },
     refreshTokenExpiresAt: { type: Date },
+    // One entry per signed-in device, so a login on one device never ends another
+    // device's session (Redis, when configured, holds the same sessions as a fast path).
+    refreshSessions: {
+        type: [{
+            _id: false,
+            deviceId: { type: String, required: true },
+            tokenHash: { type: String, required: true },
+            expiresAt: { type: Date, required: true },
+            createdAt: { type: Date, default: Date.now }
+        }],
+        default: [],
+        select: false
+    },
     tokenVersion: { type: Number, default: 0 },
     role: { type: String, default: 'sales' },
     reportsTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
@@ -28,7 +42,11 @@ const UserSchema = new mongoose.Schema({
     },
     vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', default: null },
     employeeProfileId: { type: mongoose.Schema.Types.ObjectId, ref: 'EmployeeProfile', default: null },
+    // Overrides of the role's permissions: "<screen>" is View, "<screen>:create",
+    // "<screen>:modify" and "<screen>:delete" are the actions (see config/authorization.js).
     customPermissions: { type: Map, of: Boolean, default: {} },
+    customPermissionsUpdatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    customPermissionsUpdatedAt: { type: Date, default: null },
     resetPasswordToken: { type: String, default: null },
     resetPasswordExpires: { type: Date, default: null },
     createdAt: { type: Date, default: Date.now },

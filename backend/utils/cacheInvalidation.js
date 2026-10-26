@@ -29,9 +29,17 @@ const invalidateProductCaches = () => invalidateCache('products:*', 'dashboard:q
 const invalidateQuotationCaches = () => invalidateCache('quotations:*', 'dashboard:quotations:*');
 const invalidatePlanningCaches = () => invalidateCache('planning:*');
 const invalidateStatusCaches = () => invalidateCache('statuses:*', 'planning:*');
+// Assets/Invoice Bulk Upload caches. Called whenever Product Master MGR assignments
+// change so the next page load always reflects the latest values.
+const invalidateAssetCaches = (companyId) => {
+    const patterns = ['assets:*', 'serials:*', 'invoice_bulk:*'];
+    if (companyId) patterns.push(`assets:${companyId}:*`);
+    return invalidateCache(...patterns);
+};
 
 module.exports = {
     invalidateCache,
+    invalidateAssetCaches,
     invalidateCustomerCaches,
     invalidatePlanningCaches,
     invalidateProductCaches,

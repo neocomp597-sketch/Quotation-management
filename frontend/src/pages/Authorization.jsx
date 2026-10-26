@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
@@ -10,26 +10,17 @@ import { authorizationService, userService, superAdminService, vendorService } f
 import { ROLE_LABELS as BUILTIN_ROLE_LABELS, MENU_PERMISSION_GROUPS } from '../constants/menuPermissions';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
+import PermissionGroupMatrix from '../components/PermissionGroupMatrix';
+import { childKeysFor, mergeUserPermissions, samePermissions } from '../utils/permissions';
 
-const childKeysFor = (group) => Array.from(new Set((group.children || []).map((child) => child.key)));
+const MODULE_KEYS = Array.from(new Set(MENU_PERMISSION_GROUPS.flatMap(childKeysFor)));
 
-const buildPermissionsFromEnabledSections = (groups, enabledSections = []) => {
-    const enabled = new Set(enabledSections);
-    return groups.reduce((acc, group) => {
-        const childKeys = childKeysFor(group);
-        const groupOn = enabled.has(group.key);
-        const anyChildOn = childKeys.some((key) => enabled.has(key));
+const UNSAVED_CHANGES_MESSAGE = 'You have unsaved permission changes. Leave without saving them?';
 
-        acc[group.key] = groupOn || anyChildOn;
-        childKeys.forEach((key) => {
-            acc[key] = groupOn || enabled.has(key);
-        });
-        return acc;
-    }, {});
-};
+const MATRIX_HINT = 'Module switch: off removes all access to the module; on gives View on all of its screens. Create, Modify and Delete are given separately and only on screens that can be viewed.';
 
 const Authorization = () => {
-    const { user: currentUser, isAdmin, isSuperAdmin, refreshSession } = useAuth();
+    const { user: currentUser, isAdmin, isSuperAdmin, reloadPermissions } = useAuth();
 
     const [activeTab, setActiveTab] = useState('roles'); // 'roles' | 'team' | 'vendors'
     const [roles, setRoles] = useState([]);
@@ -82,12 +73,18 @@ const Authorization = () => {
     const [selectedCompanyId, setSelectedCompanyId] = useState('');
     const [companiesLoading, setCompaniesLoading] = useState(false);
 
+    // Which actions each screen has (from the server), and unsaved edits per role / user
+    const [permissionActions, setPermissionActions] = useState({});
+    const [roleDrafts, setRoleDrafts] = useState({});
+    const [userDrafts, setUserDrafts] = useState({});
+
     const fetchMatrix = async (companyId = selectedCompanyId) => {
         try {
             const params = companyId ? { companyId } : {};
             const res = await authorizationService.getAll(params);
             setRoles(res.data.roles || []);
             setMenuGroups(res.data.menuGroups || []);
+            setPermissionActions(res.data.permissionActions || {});
         } catch (err) {
             toast.error('Error loading permissions');
         }
@@ -156,7 +153,59 @@ const Authorization = () => {
         })();
     }, [isAdmin, isSuperAdmin, selectedCompanyId]);
 
+    const roleByKey = useMemo(() => Object.fromEntries(roles.map((role) => [role.role, role])), [roles]);
+
+    // Saved permissions of a user: the role's with the user's own overrides on top
+    const getEffectiveUserPermissions = (user) => {
+        const roleObj = roleByKey[user.role];
+        return mergeUserPermissions(MENU_PERMISSION_GROUPS, roleObj?.permissions || {}, user.customPermissions || {}, permissionActions, roleObj?.lockedViewKeys);
+    };
+
+    const dirtyRoleKeys = useMemo(() => Object.keys(roleDrafts).filter((roleKey) => (
+        roleByKey[roleKey] && !samePermissions(roleDrafts[roleKey], roleByKey[roleKey].permissions, MODULE_KEYS, permissionActions)
+    )), [roleDrafts, roleByKey, permissionActions]);
+
+    const dirtyUserIds = useMemo(() => Object.keys(userDrafts).filter((userId) => {
+        const user = users.find((u) => u._id === userId);
+        return user && !samePermissions(userDrafts[userId], getEffectiveUserPermissions(user), MODULE_KEYS, permissionActions);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), [userDrafts, users, roleByKey, permissionActions]);
+
+    const hasUnsavedChanges = dirtyRoleKeys.length > 0 || dirtyUserIds.length > 0;
+
+    // Unsaved changes survive neither a reload nor leaving the page, so ask first
+    useEffect(() => {
+        if (!hasUnsavedChanges) return undefined;
+        const onBeforeUnload = (event) => {
+            event.preventDefault();
+            event.returnValue = UNSAVED_CHANGES_MESSAGE;
+            return UNSAVED_CHANGES_MESSAGE;
+        };
+        // In-app links (sidebar, header) change the page without unloading it
+        const onLinkClick = (event) => {
+            const link = event.target.closest?.('a[href]');
+            if (!link || link.target === '_blank' || event.defaultPrevented) return;
+            if (!window.confirm(UNSAVED_CHANGES_MESSAGE)) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        };
+        window.addEventListener('beforeunload', onBeforeUnload);
+        document.addEventListener('click', onLinkClick, true);
+        return () => {
+            window.removeEventListener('beforeunload', onBeforeUnload);
+            document.removeEventListener('click', onLinkClick, true);
+        };
+    }, [hasUnsavedChanges]);
+
     if (!isAdmin && !isSuperAdmin) return <Navigate to="/dashboard" replace />;
+
+    const confirmDiscardChanges = () => !hasUnsavedChanges || window.confirm(UNSAVED_CHANGES_MESSAGE);
+
+    const discardAllDrafts = () => {
+        setRoleDrafts({});
+        setUserDrafts({});
+    };
 
     const displayGroups = MENU_PERMISSION_GROUPS;
 
@@ -189,15 +238,9 @@ const Authorization = () => {
         return count + childKeys.filter((key) => perms[key]).length;
     }, 0);
 
-    // Compute effective permissions for a user (base role perms + custom user perms)
-    const getEffectiveUserPermissions = (user) => {
-        const roleObj = roles.find((r) => r.role === user.role);
-        const rolePerms = roleObj?.permissions || {};
-        const userCustom = user.customPermissions || {};
-        return { ...rolePerms, ...userCustom };
-    };
-
     const handleRefresh = async () => {
+        if (!confirmDiscardChanges()) return;
+        discardAllDrafts();
         setLoading(true);
         await Promise.all([
             fetchMatrix(selectedCompanyId), 
@@ -212,6 +255,11 @@ const Authorization = () => {
     };
 
     const toggleUserCardAccordion = (userId) => {
+        const closing = expandedUserCards[userId] ?? false;
+        if (closing && dirtyUserIds.includes(userId)) {
+            if (!window.confirm(UNSAVED_CHANGES_MESSAGE)) return;
+            discardUserDraft(userId);
+        }
         setExpandedUserCards((prev) => ({ ...prev, [userId]: !prev[userId] }));
     };
 
@@ -225,106 +273,85 @@ const Authorization = () => {
         return expandedGroups[key] ?? false;
     };
 
-    // Toggle Role Permission
-    const handleToggleRolePermission = async (roleKey, permKey, group) => {
-        const roleObj = roles.find((r) => r.role === roleKey);
-        if (!roleObj || roleObj.locked || savingRoles[roleKey]) return;
+    const companyParams = () => (selectedCompanyId ? { companyId: selectedCompanyId } : {});
 
-        const targetGroup = group || displayGroups.find((item) => item.key === permKey || childKeysFor(item).includes(permKey));
-        const childKeys = childKeysFor(targetGroup || {});
-        const isParent = targetGroup?.key === permKey;
-        const next = { ...roleObj.permissions };
+    const discardRoleDraft = (roleKey) => {
+        setRoleDrafts((prev) => {
+            const next = { ...prev };
+            delete next[roleKey];
+            return next;
+        });
+    };
 
-        if (isParent) {
-            const currentAllOn = childKeys.length
-                ? childKeys.every((key) => roleObj.permissions?.[key])
-                : Boolean(roleObj.permissions?.[permKey]);
-            const nextValue = !currentAllOn;
-            next[permKey] = nextValue;
-            childKeys.forEach((key) => {
-                next[key] = nextValue;
-            });
-        } else {
-            const nextValue = !roleObj.permissions?.[permKey];
-            next[permKey] = nextValue;
-            if (targetGroup) {
-                next[targetGroup.key] = childKeys.some((key) => key === permKey ? nextValue : Boolean(next[key]));
-            }
+    const discardUserDraft = (userId) => {
+        setUserDrafts((prev) => {
+            const next = { ...prev };
+            delete next[userId];
+            return next;
+        });
+    };
+
+    // Applies a saved role to the page; the signed-in user's own menus follow their role
+    const applySavedRole = async (roleKey, payload) => {
+        setRoles((prev) => prev.map((r) => r.role === roleKey ? { ...r, ...payload } : r));
+        discardRoleDraft(roleKey);
+        setStatusByRole((prev) => ({ ...prev, [roleKey]: 'saved' }));
+        if (roleKey === currentUser?.role) {
+            await reloadPermissions();
         }
+    };
 
-        setRoles((prev) => prev.map((r) => r.role === roleKey ? { ...r, permissions: next } : r));
+    const handleSaveRole = async (roleKey) => {
+        const roleObj = roles.find((r) => r.role === roleKey);
+        const draft = roleDrafts[roleKey];
+        if (!roleObj || !draft || savingRoles[roleKey]) return;
+
         setSavingRoles((prev) => ({ ...prev, [roleKey]: true }));
         setStatusByRole((prev) => ({ ...prev, [roleKey]: 'saving' }));
-
         try {
-            const params = selectedCompanyId ? { companyId: selectedCompanyId } : {};
-            const res = await authorizationService.update(roleKey, next, params);
-            const saved = res.data?.permissions || next;
-            setRoles((prev) => prev.map((r) => r.role === roleKey ? { ...r, permissions: saved } : r));
-            setStatusByRole((prev) => ({ ...prev, [roleKey]: 'saved' }));
-            if (roleKey === currentUser?.role || (roleKey === 'admin' && isAdmin)) {
-                await refreshSession();
-            }
+            const res = await authorizationService.update(roleKey, draft, companyParams());
+            await applySavedRole(roleKey, res.data || {});
+            toast.success(`${roleObj.label} permissions saved`);
         } catch (err) {
-            setRoles((prev) => prev.map((r) => r.role === roleKey ? { ...r, permissions: roleObj.permissions } : r));
             setStatusByRole((prev) => ({ ...prev, [roleKey]: 'error' }));
-            toast.error('Failed to save changes');
+            toast.error(err.response?.data?.message || 'Failed to save permissions');
         } finally {
             setSavingRoles((prev) => ({ ...prev, [roleKey]: false }));
         }
     };
 
-    // Toggle Individual User Permission
-    const handleToggleUserPermission = async (userId, permKey, group) => {
-        const user = users.find((u) => u._id === userId);
-        if (!user || updatingUserId === userId) return;
+    const handleResetRole = async (roleKey) => {
+        const roleObj = roles.find((r) => r.role === roleKey);
+        if (!roleObj || roleObj.locked || resettingRoles[roleKey]) return;
+        if (!window.confirm(`Reset the ${roleObj.label} role to its default permissions? Its current permissions will be replaced for everyone with this role.`)) return;
 
-        const roleObj = roles.find((r) => r.role === user.role);
-        const rolePerms = roleObj?.permissions || {};
-        const currentEffective = getEffectiveUserPermissions(user);
-        
-        const targetGroup = group || displayGroups.find((item) => item.key === permKey || childKeysFor(item).includes(permKey));
-        const childKeys = childKeysFor(targetGroup || {});
-        const isParent = targetGroup?.key === permKey;
-
-        const nextEffective = { ...currentEffective };
-
-        if (isParent) {
-            const currentAllOn = childKeys.length
-                ? childKeys.every((key) => currentEffective[key])
-                : Boolean(currentEffective[permKey]);
-            const nextValue = !currentAllOn;
-            nextEffective[permKey] = nextValue;
-            childKeys.forEach((key) => {
-                nextEffective[key] = nextValue;
-            });
-        } else {
-            const nextValue = !currentEffective[permKey];
-            nextEffective[permKey] = nextValue;
-            if (targetGroup) {
-                nextEffective[targetGroup.key] = childKeys.some((key) => key === permKey ? nextValue : Boolean(nextEffective[key]));
-            }
-        }
-
-        // Store custom overrides that differ from the base role
-        const newCustomPerms = {};
-        Object.keys(nextEffective).forEach((key) => {
-            if (nextEffective[key] !== rolePerms[key]) {
-                newCustomPerms[key] = nextEffective[key];
-            }
-        });
-
-        // Optimistically update local users state
-        setUsers((prev) => prev.map((u) => u._id === userId ? { ...u, customPermissions: newCustomPerms } : u));
-        setUpdatingUserId(userId);
-
+        setResettingRoles((prev) => ({ ...prev, [roleKey]: true }));
+        setStatusByRole((prev) => ({ ...prev, [roleKey]: 'saving' }));
         try {
-            const params = selectedCompanyId ? { companyId: selectedCompanyId } : {};
-            await userService.updatePermissions(userId, newCustomPerms, params);
-            toast.success(`Updated permissions for ${user.name}`);
+            const res = await authorizationService.update(roleKey, roleObj.defaults || {}, companyParams(), { reason: 'reset' });
+            await applySavedRole(roleKey, res.data || {});
+            toast.success(`${roleObj.label} reset to default permissions`);
         } catch (err) {
-            toast.error('Failed to update individual user permissions');
-            fetchUsers(selectedCompanyId);
+            setStatusByRole((prev) => ({ ...prev, [roleKey]: 'error' }));
+            toast.error(err.response?.data?.message || 'Reset failed');
+        } finally {
+            setResettingRoles((prev) => ({ ...prev, [roleKey]: false }));
+        }
+    };
+
+    const handleSaveUserPermissions = async (userId) => {
+        const user = users.find((u) => u._id === userId);
+        const draft = userDrafts[userId];
+        if (!user || !draft || updatingUserId === userId) return;
+
+        setUpdatingUserId(userId);
+        try {
+            const res = await userService.updatePermissions(userId, { permissions: draft }, companyParams());
+            setUsers((prev) => prev.map((u) => u._id === userId ? { ...u, customPermissions: res.data?.customPermissions || {} } : u));
+            discardUserDraft(userId);
+            toast.success(`Permissions saved for ${user.name}`);
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to save permissions');
         } finally {
             setUpdatingUserId('');
         }
@@ -334,46 +361,27 @@ const Authorization = () => {
     const handleResetUserPermissions = async (userId) => {
         const user = users.find((u) => u._id === userId);
         if (!user) return;
+        const roleLabel = roleByKey[user.role]?.label || user.role;
+        if (!window.confirm(`Reset ${user.name}'s permissions to the ${roleLabel} role defaults? Their individual permission changes will be removed.`)) return;
+
         setUpdatingUserId(userId);
         try {
-            const params = selectedCompanyId ? { companyId: selectedCompanyId } : {};
-            await userService.updatePermissions(userId, {}, params);
+            await userService.updatePermissions(userId, { customPermissions: {} }, companyParams());
             setUsers((prev) => prev.map((u) => u._id === userId ? { ...u, customPermissions: {} } : u));
+            discardUserDraft(userId);
             toast.success(`Reset ${user.name}'s permissions to role default`);
         } catch (err) {
-            toast.error('Failed to reset user permissions');
+            toast.error(err.response?.data?.message || 'Failed to reset user permissions');
         } finally {
             setUpdatingUserId('');
         }
     };
 
-    const handleResetRole = async (roleKey) => {
-        const roleObj = roles.find((r) => r.role === roleKey);
-        if (!roleObj || roleObj.locked || resettingRoles[roleKey]) return;
-
-        const defaults = buildPermissionsFromEnabledSections(displayGroups, (roleKey === 'admin' ? MENU_PERMISSION_GROUPS.map(g => g.key) : roleKey === 'manager' ? ['dashboard', 'master', 'enquiry', 'sales_pipeline', 'quotation', 'sale', 'purchase', 'planning', 'reports', 'settings'] : ['dashboard', 'enquiry', 'sales_pipeline', 'quotation']));
-        
-        setResettingRoles((prev) => ({ ...prev, [roleKey]: true }));
-        setStatusByRole((prev) => ({ ...prev, [roleKey]: 'saving' }));
-
-        try {
-            const params = selectedCompanyId ? { companyId: selectedCompanyId } : {};
-            const res = await authorizationService.update(roleKey, defaults, params);
-            setRoles((prev) => prev.map((r) => r.role === roleKey ? { ...r, permissions: res.data?.permissions || defaults } : r));
-            setStatusByRole((prev) => ({ ...prev, [roleKey]: 'saved' }));
-            if (roleKey === currentUser?.role || (roleKey === 'admin' && isAdmin)) {
-                await refreshSession();
-            }
-            toast.success('Role permissions reset');
-        } catch (err) {
-            setStatusByRole((prev) => ({ ...prev, [roleKey]: 'error' }));
-            toast.error('Reset failed');
-        } finally {
-            setResettingRoles((prev) => ({ ...prev, [roleKey]: false }));
-        }
-    };
-
     const handleUserRoleChange = async (userId, nextRole) => {
+        if (dirtyUserIds.includes(userId)) {
+            if (!window.confirm(UNSAVED_CHANGES_MESSAGE)) return;
+            discardUserDraft(userId);
+        }
         setUpdatingUserId(userId);
         try {
             const params = selectedCompanyId ? { companyId: selectedCompanyId } : {};
@@ -584,7 +592,11 @@ const Authorization = () => {
                         ) : (
                             <select
                                 value={selectedCompanyId}
-                                onChange={(e) => setSelectedCompanyId(e.target.value)}
+                                onChange={(e) => {
+                                    if (!confirmDiscardChanges()) return;
+                                    discardAllDrafts();
+                                    setSelectedCompanyId(e.target.value);
+                                }}
                                 className="bg-slate-800 text-white border border-slate-700 px-4 py-2.5 rounded-xl text-sm font-bold outline-none focus:border-primary-500 transition-colors cursor-pointer"
                             >
                                 {companies.map((c) => (
@@ -653,7 +665,8 @@ const Authorization = () => {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <h2 className="text-lg font-bold text-slate-900 dark:text-white">Default Role Permissions</h2>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400">Click any Role card or Permission Group to collapse/expand permission options.</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">Click any Role card or Permission Group to collapse/expand permission options. Changes are kept until you click Save Changes.</p>
+                                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">{MATRIX_HINT}</p>
                                 </div>
                                 <button 
                                     onClick={() => setShowNewRoleForm(!showNewRoleForm)}
@@ -705,12 +718,14 @@ const Authorization = () => {
                                     const busy = savingRoles[role.role] || resettingRoles[role.role];
                                     const status = statusByRole[role.role];
                                     const isExpanded = expandedRoles[role.role] ?? true; // Default open
-                                    const currentEnabled = enabledCount(role.permissions);
+                                    const rolePermissions = roleDrafts[role.role] || role.permissions;
+                                    const isDirty = dirtyRoleKeys.includes(role.role);
+                                    const currentEnabled = enabledCount(rolePermissions);
 
                                     return (
-                                        <section key={role.role} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs transition-all hover:shadow-md">
+                                        <section key={role.role} className={`bg-white dark:bg-slate-900 border rounded-2xl overflow-hidden shadow-xs transition-all hover:shadow-md ${isDirty ? 'border-amber-300 dark:border-amber-700' : 'border-slate-200 dark:border-slate-800'}`}>
                                             {/* Role Header Accordion Switch */}
-                                            <div 
+                                            <div
                                                 onClick={() => toggleRoleAccordion(role.role)}
                                                 className={`p-5 flex items-center justify-between cursor-pointer bg-slate-50/50 dark:bg-slate-800/50 hover:bg-slate-100/50 dark:hover:bg-slate-800/80 transition-colors ${isExpanded ? 'border-b border-slate-100 dark:border-slate-800' : ''}`}
                                             >
@@ -723,7 +738,8 @@ const Authorization = () => {
                                                             <h3 className="text-base font-black text-slate-900 dark:text-white">{role.label}</h3>
                                                             {role.locked && <MdLock className="text-slate-400 dark:text-slate-500" size={14} title="Standard System Role" />}
                                                             {busy && <span className="text-[10px] text-primary-600 dark:text-primary-400 font-bold animate-pulse ml-1">Saving...</span>}
-                                                            {status === 'saved' && <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold ml-1">Saved</span>}
+                                                            {!busy && isDirty && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold ml-1">Unsaved changes</span>}
+                                                            {!busy && !isDirty && status === 'saved' && <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold ml-1">Saved</span>}
                                                         </div>
                                                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{role.description || 'System permission profile.'}</p>
                                                     </div>
@@ -738,94 +754,60 @@ const Authorization = () => {
                                             {/* Role Card Body - Collapsible Accordion */}
                                             {isExpanded && (
                                                 <div className="p-6 space-y-4 animate-fade-in">
-                                                    {displayGroups.map((group) => {
-                                                        const children = group.children || [];
-                                                        const childKeys = childKeysFor(group);
-                                                        const enabledChildrenCount = childKeys.filter((key) => role.permissions?.[key]).length;
-                                                        const hasPartialAccess = childKeys.length ? enabledChildrenCount > 0 : Boolean(role.permissions?.[group.key]);
-                                                        const hasFullAccess = childKeys.length ? enabledChildrenCount === childKeys.length : hasPartialAccess;
-                                                        const expandedGroup = isGroupExpanded(role.role, group.key);
-
-                                                        return (
-                                                            <div key={`${role.role}-${group.key}`} className="space-y-2 border-b border-slate-50 dark:border-slate-800/60 pb-3 last:border-0 last:pb-0">
-                                                                <div className="flex items-center justify-between group">
-                                                                    <button 
-                                                                        type="button"
-                                                                        onClick={() => toggleGroupAccordion(role.role, group.key)}
-                                                                        className="flex items-center gap-2 text-left hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-                                                                    >
-                                                                        <div className={`transition-transform duration-200 ${expandedGroup ? 'rotate-0' : '-rotate-90'}`}>
-                                                                            <MdExpandMore size={18} className={hasPartialAccess ? "text-primary-600 dark:text-primary-400" : "text-slate-300 dark:text-slate-600"} />
-                                                                        </div>
-                                                                        <span className={`text-xs font-bold transition-colors ${hasPartialAccess ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'}`}>
-                                                                            {group.label}
-                                                                        </span>
-                                                                        {children.length > 0 && (
-                                                                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${hasPartialAccess ? 'bg-primary-50 dark:bg-primary-950/60 text-primary-700 dark:text-primary-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'}`}>
-                                                                                {enabledChildrenCount} / {children.length}
-                                                                            </span>
-                                                                        )}
-                                                                    </button>
-
-                                                                    {/* Toggle Group Switch */}
-                                                                    <div className="flex items-center">
-                                                                        <label className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${hasFullAccess ? 'bg-primary-600' : 'bg-slate-200 dark:bg-slate-700'} ${role.locked || busy ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}`}>
-                                                                            <input 
-                                                                                type="checkbox" 
-                                                                                className="sr-only" 
-                                                                                checked={hasFullAccess} 
-                                                                                disabled={role.locked || busy} 
-                                                                                onChange={() => handleToggleRolePermission(role.role, group.key, group)} 
-                                                                            />
-                                                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${hasFullAccess ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                                                                        </label>
-                                                                    </div>
-                                                                </div>
-
-                                                                {/* Expanded Child Permissions */}
-                                                                {expandedGroup && children.length > 0 && (
-                                                                    <div className="ml-6 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 pl-4 py-1.5 animate-fade-in">
-                                                                        {children.map((child) => {
-                                                                            const childOn = Boolean(role.permissions?.[child.key]);
-                                                                            return (
-                                                                                <div key={`${role.role}-${child.key}`} className="flex items-center justify-between">
-                                                                                    <span className={`text-xs font-medium ${childOn ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500'}`}>
-                                                                                        ↳ {child.label}
-                                                                                    </span>
-                                                                                    <label className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${childOn ? 'bg-primary-600' : 'bg-slate-200 dark:bg-slate-700'} ${role.locked || busy ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}`}>
-                                                                                        <input 
-                                                                                            type="checkbox" 
-                                                                                            className="sr-only" 
-                                                                                            checked={childOn} 
-                                                                                            disabled={role.locked || busy} 
-                                                                                            onChange={() => handleToggleRolePermission(role.role, child.key, group)} 
-                                                                                        />
-                                                                                        <span className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform ${childOn ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                                                                    </label>
-                                                                                </div>
-                                                                            );
-                                                                        })}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    })}
+                                                    {displayGroups.map((group) => (
+                                                        <PermissionGroupMatrix
+                                                            key={`${role.role}-${group.key}`}
+                                                            group={group}
+                                                            groups={displayGroups}
+                                                            permissions={rolePermissions}
+                                                            permissionActions={permissionActions}
+                                                            lockedViewKeys={role.lockedViewKeys}
+                                                            expanded={isGroupExpanded(role.role, group.key)}
+                                                            onToggleExpand={() => toggleGroupAccordion(role.role, group.key)}
+                                                            onChange={(next) => setRoleDrafts((prev) => ({ ...prev, [role.role]: next }))}
+                                                            disabled={role.locked || busy}
+                                                        />
+                                                    ))}
                                                 </div>
                                             )}
 
                                             {/* Role Footer - Rendered only when expanded */}
                                             {isExpanded && (
                                                 <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex gap-2">
-                                                    {!role.locked && (
+                                                    {!role.locked && isDirty && (
                                                         <>
-                                                            <button 
+                                                            <button
+                                                                onClick={() => discardRoleDraft(role.role)}
+                                                                disabled={busy}
+                                                                className="flex-1 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 transition-all shadow-xs"
+                                                            >
+                                                                Discard
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleSaveRole(role.role)}
+                                                                disabled={busy}
+                                                                className="flex-1 py-2 bg-primary-600 text-white rounded-xl text-xs font-bold hover:bg-primary-700 disabled:opacity-60 transition-all shadow-xs flex items-center justify-center gap-1.5"
+                                                            >
+                                                                {busy ? (
+                                                                    <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                                                ) : (
+                                                                    <MdSave size={16} />
+                                                                )}
+                                                                {busy ? 'Saving...' : 'Save Changes'}
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                    {!role.locked && !isDirty && (
+                                                        <>
+                                                            <button
                                                                 onClick={() => handleResetRole(role.role)}
+                                                                disabled={busy}
                                                                 className="flex-1 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold hover:bg-primary-50 dark:hover:bg-slate-700 hover:text-primary-600 dark:hover:text-primary-400 transition-all shadow-xs"
                                                             >
                                                                 Reset Role Defaults
                                                             </button>
                                                             {role.isCustom && (
-                                                                <button 
+                                                                <button
                                                                     onClick={() => handleDeleteRole(role.role)}
                                                                     className="px-3 py-2 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-slate-200 dark:border-slate-700 rounded-xl transition-all"
                                                                     title="Delete Role"
@@ -900,7 +882,10 @@ const Authorization = () => {
                                         const isEditing = editingUserId === user._id;
                                         const isUserExpanded = expandedUserCards[user._id] ?? false;
 
-                                        const effectivePerms = getEffectiveUserPermissions(user);
+                                        const userRole = roleByKey[user.role];
+                                        const savedPerms = getEffectiveUserPermissions(user);
+                                        const effectivePerms = userDrafts[user._id] || savedPerms;
+                                        const isUserDirty = dirtyUserIds.includes(user._id);
                                         const userEnabledCount = enabledCount(effectivePerms);
                                         const hasCustomOverrides = Object.keys(user.customPermissions || {}).length > 0;
 
@@ -972,6 +957,7 @@ const Authorization = () => {
                                                             <div className="flex items-center gap-2">
                                                                 <span className="text-sm font-bold text-slate-900 dark:text-white">{user.name}</span>
                                                                 {isMe && <span className="text-[10px] font-bold bg-primary-100 dark:bg-primary-950 text-primary-700 dark:text-primary-300 px-2 py-0.5 rounded-full">You</span>}
+                                                                {isUserDirty && <span className="text-[10px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full">Unsaved changes</span>}
                                                                 {hasCustomOverrides && (
                                                                     <span className="text-[10px] font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-full flex items-center gap-1" title="User has custom permission overrides">
                                                                         <MdTune size={12} /> Custom Perms
@@ -1054,95 +1040,83 @@ const Authorization = () => {
                                                 {/* Expanded Accordion: Individual User Permissions Group Controls */}
                                                 {isUserExpanded && (
                                                     <div className="p-6 bg-slate-50/80 dark:bg-slate-900/80 border-t border-slate-100 dark:border-slate-800 space-y-4 animate-fade-in">
-                                                        <div className="flex items-center justify-between pb-3 border-b border-slate-200/60 dark:border-slate-800">
-                                                            <div className="flex items-center gap-2">
-                                                                <MdTune className="text-primary-600 dark:text-primary-400" size={18} />
-                                                                <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
-                                                                    Custom Permissions for {user.name} ({roles.find(r => r.role === user.role)?.label || user.role})
-                                                                </h4>
+                                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200/60 dark:border-slate-800">
+                                                            <div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <MdTune className="text-primary-600 dark:text-primary-400" size={18} />
+                                                                    <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                                                                        Custom Permissions for {user.name} ({userRole?.label || user.role})
+                                                                    </h4>
+                                                                </div>
+                                                                <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+                                                                    {MATRIX_HINT} Screens shown in amber differ from the role.
+                                                                </p>
                                                             </div>
-                                                            {hasCustomOverrides && (
+                                                            {hasCustomOverrides && !isMe && (
                                                                 <button
                                                                     onClick={() => handleResetUserPermissions(user._id)}
-                                                                    className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950/50 px-3 py-1 rounded-lg transition-colors"
+                                                                    disabled={isUpdating}
+                                                                    className="shrink-0 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950/50 px-3 py-1 rounded-lg transition-colors disabled:opacity-50"
                                                                 >
                                                                     Reset to Role Defaults
                                                                 </button>
                                                             )}
                                                         </div>
 
+                                                        {isMe && (
+                                                            <div className="flex items-center gap-2 text-xs font-semibold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2">
+                                                                <MdLock size={16} /> You cannot change your own permissions. Another administrator can change them for you.
+                                                            </div>
+                                                        )}
+
                                                         {/* Permission Groups Accordion for this Individual User */}
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                                            {displayGroups.map((group) => {
-                                                                const children = group.children || [];
-                                                                const childKeys = childKeysFor(group);
-                                                                const enabledChildrenCount = childKeys.filter((key) => effectivePerms[key]).length;
-                                                                const hasPartialAccess = childKeys.length ? enabledChildrenCount > 0 : Boolean(effectivePerms[group.key]);
-                                                                const hasFullAccess = childKeys.length ? enabledChildrenCount === childKeys.length : hasPartialAccess;
-                                                                const userGroupExpanded = isGroupExpanded(`user-${user._id}`, group.key);
-
-                                                                return (
-                                                                    <div key={`user-${user._id}-${group.key}`} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 space-y-3 shadow-2xs">
-                                                                        <div className="flex items-center justify-between">
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => toggleGroupAccordion(`user-${user._id}`, group.key)}
-                                                                                className="flex items-center gap-2 text-left hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-                                                                            >
-                                                                                <div className={`transition-transform duration-200 ${userGroupExpanded ? 'rotate-0' : '-rotate-90'}`}>
-                                                                                    <MdExpandMore size={16} className={hasPartialAccess ? "text-primary-600 dark:text-primary-400" : "text-slate-300 dark:text-slate-600"} />
-                                                                                </div>
-                                                                                <span className={`text-xs font-bold ${hasPartialAccess ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'}`}>
-                                                                                    {group.label}
-                                                                                </span>
-                                                                                {children.length > 0 && (
-                                                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${hasPartialAccess ? 'bg-primary-50 dark:bg-primary-950/60 text-primary-700 dark:text-primary-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500'}`}>
-                                                                                        {enabledChildrenCount}/{children.length}
-                                                                                    </span>
-                                                                                )}
-                                                                            </button>
-
-                                                                            <label className={`relative inline-flex h-4.5 w-8 items-center rounded-full transition-colors ${hasFullAccess ? 'bg-primary-600' : 'bg-slate-200 dark:bg-slate-700'} cursor-pointer`}>
-                                                                                <input 
-                                                                                    type="checkbox" 
-                                                                                    className="sr-only" 
-                                                                                    checked={hasFullAccess} 
-                                                                                    onChange={() => handleToggleUserPermission(user._id, group.key, group)} 
-                                                                                />
-                                                                                <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${hasFullAccess ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                                                            </label>
-                                                                        </div>
-
-                                                                        {/* Group Children Checkboxes */}
-                                                                        {userGroupExpanded && children.length > 0 && (
-                                                                            <div className="ml-4 space-y-2 border-l border-slate-100 dark:border-slate-700 pl-3 pt-2">
-                                                                                {children.map((child) => {
-                                                                                    const childOn = Boolean(effectivePerms[child.key]);
-                                                                                    const isOverridden = user.customPermissions && Object.prototype.hasOwnProperty.call(user.customPermissions, child.key);
-
-                                                                                    return (
-                                                                                        <div key={`user-${user._id}-${child.key}`} className="flex items-center justify-between">
-                                                                                            <span className={`text-[11px] font-medium ${childOn ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500'} ${isOverridden ? 'font-bold text-amber-700 dark:text-amber-400' : ''}`}>
-                                                                                                ↳ {child.label}
-                                                                                            </span>
-                                                                                            <label className={`relative inline-flex h-3.5 w-6 items-center rounded-full transition-colors ${childOn ? 'bg-primary-600' : 'bg-slate-200 dark:bg-slate-700'} cursor-pointer`}>
-                                                                                                <input 
-                                                                                                    type="checkbox" 
-                                                                                                    className="sr-only" 
-                                                                                                    checked={childOn} 
-                                                                                                    onChange={() => handleToggleUserPermission(user._id, child.key, group)} 
-                                                                                                />
-                                                                                                <span className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform ${childOn ? 'translate-x-3' : 'translate-x-0.5'}`} />
-                                                                                            </label>
-                                                                                        </div>
-                                                                                    );
-                                                                                })}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            })}
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+                                                            {displayGroups.map((group) => (
+                                                                <PermissionGroupMatrix
+                                                                    key={`user-${user._id}-${group.key}`}
+                                                                    variant="card"
+                                                                    group={group}
+                                                                    groups={displayGroups}
+                                                                    permissions={effectivePerms}
+                                                                    baseline={userRole?.permissions}
+                                                                    permissionActions={permissionActions}
+                                                                    lockedViewKeys={userRole?.lockedViewKeys}
+                                                                    expanded={isGroupExpanded(`user-${user._id}`, group.key)}
+                                                                    onToggleExpand={() => toggleGroupAccordion(`user-${user._id}`, group.key)}
+                                                                    onChange={(next) => setUserDrafts((prev) => ({ ...prev, [user._id]: next }))}
+                                                                    disabled={isMe || isUpdating}
+                                                                />
+                                                            ))}
                                                         </div>
+
+                                                        {isUserDirty && (
+                                                            <div className="sticky bottom-4 z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 pl-4 bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 rounded-2xl shadow-lg">
+                                                                <span className="text-xs font-bold text-amber-700 dark:text-amber-400">
+                                                                    You have unsaved permission changes for {user.name}.
+                                                                </span>
+                                                                <div className="flex gap-2">
+                                                                    <button
+                                                                        onClick={() => discardUserDraft(user._id)}
+                                                                        disabled={isUpdating}
+                                                                        className="px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors"
+                                                                    >
+                                                                        Discard
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleSaveUserPermissions(user._id)}
+                                                                        disabled={isUpdating}
+                                                                        className="px-4 py-2 bg-primary-600 text-white rounded-xl text-xs font-bold hover:bg-primary-700 disabled:opacity-60 transition-colors flex items-center gap-1.5"
+                                                                    >
+                                                                        {isUpdating ? (
+                                                                            <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                                                        ) : (
+                                                                            <MdSave size={16} />
+                                                                        )}
+                                                                        {isUpdating ? 'Saving...' : 'Save Permissions'}
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>

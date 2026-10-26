@@ -19,6 +19,7 @@ const MENU_GROUPS = [
             { key: 'master_vendors', label: 'Vendors', description: 'Vendor master records' },
             { key: 'master_products', label: 'Product Master', description: 'Product master records' },
             { key: 'master_bom', label: 'Product BOM Master', description: 'Create, edit and view serial-number-wise BOMs' },
+            { key: 'master_type_tests', label: 'Type Test Register', description: 'Product type test certificates, validity and renewal tracking' },
             { key: 'master_contacts', label: 'Contacts', description: 'Contact management records' },
             { key: 'master_mgrs', label: 'Product MGR Master', description: 'MGR master hierarchy' },
             { key: 'master_divisions', label: 'Division Master', description: 'Division codes used by segments and invoice records' },
@@ -129,6 +130,7 @@ const MENU_GROUPS = [
             { key: 'inventory_transfers', label: 'Stock Transfers', description: 'Inter-warehouse transfers and approvals' },
             { key: 'inventory_adjustments', label: 'Stock Adjustments', description: 'Damage, loss, and physical audit adjustments' },
             { key: 'inventory_stock_counts', label: 'Physical Audit', description: 'Physical count sessions and reconciliation' },
+            { key: 'inventory_sap_audit', label: 'SAP Stock Audit', description: 'Create SAP B1 stock audit batches (people added to a batch open it without this)' },
             { key: 'inventory_alerts', label: 'Stock Alerts', description: 'Low-stock and expiry notification setup' },
             { key: 'inventory_reports', label: 'Valuation & Reports', description: 'Stock ledger, valuation, and dead-stock reports' }
         ]
@@ -257,13 +259,126 @@ const FULL_ACCESS_KEYS = getAllPermissionKeys();
 const LEGACY_PERMISSION_FALLBACKS = {
     csm_rca: 'csm_dashboard',
     master_bom: 'master_products',
+    master_type_tests: 'master_products',
     master_divisions: 'master_mgrs',
-    master_segments: 'master_mgrs'
+    master_segments: 'master_mgrs',
+    inventory_sap_audit: 'inventory_stock_counts'
 };
 
 const getLegacyFallback = (input, key) => {
     const fallbackKey = LEGACY_PERMISSION_FALLBACKS[key];
     return fallbackKey && typeof input[fallbackKey] === 'boolean' ? input[fallbackKey] : undefined;
+};
+
+// ─── Action-level permissions ───────────────────────────────────────────────
+// A screen's own key is its View permission. Create, Modify and Delete are stored
+// next to it as "<key>:create", "<key>:modify" and "<key>:delete".
+const PERMISSION_ACTIONS = ['view', 'create', 'modify', 'delete'];
+
+// Screens that only show information have View alone; screens whose records are
+// never deleted have no Delete. Every screen not listed has all four actions.
+const MODULE_ACTIONS = {
+    dashboard_overview: ['view'],
+    payroll_org_chart: ['view'],
+    payroll_org_chart_full: ['view'],
+    enquiry_analytics: ['view'],
+    sales_dashboard: ['view'],
+    sales_forecasting: ['view'],
+    sales_activities: ['view'],
+    sales_reports: ['view'],
+    sales_analytics: ['view'],
+    sales_revenue_analytics: ['view'],
+    sales_ai_pricing: ['view'],
+    sales_cpq: ['view'],
+    sales_approvals: ['view', 'modify'],
+    reports_main: ['view'],
+    master_serials: ['view', 'create', 'modify'],
+    inventory_dashboard: ['view'],
+    inventory_items: ['view'],
+    inventory_stock_in: ['view'],
+    inventory_stock_out: ['view'],
+    inventory_transfers: ['view', 'create', 'modify'],
+    inventory_adjustments: ['view', 'create', 'modify'],
+    inventory_stock_counts: ['view', 'create', 'modify'],
+    inventory_alerts: ['view', 'modify'],
+    inventory_reports: ['view'],
+    planning_simulations: ['view'],
+    planning_edit_prev_year: ['view'],
+    planning_view_sbu_wise: ['view'],
+    planning_view_segment_wise: ['view'],
+    planning_view_status_breakdown: ['view'],
+    csm_dashboard: ['view'],
+    csm_tickets: ['view', 'create', 'modify'],
+    csm_visits: ['view', 'create', 'modify'],
+    csm_attendance: ['view', 'create'],
+    csm_warranties_amc: ['view', 'create', 'modify'],
+    csm_reports: ['view'],
+    tender_dashboard: ['view'],
+    tender_reports: ['view'],
+    settings_profile: ['view', 'modify'],
+    admin_authorization: ['view'],
+    admin_salespersons: ['view', 'create', 'modify'],
+    // Older per-action flowchart switches, superseded by the actions of flowchart_view
+    flowchart_create: ['view'],
+    flowchart_edit: ['view'],
+    flowchart_delete: ['view']
+};
+
+// Screens a role always sees, whatever is saved (the client applies the same rule).
+const ROLE_LOCKED_VIEW_KEYS = {
+    employee: ['dashboard_overview', 'payroll_org_chart', 'csm_tickets', 'csm_kb', 'settings_profile']
+};
+
+const actionKey = (key, action) => (action === 'view' ? key : `${key}:${action}`);
+
+const getModuleActions = (key) => MODULE_ACTIONS[key] || PERMISSION_ACTIONS;
+
+const uniqueChildKeys = (group) => Array.from(new Set((group.children || []).map((child) => child.key)));
+
+const MODULE_KEYS = Array.from(new Set(MENU_GROUPS.flatMap((group) => (
+    group.children?.length ? uniqueChildKeys(group) : [group.key]
+))));
+
+const getPermissionActionMap = () => MODULE_KEYS.reduce((map, key) => {
+    map[key] = getModuleActions(key);
+    return map;
+}, {});
+
+const getLockedViewKeys = (role) => ROLE_LOCKED_VIEW_KEYS[role] || [];
+
+/**
+ * Adds the Create/Modify/Delete flags of every screen to `permissions`, which
+ * already holds the View values. A flag that was never saved follows the screen's
+ * View value, so roles saved before action-level permissions keep the access they
+ * had. No action is granted on a screen that cannot be viewed.
+ */
+const applyActionPermissions = (permissions, stored = {}) => {
+    MODULE_KEYS.forEach((key) => {
+        getModuleActions(key).forEach((action) => {
+            if (action === 'view') return;
+            const flagKey = actionKey(key, action);
+            const saved = stored[flagKey];
+            permissions[flagKey] = Boolean(permissions[key]) && (typeof saved === 'boolean' ? saved : true);
+        });
+    });
+    return permissions;
+};
+
+/**
+ * True when `permissions` allow `action` on the screen `key`. An action the screen
+ * does not have (deleting a ticket line, say) is decided by Modify, or by View on
+ * a screen that has nothing to modify.
+ */
+const hasPermission = (permissions = {}, key, action = 'view') => {
+    if (!permissions[key]) return false;
+    if (action === 'view') return true;
+
+    const actions = getModuleActions(key);
+    const effectiveAction = actions.includes(action)
+        ? action
+        : actions.includes('modify') ? 'modify' : 'view';
+
+    return effectiveAction === 'view' || permissions[actionKey(key, effectiveAction)] === true;
 };
 
 // Manager: everything except the admin panel
@@ -279,9 +394,10 @@ const DEFAULT_ROLE_PERMISSIONS = {
 /**
  * Validates and normalises a permission input object. Parent-only legacy input
  * grants all children in that section so existing saved roles keep working.
+ * Every action flag comes out explicit.
  */
 const sanitizePermissions = (input = {}) => {
-    return MENU_GROUPS.reduce((permissions, group) => {
+    const permissions = MENU_GROUPS.reduce((permissions, group) => {
         const childKeys = (group.children || []).map((child) => child.key);
         const hasExplicitChildren = childKeys.some((key) => typeof input[key] === 'boolean');
         const legacyParentEnabled = input[group.key] === true && !hasExplicitChildren;
@@ -305,6 +421,8 @@ const sanitizePermissions = (input = {}) => {
 
         return permissions;
     }, {});
+
+    return applyActionPermissions(permissions, input);
 };
 
 /**
@@ -314,8 +432,9 @@ const sanitizePermissions = (input = {}) => {
  */
 const resolvePermissions = (role, storedPermissions = {}) => {
     const defaults = DEFAULT_ROLE_PERMISSIONS[role] || DEFAULT_ROLE_PERMISSIONS.admin;
+    const lockedKeys = new Set(getLockedViewKeys(role));
 
-    return MENU_GROUPS.reduce((permissions, group) => {
+    const permissions = MENU_GROUPS.reduce((permissions, group) => {
         const childKeys = (group.children || []).map((child) => child.key);
         const storedParent = storedPermissions[group.key];
         const hasStoredParent = typeof storedParent === 'boolean';
@@ -326,25 +445,83 @@ const resolvePermissions = (role, storedPermissions = {}) => {
             const stored = storedPermissions[key];
             const hasStoredValue = typeof stored === 'boolean';
             const legacyFallback = getLegacyFallback(storedPermissions, key);
-            const childEnabled = hasStoredValue
+            const childEnabled = lockedKeys.has(key) || (hasStoredValue
                 ? stored
                 : typeof legacyFallback === 'boolean'
                     ? legacyFallback
                     : hasStoredParent && !hasStoredChildren
                     ? storedParent
-                    : Boolean(defaults[key]);
+                    : Boolean(defaults[key]));
 
             permissions[key] = childEnabled;
             if (childEnabled) enabledChildren += 1;
         });
 
-        permissions[group.key] = hasStoredChildren
+        permissions[group.key] = hasStoredChildren || childKeys.some((key) => lockedKeys.has(key))
             ? enabledChildren > 0
             : hasStoredParent
                 ? storedParent
                 : Boolean(defaults[group.key]);
 
         return permissions;
+    }, {});
+
+    return applyActionPermissions(permissions, storedPermissions);
+};
+
+/**
+ * Effective permissions of one user: the role's resolved permissions with the
+ * user's own overrides on top. An override saved before action-level permissions
+ * existed holds only View; its actions then follow that View value, as they did.
+ */
+const mergeUserPermissions = (role, rolePermissions = {}, customPermissions = {}) => {
+    const custom = customPermissions || {};
+    const lockedKeys = new Set(getLockedViewKeys(role));
+    const merged = {};
+
+    MENU_GROUPS.forEach((group) => {
+        const childKeys = group.children?.length ? uniqueChildKeys(group) : [group.key];
+
+        childKeys.forEach((key) => {
+            const hasViewOverride = typeof custom[key] === 'boolean';
+            const view = lockedKeys.has(key) || (hasViewOverride ? custom[key] : Boolean(rolePermissions[key]));
+            merged[key] = view;
+
+            getModuleActions(key).forEach((action) => {
+                if (action === 'view') return;
+                const flagKey = actionKey(key, action);
+                const value = typeof custom[flagKey] === 'boolean'
+                    ? custom[flagKey]
+                    : hasViewOverride ? custom[key] : Boolean(rolePermissions[flagKey]);
+                merged[flagKey] = view && value;
+            });
+        });
+
+        if (group.children?.length) {
+            merged[group.key] = childKeys.some((key) => merged[key]);
+        }
+    });
+
+    return merged;
+};
+
+/**
+ * The overrides to save for a user who should end up with `desired`: every flag
+ * that differs from the role. When View differs, all of that screen's actions are
+ * saved too, so none of them falls back to following the overridden View.
+ */
+const diffUserPermissions = (role, rolePermissions = {}, desired = {}) => {
+    const target = mergeUserPermissions(role, rolePermissions, {});
+    const locked = Object.fromEntries(getLockedViewKeys(role).map((key) => [key, true]));
+    const wanted = sanitizePermissions({ ...desired, ...locked });
+
+    return MODULE_KEYS.reduce((diff, key) => {
+        const flags = getModuleActions(key).map((action) => actionKey(key, action));
+        const viewChanged = wanted[key] !== target[key];
+        flags.forEach((flag) => {
+            if (viewChanged || wanted[flag] !== target[flag]) diff[flag] = wanted[flag];
+        });
+        return diff;
     }, {});
 };
 
@@ -353,6 +530,15 @@ module.exports = {
     ROLE_OPTIONS,
     ROLE_LABELS,
     DEFAULT_ROLE_PERMISSIONS,
+    PERMISSION_ACTIONS,
+    MODULE_KEYS,
+    actionKey,
+    getModuleActions,
+    getPermissionActionMap,
+    getLockedViewKeys,
+    hasPermission,
+    mergeUserPermissions,
+    diffUserPermissions,
     buildPermissions,
     getAllPermissionKeys,
     sanitizePermissions,

@@ -5,12 +5,14 @@ import { toast } from 'react-toastify';
 import { statusService } from '../services/api';
 import Modal from '../components/Modal';
 import PaginationControls from '../components/PaginationControls';
+import usePermission from '../hooks/usePermission';
 
 const LIST_PAGE_SIZE = 20;
 
 const StatusMaster = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
     const { id: routeId } = useParams();
+    const { canCreate, canModify, canDelete } = usePermission('master_statuses');
     const [statuses, setStatuses] = useState([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
@@ -142,13 +144,15 @@ const StatusMaster = ({ isCreatePage, isEditPage }) => {
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Status Master</h1>
                     <p className="text-slate-500 font-medium">Manage statuses for planning and tracking.</p>
                 </div>
-                <button
-                    onClick={() => handleOpenModal()}
-                    className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
-                >
-                    <MdAdd size={20} />
-                    <span>Add Status</span>
-                </button>
+                {canCreate && (
+                    <button
+                        onClick={() => handleOpenModal()}
+                        className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdAdd size={20} />
+                        <span>Add Status</span>
+                    </button>
+                )}
             </div>
 
             <div className="mobile-master-shell bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
@@ -185,20 +189,24 @@ const StatusMaster = ({ isCreatePage, isEditPage }) => {
                                             </td>
                                             <td className="p-4 text-right">
                                                 <div className="flex justify-end gap-2">
-                                                    <button
-                                                        onClick={() => handleOpenModal(status)}
-                                                        className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
-                                                        title="Edit"
-                                                    >
-                                                        <MdEdit size={18} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete(status._id)}
-                                                        className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
-                                                        title="Delete"
-                                                    >
-                                                        <MdDelete size={18} />
-                                                    </button>
+                                                    {canModify && (
+                                                        <button
+                                                            onClick={() => handleOpenModal(status)}
+                                                            className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                                                            title="Edit"
+                                                        >
+                                                            <MdEdit size={18} />
+                                                        </button>
+                                                    )}
+                                                    {canDelete && (
+                                                        <button
+                                                            onClick={() => handleDelete(status._id)}
+                                                            className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                                                            title="Delete"
+                                                        >
+                                                            <MdDelete size={18} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

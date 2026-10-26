@@ -1155,12 +1155,14 @@ const FlowchartCanvas = ({
                                         <p className="text-[11px] text-slate-500 font-medium">
                                             {v.nodes?.length || 0} nodes • {v.edges?.length || 0} connectors
                                         </p>
-                                        <button
-                                            onClick={() => handleRestoreVersion(v.versionId)}
-                                            className="w-full py-1.5 rounded-xl bg-primary-50 hover:bg-primary-100 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300 font-bold text-xs transition-colors"
-                                        >
-                                            Restore Snapshot
-                                        </button>
+                                        {!readOnly && (
+                                            <button
+                                                onClick={() => handleRestoreVersion(v.versionId)}
+                                                className="w-full py-1.5 rounded-xl bg-primary-50 hover:bg-primary-100 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300 font-bold text-xs transition-colors"
+                                            >
+                                                Restore Snapshot
+                                            </button>
+                                        )}
                                     </div>
                                 ))}
                             </div>

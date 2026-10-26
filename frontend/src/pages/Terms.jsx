@@ -6,12 +6,14 @@ import { termsService } from '../services/api';
 import Modal from '../components/Modal';
 import PaginationControls from '../components/PaginationControls';
 import { formatDate } from '../utils/helpers';
+import usePermission from '../hooks/usePermission';
 
 const LIST_PAGE_SIZE = 20;
 
 const Terms = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
     const { id: routeId } = useParams();
+    const { canCreate, canModify, canDelete } = usePermission('master_terms');
     const [templates, setTemplates] = useState([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
@@ -158,13 +160,15 @@ const Terms = ({ isCreatePage, isEditPage }) => {
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Terms & Conditions</h1>
                     <p className="text-slate-500 font-medium">Manage legal templates for reliable quotations.</p>
                 </div>
-                <button
-                    onClick={() => handleOpenModal()}
-                    className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
-                >
-                    <MdAdd size={20} />
-                    <span>New Template</span>
-                </button>
+                {canCreate && (
+                    <button
+                        onClick={() => handleOpenModal()}
+                        className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdAdd size={20} />
+                        <span>New Template</span>
+                    </button>
+                )}
             </div>
 
             {loading ? (
@@ -200,20 +204,24 @@ const Terms = ({ isCreatePage, isEditPage }) => {
                                     {formatDate(t.createdAt)}
                                 </span>
                                 <div className="flex gap-2">
-                                    <button
-                                        onClick={() => handleOpenModal(t)}
-                                        className="p-2 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                        title="Edit Template"
-                                    >
-                                        <MdEdit size={18} />
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(t._id)}
-                                        className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                        title="Delete Template"
-                                    >
-                                        <MdDelete size={18} />
-                                    </button>
+                                    {canModify && (
+                                        <button
+                                            onClick={() => handleOpenModal(t)}
+                                            className="p-2 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                            title="Edit Template"
+                                        >
+                                            <MdEdit size={18} />
+                                        </button>
+                                    )}
+                                    {canDelete && (
+                                        <button
+                                            onClick={() => handleDelete(t._id)}
+                                            className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                            title="Delete Template"
+                                        >
+                                            <MdDelete size={18} />
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>

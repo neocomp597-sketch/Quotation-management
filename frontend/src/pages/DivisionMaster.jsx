@@ -3,6 +3,7 @@ import { toast } from 'react-toastify';
 import { MdAdd, MdEdit, MdDelete } from 'react-icons/md';
 import Modal from '../components/Modal';
 import { divisionService } from '../services/api';
+import usePermission from '../hooks/usePermission';
 
 const EMPTY_FORM = { code: '', description: '', status: 'Active' };
 
@@ -12,6 +13,7 @@ const labelClass = 'block text-[10px] font-black uppercase tracking-widest text-
 // Division Master: Division Code + Description + Status. Segments and Invoice Bulk Upload
 // records reference a division; the code is what Excel files carry.
 const DivisionMaster = () => {
+    const { canCreate, canModify, canDelete } = usePermission('master_divisions');
     const [divisions, setDivisions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -90,13 +92,15 @@ const DivisionMaster = () => {
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Division Master</h1>
                     <p className="text-slate-500 font-medium">Division codes used by the Segment Master and Invoice Bulk Upload.</p>
                 </div>
-                <button
-                    onClick={() => openModal()}
-                    className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
-                >
-                    <MdAdd size={20} />
-                    <span>Add Division</span>
-                </button>
+                {canCreate && (
+                    <button
+                        onClick={() => openModal()}
+                        className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                    >
+                        <MdAdd size={20} />
+                        <span>Add Division</span>
+                    </button>
+                )}
             </div>
 
             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
@@ -125,6 +129,7 @@ const DivisionMaster = () => {
                                             <td className="p-4 text-center">
                                                 <button
                                                     onClick={() => toggleStatus(division)}
+                                                    disabled={!canModify}
                                                     className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm border ${division.status === 'Active'
                                                         ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
                                                         : 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100'}`}
@@ -134,12 +139,16 @@ const DivisionMaster = () => {
                                             </td>
                                             <td className="p-4 text-right">
                                                 <div className="flex justify-end gap-2">
-                                                    <button onClick={() => openModal(division)} className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all" title="Edit">
-                                                        <MdEdit size={18} />
-                                                    </button>
-                                                    <button onClick={() => handleDelete(division)} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all" title="Delete">
-                                                        <MdDelete size={18} />
-                                                    </button>
+                                                    {canModify && (
+                                                        <button onClick={() => openModal(division)} className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all" title="Edit">
+                                                            <MdEdit size={18} />
+                                                        </button>
+                                                    )}
+                                                    {canDelete && (
+                                                        <button onClick={() => handleDelete(division)} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all" title="Delete">
+                                                            <MdDelete size={18} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

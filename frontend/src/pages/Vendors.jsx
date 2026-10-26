@@ -4,10 +4,11 @@ import { MdAdd, MdDelete, MdEdit, MdSearch, MdStorefront, MdFileDownload, MdFile
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import Modal from '../components/Modal';
-import ImportModal from '../components/ImportModal';
+import ImportWizard from '../components/import/ImportWizard';
 import PaginationControls from '../components/PaginationControls';
 import { vendorService, importService } from '../services/api';
 import { isValidGSTIN, isValidMobile } from '../utils/validation';
+import usePermission from '../hooks/usePermission';
 
 const LIST_PAGE_SIZE = 20;
 
@@ -27,6 +28,7 @@ const defaultForm = {
 const Vendors = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
     const { id: routeId } = useParams();
+    const { canCreate, canModify, canDelete } = usePermission('master_vendors');
     const [vendors, setVendors] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -253,20 +255,24 @@ const Vendors = ({ isCreatePage, isEditPage }) => {
                         <MdFileDownload size={20} />
                         <span>Export</span>
                     </button>
-                    <button
-                        onClick={() => setIsImportModalOpen(true)}
-                        className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-emerald-600/20 uppercase text-xs tracking-widest active:scale-95"
-                    >
-                        <MdFileUpload size={20} />
-                        <span>Import</span>
-                    </button>
-                    <button
-                        onClick={() => openModal()}
-                        className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
-                    >
-                        <MdAdd size={20} />
-                        <span>Add Vendor</span>
-                    </button>
+                    {canCreate && (
+                        <>
+                            <button
+                                onClick={() => setIsImportModalOpen(true)}
+                                className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-emerald-600/20 uppercase text-xs tracking-widest active:scale-95"
+                            >
+                                <MdFileUpload size={20} />
+                                <span>Import</span>
+                            </button>
+                            <button
+                                onClick={() => openModal()}
+                                className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                            >
+                                <MdAdd size={20} />
+                                <span>Add Vendor</span>
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -343,20 +349,24 @@ const Vendors = ({ isCreatePage, isEditPage }) => {
                                         </td>
                                         <td className="px-8 py-5 text-right">
                                             <div className="flex items-center justify-end gap-2">
-                                                <button
-                                                    onClick={() => openModal(vendor)}
-                                                    className="p-2.5 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                    title="Edit Vendor"
-                                                >
-                                                    <MdEdit size={18} />
-                                                </button>
-                                                <button
-                                                    onClick={() => onDelete(vendor._id)}
-                                                    className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                                                    title="Delete Vendor"
-                                                >
-                                                    <MdDelete size={18} />
-                                                </button>
+                                                {canModify && (
+                                                    <button
+                                                        onClick={() => openModal(vendor)}
+                                                        className="p-2.5 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                        title="Edit Vendor"
+                                                    >
+                                                        <MdEdit size={18} />
+                                                    </button>
+                                                )}
+                                                {canDelete && (
+                                                    <button
+                                                        onClick={() => onDelete(vendor._id)}
+                                                        className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                        title="Delete Vendor"
+                                                    >
+                                                        <MdDelete size={18} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -524,16 +534,13 @@ const Vendors = ({ isCreatePage, isEditPage }) => {
             )}
 
             {/* Import Modal */}
-            <ImportModal
+            <ImportWizard
                 isOpen={isImportModalOpen}
                 onClose={() => setIsImportModalOpen(false)}
                 title="Import Vendors"
-                onImport={async (file) => {
-                    const result = await importService.importVendors(file);
-                    fetchVendors();
-                    return result;
-                }}
+                module="vendors"
                 onDownloadTemplate={importService.getVendorTemplate}
+                onImported={fetchVendors}
             />
         </div>
     );

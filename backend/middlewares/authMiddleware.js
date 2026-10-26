@@ -3,6 +3,7 @@ const User = require('../models/User');
 const { getRedis } = require('../config/redis');
 const { getCachedJson, setCachedJson } = require('../utils/apiCache');
 const { runWithTenant } = require('./tenantContext');
+const { enforceApiPermission } = require('./permissionMiddleware');
 const {
     normalizeBranchId,
     canUseBranch,
@@ -82,7 +83,8 @@ exports.protect = async (req, res, next) => {
                 return res.status(401).json({ message: 'Not authorized, user not found' });
             }
 
-            if (typeof decoded.tokenVersion === 'number' && decoded.tokenVersion !== user.tokenVersion) {
+            // Lean reads skip schema defaults, so a user saved without tokenVersion counts as 0.
+            if (typeof decoded.tokenVersion === 'number' && decoded.tokenVersion !== (user.tokenVersion || 0)) {
                 return res.status(401).json({ message: 'Not authorized, token revoked' });
             }
 
@@ -183,7 +185,9 @@ exports.protect = async (req, res, next) => {
                 branchIds = assignedBranchIds;
             }
 
-            runWithTenant(req.user.companyId, () => next(), {
+            // Screen-level permissions (View/Create/Modify/Delete) are checked last,
+            // inside the tenant context, for every protected route.
+            runWithTenant(req.user.companyId, () => enforceApiPermission(req, res, next), {
                 bypassTenant: isSuperAdmin,
                 bypassBranch: isSuperAdmin && isPlatformAdminRequest(req),
                 branchScoped,

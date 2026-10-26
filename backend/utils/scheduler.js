@@ -6,6 +6,7 @@ const Quotation = require('../models/Quotation');
 const User = require('../models/User');
 const AuditLog = require('../models/AuditLog');
 const { createCompanyNotifications } = require('./notificationHelper');
+const { checkTypeTestReminders } = require('./typeTestReminders');
 const { formatDate, formatDateTime } = require('./dateFormat');
 const { runWithTenant } = require('../middlewares/tenantContext');
 const { closeBullMq, createWorker, getQueue, getQueueEvents } = require('../config/bullmq');
@@ -286,6 +287,7 @@ const runScheduledTasks = async () => {
     await checkMeetingReminders();
     await autoCompleteMeetings();
     await autoExpireQuotations();
+    await checkTypeTestReminders();
 };
 
 const FOLLOW_UP_QUEUE = 'follow-up-notifications';
@@ -378,4 +380,5 @@ exports.checkFollowUps = checkFollowUps;
 exports.checkMeetingReminders = checkMeetingReminders;
 exports.autoCompleteMeetings = autoCompleteMeetings;
 exports.autoExpireQuotations = autoExpireQuotations;
+exports.checkTypeTestReminders = checkTypeTestReminders;
 exports.runScheduledTasks = runScheduledTasks;

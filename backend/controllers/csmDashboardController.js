@@ -31,10 +31,25 @@ exports.getStats = async (req, res) => {
         const startOfToday = new Date();
         startOfToday.setHours(0, 0, 0, 0);
 
+        // Tickets raised today (any status), same day boundary as the Resolved cards.
+        const createdTodayCount = await Ticket.countDocuments({
+            ...baseScope,
+            createdAt: { $gte: startOfToday }
+        });
+
         const resolvedTodayCount = await Ticket.countDocuments({
             ...baseScope,
             status: 'Resolved',
             resolvedAt: { $gte: startOfToday }
+        });
+
+        // Resolved yesterday, including tickets that have since been closed.
+        const startOfYesterday = new Date(startOfToday);
+        startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+        const resolvedYesterdayCount = await Ticket.countDocuments({
+            ...baseScope,
+            status: { $in: ['Resolved', 'Closed'] },
+            resolvedAt: { $gte: startOfYesterday, $lt: startOfToday }
         });
 
         // Overdue tickets (any unresolved ticket past resolution due time)
@@ -152,9 +167,11 @@ exports.getStats = async (req, res) => {
             metrics: {
                 open: openCount + assignedCount + inProgressCount,
                 unassigned: unassignedCount,
+                createdToday: createdTodayCount,
                 pending: pendingCount,
                 overdue: overdueCount,
                 resolvedToday: resolvedTodayCount,
+                resolvedYesterday: resolvedYesterdayCount,
                 fcrRate
             },
             statusBreakdown: statusBreakdown.map(item => ({ name: item._id, value: item.count })),

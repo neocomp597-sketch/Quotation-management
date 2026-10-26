@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
     MdAdd, MdSearch, MdEdit, MdDelete, MdBusiness, 
@@ -10,10 +10,12 @@ import Modal from '../components/Modal';
 import CascadingLocationSelector from '../components/CascadingLocationSelector';
 import { isValidGSTIN, isValidMobile, isValidPincode } from '../utils/validation';
 import { resolveImageUrl } from '../utils/helpers';
+import usePermission from '../hooks/usePermission';
 
 const BranchMaster = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
     const { id: routeId } = useParams();
+    const { canCreate, canModify, canDelete } = usePermission('master_branches');
     const [branches, setBranches] = useState([]);
     const [stateList, setStateList] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -23,6 +25,9 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingBranch, setEditingBranch] = useState(null);
     const [submitting, setSubmitting] = useState(false);
+    // The disabled button only takes effect after a re-render, so a quick double
+    // click could still send two create requests; this ref blocks the second one.
+    const submittingRef = useRef(false);
 
     const initialFormState = {
         name: '',
@@ -147,8 +152,9 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
-        if (!formData.name || !formData.code || !formData.branchPrefix) {
+        if (submittingRef.current) return;
+
+        if (!formData.name.trim() || !formData.code.trim() || !formData.branchPrefix.trim()) {
             toast.error('Branch Name, Code, and Prefix are required!');
             return;
         }
@@ -166,6 +172,7 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
             return;
         }
 
+        submittingRef.current = true;
         setSubmitting(true);
         try {
             if (editingBranch) {
@@ -180,6 +187,7 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
         } catch (err) {
             toast.error(err.response?.data?.message || 'Error saving branch');
         } finally {
+            submittingRef.current = false;
             setSubmitting(false);
         }
     };
@@ -226,13 +234,15 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                     </div>
                 </div>
 
-                <button
-                    onClick={() => handleOpenModal()}
-                    className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-2xl shadow-lg shadow-primary-600/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                >
-                    <MdAdd size={20} />
-                    <span>Add New Branch</span>
-                </button>
+                {canCreate && (
+                    <button
+                        onClick={() => handleOpenModal()}
+                        className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-2xl shadow-lg shadow-primary-600/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                        <MdAdd size={20} />
+                        <span>Add New Branch</span>
+                    </button>
+                )}
             </div>
 
             {/* Search and Filters Bar */}
@@ -261,9 +271,11 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                 <div className="py-16 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800">
                     <MdBusiness size={48} className="mx-auto text-slate-300 dark:text-slate-700 mb-3" />
                     <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">No Branches Found</h3>
-                    <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-                        Get started by clicking "Add New Branch" above to setup your office branches.
-                    </p>
+                    {canCreate && (
+                        <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                            Get started by clicking "Add New Branch" above to setup your office branches.
+                        </p>
+                    )}
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -361,20 +373,24 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                             </div>
 
                             <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
-                                <button
-                                    onClick={() => handleOpenModal(branch)}
-                                    className="p-2 text-slate-600 hover:text-primary-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
-                                    title="Edit Branch"
-                                >
-                                    <MdEdit size={18} />
-                                </button>
-                                <button
-                                    onClick={() => handleDelete(branch._id, branch.name)}
-                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-colors"
-                                    title="Delete Branch"
-                                >
-                                    <MdDelete size={18} />
-                                </button>
+                                {canModify && (
+                                    <button
+                                        onClick={() => handleOpenModal(branch)}
+                                        className="p-2 text-slate-600 hover:text-primary-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+                                        title="Edit Branch"
+                                    >
+                                        <MdEdit size={18} />
+                                    </button>
+                                )}
+                                {canDelete && (
+                                    <button
+                                        onClick={() => handleDelete(branch._id, branch.name)}
+                                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-colors"
+                                        title="Delete Branch"
+                                    >
+                                        <MdDelete size={18} />
+                                    </button>
+                                )}
                             </div>
                         </div>
                     ))}

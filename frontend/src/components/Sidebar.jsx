@@ -44,6 +44,7 @@ import {
     MdCompareArrows,
     MdTune,
     MdFactCheck,
+    MdPlaylistAddCheck,
     MdNotificationsActive,
     MdList,
     MdSecurity,
@@ -54,8 +55,11 @@ import {
     MdSwapHoriz,
 } from 'react-icons/md';
 import { useAuth } from '../context/AuthContext';
-import { companySettingsService } from '../services/api';
+import { companySettingsService, stockAuditService } from '../services/api';
 import { resolveImageUrl } from '../utils/helpers';
+
+// Whether the signed-in user has been added to any stock audit batch, kept across remounts.
+let auditBatchesCache = { userKey: null, has: false };
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
     const location = useLocation();
@@ -63,6 +67,23 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 
     const [expanded, setExpanded] = useState({});
     const [brandSettings, setBrandSettings] = useState(null);
+
+    // People added to a stock audit batch see SAP Stock Audit without the permission to create batches.
+    const userKey = user?._id || user?.id || user?.email || null;
+    const canCreateAudits = hasAccess('inventory_sap_audit');
+    const [auditBatches, setAuditBatches] = useState(auditBatchesCache);
+    const hasAuditBatches = auditBatches.userKey === userKey && auditBatches.has;
+    useEffect(() => {
+        if (!userKey || canCreateAudits) return undefined;
+        let cancelled = false;
+        stockAuditService.getAssignedCount()
+            .then(res => {
+                auditBatchesCache = { userKey, has: (res.data?.count || 0) > 0 };
+                if (!cancelled) setAuditBatches(auditBatchesCache);
+            })
+            .catch(() => {});
+        return () => { cancelled = true; };
+    }, [userKey, canCreateAudits]);
 
     useEffect(() => {
         const fetchBranding = async () => {
@@ -130,7 +151,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             children: [
                 { key: 'master_attributes', name: 'Attributes', icon: <MdAssignment size={18} />, path: '/attributes' },
                 { key: 'master_branches', name: 'Branch Master', icon: <MdBusiness size={18} />, path: '/branches' },
-                { key: 'master_branches', name: 'City Master', icon: <MdLocationCity size={18} />, path: '/city-master' },
+                { key: 'city_master', name: 'City Master', icon: <MdLocationCity size={18} />, path: '/city-master' },
                 { key: 'master_contacts', name: 'Contacts', icon: <MdContactPhone size={18} />, path: '/contacts' },
                 { key: 'master_customers', name: 'Customers', icon: <MdPeople size={18} />, path: '/customers' },
                 { key: 'sales_deals', name: 'Deals', icon: <MdViewKanban size={18} />, path: '/sales/deals' },
@@ -145,9 +166,10 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'master_products', name: 'Product Master', icon: <MdInventory size={18} />, path: '/products' },
                 { key: 'master_mgrs', name: 'Product MGR Master', icon: <MdCategory size={18} />, path: '/mgrs' },
                 { key: 'master_segments', name: 'Segment Master', icon: <MdCategory size={18} />, path: '/segments' },
-                { key: 'master_branches', name: 'State Master', icon: <MdMap size={18} />, path: '/state-master' },
+                { key: 'state_master_create', name: 'State Master', icon: <MdMap size={18} />, path: '/state-master' },
                 { key: 'master_statuses', name: 'Status Master', icon: <MdBarChart size={18} />, path: '/status-master', adminOnly: true },
                 { key: 'master_terms', name: 'Terms & Conditions', icon: <MdDescription size={18} />, path: '/terms' },
+                { key: 'master_type_tests', name: 'Type Test Register', icon: <MdFactCheck size={18} />, path: '/type-tests' },
                 { key: 'master_territories', name: 'Territory Master', icon: <MdMap size={18} />, path: '/territory-master' },
                 { key: 'master_vendors', name: 'Vendors', icon: <MdStorefront size={18} />, path: '/vendors' },
             ]
@@ -251,6 +273,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'inventory_transfers', name: 'Stock Transfers', icon: <MdCompareArrows size={18} />, path: '/inventory/transfers' },
                 { key: 'inventory_adjustments', name: 'Adjustments', icon: <MdTune size={18} />, path: '/inventory/adjustments' },
                 { key: 'inventory_stock_counts', name: 'Physical Audit', icon: <MdFactCheck size={18} />, path: '/inventory/counts' },
+                { key: 'inventory_sap_audit', name: 'SAP Stock Audit', icon: <MdPlaylistAddCheck size={18} />, path: '/inventory/stock-audit', alsoForAuditMembers: true },
                 { key: 'inventory_alerts', name: 'Stock Alerts', icon: <MdNotificationsActive size={18} />, path: '/inventory/alerts' },
                 { key: 'inventory_reports', name: 'Valuation & Reports', icon: <MdAssessment size={18} />, path: '/inventory/reports' },
             ]
@@ -353,6 +376,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 children: item.children
                     .filter((child) => {
                         if (child.superAdminOnly) return isSuperAdmin;
+                        if (child.alsoForAuditMembers && hasAuditBatches) return true;
                         return child.adminOnly ? (isAdmin || isSuperAdmin) : hasAccess(child.key);
                     })
                     .sort((a, b) => (a.sortName || a.name).localeCompare(b.sortName || b.name, 'en', { sensitivity: 'base' })),
@@ -364,7 +388,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             }
             return item.children.length > 0 || hasAccess(item.key);
         });
-    }, [user, menuStructure, isSuperAdmin, isAdmin, hasAccess]);
+    }, [user, menuStructure, isSuperAdmin, isAdmin, hasAccess, hasAuditBatches]);
 
     const getAutoExpanded = (key, children) => {
         if (expanded[key] !== undefined) return expanded[key];

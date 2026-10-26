@@ -4,13 +4,15 @@ import { MdAdd, MdEdit, MdDelete, MdArrowBack, MdFileUpload } from 'react-icons/
 import { toast } from 'react-toastify';
 import { mgrService, attributeService, importService } from '../services/api';
 import Modal from '../components/Modal';
-import ImportModal from '../components/ImportModal';
+import ImportWizard from '../components/import/ImportWizard';
+import usePermission from '../hooks/usePermission';
 
 import { useNavigate, useParams } from 'react-router-dom';
 
 const Attributes = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
     const { id: routeId } = useParams();
+    const { canCreate, canModify, canDelete } = usePermission('master_attributes');
     const [mgr3s, setMgr3s] = useState([]);
     const [selectedMgr3, setSelectedMgr3] = useState('');
     const [attributes, setAttributes] = useState([]);
@@ -169,23 +171,25 @@ const Attributes = ({ isCreatePage, isEditPage }) => {
                         <p className="text-slate-500 font-medium">Manage attributes for MGR3 categories.</p>
                     </div>
                 </div>
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => setIsImportModalOpen(true)}
-                        className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-indigo-600/20 uppercase text-xs tracking-widest active:scale-95"
-                    >
-                        <MdFileUpload size={20} />
-                        <span>Upload</span>
-                    </button>
-                    <button
-                        onClick={() => handleOpenModal()}
-                        disabled={!selectedMgr3}
-                        className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:bg-slate-300 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
-                    >
-                        <MdAdd size={20} />
-                        <span>Add Attribute</span>
-                    </button>
-                </div>
+                {canCreate && (
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setIsImportModalOpen(true)}
+                            className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-indigo-600/20 uppercase text-xs tracking-widest active:scale-95"
+                        >
+                            <MdFileUpload size={20} />
+                            <span>Upload</span>
+                        </button>
+                        <button
+                            onClick={() => handleOpenModal()}
+                            disabled={!selectedMgr3}
+                            className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:bg-slate-300 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                        >
+                            <MdAdd size={20} />
+                            <span>Add Attribute</span>
+                        </button>
+                    </div>
+                )}
             </div>
 
 
@@ -258,18 +262,22 @@ const Attributes = ({ isCreatePage, isEditPage }) => {
                                             </td>
                                             <td className="p-4 text-right">
                                                 <div className="flex justify-end gap-2">
-                                                    <button
-                                                        onClick={() => handleOpenModal(attr)}
-                                                        className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
-                                                    >
-                                                        <MdEdit size={18} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete(attr._id)}
-                                                        className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
-                                                    >
-                                                        <MdDelete size={18} />
-                                                    </button>
+                                                    {canModify && (
+                                                        <button
+                                                            onClick={() => handleOpenModal(attr)}
+                                                            className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                                                        >
+                                                            <MdEdit size={18} />
+                                                        </button>
+                                                    )}
+                                                    {canDelete && (
+                                                        <button
+                                                            onClick={() => handleDelete(attr._id)}
+                                                            className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                                                        >
+                                                            <MdDelete size={18} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -375,19 +383,16 @@ const Attributes = ({ isCreatePage, isEditPage }) => {
                 </div>
             )}
 
-            <ImportModal
+            <ImportWizard
                 isOpen={isImportModalOpen}
                 onClose={() => setIsImportModalOpen(false)}
                 title="Import Attributes Master"
-                type="attribute-master"
-                onImport={async (file) => {
-                    const result = await importService.importAttributeMaster(file, selectedMgr3);
-                    if (selectedMgr3) {
-                        fetchAttributes();
-                    }
-                    return result;
-                }}
+                module="attribute-master"
+                params={{ mgr3Id: selectedMgr3 || undefined }}
                 onDownloadTemplate={importService.getAttributeMasterTemplate}
+                onImported={() => {
+                    if (selectedMgr3) fetchAttributes();
+                }}
             />
 
         </div>

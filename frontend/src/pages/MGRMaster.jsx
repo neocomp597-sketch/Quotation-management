@@ -6,6 +6,7 @@ import Modal from '../components/Modal';
 import PaginationControls from '../components/PaginationControls';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import usePermission from '../hooks/usePermission';
 
 const LIST_PAGE_SIZE = 20;
 
@@ -13,6 +14,7 @@ const MGRMaster = ({ isCreatePage = false, isEditPage = false }) => {
     const navigate = useNavigate();
     const { id } = useParams();
     const { isAdmin, isSuperAdmin } = useAuth();
+    const { canCreate, canModify, canDelete } = usePermission('master_mgrs');
     const [mgrs, setMgrs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('MGR1');
@@ -262,13 +264,15 @@ const MGRMaster = ({ isCreatePage = false, isEditPage = false }) => {
                     >
                         <span>Attributes</span>
                     </button>
-                    <button
-                        onClick={() => handleOpenModal()}
-                        className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
-                    >
-                        <MdAdd size={20} />
-                        <span>Add {activeTab}</span>
-                    </button>
+                    {canCreate && (
+                        <button
+                            onClick={() => handleOpenModal()}
+                            className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                        >
+                            <MdAdd size={20} />
+                            <span>Add {activeTab}</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -325,6 +329,7 @@ const MGRMaster = ({ isCreatePage = false, isEditPage = false }) => {
                                             <td className="p-4 text-center">
                                                 <button
                                                     onClick={() => toggleStatus(mgr)}
+                                                    disabled={!canModify}
                                                     className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm border ${mgr.status === 'Active'
                                                             ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
                                                             : 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100'
@@ -335,20 +340,24 @@ const MGRMaster = ({ isCreatePage = false, isEditPage = false }) => {
                                             </td>
                                             <td className="p-4 text-right">
                                                 <div className="flex justify-end gap-2">
-                                                    <button
-                                                        onClick={() => handleOpenModal(mgr)}
-                                                        className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
-                                                        title="Edit"
-                                                    >
-                                                        <MdEdit size={18} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete(mgr._id)}
-                                                        className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
-                                                        title="Delete"
-                                                    >
-                                                        <MdDelete size={18} />
-                                                    </button>
+                                                    {canModify && (
+                                                        <button
+                                                            onClick={() => handleOpenModal(mgr)}
+                                                            className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                                                            title="Edit"
+                                                        >
+                                                            <MdEdit size={18} />
+                                                        </button>
+                                                    )}
+                                                    {canDelete && (
+                                                        <button
+                                                            onClick={() => handleDelete(mgr._id)}
+                                                            className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                                                            title="Delete"
+                                                        >
+                                                            <MdDelete size={18} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -582,7 +591,7 @@ const MGRMaster = ({ isCreatePage = false, isEditPage = false }) => {
                                 <div className="whitespace-pre-wrap font-medium bg-slate-50 p-4 rounded-2xl border border-slate-100 text-slate-800 leading-relaxed">
                                     {infoText}
                                 </div>
-                                {(isAdmin || isSuperAdmin) && (
+                                {(isAdmin || isSuperAdmin) && canModify && (
                                     <div className="flex justify-end pt-2">
                                         <button
                                             type="button"

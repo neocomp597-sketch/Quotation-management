@@ -10,6 +10,7 @@ import { territoryService, userService, mgrService, csmService } from '../servic
 import Modal from '../components/Modal';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
 import { isValidPincode } from '../utils/validation';
+import usePermission from '../hooks/usePermission';
 
 const TERRITORY_TYPE_OPTIONS = ['Country', 'Zone', 'State', 'City', 'Area', 'Custom'];
 const TERRITORY_LOAD_TOAST_ID = 'territory-master-territories-load-error';
@@ -18,6 +19,7 @@ const USER_LOAD_TOAST_ID = 'territory-master-users-load-error';
 const TerritoryMaster = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
     const { id: routeId } = useParams();
+    const { canCreate, canModify, canDelete } = usePermission('master_territories');
     const [territories, setTerritories] = useState([]);
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -331,20 +333,24 @@ const TerritoryMaster = ({ isCreatePage, isEditPage }) => {
                                     </div>
                                 </div>
                                 <div className="flex gap-1.5 opacity-0 group-hover/node:opacity-100 transition-opacity">
-                                    <button 
-                                        onClick={() => handleOpenModal(node)}
-                                        className="p-2 bg-white border border-slate-100 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm"
-                                        title="Edit Territory"
-                                    >
-                                        <MdEdit size={16} />
-                                    </button>
-                                    <button 
-                                        onClick={() => handleDelete(node)}
-                                        className="p-2 bg-white border border-slate-100 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm"
-                                        title="Delete Territory"
-                                    >
-                                        <MdDelete size={16} />
-                                    </button>
+                                    {canModify && (
+                                        <button
+                                            onClick={() => handleOpenModal(node)}
+                                            className="p-2 bg-white border border-slate-100 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm"
+                                            title="Edit Territory"
+                                        >
+                                            <MdEdit size={16} />
+                                        </button>
+                                    )}
+                                    {canDelete && (
+                                        <button
+                                            onClick={() => handleDelete(node)}
+                                            className="p-2 bg-white border border-slate-100 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm"
+                                            title="Delete Territory"
+                                        >
+                                            <MdDelete size={16} />
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                             {hasChildren && isExpanded && renderTreeNodes(node._id, depth + 1)}
@@ -364,13 +370,15 @@ const TerritoryMaster = ({ isCreatePage, isEditPage }) => {
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Territory Master</h1>
                     <p className="text-slate-500 font-medium">Organize sales zones, map reps, and configure automatic customer tagging.</p>
                 </div>
-                <button
-                    onClick={() => handleOpenModal()}
-                    className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3.5 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95 shrink-0"
-                >
-                    <MdAdd size={20} />
-                    <span>Create Territory</span>
-                </button>
+                {canCreate && (
+                    <button
+                        onClick={() => handleOpenModal()}
+                        className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3.5 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95 shrink-0"
+                    >
+                        <MdAdd size={20} />
+                        <span>Create Territory</span>
+                    </button>
+                )}
             </div>
 
             {loading ? (
@@ -389,7 +397,7 @@ const TerritoryMaster = ({ isCreatePage, isEditPage }) => {
                             </h2>
                             {territories.length === 0 ? (
                                 <div className="p-10 text-center text-slate-400 font-bold border-2 border-dashed border-slate-100 rounded-2xl">
-                                    No territories configured. Get started by creating your first zone!
+                                    No territories configured.{canCreate && ' Get started by creating your first zone!'}
                                 </div>
                             ) : (
                                 <div className="space-y-3">

@@ -5,7 +5,6 @@ const User = require('../models/User');
 const Company = require('../models/Company');
 const Branch = require('../models/Branch');
 const { getRedis } = require('../config/redis');
-const { enqueueLegacyRefreshSession } = require('../queues/authSessionQueue');
 const { isSuperAdminRole, invalidateAuthUserCache } = require('../middlewares/authMiddleware');
 const {
     BRANCH_SUMMARY_FIELDS,
@@ -19,6 +18,8 @@ const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || '20m';
 const REFRESH_TOKEN_DAYS = Number(process.env.REFRESH_TOKEN_DAYS || 30);
 const REFRESH_TOKEN_SECONDS = REFRESH_TOKEN_DAYS * 24 * 60 * 60;
 const REFRESH_COOKIE_NAME = 'refreshToken';
+// Devices a user can stay signed in on at once; the oldest session is dropped beyond this.
+const MAX_DEVICE_SESSIONS = Number(process.env.MAX_DEVICE_SESSIONS || 10);
 const DEVICE_COOKIE_NAME = 'deviceId';
 
 const getJwtSecret = () => process.env.JWT_SECRET || 'secret123';
@@ -210,31 +211,34 @@ const storeRefreshSession = async (user, deviceId, refreshToken) => {
     });
 
     if (redis) {
-        await redis.set(refreshKey(user._id, deviceId), payload, { EX: REFRESH_TOKEN_SECONDS });
-        await redis.sAdd(sessionSetKey(user._id), deviceId);
-        await redis.expire(sessionSetKey(user._id), REFRESH_TOKEN_SECONDS);
-        let queued = false;
         try {
-            queued = await enqueueLegacyRefreshSession({
-                userId: user._id.toString(),
-                tokenHash,
-                expiresAt: expiresAt.toISOString(),
-            });
+            await redis.set(refreshKey(user._id, deviceId), payload, { EX: REFRESH_TOKEN_SECONDS });
+            await redis.sAdd(sessionSetKey(user._id), deviceId);
+            await redis.expire(sessionSetKey(user._id), REFRESH_TOKEN_SECONDS);
         } catch (error) {
-            console.error('Failed to enqueue legacy refresh session persistence:', error.message);
+            console.error('Failed to store refresh session in Redis:', error.message);
         }
-        if (!queued) {
-            await User.findByIdAndUpdate(user._id, {
-                refreshTokenHash: tokenHash,
-                refreshTokenExpiresAt: expiresAt,
-            });
-        }
-        return;
     }
 
-    user.refreshTokenHash = tokenHash;
-    user.refreshTokenExpiresAt = expiresAt;
-    await user.save();
+    // The database copy is the source of truth: it survives a Redis restart and works
+    // without Redis. Replace this device's entry, drop expired ones, keep the newest few.
+    await User.updateOne(
+        { _id: user._id },
+        { $pull: { refreshSessions: { $or: [{ deviceId }, { expiresAt: { $lt: new Date() } }] } } }
+    );
+    await User.updateOne(
+        { _id: user._id },
+        { $push: { refreshSessions: { $each: [{ deviceId, tokenHash, expiresAt, createdAt: new Date() }], $slice: -MAX_DEVICE_SESSIONS } } }
+    );
+};
+
+/** True when the database holds this refresh token for this device and it has not expired. */
+const hasStoredRefreshSession = async (userId, deviceId, tokenHash) => {
+    const user = await User.findOne({
+        _id: userId,
+        refreshSessions: { $elemMatch: { deviceId, tokenHash, expiresAt: { $gt: new Date() } } }
+    }).select('_id').lean();
+    return Boolean(user);
 };
 
 const loadRefreshSession = async (userId, deviceId) => {
@@ -377,19 +381,29 @@ exports.refresh = async (req, res) => {
             return res.status(401).json({ message: 'Refresh token missing' });
         }
 
-        const decoded = jwt.verify(refreshToken, getRefreshSecret());
+        let decoded;
+        try {
+            decoded = jwt.verify(refreshToken, getRefreshSecret());
+        } catch {
+            clearRefreshCookie(res, req);
+            return res.status(401).json({ message: 'Refresh token invalid' });
+        }
+
         const user = await User.findById(decoded.id)
             .populate(BRANCH_POPULATE);
         const deviceId = getDeviceId(req, decoded);
-        const redisSession = await loadRefreshSession(decoded.id, deviceId);
-        const hasValidRedisSession = redisSession?.tokenHash === hashToken(refreshToken);
-        const hasLegacySession = user?.refreshTokenHash === hashToken(refreshToken);
+        const tokenHash = hashToken(refreshToken);
+        const redisSession = await loadRefreshSession(decoded.id, deviceId).catch(() => null);
+        const hasValidSession =
+            redisSession?.tokenHash === tokenHash ||
+            (user && await hasStoredRefreshSession(user._id, deviceId, tokenHash)) ||
+            // Sessions issued before per-device storage, kept until they expire.
+            (user?.refreshTokenHash === tokenHash && !(user.refreshTokenExpiresAt && user.refreshTokenExpiresAt < new Date()));
 
         if (
             !user ||
-            (!hasValidRedisSession && !hasLegacySession) ||
-            user.tokenVersion !== decoded.tokenVersion ||
-            (user.refreshTokenExpiresAt && user.refreshTokenExpiresAt < new Date())
+            !hasValidSession ||
+            (user.tokenVersion || 0) !== (decoded.tokenVersion || 0)
         ) {
             clearRefreshCookie(res, req);
             return res.status(401).json({ message: 'Refresh token invalid' });
@@ -412,8 +426,10 @@ exports.refresh = async (req, res) => {
             user: await buildSessionUser(user),
         });
     } catch (error) {
-        clearRefreshCookie(res, req);
-        res.status(401).json({ message: 'Refresh token invalid' });
+        // A database / Redis hiccup is not a bad token: keep the cookie so the next
+        // attempt can succeed instead of signing the user out.
+        console.error('Refresh error:', error.message);
+        res.status(503).json({ message: 'Session refresh temporarily unavailable' });
     }
 };
 
@@ -431,14 +447,11 @@ exports.logout = async (req, res) => {
                 decoded = null;
             }
 
-            const user = decoded
-                ? await User.findById(decoded.id)
-                : await User.findOne({ refreshTokenHash: hashToken(refreshToken) });
-            if (user) {
-                user.refreshTokenHash = undefined;
-                user.refreshTokenExpiresAt = undefined;
-                await user.save();
-            }
+            // Sign out this device only; other devices keep their sessions.
+            const tokenHash = hashToken(refreshToken);
+            const userFilter = decoded ? { _id: decoded.id } : { $or: [{ refreshTokenHash: tokenHash }, { 'refreshSessions.tokenHash': tokenHash }] };
+            await User.updateOne(userFilter, { $pull: { refreshSessions: { tokenHash } } });
+            await User.updateOne({ ...userFilter, refreshTokenHash: tokenHash }, { $unset: { refreshTokenHash: '', refreshTokenExpiresAt: '' } });
         }
 
         await blacklistAccessToken(req);
@@ -456,6 +469,7 @@ exports.logoutAll = async (req, res) => {
             await revokeAllRefreshSessions(req.user.id);
             await User.findByIdAndUpdate(req.user.id, {
                 $inc: { tokenVersion: 1 },
+                $set: { refreshSessions: [] },
                 $unset: { refreshTokenHash: '', refreshTokenExpiresAt: '' },
             });
         }
