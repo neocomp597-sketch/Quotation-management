@@ -976,6 +976,7 @@ export const csmService = {
   getAmcs: () => api.get("/csm/amcs"),
   createAmc: (data) => api.post("/csm/amcs", data),
   getAssets: (params = {}) => api.get("/csm/assets", { params }),
+  exportAssets: (params = {}) => api.get("/csm/assets/export", { params, responseType: "blob" }),
   createAsset: (data) => api.post("/csm/assets", data),
   createSingleAsset: (data) => api.post("/csm/assets/single", data),
   returnAsset: (id, returnReason) => api.post(`/csm/assets/${id}/return`, { returnReason }),

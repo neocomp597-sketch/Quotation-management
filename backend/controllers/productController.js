@@ -249,15 +249,30 @@ const createProduct = async (req, res) => {
         const cleanProductCode = String(productCode).trim();
         const cleanProductName = String(productName).trim();
 
+        const companyFilter = req.user?.companyId ? { companyId: req.user.companyId } : {};
+
         // Pre-check for duplicate product code within company
         if (cleanProductCode) {
             const existingCode = await Product.findOne({
-                companyId: req.user?.companyId,
+                ...companyFilter,
                 productCode: new RegExp(`^${cleanProductCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
             });
             if (existingCode) {
                 return res.status(400).json({
-                    message: `Product Code "${cleanProductCode}" already exists. Please enter a unique Product Code.`
+                    message: `Product Code "${cleanProductCode}" already exists. Duplicate products are not allowed.`
+                });
+            }
+        }
+
+        // Pre-check for duplicate product name within company
+        if (cleanProductName) {
+            const existingName = await Product.findOne({
+                ...companyFilter,
+                productName: new RegExp(`^${cleanProductName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
+            });
+            if (existingName) {
+                return res.status(400).json({
+                    message: `Product Name "${cleanProductName}" already exists. Duplicate products are not allowed.`
                 });
             }
         }
@@ -485,6 +500,37 @@ const updateProduct = async (req, res) => {
             repairTroubleshootingUrl
         } = req.body;
 
+        const cleanProductCode = productCode !== undefined ? String(productCode).trim() : null;
+        const cleanProductName = productName !== undefined ? String(productName).trim() : null;
+
+        const companyFilter = req.user?.companyId ? { companyId: req.user.companyId } : {};
+
+        if (cleanProductCode) {
+            const existingCode = await Product.findOne({
+                _id: { $ne: req.params.id },
+                ...companyFilter,
+                productCode: new RegExp(`^${cleanProductCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
+            });
+            if (existingCode) {
+                return res.status(400).json({
+                    message: `Product Code "${cleanProductCode}" already exists. Duplicate products are not allowed.`
+                });
+            }
+        }
+
+        if (cleanProductName) {
+            const existingName = await Product.findOne({
+                _id: { $ne: req.params.id },
+                ...companyFilter,
+                productName: new RegExp(`^${cleanProductName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
+            });
+            if (existingName) {
+                return res.status(400).json({
+                    message: `Product Name "${cleanProductName}" already exists. Duplicate products are not allowed.`
+                });
+            }
+        }
+
         const updateData = {
             productCode,
             productName,
@@ -562,6 +608,11 @@ const updateProduct = async (req, res) => {
         res.json(buildProductResponse(updatedProduct));
     } catch (error) {
         console.error(error);
+        if (error.code === 11000 || String(error.message || '').includes('E11000') || String(error.message || '').includes('duplicate key')) {
+            return res.status(400).json({
+                message: `Product Code "${req.body.productCode || 'code'}" already exists. Duplicate products are not allowed.`
+            });
+        }
         res.status(statusForProductError(error)).json({ message: error.message || 'Error updating product' });
     }
 };

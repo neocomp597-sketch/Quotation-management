@@ -598,6 +598,29 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
             return;
         }
 
+        const cleanProductCode = formData.productCode?.trim().toLowerCase();
+        const cleanProductName = formData.productName?.trim().toLowerCase();
+
+        // Check for duplicate product code
+        const duplicateCode = (Array.isArray(products) ? products : []).find(p =>
+            String(p._id) !== String(editingProduct?._id) &&
+            String(p.productCode || '').trim().toLowerCase() === cleanProductCode
+        );
+        if (duplicateCode) {
+            toast.error(`Product Code "${formData.productCode.trim()}" already exists. Duplicate products are not allowed.`);
+            return;
+        }
+
+        // Check for duplicate product name
+        const duplicateName = (Array.isArray(products) ? products : []).find(p =>
+            String(p._id) !== String(editingProduct?._id) &&
+            String(p.productName || '').trim().toLowerCase() === cleanProductName
+        );
+        if (duplicateName) {
+            toast.error(`Product Name "${formData.productName.trim()}" already exists. Duplicate products are not allowed.`);
+            return;
+        }
+
         const normalizedVendors = (formData.vendors || [])
             .filter(v => v.vendorId)
             .map(v => ({

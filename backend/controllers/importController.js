@@ -329,6 +329,9 @@ const importProducts = async (req, res) => {
             errors: []
         };
 
+        const seenCodesInFile = new Set();
+        const seenNamesInFile = new Set();
+
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
             try {
@@ -355,13 +358,35 @@ const importProducts = async (req, res) => {
                     }
                 }
 
+                const cleanCode = String(productCode).trim();
+                const cleanName = String(productName).trim();
+                const normCode = cleanCode.toLowerCase();
+                const normName = cleanName.toLowerCase();
+
+                // Disallow duplicate codes or names within the uploaded file
+                if (seenCodesInFile.has(normCode)) {
+                    results.skipped++;
+                    results.errors.push(`Row ${i + 2}: Duplicate Product Code "${cleanCode}" in uploaded file. Duplicate products are not allowed.`);
+                    continue;
+                }
+                if (seenNamesInFile.has(normName)) {
+                    results.skipped++;
+                    results.errors.push(`Row ${i + 2}: Duplicate Product Name "${cleanName}" in uploaded file. Duplicate products are not allowed.`);
+                    continue;
+                }
+                seenCodesInFile.add(normCode);
+                seenNamesInFile.add(normName);
+
+                const companyId = req.user?.companyId;
+                const companyFilter = companyId ? { companyId } : {};
+
                 let existing = null;
-                if (productCode) {
-                    existing = await Product.findOne({ productCode: buildExactRegex(productCode) });
+                if (cleanCode) {
+                    existing = await Product.findOne({ ...companyFilter, productCode: buildExactRegex(cleanCode) });
                 }
                 
-                if (!existing && productName) {
-                    existing = await Product.findOne({ productName: buildExactRegex(productName) });
+                if (!existing && cleanName) {
+                    existing = await Product.findOne({ ...companyFilter, productName: buildExactRegex(cleanName) });
                 }
                 
                 const productData = {

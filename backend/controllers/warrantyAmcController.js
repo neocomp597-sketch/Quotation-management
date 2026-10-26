@@ -7,6 +7,8 @@ const Customer = require('../models/Customer');
 const SerialTransfer = require('../models/SerialTransfer');
 const { formatDate } = require('../utils/dateFormat');
 const mongoose = require('mongoose');
+const ExcelJS = require('exceljs');
+require('../models/MGR');
 const { productMgrPopulate, applyProductMgrs, applyProductMgrsToAll, stripMgrFields } = require('../utils/productMgr');
 const { loadDivisionSegmentLookup, resolveDivisionSegment } = require('../utils/divisionSegment');
 
@@ -772,6 +774,159 @@ exports.getAssets = async (req, res) => {
         res.status(500).json({ message: error.message || 'Error fetching assets' });
     }
 };
+
+// Export all matching assets as Excel file
+exports.exportAssets = async (req, res) => {
+    try {
+        const companyId = req.user?.companyId;
+        if (!companyId) return res.status(401).json({ message: 'Authentication required: no company context found.' });
+        const branchId = req.user?.activeBranchId || req.user?.branchId;
+
+        const filter = { companyId };
+        if (branchId) filter.branchId = branchId;
+        if (req.query.customerId) filter.customerId = req.query.customerId;
+        if (req.query.productId) filter.productId = req.query.productId;
+        if (req.query.status && req.query.status !== 'ALL') filter.status = req.query.status;
+
+        const mgrFilters = ['mgr1', 'mgr2', 'mgr3', 'mgr4', 'mgr5']
+            .filter((field) => req.query[field] && mongoose.Types.ObjectId.isValid(req.query[field]));
+        if (mgrFilters.length) {
+            const productIds = await Product.find({ companyId, $and: mgrFilters.map((field) => ({ [field]: req.query[field] })) }).distinct('_id');
+            if (!productIds.length) {
+                const workbook = new ExcelJS.Workbook();
+                const sheet = workbook.addWorksheet('Invoice Bulk Upload');
+                sheet.columns = [
+                    { header: 'Serial Number', key: 'serialNumber', width: 22 },
+                    { header: 'Product Name', key: 'productName', width: 35 },
+                    { header: 'Product Code', key: 'productCode', width: 18 },
+                    { header: 'Status', key: 'status', width: 14 },
+                    { header: 'Customer Code', key: 'customerCode', width: 16 },
+                    { header: 'Customer', key: 'customer', width: 32 },
+                    { header: 'Customer Postal Code', key: 'customerPostalCode', width: 16 },
+                    { header: 'Invoice Ref', key: 'invoiceNumber', width: 20 },
+                    { header: 'Sale Date', key: 'saleDate', width: 15 },
+                    { header: 'Location', key: 'location', width: 18 },
+                    { header: 'Division_Code', key: 'divisionCode', width: 16 },
+                    { header: 'Division_Desc', key: 'divisionDesc', width: 22 },
+                    { header: 'Segment_Code', key: 'segmentCode', width: 16 },
+                    { header: 'Segment_Desc', key: 'segmentDesc', width: 22 },
+                    { header: 'Mgr 1', key: 'mgr1', width: 20 },
+                    { header: 'Mgr 2', key: 'mgr2', width: 20 },
+                    { header: 'Mgr 3', key: 'mgr3', width: 20 },
+                    { header: 'Mgr 4', key: 'mgr4', width: 20 },
+                    { header: 'Mgr 5', key: 'mgr5', width: 20 },
+                    { header: 'Indicator_Field', key: 'indicatorField', width: 18 },
+                    { header: 'Project Code', key: 'projectCode', width: 18 },
+                    { header: 'Project Name', key: 'projectName', width: 25 }
+                ];
+                sheet.getRow(1).font = { bold: true };
+                res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+                res.setHeader('Content-Disposition', 'attachment; filename="Invoice_Bulk_Upload.xlsx"');
+                res.setHeader('x-total-count', '0');
+                await workbook.xlsx.write(res);
+                return res.end();
+            }
+            filter.productId = { $in: productIds };
+        }
+
+        if (req.query.q && String(req.query.q).trim()) {
+            const escaped = String(req.query.q).trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+            filter.$or = [
+                { serialNumber: { $regex: escaped, $options: 'i' } },
+                { productCode: { $regex: escaped, $options: 'i' } },
+                { productName: { $regex: escaped, $options: 'i' } },
+                { invoiceNumber: { $regex: escaped, $options: 'i' } },
+                { customerNameStr: { $regex: escaped, $options: 'i' } }
+            ];
+        }
+
+        const docs = await Asset.find(filter)
+            .select('serialNumber productName productCode status customerCode customerNameStr customerPostalCode invoiceNumber saleDate invoiceDate location divisionId segmentId indicatorField projectCode projectName mgr1 mgr2 mgr3 mgr4 mgr5 productId customerId')
+            .populate({ path: 'customerId', select: 'customerName companyName externalCode billingAddress pincode mobile', options: { bypassTenant: true } })
+            .populate(productMgrPopulate())
+            .populate(DIVISION_POPULATE)
+            .populate(SEGMENT_POPULATE)
+            .sort({ createdAt: -1, _id: -1 })
+            .allowDiskUse(true)
+            .lean();
+
+        const populatedDocs = applyProductMgrsToAll(docs);
+
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet('Invoice Bulk Upload');
+        sheet.columns = [
+            { header: 'Serial Number', key: 'serialNumber', width: 22 },
+            { header: 'Product Name', key: 'productName', width: 35 },
+            { header: 'Product Code', key: 'productCode', width: 18 },
+            { header: 'Status', key: 'status', width: 14 },
+            { header: 'Customer Code', key: 'customerCode', width: 16 },
+            { header: 'Customer', key: 'customer', width: 32 },
+            { header: 'Customer Postal Code', key: 'customerPostalCode', width: 16 },
+            { header: 'Invoice Ref', key: 'invoiceNumber', width: 20 },
+            { header: 'Sale Date', key: 'saleDate', width: 15 },
+            { header: 'Location', key: 'location', width: 18 },
+            { header: 'Division_Code', key: 'divisionCode', width: 16 },
+            { header: 'Division_Desc', key: 'divisionDesc', width: 22 },
+            { header: 'Segment_Code', key: 'segmentCode', width: 16 },
+            { header: 'Segment_Desc', key: 'segmentDesc', width: 22 },
+            { header: 'Mgr 1', key: 'mgr1', width: 20 },
+            { header: 'Mgr 2', key: 'mgr2', width: 20 },
+            { header: 'Mgr 3', key: 'mgr3', width: 20 },
+            { header: 'Mgr 4', key: 'mgr4', width: 20 },
+            { header: 'Mgr 5', key: 'mgr5', width: 20 },
+            { header: 'Indicator_Field', key: 'indicatorField', width: 18 },
+            { header: 'Project Code', key: 'projectCode', width: 18 },
+            { header: 'Project Name', key: 'projectName', width: 25 }
+        ];
+        sheet.getRow(1).font = { bold: true };
+        sheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+        for (const asset of populatedDocs) {
+            const prodName = asset.productId?.productName || asset.productName || '';
+            const prodCode = asset.productId?.productCode || asset.productCode || '';
+            const custName = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || asset.customerName || (asset.customerId ? 'Customer' : 'Stock (Unsold)');
+            const sDate = asset.saleDate || asset.invoiceDate;
+
+            sheet.addRow({
+                serialNumber: asset.serialNumber || '',
+                productName: prodName,
+                productCode: prodCode,
+                status: asset.status || 'IN_STOCK',
+                customerCode: asset.customerCode || asset.customerId?.externalCode || '',
+                customer: custName,
+                customerPostalCode: asset.customerPostalCode || '',
+                invoiceNumber: asset.invoiceNumber || '',
+                saleDate: sDate ? formatDate(sDate, '') : '',
+                location: asset.location || '',
+                divisionCode: asset.divisionId?.code || '',
+                divisionDesc: asset.divisionId?.description || '',
+                segmentCode: asset.segmentId?.code || '',
+                segmentDesc: asset.segmentId?.description || '',
+                mgr1: asset.mgr1 || '',
+                mgr2: asset.mgr2 || '',
+                mgr3: asset.mgr3 || '',
+                mgr4: asset.mgr4 || '',
+                mgr5: asset.mgr5 || '',
+                indicatorField: asset.indicatorField || '',
+                projectCode: asset.projectCode || '',
+                projectName: asset.projectName || ''
+            });
+        }
+
+        const dateStr = new Date().toISOString().slice(0, 10);
+        const filename = `Invoice_Bulk_Upload_${dateStr}.xlsx`;
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('x-total-count', String(populatedDocs.length));
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        console.error('exportAssets error:', error);
+        res.status(500).json({ message: error.message || 'Error exporting assets' });
+    }
+};
+
 exports.getAssetSummary = async (req, res) => {
     try {
         const { assetId, serialNumber } = req.query;
