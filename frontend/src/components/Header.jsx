@@ -76,6 +76,7 @@ const searchablePages = [
     { label: 'AI Pricing Insights', path: '/sales/ai-pricing', permissionKey: 'sales_ai_pricing', keywords: ['ai pricing'] },
     { label: 'Employees', path: '/payroll/employees', permissionKey: 'payroll_employees', keywords: ['payroll employees'] },
     { label: 'CSM Dashboard', path: '/csm/dashboard', permissionKey: 'csm_dashboard', keywords: ['service dashboard'] },
+    { label: 'CSM Detail Dashboard', path: '/csm/detail-dashboard', permissionKey: 'csm_detail_dashboard', keywords: ['service analytics', 'sla compliance', 'resolution speed', 'engineer performance'] },
     { label: 'Tickets', path: '/csm/tickets', permissionKey: 'csm_tickets', keywords: ['tickets register', 'service tickets'] },
     { label: 'Service Visits', path: '/csm/visits', permissionKey: 'csm_visits', keywords: ['visits'] },
     { label: 'Field Attendance', path: '/csm/field-attendance', permissionKey: 'csm_attendance', keywords: ['field attendance', 'engineer check-in', 'attendance'] },

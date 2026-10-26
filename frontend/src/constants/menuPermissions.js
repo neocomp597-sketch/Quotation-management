@@ -144,6 +144,7 @@ export const MENU_PERMISSION_GROUPS = [
         defaultRoute: '/csm/dashboard',
         children: [
             { key: 'csm_dashboard', label: 'CSM Dashboard', description: 'Overview and customer service analytics', defaultRoute: '/csm/dashboard' },
+            { key: 'csm_detail_dashboard', label: 'CSM Detail Dashboard', description: 'Resolution speed, SLA compliance, field service log, ticket charts and engineer performance', defaultRoute: '/csm/detail-dashboard' },
             { key: 'csm_tickets', label: 'Tickets Register', description: 'View, create, and resolve customer support tickets', defaultRoute: '/csm/tickets' },
             { key: 'csm_tickets', label: 'My Tickets', description: 'Tickets created by or assigned to the logged-in user', defaultRoute: '/csm/tickets?tab=my' },
             { key: 'csm_tickets', label: 'My Team Tickets', description: 'Tickets for the logged-in user reporting hierarchy', defaultRoute: '/csm/tickets?tab=team' },

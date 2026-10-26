@@ -75,6 +75,7 @@ const PayrollMasters = lazy(() => import('./pages/PayrollMasters'));
 const OrgChart = lazy(() => import('./pages/OrgChart'));
 const Flowcharts = lazy(() => import('./pages/Flowcharts'));
 const CSMDashboard = lazy(() => import('./pages/CSMDashboard'));
+const CSMDetailDashboard = lazy(() => import('./pages/CSMDetailDashboard'));
 const CSMTickets = lazy(() => import('./pages/CSMTickets'));
 const TicketDetail = lazy(() => import('./pages/TicketDetail'));
 const ServiceVisits = lazy(() => import('./pages/ServiceVisits'));
@@ -377,6 +378,7 @@ function App() {
 
             {/* CSM Routes */}
             <Route path="/csm/dashboard" element={<PermissionRoute permissionKey="csm_dashboard"><Layout><CSMDashboard /></Layout></PermissionRoute>} />
+            <Route path="/csm/detail-dashboard" element={<PermissionRoute permissionKey="csm_detail_dashboard"><Layout><CSMDetailDashboard /></Layout></PermissionRoute>} />
             <Route path="/csm/tickets" element={<PermissionRoute permissionKey="csm_tickets"><Layout><CSMTickets /></Layout></PermissionRoute>} />
             <Route path="/csm/tickets/:id" element={<PermissionRoute permissionKey="csm_tickets"><Layout><TicketDetail /></Layout></PermissionRoute>} />
             <Route path="/csm/visits" element={<PermissionRoute permissionKey="csm_visits"><Layout><ServiceVisits /></Layout></PermissionRoute>} />

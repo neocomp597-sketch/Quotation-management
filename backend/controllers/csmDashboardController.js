@@ -14,18 +14,18 @@ exports.getStats = async (req, res) => {
         });
 
         // 1. Unassigned Tickets count (Requirement 3)
-        // Tickets that are not resolved/closed/cancelled and have no engineer assigned
+        // Tickets that are not resolved/closed/cancelled and have no engineer assigned.
+        // `null` also matches a missing field, and leaves baseScope's own $or (user hierarchy) intact.
         const unassignedQuery = {
             ...baseScope,
             status: { $nin: ['Resolved', 'Closed', 'Cancelled'] },
-            $or: [{ assignedEngineerId: null }, { assignedEngineerId: { $exists: false } }]
+            assignedEngineerId: null
         };
         const unassignedCount = await Ticket.countDocuments(unassignedQuery);
 
         // Core metric counters
-        const openCount = await Ticket.countDocuments({ ...baseScope, status: 'Open' });
-        const assignedCount = await Ticket.countDocuments({ ...baseScope, status: 'Assigned' });
-        const inProgressCount = await Ticket.countDocuments({ ...baseScope, status: 'In Progress' });
+        // Open = every ticket still in process, the same set as the register's "Open Tickets" filter.
+        const openCount = await Ticket.countDocuments({ ...baseScope, status: { $nin: ['Resolved', 'Closed', 'Cancelled'] } });
         const pendingCount = await Ticket.countDocuments({ ...baseScope, status: 'Pending Customer' });
 
         const startOfToday = new Date();
@@ -45,9 +45,10 @@ exports.getStats = async (req, res) => {
             createdAt: { $gte: startOfYesterday, $lt: startOfToday }
         });
 
+        // Resolved today, including tickets that have since been closed (same rule as yesterday).
         const resolvedTodayCount = await Ticket.countDocuments({
             ...baseScope,
-            status: 'Resolved',
+            status: { $in: ['Resolved', 'Closed'] },
             resolvedAt: { $gte: startOfToday }
         });
 
@@ -171,7 +172,7 @@ exports.getStats = async (req, res) => {
 
         res.json({
             metrics: {
-                open: openCount + assignedCount + inProgressCount,
+                open: openCount,
                 unassigned: unassignedCount,
                 createdToday: createdTodayCount,
                 createdYesterday: createdYesterdayCount,

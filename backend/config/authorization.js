@@ -197,6 +197,7 @@ const MENU_GROUPS = [
         description: 'Manage support tickets, service visits, warranties, AMCs, knowledge base, and feedback',
         children: [
             { key: 'csm_dashboard', label: 'CSM Dashboard', description: 'Overview and service analytics' },
+            { key: 'csm_detail_dashboard', label: 'CSM Detail Dashboard', description: 'Resolution speed, SLA compliance, field service log, ticket charts and engineer performance' },
             { key: 'csm_tickets', label: 'Tickets Register', description: 'View, create, and resolve customer support tickets' },
             { key: 'csm_tickets', label: 'My Complaints', description: 'Complaints created by or assigned to the logged-in user' },
             { key: 'csm_tickets', label: 'My Team Complaints', description: 'Complaints for the logged-in user reporting hierarchy' },
@@ -258,6 +259,7 @@ const FULL_ACCESS_KEYS = getAllPermissionKeys();
 // so existing users keep their access until an admin sets the new key explicitly.
 const LEGACY_PERMISSION_FALLBACKS = {
     csm_rca: 'csm_dashboard',
+    csm_detail_dashboard: 'csm_dashboard',
     master_bom: 'master_products',
     master_type_tests: 'master_products',
     master_divisions: 'master_mgrs',
@@ -308,6 +310,7 @@ const MODULE_ACTIONS = {
     planning_view_segment_wise: ['view'],
     planning_view_status_breakdown: ['view'],
     csm_dashboard: ['view'],
+    csm_detail_dashboard: ['view'],
     csm_tickets: ['view', 'create', 'modify'],
     csm_visits: ['view', 'create', 'modify'],
     csm_attendance: ['view', 'create'],

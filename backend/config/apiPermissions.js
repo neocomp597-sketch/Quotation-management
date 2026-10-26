@@ -235,7 +235,7 @@ const API_PERMISSION_RULES = [
     { prefix: '/api/planning', key: 'planning_screen', viewKeys: ['planning_screen', 'planning_simulations', 'reports_main'] },
 
     // ── Customer service ──────────────────────────────────────────────────
-    { prefix: '/api/csm/dashboard', key: 'csm_dashboard' },
+    { prefix: '/api/csm/dashboard', key: 'csm_dashboard', viewKeys: ['csm_dashboard', 'csm_detail_dashboard'] },
     { prefix: '/api/csm/reports', key: 'csm_reports' },
     {
         prefix: '/api/csm/tickets', key: 'csm_tickets', viewKeys: ['csm_tickets', 'csm_rca', 'csm_visits'],
@@ -256,7 +256,7 @@ const API_PERMISSION_RULES = [
     { prefix: '/api/csm/customer-contacts', key: 'csm_tickets', routes: { 'POST /': createOrModify('csm_tickets') } },
     {
         prefix: '/api/csm/visits', key: 'csm_visits',
-        viewKeys: ['csm_visits', 'csm_dashboard', 'csm_tickets', 'csm_warranties_amc'],
+        viewKeys: ['csm_visits', 'csm_dashboard', 'csm_detail_dashboard', 'csm_tickets', 'csm_warranties_amc'],
         routes: { 'POST /:id/check-in': 'modify', 'POST /:id/check-out': 'modify', 'PATCH /:id/reschedule': 'modify' }
     },
     { prefix: '/api/csm/attendance', key: 'csm_attendance', routes: { 'POST /check-out': 'create' } },
