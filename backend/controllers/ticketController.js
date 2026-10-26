@@ -487,6 +487,12 @@ exports.getTickets = async (req, res) => {
             const startOfToday = new Date();
             startOfToday.setHours(0, 0, 0, 0);
             filter.createdAt = { $gte: startOfToday };
+        } else if (req.query.createdOn === 'yesterday') {
+            const startOfToday = new Date();
+            startOfToday.setHours(0, 0, 0, 0);
+            const startOfYesterday = new Date(startOfToday);
+            startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+            filter.createdAt = { $gte: startOfYesterday, $lt: startOfToday };
         }
         if (req.query.slaBreached === 'true') {
             filter.slaResolutionDue = { $lt: new Date() };

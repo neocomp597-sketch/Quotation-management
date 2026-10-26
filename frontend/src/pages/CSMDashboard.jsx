@@ -11,7 +11,7 @@ import {
     MdCheckCircle, MdTimer, MdTrendingUp, MdRefresh,
     MdFlashOn, MdLocationOn, MdPerson, MdFilterList,
     MdAssignmentInd, MdCalendarToday, MdBusiness,
-    MdExpandMore, MdExpandLess, MdRestartAlt, MdTune, MdAddCircleOutline
+    MdExpandMore, MdExpandLess, MdRestartAlt, MdTune, MdAddCircleOutline, MdHistory
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
 
@@ -170,7 +170,7 @@ const CSMDashboard = () => {
         );
     }
 
-    const metrics = stats?.metrics || { open: 0, unassigned: 0, createdToday: 0, pending: 0, overdue: 0, resolvedToday: 0, resolvedYesterday: 0 };
+    const metrics = stats?.metrics || { open: 0, unassigned: 0, createdToday: 0, createdYesterday: 0, pending: 0, overdue: 0, resolvedToday: 0, resolvedYesterday: 0 };
     const statusData = stats?.statusBreakdown || [];
     const categoryData = stats?.categoryBreakdown || [];
     const complianceData = stats?.slaCompliance || [];
@@ -180,7 +180,8 @@ const CSMDashboard = () => {
         metrics.open === 0 && 
         metrics.unassigned === 0 &&
         (metrics.createdToday || 0) === 0 &&
-        metrics.pending === 0 && 
+        (metrics.createdYesterday || 0) === 0 &&
+        metrics.pending === 0 &&
         (metrics.resolvedYesterday || 0) === 0 && 
         metrics.resolvedToday === 0 && 
         visits.length === 0;
@@ -188,6 +189,7 @@ const CSMDashboard = () => {
     // Requirement 3: Unassigned Tickets block added & clickable card links
     const metricCards = [
         { label: 'Created Today', value: metrics.createdToday || 0, icon: <MdAddCircleOutline size={20} />, color: 'from-blue-500 to-blue-700', link: '/csm/tickets?createdOn=today&tab=all' },
+        { label: 'Created Yesterday', value: metrics.createdYesterday || 0, icon: <MdHistory size={20} />, color: 'from-indigo-400 to-blue-600', link: '/csm/tickets?createdOn=yesterday&tab=all' },
         { label: 'Open', value: metrics.open, icon: <MdAssignment size={20} />, color: 'from-teal-500 to-emerald-600', link: '/csm/tickets?status=open_tickets&tab=all' },
         { label: 'Unassigned', value: metrics.unassigned || 0, icon: <MdAssignmentInd size={20} />, color: 'from-purple-500 to-indigo-600', link: '/csm/tickets?unassigned=true&tab=all' },
         { label: 'Pending', value: metrics.pending, icon: <MdHourglassEmpty size={20} />, color: 'from-amber-400 to-orange-500', link: '/csm/tickets?status=Pending Customer&tab=all' },
@@ -488,7 +490,7 @@ const CSMDashboard = () => {
             ) : (
                 <>
                     {/* Requirement 3: Metrics Row with Unassigned Tickets block */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
                         {metricCards.map((card, i) => (
                             <div 
                                 key={i}

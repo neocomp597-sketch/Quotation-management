@@ -489,8 +489,9 @@ const CSMTickets = () => {
             if (searchParams.get('resolvedOn') === 'yesterday') {
                 queryParams.resolvedOn = 'yesterday';
             }
-            if (searchParams.get('createdOn') === 'today') {
-                queryParams.createdOn = 'today';
+            const createdOn = searchParams.get('createdOn');
+            if (createdOn === 'today' || createdOn === 'yesterday') {
+                queryParams.createdOn = createdOn;
             }
             if (filterInvoiceType === 'manual') {
                 queryParams.isManual = 'true';
