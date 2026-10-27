@@ -298,7 +298,7 @@ function App() {
             <Route path="/serial-no-transfer" element={<PermissionRoute permissionKey="master_serials"><Layout><SerialNoTransfer /></Layout></PermissionRoute>} />
             <Route path="/serial-no-transfer/:assetId" element={<PermissionRoute permissionKey="master_serials"><Layout><SerialNoDetails /></Layout></PermissionRoute>} />
             <Route path="/serial-no-transfer/:assetId/transfer" element={<PermissionRoute permissionKey="master_serials"><Layout><SerialNoDetails transfer /></Layout></PermissionRoute>} />
-            <Route path="/serial-no-master/view/:serialNumber" element={<PermissionRoute permissionKey="master_serials"><Layout><AssetLifecycle /></Layout></PermissionRoute>} />
+            <Route path="/serial-no-master/view/:serialNumber" element={<PermissionRoute permissionKey="master_serials_view_details"><Layout><AssetLifecycle /></Layout></PermissionRoute>} />
             <Route path="/flowcharts" element={<PermissionRoute permissionKey="flowchart_view"><Layout><Flowcharts /></Layout></PermissionRoute>} />
             <Route path="/settings" element={<PermissionRoute permissionKey="settings_profile"><Layout><Settings /></Layout></PermissionRoute>} />
             <Route path="/status-master" element={<PermissionRoute adminOnly={true}><Layout><StatusMaster /></Layout></PermissionRoute>} />

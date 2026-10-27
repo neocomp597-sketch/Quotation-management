@@ -23,6 +23,8 @@ export const MENU_PERMISSION_GROUPS = [
             { key: 'csm_masters', label: 'Engineers Master', description: 'Field service engineers master', defaultRoute: '/csm/masters?tab=engineers' },
             { key: 'flowchart_view', label: 'Flowchart Builder', description: 'Visual process flowchart builder', defaultRoute: '/flowcharts' },
             { key: 'master_serials', label: 'Invoice Bulk Upload', description: 'Serial number and asset master records', defaultRoute: '/serial-no-master' },
+            { key: 'master_serials_view_details', label: 'Invoice Bulk Upload: View Details', description: 'Open the lifecycle details of an Invoice Bulk Upload entry', defaultRoute: '/serial-no-master' },
+            { key: 'master_serials_edit', label: 'Invoice Bulk Upload: Edit Entry', description: 'Change a saved Invoice Bulk Upload entry', defaultRoute: '/serial-no-master' },
             { key: 'payroll_org_chart_full', label: 'Org Chart (Full Company)', description: 'Full company org chart access', defaultRoute: '/payroll/org-chart' },
             { key: 'payroll_org_chart', label: 'Org Chart (My Team)', description: 'Direct reporting org chart access', defaultRoute: '/payroll/org-chart' },
             { key: 'master_bom', label: 'Product BOM Master', description: 'Create, edit and view serial-number-wise BOMs', defaultRoute: '/bom-master' },

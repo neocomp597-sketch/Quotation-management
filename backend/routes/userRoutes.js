@@ -140,6 +140,7 @@ router.get('/seed-employees-admin', async (req, res) => {
             admin: true, admin_authorization: true, admin_salespersons: true,
             payroll: true, payroll_payslips: true, payroll_employees: true, payroll_masters: true, payroll_runs: true, payroll_payments: true, payroll_settings: true, payroll_letters: true, payroll_reports: true,
             csm: true, csm_dashboard: true, csm_tickets: true, csm_visits: true, csm_warranties_amc: true, csm_kb: true, csm_masters: true, csm_reports: true, csm_rca: true, csm_detail_dashboard: true,
+            master_serials_view_details: true, master_serials_edit: true,
             tender: true, tender_dashboard: true, tender_register: true, tender_reports: true
         };
 

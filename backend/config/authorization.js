@@ -30,6 +30,8 @@ const MENU_GROUPS = [
             { key: 'master_territories', label: 'Territory Master', description: 'Territory master management' },
             { key: 'master_branches', label: 'Branch Master', description: 'Branch master management' },
             { key: 'master_serials', label: 'Invoice Bulk Upload', description: 'Invoice bulk upload and serial asset management' },
+            { key: 'master_serials_view_details', label: 'Invoice Bulk Upload: View Details', description: 'Open the lifecycle details of an Invoice Bulk Upload entry' },
+            { key: 'master_serials_edit', label: 'Invoice Bulk Upload: Edit Entry', description: 'Change a saved Invoice Bulk Upload entry' },
             { key: 'state_master_create', label: 'State Master', description: 'State master management' },
             { key: 'city_master', label: 'City Master', description: 'City master management' },
             { key: 'csm_masters', label: 'Engineers Master', description: 'Field service engineers master' },
@@ -260,11 +262,22 @@ const FULL_ACCESS_KEYS = getAllPermissionKeys();
 const LEGACY_PERMISSION_FALLBACKS = {
     csm_rca: 'csm_dashboard',
     csm_detail_dashboard: 'csm_dashboard',
+    master_serials_view_details: 'master_serials',
     master_bom: 'master_products',
     master_type_tests: 'master_products',
     master_divisions: 'master_mgrs',
     master_segments: 'master_mgrs',
     inventory_sap_audit: 'inventory_stock_counts'
+};
+
+// Switches that allow something no role could do before they were added (Invoice Bulk
+// Upload entries could not be edited). A role with no saved value gets them only when it
+// is the admin role, whatever its other defaults are; an admin grants them to others.
+const ADMIN_DEFAULT_ONLY_KEYS = new Set(['master_serials_edit']);
+
+const withoutAdminOnlyKeys = (permissions) => {
+    ADMIN_DEFAULT_ONLY_KEYS.forEach((key) => { permissions[key] = false; });
+    return permissions;
 };
 
 const getLegacyFallback = (input, key) => {
@@ -295,6 +308,8 @@ const MODULE_ACTIONS = {
     sales_approvals: ['view', 'modify'],
     reports_main: ['view'],
     master_serials: ['view', 'create', 'modify'],
+    master_serials_view_details: ['view'],
+    master_serials_edit: ['view'],
     inventory_dashboard: ['view'],
     inventory_items: ['view'],
     inventory_stock_in: ['view'],
@@ -389,9 +404,9 @@ const hasPermission = (permissions = {}, key, action = 'view') => {
 // Employee: employee access - payslips, payroll, csm tickets, csm attendance, csm kb, dashboard
 const DEFAULT_ROLE_PERMISSIONS = {
     admin: buildPermissions(FULL_ACCESS_KEYS),
-    manager: buildPermissions(['dashboard', 'master', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'sale', 'purchase', 'inventory', 'planning', 'reports', 'settings', 'csm', 'tender', 'payroll_org_chart']),
-    sales: buildPermissions(['dashboard', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'inventory_items', 'inventory_stock_in', 'inventory_stock_out', 'inventory_transfers', 'csm_tickets', 'csm_attendance', 'csm_kb', 'tender_dashboard', 'tender_register', 'payroll_org_chart']),
-    employee: buildPermissions(['dashboard', 'payroll_org_chart', 'csm_tickets', 'csm_attendance', 'csm_kb', 'settings_profile'])
+    manager: withoutAdminOnlyKeys(buildPermissions(['dashboard', 'master', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'sale', 'purchase', 'inventory', 'planning', 'reports', 'settings', 'csm', 'tender', 'payroll_org_chart'])),
+    sales: withoutAdminOnlyKeys(buildPermissions(['dashboard', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'inventory_items', 'inventory_stock_in', 'inventory_stock_out', 'inventory_transfers', 'csm_tickets', 'csm_attendance', 'csm_kb', 'tender_dashboard', 'tender_register', 'payroll_org_chart'])),
+    employee: withoutAdminOnlyKeys(buildPermissions(['dashboard', 'payroll_org_chart', 'csm_tickets', 'csm_attendance', 'csm_kb', 'settings_profile']))
 };
 
 /**
@@ -452,6 +467,8 @@ const resolvePermissions = (role, storedPermissions = {}) => {
                 ? stored
                 : typeof legacyFallback === 'boolean'
                     ? legacyFallback
+                    : ADMIN_DEFAULT_ONLY_KEYS.has(key)
+                    ? String(role || '').toLowerCase() === 'admin'
                     : hasStoredParent && !hasStoredChildren
                     ? storedParent
                     : Boolean(defaults[key]));

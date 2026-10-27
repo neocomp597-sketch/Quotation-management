@@ -360,6 +360,117 @@ exports.createAsset = async (req, res) => {
     }
 };
 
+// Product of an Invoice Bulk Upload entry (Add Single Entry and Edit): found by code, then
+// name, in this company and then in any company; else created.
+const resolveEntryProduct = async (companyId, cleanProductCode, productName) => {
+    let product = await Product.findOne({
+        companyId,
+        productCode: buildExactRegex(cleanProductCode)
+    });
+
+    if (!product && productName) {
+        product = await Product.findOne({
+            companyId,
+            productName: buildExactRegex(productName)
+        });
+    }
+
+    if (!product && cleanProductCode) {
+        product = await Product.findOne({ productCode: buildExactRegex(cleanProductCode) })
+            .setOptions({ bypassTenant: true });
+    }
+    if (!product && productName) {
+        product = await Product.findOne({ productName: buildExactRegex(productName) })
+            .setOptions({ bypassTenant: true });
+    }
+
+    if (!product) {
+        // Names are unique: reuse a product whose name differs only in case / spacing.
+        const sameName = await findDuplicate('productName', productName || cleanProductCode, { companyId });
+        if (sameName) product = await Product.findById(sameName._id);
+    }
+
+    if (!product) {
+        try {
+            product = await Product.create({
+                companyId,
+                productCode: cleanProductCode,
+                productName: productName || cleanProductCode,
+                hsnCode: 'N/A',
+                gstPercentage: 18,
+                basePrice: 0,
+                mrp: 0,
+                uom: 'Nos',
+                status: 'Active'
+            });
+        } catch (createErr) {
+            product = await Product.findOne({ productCode: buildExactRegex(cleanProductCode) })
+                .setOptions({ bypassTenant: true });
+            if (!product) {
+                throw createErr;
+            }
+        }
+    }
+    return product;
+};
+
+// Customer of an Invoice Bulk Upload entry (Add Single Entry and Edit), from the Customer
+// Master by Customer Code, else Customer Name; created when missing. Returns the customer
+// and the code, postal code and mobile the entry stores.
+const resolveEntryCustomer = async (req, { companyId, customerCode, customerInput, mobile = '' }) => {
+    let customer = null;
+    let cleanMobile = mobile;
+    let finalCustomerCode = String(customerCode || '').trim();
+    let finalCustomerPostalCode = '';
+    const searchTarget = finalCustomerCode || (customerInput ? String(customerInput).trim() : '');
+
+    if (searchTarget) {
+        customer = await Customer.findOne({
+            companyId,
+            $or: [
+                { externalCode: buildExactRegex(searchTarget) },
+                { customerName: buildExactRegex(searchTarget) },
+                { companyName: buildExactRegex(searchTarget) }
+            ]
+        });
+        if (!customer) {
+            // Customer codes are unique in the whole company: a customer of another branch
+            // with this code is the same customer (creating it again would be refused).
+            customer = await Customer.findOne({ companyId, externalCode: searchTarget })
+                .collation(Customer.CUSTOMER_CODE_COLLATION)
+                .setOptions({ bypassBranch: true });
+        }
+
+        if (!customer) {
+            customer = await Customer.create({
+                companyId,
+                externalCode: searchTarget,
+                customerName: customerInput || searchTarget,
+                companyName: customerInput || searchTarget,
+                mobile: cleanMobile,
+                createdBy: req.user?.id || null
+            });
+        } else if (cleanMobile && !customer.mobile) {
+            customer.mobile = cleanMobile;
+            await customer.save();
+        }
+
+        if (customer) {
+            if (!cleanMobile && customer.mobile) cleanMobile = String(customer.mobile).trim();
+            if (!customer.externalCode && finalCustomerCode) {
+                customer.externalCode = finalCustomerCode;
+                await customer.save();
+            }
+            finalCustomerCode = customer.externalCode || searchTarget;
+            // Postal Code is strictly derived from Customer Master with 6-digit validation
+            const rawPin = customer.billingAddress?.pincode || customer.pincode || '';
+            const cleanPin = String(rawPin).trim().replace(/\D/g, '');
+            finalCustomerPostalCode = cleanPin.length === 6 ? cleanPin : String(rawPin).trim();
+        }
+    }
+    return { customer, finalCustomerCode, finalCustomerPostalCode, cleanMobile };
+};
+
 // Single Entry Creation (Requirement #15, #3, #4, #8, #17)
 exports.createSingleAsset = async (req, res) => {
     try {
@@ -411,107 +522,12 @@ exports.createSingleAsset = async (req, res) => {
         const cleanProductCode = String(productCode).trim();
         const cleanIndicator = String(indicatorField || '').trim().slice(0, 20);
 
-        // Resolve product
-        let product = await Product.findOne({
-            companyId,
-            productCode: buildExactRegex(cleanProductCode)
-        });
-
-        if (!product && productName) {
-            product = await Product.findOne({
-                companyId,
-                productName: buildExactRegex(productName)
-            });
-        }
-
-        if (!product && cleanProductCode) {
-            product = await Product.findOne({ productCode: buildExactRegex(cleanProductCode) })
-                .setOptions({ bypassTenant: true });
-        }
-        if (!product && productName) {
-            product = await Product.findOne({ productName: buildExactRegex(productName) })
-                .setOptions({ bypassTenant: true });
-        }
-
-        if (!product) {
-            // Names are unique: reuse a product whose name differs only in case / spacing.
-            const sameName = await findDuplicate('productName', productName || cleanProductCode, { companyId });
-            if (sameName) product = await Product.findById(sameName._id);
-        }
-
-        if (!product) {
-            try {
-                product = await Product.create({
-                    companyId,
-                    productCode: cleanProductCode,
-                    productName: productName || cleanProductCode,
-                    hsnCode: 'N/A',
-                    gstPercentage: 18,
-                    basePrice: 0,
-                    mrp: 0,
-                    uom: 'Nos',
-                    status: 'Active'
-                });
-            } catch (createErr) {
-                product = await Product.findOne({ productCode: buildExactRegex(cleanProductCode) })
-                    .setOptions({ bypassTenant: true });
-                if (!product) {
-                    throw createErr;
-                }
-            }
-        }
+        const product = await resolveEntryProduct(companyId, cleanProductCode, productName);
         // MGR 1-5 are not stored on the asset: every read derives them from the Product Master.
 
-        // Resolve customer from Customer Master using Customer Code or Customer Name
-        let customer = null;
-        let finalCustomerCode = String(customerCode || '').trim();
-        let finalCustomerPostalCode = '';
-        const searchTarget = finalCustomerCode || (customerInput ? String(customerInput).trim() : '');
-
-        if (searchTarget) {
-            customer = await Customer.findOne({
-                companyId,
-                $or: [
-                    { externalCode: buildExactRegex(searchTarget) },
-                    { customerName: buildExactRegex(searchTarget) },
-                    { companyName: buildExactRegex(searchTarget) }
-                ]
-            });
-            if (!customer) {
-                // Customer codes are unique in the whole company: a customer of another branch
-                // with this code is the same customer (creating it again would be refused).
-                customer = await Customer.findOne({ companyId, externalCode: searchTarget })
-                    .collation(Customer.CUSTOMER_CODE_COLLATION)
-                    .setOptions({ bypassBranch: true });
-            }
-
-            if (!customer) {
-                customer = await Customer.create({
-                    companyId,
-                    externalCode: searchTarget,
-                    customerName: customerInput || searchTarget,
-                    companyName: customerInput || searchTarget,
-                    mobile: cleanMobile,
-                    createdBy: req.user?.id || null
-                });
-            } else if (cleanMobile && !customer.mobile) {
-                customer.mobile = cleanMobile;
-                await customer.save();
-            }
-
-            if (customer) {
-                if (!cleanMobile && customer.mobile) cleanMobile = String(customer.mobile).trim();
-                if (!customer.externalCode && finalCustomerCode) {
-                    customer.externalCode = finalCustomerCode;
-                    await customer.save();
-                }
-                finalCustomerCode = customer.externalCode || searchTarget;
-                // Postal Code is strictly derived from Customer Master with 6-digit validation
-                const rawPin = customer.billingAddress?.pincode || customer.pincode || '';
-                const cleanPin = String(rawPin).trim().replace(/\D/g, '');
-                finalCustomerPostalCode = cleanPin.length === 6 ? cleanPin : String(rawPin).trim();
-            }
-        }
+        const resolvedCustomer = await resolveEntryCustomer(req, { companyId, customerCode, customerInput, mobile: cleanMobile });
+        const { customer, finalCustomerCode, finalCustomerPostalCode } = resolvedCustomer;
+        cleanMobile = resolvedCustomer.cleanMobile;
 
         // Unique Identifier Check: Serial Number (System-wide uniqueness)
         let existingAssets = await Asset.find({
@@ -645,11 +661,173 @@ exports.createSingleAsset = async (req, res) => {
     }
 };
 
-// Invoice Bulk Upload entries cannot be edited or deleted once saved (Import, Add Single Entry,
-// Sales Return and Export still work). The PUT/DELETE routes answer with this so a direct API call
-// gets a clear refusal instead of a 404.
+const RETURNED_STATUSES = ['RETURN', 'RETURNED'];
+const sameText = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+
+// Edit a saved Invoice Bulk Upload entry (PUT /assets/:id, Edit permission). Same rules as Add
+// Single Entry, and changes that have a flow of their own are refused here:
+//  - the Serial Number is the entry's identity (history and transfers follow it) and stays;
+//  - returning goes through Sales Return, re-selling a returned serial through Add Single Entry;
+//  - a transferred serial changes owner (customer, status) through Serial No Transfer.
+// Product and customer are looked up again only when their fields were changed, so saving an
+// entry without touching them keeps exactly what it had. `saleDate` left out keeps the date.
+exports.updateAsset = async (req, res) => {
+    try {
+        const companyId = req.user?.companyId;
+        const { id } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: 'Invalid entry' });
+        }
+
+        const asset = await Asset.findOne({ _id: id, companyId })
+            .populate({ path: 'productId', select: 'productCode productName', options: { bypassTenant: true } })
+            .populate({ path: 'customerId', options: { bypassTenant: true } });
+        if (!asset) {
+            return res.status(404).json({ message: 'Invoice Bulk Upload entry not found' });
+        }
+
+        const {
+            serialNumber,
+            productCode,
+            productName,
+            status = asset.status,
+            customerCode = '',
+            customer: customerInput = '',
+            invoiceNumber = '',
+            saleDate,
+            location = '',
+            indicatorField = '',
+            divisionId,
+            segmentId
+        } = req.body;
+
+        if (serialNumber !== undefined && !sameText(serialNumber, asset.serialNumber)) {
+            return res.status(400).json({ message: 'Serial Number cannot be changed. Add a new entry for a different serial number.' });
+        }
+        if (!productCode || !String(productCode).trim()) {
+            return res.status(400).json({ message: 'Product Code is required' });
+        }
+        if (!Asset.schema.path('status').enumValues.includes(status)) {
+            return res.status(400).json({ message: `Invalid status: ${status}` });
+        }
+        const statusChanged = status !== asset.status;
+        if (statusChanged && RETURNED_STATUSES.includes(asset.status)) {
+            return res.status(400).json({ message: 'A returned serial number is re-sold with Add Single Entry, not by editing its status.' });
+        }
+        if (statusChanged && RETURNED_STATUSES.includes(status)) {
+            return res.status(400).json({ message: 'Use Sales Return to return a sold serial number.' });
+        }
+
+        let finalSaleDate = asset.saleDate || null;
+        if (saleDate !== undefined) {
+            finalSaleDate = saleDate ? new Date(saleDate) : null;
+            if (finalSaleDate && Number.isNaN(finalSaleDate.getTime())) {
+                return res.status(400).json({ message: 'Sale Date is not a valid date' });
+            }
+        }
+        // Same as a new entry: a serial marked sold without any date was sold now.
+        if (statusChanged && status === 'SOLD' && !finalSaleDate && !asset.invoiceDate) {
+            finalSaleDate = new Date();
+        }
+
+        let divisionSegment;
+        try {
+            const lookup = await loadDivisionSegmentLookup(companyId);
+            divisionSegment = resolveDivisionSegment(lookup, { divisionId, segmentId }, { required: true });
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({ message: err.message });
+        }
+
+        const currentCustomer = asset.customerId && typeof asset.customerId === 'object' ? asset.customerId : null;
+        const customerChanged = !sameText(customerCode, asset.customerCode || currentCustomer?.externalCode)
+            || !sameText(customerInput, currentCustomer?.companyName || currentCustomer?.customerName || asset.customerNameStr);
+
+        if (customerChanged || statusChanged) {
+            const transferred = await SerialTransfer.exists({ companyId, assetId: asset._id, isActive: true })
+                .setOptions({ bypassTenant: true });
+            if (transferred) {
+                return res.status(400).json({
+                    message: 'This serial number has been transferred. Change its owner with Serial No Transfer; its customer and status cannot be edited here.'
+                });
+            }
+        }
+
+        const cleanProductCode = String(productCode).trim();
+        const currentProductCode = asset.productId?.productCode || asset.productCode;
+        if (!sameText(cleanProductCode, currentProductCode)) {
+            const product = await resolveEntryProduct(companyId, cleanProductCode, productName);
+            asset.set({
+                productId: product._id,
+                productCode: product.productCode || cleanProductCode,
+                productName: product.productName || productName || cleanProductCode
+            });
+        }
+
+        if (customerChanged) {
+            const { customer, finalCustomerCode, finalCustomerPostalCode, cleanMobile } =
+                await resolveEntryCustomer(req, { companyId, customerCode, customerInput });
+            asset.set({
+                customerId: customer ? customer._id : null,
+                customerCode: finalCustomerCode,
+                customerNameStr: customer ? (customer.companyName || customer.customerName) : String(customerInput || '').trim(),
+                customerPostalCode: finalCustomerPostalCode,
+                customerMobile: cleanMobile
+            });
+        }
+
+        asset.set({
+            status,
+            invoiceNumber: String(invoiceNumber || '').trim(),
+            saleDate: finalSaleDate,
+            location: String(location || '').trim(),
+            indicatorField: String(indicatorField || '').trim().slice(0, 20),
+            divisionId: divisionSegment.division._id,
+            segmentId: divisionSegment.segment._id
+        });
+        await asset.save();
+
+        const updatedDoc = applyCustomerPostalCode(applyProductMgrs(
+            await Asset.findById(asset._id)
+                .populate({ path: 'customerId', options: { bypassTenant: true } })
+                .populate(productMgrPopulate()).populate(DIVISION_POPULATE).populate(SEGMENT_POPULATE)
+                .lean()
+        ));
+
+        // Shown as "Entry edited" in the serial's Activity Log.
+        await AssetHistory.create({
+            companyId,
+            branchId: asset.branchId || null,
+            assetId: asset._id,
+            serialNumber: asset.serialNumber,
+            productId: updatedDoc.productId?._id || null,
+            productCode: updatedDoc.productId?.productCode || updatedDoc.productCode || '',
+            productName: updatedDoc.productId?.productName || updatedDoc.productName || '',
+            customerId: updatedDoc.customerId?._id || null,
+            customerCode: updatedDoc.customerCode || '',
+            customerName: updatedDoc.customerId?.companyName || updatedDoc.customerId?.customerName || updatedDoc.customerNameStr || '',
+            customerPostalCode: updatedDoc.customerPostalCode || '',
+            customerMobile: updatedDoc.customerMobile || '',
+            invoiceNumber: updatedDoc.invoiceNumber || '',
+            saleDate: updatedDoc.saleDate || null,
+            location: updatedDoc.location || '',
+            indicatorField: updatedDoc.indicatorField || '',
+            transactionType: 'UPDATE',
+            status: updatedDoc.status,
+            createdBy: req.user?.id || null
+        });
+
+        res.json({ message: 'Entry updated successfully', data: updatedDoc });
+    } catch (error) {
+        console.error('updateAsset error:', error);
+        res.status(500).json({ message: error.message || 'Error updating entry' });
+    }
+};
+
+// Invoice Bulk Upload entries cannot be deleted or partially updated (they are changed with Edit,
+// PUT /assets/:id). The PATCH/DELETE routes answer with this so a direct API call gets a clear
+// refusal instead of a 404.
 exports.rejectEntryChange = (req, res) => res.status(405).json({
-    message: 'Invoice Bulk Upload entries cannot be edited or deleted.'
+    message: 'Invoice Bulk Upload entries cannot be deleted. Use Edit to change an entry.'
 });
 
 // Process Sales Return (Requirement #6, #7, #8)

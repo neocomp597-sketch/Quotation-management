@@ -1000,6 +1000,7 @@ export const csmService = {
   exportAssets: (params = {}) => api.get("/csm/assets/export", { params, responseType: "blob" }),
   createAsset: (data) => api.post("/csm/assets", data),
   createSingleAsset: (data) => api.post("/csm/assets/single", data),
+  updateAsset: (id, data) => api.put(`/csm/assets/${id}`, data),
   returnAsset: (id, returnReason) => api.post(`/csm/assets/${id}/return`, { returnReason }),
   getReturnHistory: () => api.get("/csm/assets/return-history"),
   getAssetSummary: (params = {}) => api.get("/csm/assets/summary", { params }),
