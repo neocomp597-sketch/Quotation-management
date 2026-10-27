@@ -235,7 +235,7 @@ const API_PERMISSION_RULES = [
     { prefix: '/api/planning', key: 'planning_screen', viewKeys: ['planning_screen', 'planning_simulations', 'reports_main'] },
 
     // ── Customer service ──────────────────────────────────────────────────
-    { prefix: '/api/csm/dashboard', key: 'csm_dashboard' },
+    { prefix: '/api/csm/dashboard', key: 'csm_dashboard', viewKeys: ['csm_dashboard', 'csm_detail_dashboard'] },
     { prefix: '/api/csm/reports', key: 'csm_reports' },
     {
         prefix: '/api/csm/tickets', key: 'csm_tickets', viewKeys: ['csm_tickets', 'csm_rca', 'csm_visits'],
@@ -256,7 +256,7 @@ const API_PERMISSION_RULES = [
     { prefix: '/api/csm/customer-contacts', key: 'csm_tickets', routes: { 'POST /': createOrModify('csm_tickets') } },
     {
         prefix: '/api/csm/visits', key: 'csm_visits',
-        viewKeys: ['csm_visits', 'csm_dashboard', 'csm_tickets', 'csm_warranties_amc'],
+        viewKeys: ['csm_visits', 'csm_dashboard', 'csm_detail_dashboard', 'csm_tickets', 'csm_warranties_amc'],
         routes: { 'POST /:id/check-in': 'modify', 'POST /:id/check-out': 'modify', 'PATCH /:id/reschedule': 'modify' }
     },
     { prefix: '/api/csm/attendance', key: 'csm_attendance', routes: { 'POST /check-out': 'create' } },
@@ -271,8 +271,17 @@ const API_PERMISSION_RULES = [
             'POST /': { anyOf: [['csm_tickets', 'create'], ['csm_warranties_amc', 'create'], ['master_serials', 'create']] },
             'POST /single': { key: 'master_serials', action: 'create' },
             'POST /:id/return': { key: 'master_serials', action: 'modify' },
-            // Saved entries cannot be changed; the controller answers these
-            'PUT /:id': SKIP,
+            // Invoice Bulk Upload's Edit and View Details are switches of their own. The
+            // summary also feeds the ticket form and the warranty / customer screens, so
+            // those keep it; Invoice Bulk Upload access alone no longer does.
+            'PUT /:id': { key: 'master_serials_edit', action: 'view' },
+            'GET /summary': {
+                anyOf: [
+                    ['master_serials_view_details', 'view'], ['csm_tickets', 'view'],
+                    ['csm_warranties_amc', 'view'], ['master_customers', 'view']
+                ]
+            },
+            // Entries cannot be deleted or partially updated; the controller answers these
             'PATCH /:id': SKIP,
             'DELETE /:id': SKIP
         }

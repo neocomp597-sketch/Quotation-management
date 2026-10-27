@@ -75,6 +75,7 @@ const PayrollMasters = lazy(() => import('./pages/PayrollMasters'));
 const OrgChart = lazy(() => import('./pages/OrgChart'));
 const Flowcharts = lazy(() => import('./pages/Flowcharts'));
 const CSMDashboard = lazy(() => import('./pages/CSMDashboard'));
+const CSMDetailDashboard = lazy(() => import('./pages/CSMDetailDashboard'));
 const CSMTickets = lazy(() => import('./pages/CSMTickets'));
 const TicketDetail = lazy(() => import('./pages/TicketDetail'));
 const ServiceVisits = lazy(() => import('./pages/ServiceVisits'));
@@ -297,7 +298,7 @@ function App() {
             <Route path="/serial-no-transfer" element={<PermissionRoute permissionKey="master_serials"><Layout><SerialNoTransfer /></Layout></PermissionRoute>} />
             <Route path="/serial-no-transfer/:assetId" element={<PermissionRoute permissionKey="master_serials"><Layout><SerialNoDetails /></Layout></PermissionRoute>} />
             <Route path="/serial-no-transfer/:assetId/transfer" element={<PermissionRoute permissionKey="master_serials"><Layout><SerialNoDetails transfer /></Layout></PermissionRoute>} />
-            <Route path="/serial-no-master/view/:serialNumber" element={<PermissionRoute permissionKey="master_serials"><Layout><AssetLifecycle /></Layout></PermissionRoute>} />
+            <Route path="/serial-no-master/view/:serialNumber" element={<PermissionRoute permissionKey="master_serials_view_details"><Layout><AssetLifecycle /></Layout></PermissionRoute>} />
             <Route path="/flowcharts" element={<PermissionRoute permissionKey="flowchart_view"><Layout><Flowcharts /></Layout></PermissionRoute>} />
             <Route path="/settings" element={<PermissionRoute permissionKey="settings_profile"><Layout><Settings /></Layout></PermissionRoute>} />
             <Route path="/status-master" element={<PermissionRoute adminOnly={true}><Layout><StatusMaster /></Layout></PermissionRoute>} />
@@ -377,6 +378,7 @@ function App() {
 
             {/* CSM Routes */}
             <Route path="/csm/dashboard" element={<PermissionRoute permissionKey="csm_dashboard"><Layout><CSMDashboard /></Layout></PermissionRoute>} />
+            <Route path="/csm/detail-dashboard" element={<PermissionRoute permissionKey="csm_detail_dashboard"><Layout><CSMDetailDashboard /></Layout></PermissionRoute>} />
             <Route path="/csm/tickets" element={<PermissionRoute permissionKey="csm_tickets"><Layout><CSMTickets /></Layout></PermissionRoute>} />
             <Route path="/csm/tickets/:id" element={<PermissionRoute permissionKey="csm_tickets"><Layout><TicketDetail /></Layout></PermissionRoute>} />
             <Route path="/csm/visits" element={<PermissionRoute permissionKey="csm_visits"><Layout><ServiceVisits /></Layout></PermissionRoute>} />

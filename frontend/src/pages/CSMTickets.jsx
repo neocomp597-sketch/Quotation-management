@@ -486,11 +486,13 @@ const CSMTickets = () => {
             if (searchParams.get('slaBreached') === 'true') {
                 queryParams.slaBreached = 'true';
             }
-            if (searchParams.get('resolvedOn') === 'yesterday') {
-                queryParams.resolvedOn = 'yesterday';
+            const resolvedOn = searchParams.get('resolvedOn');
+            if (resolvedOn === 'today' || resolvedOn === 'yesterday') {
+                queryParams.resolvedOn = resolvedOn;
             }
-            if (searchParams.get('createdOn') === 'today') {
-                queryParams.createdOn = 'today';
+            const createdOn = searchParams.get('createdOn');
+            if (createdOn === 'today' || createdOn === 'yesterday') {
+                queryParams.createdOn = createdOn;
             }
             if (filterInvoiceType === 'manual') {
                 queryParams.isManual = 'true';

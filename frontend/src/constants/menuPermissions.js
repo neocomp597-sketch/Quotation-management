@@ -23,6 +23,8 @@ export const MENU_PERMISSION_GROUPS = [
             { key: 'csm_masters', label: 'Engineers Master', description: 'Field service engineers master', defaultRoute: '/csm/masters?tab=engineers' },
             { key: 'flowchart_view', label: 'Flowchart Builder', description: 'Visual process flowchart builder', defaultRoute: '/flowcharts' },
             { key: 'master_serials', label: 'Invoice Bulk Upload', description: 'Serial number and asset master records', defaultRoute: '/serial-no-master' },
+            { key: 'master_serials_view_details', label: 'Invoice Bulk Upload: View Details', description: 'Open the lifecycle details of an Invoice Bulk Upload entry', defaultRoute: '/serial-no-master' },
+            { key: 'master_serials_edit', label: 'Invoice Bulk Upload: Edit Entry', description: 'Change a saved Invoice Bulk Upload entry', defaultRoute: '/serial-no-master' },
             { key: 'payroll_org_chart_full', label: 'Org Chart (Full Company)', description: 'Full company org chart access', defaultRoute: '/payroll/org-chart' },
             { key: 'payroll_org_chart', label: 'Org Chart (My Team)', description: 'Direct reporting org chart access', defaultRoute: '/payroll/org-chart' },
             { key: 'master_bom', label: 'Product BOM Master', description: 'Create, edit and view serial-number-wise BOMs', defaultRoute: '/bom-master' },
@@ -144,6 +146,7 @@ export const MENU_PERMISSION_GROUPS = [
         defaultRoute: '/csm/dashboard',
         children: [
             { key: 'csm_dashboard', label: 'CSM Dashboard', description: 'Overview and customer service analytics', defaultRoute: '/csm/dashboard' },
+            { key: 'csm_detail_dashboard', label: 'CSM Detail Dashboard', description: 'Resolution speed, SLA compliance, field service log, ticket charts and engineer performance', defaultRoute: '/csm/detail-dashboard' },
             { key: 'csm_tickets', label: 'Tickets Register', description: 'View, create, and resolve customer support tickets', defaultRoute: '/csm/tickets' },
             { key: 'csm_tickets', label: 'My Tickets', description: 'Tickets created by or assigned to the logged-in user', defaultRoute: '/csm/tickets?tab=my' },
             { key: 'csm_tickets', label: 'My Team Tickets', description: 'Tickets for the logged-in user reporting hierarchy', defaultRoute: '/csm/tickets?tab=team' },

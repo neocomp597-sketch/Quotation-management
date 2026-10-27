@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import SiteLogo from './SiteLogo';
 import {
     MdDashboard,
+    MdInsights,
     MdPeople,
     MdInventory,
     MdDescription,
@@ -295,6 +296,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             icon: <MdBuildCircle size={22} />,
             children: [
                 { key: 'csm_dashboard', name: 'CSM Dashboard', icon: <MdDashboard size={18} />, path: '/csm/dashboard' },
+                { key: 'csm_detail_dashboard', name: 'CSM Detail Dashboard', icon: <MdInsights size={18} />, path: '/csm/detail-dashboard' },
                 { key: 'csm_tickets', name: 'Tickets Register', icon: <MdAssignment size={18} />, path: '/csm/tickets' },
                 { key: 'csm_tickets', name: 'My Tickets', icon: <MdPeople size={18} />, path: '/csm/tickets?tab=my' },
                 { key: 'csm_tickets', name: 'My Team Tickets', icon: <MdAccountTree size={18} />, path: '/csm/tickets?tab=team' },

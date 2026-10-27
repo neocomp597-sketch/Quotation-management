@@ -447,8 +447,8 @@ const importProducts = async (req, res) => {
                 importBatch.add({ productCode, productName }, i + 2);
 
                 let existing = null;
-                if (productCode) {
-                    existing = await Product.findOne({ productCode: buildExactRegex(productCode) });
+                if (cleanCode) {
+                    existing = await Product.findOne({ ...companyFilter, productCode: buildExactRegex(cleanCode) });
                 }
 
                 // A row without a code updates the product with that name. A row with a code

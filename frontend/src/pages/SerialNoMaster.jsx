@@ -6,7 +6,7 @@ import * as XLSX from 'xlsx';
 import {
     MdSearch, MdTag, MdInfoOutline, MdSync,
     MdLocalOffer, MdPeople, MdReceipt, MdAssignmentTurnedIn,
-    MdFileUpload, MdFileDownload, MdAdd, MdUndo, MdHistory
+    MdFileUpload, MdFileDownload, MdAdd, MdUndo, MdHistory, MdEdit
 } from 'react-icons/md';
 import Modal from '../components/Modal';
 import ImportWizard from '../components/import/ImportWizard';
@@ -14,6 +14,7 @@ import PaginationControls from '../components/PaginationControls';
 import { formatDate } from '../utils/helpers';
 import DateInput from '../components/DateInput';
 import usePermission from '../hooks/usePermission';
+import { useAuth } from '../context/AuthContext';
 
 const PAGE_SIZE = 15;
 
@@ -59,12 +60,15 @@ const idOf = (value) => String(value?._id || value || '');
 // active segment yet (e.g. EXP / CCD until their segments are defined).
 const NO_ACTIVE_SEGMENTS_MESSAGE = "No active segments are configured for this Division. Please contact the administrator.";
 
+// `customer` is the Customer Name and `customerCode` the Customer Code; the API looks the
+// customer up by code first, then by name.
 const EMPTY_SINGLE_FORM = {
     serialNumber: '',
     productCode: '',
     productName: '',
     status: 'IN_STOCK',
     customer: '',
+    customerCode: '',
     customerPostalCode: '',
     invoiceNumber: '',
     saleDate: '',
@@ -73,6 +77,34 @@ const EMPTY_SINGLE_FORM = {
     segmentId: '',
     indicatorField: ''
 };
+
+const STATUS_OPTIONS = ['IN_STOCK', 'SOLD', 'ALLOCATED', 'RETURN', 'SCRAPPED'];
+const RETURNED_STATUSES = ['RETURN', 'RETURNED'];
+
+// A saved date as the 'YYYY-MM-DD' value of a date input, in the browser's own time zone.
+const toDateInputValue = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+};
+
+// The Edit form of a saved entry, filled the way the list shows it.
+const formFromAsset = (asset) => ({
+    serialNumber: asset.serialNumber || '',
+    productCode: asset.productId?.productCode || asset.productCode || '',
+    productName: asset.productId?.productName || asset.productName || '',
+    status: asset.status || 'IN_STOCK',
+    customer: asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || '',
+    customerCode: asset.customerCode || asset.customerId?.externalCode || '',
+    customerPostalCode: asset.customerPostalCode || '',
+    invoiceNumber: asset.invoiceNumber || '',
+    saleDate: toDateInputValue(asset.saleDate || asset.invoiceDate),
+    location: asset.location || '',
+    divisionId: idOf(asset.divisionId),
+    segmentId: idOf(asset.segmentId),
+    indicatorField: asset.indicatorField || ''
+});
 
 const findProductByCode = (products, code) => {
     const clean = String(code || '').trim().toLowerCase();
@@ -95,6 +127,10 @@ const MgrLine = ({ record }) => {
 const SerialNoMaster = () => {
     const navigate = useNavigate();
     const { canCreate, canModify } = usePermission('master_serials');
+    // View Details and Edit are switches of their own in Authorization; the API checks them too.
+    const { hasAccess } = useAuth();
+    const canViewDetails = hasAccess('master_serials_view_details');
+    const canEdit = hasAccess('master_serials_edit');
     const [assets, setAssets] = useState([]);
     const [assetPagination, setAssetPagination] = useState({ page: 1, limit: PAGE_SIZE, total: 0, pages: 1 });
     const [assetSummary, setAssetSummary] = useState({ total: 0, inStock: 0, sold: 0, returned: 0 });
@@ -104,6 +140,7 @@ const SerialNoMaster = () => {
     const [fetchError, setFetchError] = useState(null); // null | { message, status }
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [activeTab, setActiveTab] = useState('active'); // 'active' | 'returns'
+    const [isExporting, setIsExporting] = useState(false);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedStatus, setSelectedStatus] = useState('ALL');
@@ -118,6 +155,14 @@ const SerialNoMaster = () => {
     const [pageView, setPageView] = useState('list');
     const [singleSaving, setSingleSaving] = useState(false);
     const [singleForm, setSingleForm] = useState(EMPTY_SINGLE_FORM);
+    // The saved entry being edited; null while adding a single entry.
+    const [editingAsset, setEditingAsset] = useState(null);
+    const isEditing = Boolean(editingAsset);
+    const isReturnedEntry = isEditing && RETURNED_STATUSES.includes(editingAsset.status);
+    // Returning has its own flow (Sales Return), and a returned serial is re-sold with Add Single Entry.
+    const statusOptions = !isEditing
+        ? STATUS_OPTIONS
+        : isReturnedEntry ? [editingAsset.status] : STATUS_OPTIONS.filter(s => s !== 'RETURN');
 
     // Division Master -> Division dropdown -> Segment Master -> Segment dropdown.
     const [divisions, setDivisions] = useState([]);
@@ -381,14 +426,22 @@ const SerialNoMaster = () => {
         }
     };
 
-    // Single Entry Submit (Requirement #15). Saved entries cannot be edited or deleted.
+    // Single Entry Submit (Requirement #15). The same form edits a saved entry; entries cannot be deleted.
     const openSingleEntry = () => {
+        setEditingAsset(null);
         setSingleForm(EMPTY_SINGLE_FORM);
+        setPageView('single');
+    };
+
+    const openEditEntry = (asset) => {
+        setEditingAsset(asset);
+        setSingleForm(formFromAsset(asset));
         setPageView('single');
     };
 
     const closeSingleEntry = () => {
         setPageView('list');
+        setEditingAsset(null);
         setSingleForm(EMPTY_SINGLE_FORM);
     };
 
@@ -414,13 +467,22 @@ const SerialNoMaster = () => {
 
         setSingleSaving(true);
         try {
-            await csmService.createSingleAsset(singleForm);
-            toast.success('Single entry created successfully!');
+            if (isEditing) {
+                const changes = { ...singleForm };
+                // An untouched Sale Date is left out so the entry keeps its saved date (an imported
+                // entry may only have an invoice date, which the form shows in its place).
+                if (changes.saleDate === formFromAsset(editingAsset).saleDate) delete changes.saleDate;
+                await csmService.updateAsset(editingAsset._id, changes);
+                toast.success(`Entry ${editingAsset.serialNumber} updated successfully!`);
+            } else {
+                await csmService.createSingleAsset(singleForm);
+                toast.success('Single entry created successfully!');
+            }
             closeSingleEntry();
             fetchData();
         } catch (err) {
             console.error('Single entry save error:', err);
-            toast.error(err.response?.data?.message || 'Failed to save single entry');
+            toast.error(err.response?.data?.message || (isEditing ? 'Failed to update entry' : 'Failed to save single entry'));
         } finally {
             setSingleSaving(false);
         }
@@ -484,10 +546,12 @@ const SerialNoMaster = () => {
                                 ← Back to Invoice Bulk Upload
                             </button>
                             <h1 className="text-3xl font-black tracking-tight text-slate-900 font-outfit uppercase">
-                                Add Single Entry
+                                {isEditing ? 'Edit Entry' : 'Add Single Entry'}
                             </h1>
                             <p className="text-slate-500 font-semibold text-sm">
-                                Manually enter one invoice, product, or serial record into the system without uploading an Excel file.
+                                {isEditing
+                                    ? `Change the saved details of serial number ${editingAsset.serialNumber}.`
+                                    : 'Manually enter one invoice, product, or serial record into the system without uploading an Excel file.'}
                             </p>
                         </div>
                         <div className="flex items-center gap-3">
@@ -504,7 +568,7 @@ const SerialNoMaster = () => {
                                 disabled={singleSaving || divisionHasNoActiveSegments}
                                 className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20 active:scale-95 disabled:opacity-50 cursor-pointer"
                             >
-                                {singleSaving ? 'Saving Entry...' : 'Save Single Entry'}
+                                {singleSaving ? 'Saving Entry...' : (isEditing ? 'Save Changes' : 'Save Single Entry')}
                             </button>
                         </div>
                     </div>
@@ -519,8 +583,10 @@ const SerialNoMaster = () => {
                                         required
                                         placeholder="e.g. SN-100202"
                                         value={singleForm.serialNumber}
+                                        readOnly={isEditing}
+                                        title={isEditing ? 'The serial number of a saved entry cannot be changed' : undefined}
                                         onChange={(e) => setSingleForm({ ...singleForm, serialNumber: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                        className={`w-full px-4 py-3 border border-slate-200 rounded-xl transition-all outline-none font-semibold ${isEditing ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-slate-50 text-slate-900 focus:ring-2 focus:ring-primary-500 focus:bg-white'}`}
                                     />
                                 </div>
                                 <div>
@@ -549,18 +615,24 @@ const SerialNoMaster = () => {
                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Status</label>
                                     <select
                                         value={singleForm.status}
+                                        disabled={isReturnedEntry}
                                         onChange={(e) => setSingleForm({ ...singleForm, status: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900 disabled:opacity-60"
                                     >
-                                        <option value="IN_STOCK">IN_STOCK</option>
-                                        <option value="SOLD">SOLD</option>
-                                        <option value="ALLOCATED">ALLOCATED</option>
-                                        <option value="RETURN">RETURN</option>
-                                        <option value="SCRAPPED">SCRAPPED</option>
+                                        {statusOptions.map(status => (
+                                            <option key={status} value={status}>{status}</option>
+                                        ))}
                                     </select>
+                                    {isEditing && (
+                                        <p className="mt-1.5 text-[10px] font-semibold text-slate-400">
+                                            {isReturnedEntry
+                                                ? 'Re-sell a returned serial with Add Single Entry.'
+                                                : 'Use Sales Return to return a sold serial.'}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Name / Code</label>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Name</label>
                                     <input
                                         type="text"
                                         placeholder="e.g. Apex Industrial"
@@ -570,12 +642,12 @@ const SerialNoMaster = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Postal Code</label>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Code</label>
                                     <input
                                         type="text"
-                                        placeholder="e.g. 400001"
-                                        value={singleForm.customerPostalCode}
-                                        onChange={(e) => setSingleForm({ ...singleForm, customerPostalCode: e.target.value })}
+                                        placeholder="e.g. C-10023"
+                                        value={singleForm.customerCode}
+                                        onChange={(e) => setSingleForm({ ...singleForm, customerCode: e.target.value })}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
                                     />
                                 </div>
@@ -644,7 +716,16 @@ const SerialNoMaster = () => {
                                         <p className="mt-1.5 text-[10px] font-bold text-rose-600">{NO_ACTIVE_SEGMENTS_MESSAGE}</p>
                                     )}
                                 </div>
-                                <div className="hidden lg:block" aria-hidden="true" />
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Postal Code</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. 400001"
+                                        value={singleForm.customerPostalCode}
+                                        onChange={(e) => setSingleForm({ ...singleForm, customerPostalCode: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
                                 <div className="col-span-full p-4 bg-slate-50 border border-slate-200 rounded-xl">
                                     <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">MGR 1 – 5 (from Product Master)</span>
@@ -727,11 +808,12 @@ const SerialNoMaster = () => {
                     )}
                     <button
                         onClick={handleExport}
-                        className="flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-5 py-3 rounded-2xl font-black transition-all uppercase text-[10px] tracking-widest active:scale-95 shadow-md shadow-teal-600/10"
+                        disabled={isExporting}
+                        className="flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white px-5 py-3 rounded-2xl font-black transition-all uppercase text-[10px] tracking-widest active:scale-95 shadow-md shadow-teal-600/10 cursor-pointer"
                         title="Export Assets / Serials Excel"
                     >
-                        <MdFileDownload size={18} />
-                        <span>Export</span>
+                        {isExporting ? <MdSync className="animate-spin" size={18} /> : <MdFileDownload size={18} />}
+                        <span>{isExporting ? 'Exporting...' : 'Export'}</span>
                     </button>
                     <button
                         onClick={() => { fetchData(); if (activeTab === 'returns') fetchReturnHistory(); }}
@@ -953,6 +1035,8 @@ const SerialNoMaster = () => {
                                     <tbody>
                                         {paginatedAssets.map(asset => {
                                             const custDisplay = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || (asset.customerId ? 'Customer' : '');
+                                            const canReturn = asset.status === 'SOLD' && canModify;
+                                            const hasActions = canViewDetails || canEdit || canReturn;
                                             return (
                                                 <tr key={asset._id} className="border-b last:border-0 border-slate-50 hover:bg-slate-50/50 transition-colors">
                                                     <td className="p-4 text-sm font-black text-slate-900 font-mono tracking-wide">
@@ -1015,8 +1099,10 @@ const SerialNoMaster = () => {
                                                             </span>
                                                         )}
                                                     </td>
-                                                    {/* Actions are grouped under the row's information control. */}
+                                                    {/* Actions are grouped under the row's information control; each one
+                                                        shows only with its permission (View Details, Edit, Modify). */}
                                                     <td className="p-4 text-right">
+                                                        {hasActions ? (
                                                         <div className="relative inline-flex justify-end">
                                                             <button
                                                                 onClick={() => setOpenActionMenuAssetId(current => current === asset._id ? null : asset._id)}
@@ -1029,17 +1115,31 @@ const SerialNoMaster = () => {
                                                             </button>
                                                             {openActionMenuAssetId === asset._id && (
                                                                 <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 text-left shadow-lg">
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setOpenActionMenuAssetId(null);
-                                                                            handleViewDetail(asset.serialNumber);
-                                                                        }}
-                                                                        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                                                                    >
-                                                                        <MdInfoOutline size={16} />
-                                                                        View details
-                                                                    </button>
-                                                                    {asset.status === 'SOLD' && canModify && (
+                                                                    {canViewDetails && (
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                setOpenActionMenuAssetId(null);
+                                                                                handleViewDetail(asset.serialNumber);
+                                                                            }}
+                                                                            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                                                        >
+                                                                            <MdInfoOutline size={16} />
+                                                                            View details
+                                                                        </button>
+                                                                    )}
+                                                                    {canEdit && (
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                setOpenActionMenuAssetId(null);
+                                                                                openEditEntry(asset);
+                                                                            }}
+                                                                            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-primary-700 hover:bg-primary-50"
+                                                                        >
+                                                                            <MdEdit size={16} />
+                                                                            Edit
+                                                                        </button>
+                                                                    )}
+                                                                    {canReturn && (
                                                                         <button
                                                                             onClick={() => {
                                                                                 setOpenActionMenuAssetId(null);
@@ -1054,6 +1154,9 @@ const SerialNoMaster = () => {
                                                                 </div>
                                                             )}
                                                         </div>
+                                                        ) : (
+                                                            <span className="text-slate-300">-</span>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             );

@@ -59,6 +59,7 @@ router.get('/assets/summary', protect, warrantyAmcController.getAssetSummary);
 router.get('/assets/activity', protect, warrantyAmcController.getAssetActivity);
 router.get('/assets/search-serials', protect, warrantyAmcController.searchSerialNumbers);
 router.get('/assets/return-history', protect, warrantyAmcController.getReturnHistory);
+router.get('/assets/export', protect, warrantyAmcController.exportAssets);
 router.get('/warranties/serial-lookup', protect, warrantyAmcController.lookupWarrantySerial);
 router.post('/warranties', protect, warrantyAmcController.createWarranty);
 router.get('/warranties', protect, warrantyAmcController.getWarranties);
@@ -66,8 +67,8 @@ router.post('/amcs', protect, warrantyAmcController.createAmc);
 router.get('/amcs', protect, warrantyAmcController.getAmcs);
 router.post('/assets/single', protect, warrantyAmcController.createSingleAsset);
 router.post('/assets/:id/return', protect, warrantyAmcController.returnAsset);
-// Invoice Bulk Upload entries are not editable or deletable.
-router.put('/assets/:id', protect, warrantyAmcController.rejectEntryChange);
+// Invoice Bulk Upload entries are edited with PUT (Edit permission); they cannot be deleted.
+router.put('/assets/:id', protect, warrantyAmcController.updateAsset);
 router.patch('/assets/:id', protect, warrantyAmcController.rejectEntryChange);
 router.delete('/assets/:id', protect, warrantyAmcController.rejectEntryChange);
 router.post('/assets', protect, warrantyAmcController.createAsset);

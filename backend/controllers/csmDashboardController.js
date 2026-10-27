@@ -14,22 +14,24 @@ exports.getStats = async (req, res) => {
         });
 
         // 1. Unassigned Tickets count (Requirement 3)
-        // Tickets that are not resolved/closed/cancelled and have no engineer assigned
+        // Tickets that are not resolved/closed/cancelled and have no engineer assigned.
+        // `null` also matches a missing field, and leaves baseScope's own $or (user hierarchy) intact.
         const unassignedQuery = {
             ...baseScope,
             status: { $nin: ['Resolved', 'Closed', 'Cancelled'] },
-            $or: [{ assignedEngineerId: null }, { assignedEngineerId: { $exists: false } }]
+            assignedEngineerId: null
         };
         const unassignedCount = await Ticket.countDocuments(unassignedQuery);
 
         // Core metric counters
-        const openCount = await Ticket.countDocuments({ ...baseScope, status: 'Open' });
-        const assignedCount = await Ticket.countDocuments({ ...baseScope, status: 'Assigned' });
-        const inProgressCount = await Ticket.countDocuments({ ...baseScope, status: 'In Progress' });
+        // Open = every ticket still in process, the same set as the register's "Open Tickets" filter.
+        const openCount = await Ticket.countDocuments({ ...baseScope, status: { $nin: ['Resolved', 'Closed', 'Cancelled'] } });
         const pendingCount = await Ticket.countDocuments({ ...baseScope, status: 'Pending Customer' });
 
         const startOfToday = new Date();
         startOfToday.setHours(0, 0, 0, 0);
+        const startOfYesterday = new Date(startOfToday);
+        startOfYesterday.setDate(startOfYesterday.getDate() - 1);
 
         // Tickets raised today (any status), same day boundary as the Resolved cards.
         const createdTodayCount = await Ticket.countDocuments({
@@ -37,15 +39,20 @@ exports.getStats = async (req, res) => {
             createdAt: { $gte: startOfToday }
         });
 
+        // Tickets raised yesterday (any status).
+        const createdYesterdayCount = await Ticket.countDocuments({
+            ...baseScope,
+            createdAt: { $gte: startOfYesterday, $lt: startOfToday }
+        });
+
+        // Resolved today, including tickets that have since been closed (same rule as yesterday).
         const resolvedTodayCount = await Ticket.countDocuments({
             ...baseScope,
-            status: 'Resolved',
+            status: { $in: ['Resolved', 'Closed'] },
             resolvedAt: { $gte: startOfToday }
         });
 
         // Resolved yesterday, including tickets that have since been closed.
-        const startOfYesterday = new Date(startOfToday);
-        startOfYesterday.setDate(startOfYesterday.getDate() - 1);
         const resolvedYesterdayCount = await Ticket.countDocuments({
             ...baseScope,
             status: { $in: ['Resolved', 'Closed'] },
@@ -165,9 +172,10 @@ exports.getStats = async (req, res) => {
 
         res.json({
             metrics: {
-                open: openCount + assignedCount + inProgressCount,
+                open: openCount,
                 unassigned: unassignedCount,
                 createdToday: createdTodayCount,
+                createdYesterday: createdYesterdayCount,
                 pending: pendingCount,
                 overdue: overdueCount,
                 resolvedToday: resolvedTodayCount,
