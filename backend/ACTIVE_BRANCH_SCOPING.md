@@ -73,3 +73,22 @@ catalog and is not branch scoped.
   query (an id lookup that must reach any record). `bypassTenant: true` implies it.
 - `runWithTenant(companyId, fn, { bypassBranch: true })` - background work that must
   not be branch filtered.
+
+## Serial branch transfers
+
+Serial No Transfer > Branch Transfer moves Invoice Bulk Upload serials (Asset) to another
+branch: the Asset, its customer history (SerialTransfer) and its Invoice Bulk Upload
+history (AssetHistory) take the destination branch in one transaction, and a
+SerialBranchTransfer record per serial keeps both branches. Status, customer and invoice
+data are not changed. The routes under `/api/serial-transfers/branch-transfers` run
+without the active-branch filter (`acrossBranches`); `utils/serialBranchAccess.js` holds
+the rules, switched by `SERIAL_BRANCH_TRANSFER_ACCESS`:
+
+- unset / `all` (current, for testing): serials can be moved out of any branch of the
+  company, and every transfer is listed in every branch.
+- `branch`: serials can be moved only out of the active branch (or, without one, the
+  user's selectable branches), and only transfers out of or into those branches are
+  listed.
+
+The Serial No List, Invoice Bulk Upload and the other Serial No Transfer tabs keep the
+normal active-branch scoping above, so a moved serial shows under its new branch.

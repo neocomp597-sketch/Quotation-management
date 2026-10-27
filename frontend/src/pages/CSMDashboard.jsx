@@ -230,21 +230,21 @@ const CSMDashboard = () => {
     const dayOptions = Array.from({ length: daysInSelectedMonth }, (_, idx) => idx + 1);
 
     return (
-        <div className="p-6 space-y-6 max-w-7xl mx-auto animate-fade-in-up">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
-                <div>
-                    <h1 className="text-3xl font-black tracking-tight text-slate-900 font-outfit uppercase flex items-center gap-2">
-                        <MdFlashOn className="text-teal-600 animate-pulse" /> Customer Service Analytics
+        <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto animate-fade-in-up">
+            {/* Header: title and Refresh share one row on phones */}
+            <div className="flex flex-row items-start md:items-center justify-between gap-3 sm:gap-4 border-b border-slate-100 pb-3 sm:pb-5">
+                <div className="min-w-0">
+                    <h1 className="text-xl sm:text-3xl font-black tracking-tight text-slate-900 font-outfit uppercase flex items-center gap-2">
+                        <MdFlashOn className="text-teal-600 animate-pulse shrink-0" /> Customer Service Analytics
                     </h1>
-                    <p className="text-slate-500 font-semibold text-sm">
+                    <p className="hidden sm:block text-slate-500 font-semibold text-sm">
                         Live insights into support load, SLA compliance targets, and engineer performance.
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                     <button
                         onClick={() => loadStats(true)}
-                        className="p-3 text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-2xl shadow-sm hover:bg-slate-50 transition-all flex items-center gap-1 font-bold text-xs"
+                        className="p-2.5 sm:p-3 text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-2xl shadow-sm hover:bg-slate-50 transition-all flex items-center gap-1 font-bold text-xs"
                         title="Refresh Stats"
                     >
                         <MdRefresh size={18} /> Refresh
@@ -255,12 +255,12 @@ const CSMDashboard = () => {
             {/* Filter Toolbar (Collapsible & Premium UI) */}
             <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
                 {/* Filter Header / Collapse Toggle Bar */}
-                <div 
+                <div
                     onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
-                    className="p-4 flex items-center justify-between gap-4 cursor-pointer select-none hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                    className="p-3 sm:p-4 flex items-center justify-between gap-3 sm:gap-4 cursor-pointer select-none hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
                 >
-                    <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 rounded-2xl border border-teal-100 dark:border-teal-900/50">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-2 sm:p-2.5 bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 rounded-2xl border border-teal-100 dark:border-teal-900/50">
                             <MdFilterList size={20} />
                         </div>
                         <div>
@@ -487,20 +487,21 @@ const CSMDashboard = () => {
                 </div>
             ) : (
                 <>
-                    {/* Requirement 3: Metrics Row with Unassigned Tickets block */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                    {/* Requirement 3: Metrics Row with Unassigned Tickets block. Phones get three
+                        compact cards per row so all six fit on the first screen. */}
+                    <div className="grid grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-4">
                         {metricCards.map((card, i) => (
-                            <div 
+                            <div
                                 key={i}
                                 onClick={() => card.link && navigate(card.link)}
-                                className="relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl px-4 py-3.5 shadow-sm flex items-center justify-between gap-3 cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all active:scale-[0.98] group"
+                                className="relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl sm:rounded-2xl px-2.5 pt-3 pb-2 sm:px-4 sm:py-3.5 shadow-sm flex items-center justify-between gap-3 cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all active:scale-[0.98] group"
                             >
                                 <span className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${card.color}`} />
                                 <div className="min-w-0">
-                                    <span className="block text-[11px] leading-tight font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">{card.label}</span>
-                                    <h2 className="text-3xl font-black text-slate-900 dark:text-slate-100 font-outfit leading-tight tabular-nums">{card.value ?? 0}</h2>
+                                    <span className="block min-h-[2.5em] sm:min-h-0 text-[10px] sm:text-[11px] leading-tight font-black uppercase text-slate-500 dark:text-slate-400 tracking-wide sm:tracking-wider group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">{card.label}</span>
+                                    <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 font-outfit leading-tight tabular-nums">{card.value ?? 0}</h2>
                                 </div>
-                                <div className={`flex-shrink-0 w-10 h-10 bg-gradient-to-br ${card.color} rounded-xl flex items-center justify-center text-white shadow-sm group-hover:scale-110 transition-transform`}>
+                                <div className={`hidden sm:flex flex-shrink-0 w-10 h-10 bg-gradient-to-br ${card.color} rounded-xl items-center justify-center text-white shadow-sm group-hover:scale-110 transition-transform`}>
                                     {card.icon}
                                 </div>
                             </div>

@@ -485,6 +485,11 @@ export const serialTransferService = {
   // Customer Activity Log: ownership = Active (current owners) | Inactive (earlier owners).
   listActivity: (params = {}) => api.get("/serial-transfers/activity", { params }),
   exportActivity: (params = {}) => api.get("/serial-transfers/activity/export", { params, responseType: "blob" }),
+  listBranchTransfers: (params = {}) => api.get("/serial-transfers/branch-transfers", { params }),
+  createBranchTransfer: (data) => api.post("/serial-transfers/branch-transfers", data),
+  getTransferBranches: () => api.get("/serial-transfers/branch-transfers/branches"),
+  searchBranchSerials: (params = {}) => api.get("/serial-transfers/branch-transfers/serials", { params }),
+  getSerialBranchHistory: (assetId) => api.get(`/serial-transfers/branch-transfers/serials/${assetId}`),
 };
 
 export const companySettingsService = {

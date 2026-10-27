@@ -1,0 +1,127 @@
+<!-- ARCRM Dashboard Clock (fills the whole marked box)
+     Box ratio from your screenshot = 718 x 341 px (about 2.1 : 1).
+     The clock always takes 100% of the width of its parent and keeps that ratio,
+     and everything inside scales with it. No libraries needed. -->
+
+<div class="arcrm-clock" id="arcrmClock" role="timer" aria-label="Current time">
+  <svg class="arcrm-clock__face" viewBox="0 0 200 200" aria-hidden="true">
+    <defs>
+      <filter id="arcrmGlow" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="2" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    <g id="arcrmTicks" filter="url(#arcrmGlow)" stroke="#cfe6ff" stroke-linecap="round" stroke-width="3"></g>
+    <g filter="url(#arcrmGlow)" stroke-linecap="round">
+      <line id="arcrmHour" x1="100" y1="112" x2="100" y2="58" stroke="#ffffff" stroke-width="4"/>
+      <line id="arcrmMin"  x1="100" y1="116" x2="100" y2="34" stroke="#ffffff" stroke-width="3"/>
+      <line id="arcrmSec"  x1="100" y1="116" x2="100" y2="26" stroke="#ff4f93" stroke-width="1.6"/>
+    </g>
+    <circle cx="100" cy="100" r="3.5" fill="#ff4f93"/>
+  </svg>
+
+  <div class="arcrm-clock__digital">
+    <div class="arcrm-clock__time">
+      <span id="arcrmHM">00:00</span><span class="arcrm-clock__sec" id="arcrmS">00</span>
+    </div>
+    <div class="arcrm-clock__date" id="arcrmDate"></div>
+  </div>
+</div>
+
+<style>
+  .arcrm-clock{
+    container-type:inline-size;          /* lets children size themselves from the box width */
+    box-sizing:border-box;
+    width:17cm;                          /* length */
+    height:9cm;                          /* width (height) */
+    max-width:100%;                      /* shrinks on small screens so it never overflows */
+    margin:0 auto;                       /* centred; use margin:0; for left aligned */
+    aspect-ratio:17 / 9;                 /* keeps the shape if max-width kicks in */
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:5cqw;
+    padding:3cqw 4cqw;
+    border-radius:1.8cqw;
+    overflow:hidden;
+    color:#eaf3ff;
+    background:
+      radial-gradient(120% 90% at 15% 0%, #25357a 0%, rgba(37,53,122,0) 55%),
+      linear-gradient(180deg,#0e1642 0%,#070b24 100%);
+    box-shadow:0 10px 30px rgba(5,10,40,.35), inset 0 0 0 1px rgba(160,190,255,.12);
+    font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+  }
+  .arcrm-clock *{box-sizing:border-box}
+  .arcrm-clock__face{
+    flex:none;
+    width:38cqw;
+    height:38cqw;
+  }
+  .arcrm-clock__digital{flex:none}
+  .arcrm-clock__time{
+    font-family:"Courier New",ui-monospace,Menlo,Consolas,monospace;
+    font-variant-numeric:tabular-nums;
+    font-size:11.5cqw;
+    font-weight:700;
+    line-height:1;
+    letter-spacing:.04em;
+    white-space:nowrap;
+    color:#dff0ff;
+    text-shadow:0 0 .6cqw rgba(150,200,255,.9),0 0 2.4cqw rgba(90,150,255,.55);
+  }
+  .arcrm-clock__sec{
+    font-size:.42em;
+    margin-left:.25em;
+    letter-spacing:.02em;
+  }
+  .arcrm-clock__date{
+    margin-top:2.4cqw;
+    font-size:3.5cqw;
+    white-space:nowrap;
+    color:#f2f7ff;
+    text-shadow:0 0 1cqw rgba(150,200,255,.35);
+  }
+</style>
+
+<script>
+(function () {
+  var NS = "http://www.w3.org/2000/svg";
+  var ticks = document.getElementById("arcrmTicks");
+  var hourH = document.getElementById("arcrmHour");
+  var minH  = document.getElementById("arcrmMin");
+  var secH  = document.getElementById("arcrmSec");
+  var hm    = document.getElementById("arcrmHM");
+  var ss    = document.getElementById("arcrmS");
+  var dateE = document.getElementById("arcrmDate");
+  var DAYS  = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+
+  for (var i = 0; i < 12; i++) {
+    var a = i * 30 * Math.PI / 180, r1 = 78, r2 = 92;
+    var l = document.createElementNS(NS, "line");
+    l.setAttribute("x1", 100 + r1 * Math.sin(a));
+    l.setAttribute("y1", 100 - r1 * Math.cos(a));
+    l.setAttribute("x2", 100 + r2 * Math.sin(a));
+    l.setAttribute("y2", 100 - r2 * Math.cos(a));
+    ticks.appendChild(l);
+  }
+
+  function pad(n){ return n < 10 ? "0" + n : "" + n; }
+  function rot(el, deg){ el.setAttribute("transform", "rotate(" + deg + " 100 100)"); }
+
+  function tick() {
+    var d = new Date();
+    var h = d.getHours(), m = d.getMinutes(), s = d.getSeconds(), ms = d.getMilliseconds();
+
+    rot(secH,  (s + ms / 1000) * 6);
+    rot(minH,  (m + s / 60) * 6);
+    rot(hourH, ((h % 12) + m / 60) * 30);
+
+    hm.textContent    = pad(h) + ":" + pad(m);
+    ss.textContent    = pad(s);
+    dateE.textContent = DAYS[d.getDay()] + ", " + pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear();
+
+    requestAnimationFrame(tick);
+  }
+  tick();
+})();
+</script>

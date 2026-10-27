@@ -920,12 +920,12 @@ const ServiceVisits = () => {
                                     <table className="w-full text-left border-collapse text-sm">
                                         <thead>
                                             <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
-                                                <th className="px-6 py-4">Visit No</th>
-                                                <th className="px-6 py-4">Ticket Details</th>
-                                                <th className="px-6 py-4">Engineer</th>
-                                                <th className="px-6 py-4">Scheduled Date</th>
-                                                <th className="px-6 py-4">Status</th>
-                                                <th className="px-6 py-4 text-center">Action</th>
+                                                <th className="px-4 py-4">Visit No</th>
+                                                <th className="px-4 py-4">Ticket Details</th>
+                                                <th className="px-4 py-4">Engineer</th>
+                                                <th className="px-4 py-4">Scheduled Date</th>
+                                                <th className="px-4 py-4">Status</th>
+                                                <th className="px-4 py-4 text-center">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
@@ -942,7 +942,7 @@ const ServiceVisits = () => {
                                                         }`}
                                                         onClick={() => handleSelectVisit(v)}
                                                     >
-                                                        <td className="px-6 py-4 font-black text-slate-900 whitespace-nowrap">
+                                                        <td className="px-4 py-4 font-black text-slate-900 whitespace-nowrap">
                                                             {v.visitNo}
                                                             {v.branchId?.name && (
                                                                 <span className="block w-fit mt-1 text-[9px] px-2 py-0.5 rounded-full font-black tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
@@ -950,15 +950,15 @@ const ServiceVisits = () => {
                                                                 </span>
                                                             )}
                                                         </td>
-                                                        <td className="px-6 py-4">
+                                                        <td className="px-4 py-4">
                                                             <p className="font-bold text-slate-900">{v.ticketId?.ticketNo || 'N/A'}</p>
                                                             {v.ticketId?.issueTitle && (
-                                                                <p className="text-xs text-slate-600 line-clamp-1">{v.ticketId.issueTitle}</p>
+                                                                <p className="text-xs text-slate-600 line-clamp-3 break-words leading-snug" title={v.ticketId.issueTitle}>{v.ticketId.issueTitle}</p>
                                                             )}
                                                             <p className="text-[10px] text-slate-400 uppercase tracking-tight">{v.ticketId?.customerId?.customerName}</p>
                                                         </td>
-                                                        <td className="px-6 py-4 text-slate-500">{v.engineerId?.name || 'Unassigned'}</td>
-                                                        <td className="px-6 py-4 text-slate-500 whitespace-nowrap">{formatDateTime(v.scheduledDate)}</td>
+                                                        <td className="px-4 py-4 text-slate-500">{v.engineerId?.name || 'Unassigned'}</td>
+                                                        <td className="px-4 py-4 text-slate-500 whitespace-nowrap">{formatDateTime(v.scheduledDate)}</td>
                                                         <td className="px-4 py-4 whitespace-nowrap">
                                                             <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border tracking-wider ${visitStatusClass(v.status)}`}>
                                                                 {v.status}

@@ -1,23 +1,32 @@
 const mongoose = require('mongoose');
 const ExcelJS = require('exceljs');
 const Asset = require('../models/Asset');
+const AssetHistory = require('../models/AssetHistory');
+const Branch = require('../models/Branch');
+const Counter = require('../models/Counter');
 const Customer = require('../models/Customer');
 const Product = require('../models/Product');
 require('../models/MGR'); // populated through Product mgr1..mgr5
 const SerialTransfer = require('../models/SerialTransfer');
+const SerialBranchTransfer = require('../models/SerialBranchTransfer');
 const { MGR_KEYS, formatMgrVal } = require('../utils/productMgr');
 const { formatDate } = require('../utils/dateFormat');
 const { getActiveBranchId } = require('../middlewares/tenantContext');
+const { limitedBranchIds, canMoveFrom, visibleTransfersCondition } = require('../utils/serialBranchAccess');
 
 /**
- * Serial No Transfer: the customer-wise ownership history of sold serial numbers.
+ * Serial No Transfer: the serial numbers of Invoice Bulk Upload (Asset), read straight from
+ * the Asset records so nothing is copied and every status (sold, in stock, allocated, return,
+ * scrapped) is listed as Invoice Bulk Upload shows it.
  *
- * The serials are the SOLD records of Invoice Bulk Upload (Asset). The first customer is the
- * one the serial was sold to; that "Sold" record is written the first time the serial is
- * transferred, from the invoice data. Each transfer switches the current record off and adds
- * a new active one, so history is never overwritten and only the latest customer is active.
- * The Asset's customer is moved to the new customer as well, so complaints, AMC and the
- * Invoice Bulk Upload list show the current holder.
+ * Customer transfers apply to SOLD serials. The first customer is the one the serial was sold
+ * to; that "Sold" record is written the first time the serial is transferred, from the invoice
+ * data. Each transfer switches the current record off and adds a new active one, so history is
+ * never overwritten and only the latest customer is active. The Asset's customer is moved to
+ * the new customer as well, so complaints, AMC and the Invoice Bulk Upload list show the
+ * current holder.
+ *
+ * Branch transfers (bottom of this file) move serials of any status to another branch.
  */
 
 const cleanText = (value) => String(value ?? '').trim().replace(/\s+/g, ' ');
@@ -65,12 +74,12 @@ const dateRange = (query) => {
     return range;
 };
 
-// The sale date shown in the Serial No List: saleDate, else invoiceDate, else createdAt (see saleDateOf).
+// The sale date shown in the Serial No List: saleDate, else invoiceDate, else (sold serials only) createdAt.
 const saleDateCondition = (range) => ({
     $or: [
         { saleDate: range },
         { saleDate: null, invoiceDate: range },
-        { saleDate: null, invoiceDate: null, createdAt: range }
+        { saleDate: null, invoiceDate: null, status: 'SOLD', createdAt: range }
     ]
 });
 
@@ -90,6 +99,31 @@ const mgrProductFilter = async (query) => {
     const ids = await Product.find(conditions).setOptions({ bypassBranch: true }).distinct('_id');
     return { $in: ids };
 };
+
+// Invoice Bulk Upload statuses offered by the status filters. Return covers both spellings
+// (Invoice Bulk Upload counts RETURN and RETURNED together); records saved without a status
+// are shown as In Stock, so they are found under it.
+const ASSET_STATUSES = {
+    SOLD: 'SOLD',
+    IN_STOCK: { $in: ['IN_STOCK', null] },
+    ALLOCATED: 'ALLOCATED',
+    RETURN: { $in: ['RETURN', 'RETURNED'] },
+    SCRAPPED: 'SCRAPPED'
+};
+
+/** Asset.status condition for a ?status filter value, or null when no status is chosen. */
+const assetStatusCondition = (value) => {
+    const key = cleanText(value).toUpperCase();
+    if (!key) return null;
+    if (!ASSET_STATUSES[key]) throw httpError(400, 'Unknown status filter.');
+    return ASSET_STATUSES[key];
+};
+
+const statusOf = (asset) => asset?.status || 'IN_STOCK';
+
+const branchPopulate = { path: 'branchId', select: 'name code', options: { bypassTenant: true } };
+const branchLabel = (branch) => cleanText(branch?.name) || cleanText(branch?.code);
+const idOf = (value) => value?._id || value || null;
 
 const sendError = (res, error, message) => {
     if (error.status) return res.status(error.status).json({ message: error.message });
@@ -141,33 +175,38 @@ const saleRecord = (asset) => ({
     transferDate: saleDateOf(asset),
     invoiceNumber: asset.invoiceNumber || '',
     isActive: true,
-    branchId: asset.branchId || null
+    branchId: idOf(asset.branchId)
 });
 
 const historyOf = (assetId) => SerialTransfer.find(addActiveBranchFilter({ assetId }))
     .sort({ transferDate: 1, createdAt: 1 })
     .lean();
 
-const statusFilter = async (status) => {
-    if (status !== 'Transferred' && status !== 'Sold') return null;
+// ?ownership=Sold: sold serials still with the customer they were sold to; Transferred: serials
+// that have changed customer at least once.
+const ownershipFilter = async (ownership) => {
+    if (ownership !== 'Transferred' && ownership !== 'Sold') return null;
     const rows = await SerialTransfer.aggregate([
         { $match: { entryType: 'Transferred' } },
         { $group: { _id: '$assetId' } }
     ]);
     const ids = rows.map((row) => row._id);
-    return status === 'Transferred' ? { $in: ids } : { $nin: ids };
+    return ownership === 'Transferred' ? { $in: ids } : { $nin: ids };
 };
 
 /**
- * Serial No List: every sold serial with its current customer. The current customer is the
- * serial's Active owner, so every row is Active; `transferred` says whether it has changed hands
- * since the sale. The asset's own status stays SOLD, which is its inventory/invoice status.
+ * Serial No List: every Invoice Bulk Upload serial, of every status, with its current branch and
+ * current customer (?status filters by status). The list follows the same branch rule as Invoice
+ * Bulk Upload. `transferred` says whether a sold serial has changed customer since the sale.
  */
 exports.listSerials = async (req, res) => {
     try {
         const { page, limit, skip } = getPagination(req.query);
-        const query = { status: 'SOLD' };
+        const query = {};
         const and = [];
+        const status = assetStatusCondition(req.query.status);
+        if (status) and.push({ status });
+        if (req.query.ownership === 'Sold') and.push({ status: 'SOLD' });
 
         const search = cleanText(req.query.search);
         if (search) {
@@ -192,14 +231,15 @@ exports.listSerials = async (req, res) => {
         const products = await mgrProductFilter(req.query);
         if (products) query.productId = products;
 
-        const assetFilter = await statusFilter(req.query.status);
+        const assetFilter = await ownershipFilter(req.query.ownership);
         if (assetFilter) query._id = assetFilter;
         const scopedQuery = addActiveBranchFilter(query);
 
         const [assets, total] = await Promise.all([
             Asset.find(scopedQuery)
-                .select('serialNumber productId productCode productName customerId customerCode customerNameStr saleDate invoiceDate invoiceNumber createdAt')
+                .select('serialNumber productId productCode productName status branchId customerId customerCode customerNameStr saleDate invoiceDate invoiceNumber createdAt')
                 .populate(customerPopulate)
+                .populate(branchPopulate)
                 .sort({ saleDate: -1, createdAt: -1 })
                 .skip(skip)
                 .limit(limit)
@@ -232,12 +272,15 @@ exports.listSerials = async (req, res) => {
                 customerId: asset.customerId?._id || null,
                 customerCode: cleanText(asset.customerId?.externalCode) || asset.customerCode,
                 customerName: customerLabel(asset.customerId, asset.customerNameStr),
-                saleDate: saleDateOf(asset),
+                // A serial that is not sold has a sale date only if its invoice gave one.
+                saleDate: asset.status === 'SOLD' ? saleDateOf(asset) : asset.saleDate || asset.invoiceDate || null,
                 invoiceNumber: asset.invoiceNumber,
                 transfers,
                 lastTransferDate: transfers ? transfer.lastTransferDate : null,
                 transferred: transfers > 0,
-                status: 'Active'
+                status: statusOf(asset),
+                branchId: idOf(asset.branchId),
+                branchName: branchLabel(asset.branchId)
             };
         });
 
@@ -248,12 +291,12 @@ exports.listSerials = async (req, res) => {
 };
 
 const loadSerial = async (assetId) => {
-    const asset = await Asset.findOne(addActiveBranchFilter({ _id: assetId, status: 'SOLD' })).populate(customerPopulate).lean();
+    const asset = await Asset.findOne(addActiveBranchFilter({ _id: assetId })).populate(customerPopulate).populate(branchPopulate).lean();
     if (!asset) return null;
 
     let history = await historyOf(asset._id);
     // Not transferred yet: the sale is shown from the invoice row until the first transfer saves it.
-    if (!history.length) history = [{ ...saleRecord(asset), _id: null, pending: true }];
+    if (!history.length && asset.status === 'SOLD') history = [{ ...saleRecord(asset), _id: null, pending: true }];
 
     return {
         asset: {
@@ -261,6 +304,9 @@ const loadSerial = async (assetId) => {
             serialNumber: asset.serialNumber,
             productCode: asset.productCode,
             productName: asset.productName,
+            status: statusOf(asset),
+            branchId: idOf(asset.branchId),
+            branchName: branchLabel(asset.branchId),
             invoiceNumber: asset.invoiceNumber,
             saleDate: saleDateOf(asset),
             customerId: asset.customerId?._id || null,
@@ -271,14 +317,24 @@ const loadSerial = async (assetId) => {
     };
 };
 
-/** One serial number with its complete customer history, oldest first. */
+// The serial a customer transfer or past entry is saved for; only sold serials have a customer to change.
+const loadSoldSerial = async (assetId) => {
+    const asset = await Asset.findOne(addActiveBranchFilter({ _id: assetId })).populate(customerPopulate).lean();
+    if (!asset) throw httpError(404, 'Serial number not found');
+    if (asset.status !== 'SOLD') {
+        throw httpError(400, `${asset.serialNumber} is ${statusOf(asset).replace(/_/g, ' ')}. Only sold serial numbers can be moved to another customer.`);
+    }
+    return asset;
+};
+
+/** One serial number (any status) with its complete customer history, oldest first. */
 exports.getSerial = async (req, res) => {
     try {
         if (!mongoose.Types.ObjectId.isValid(req.params.assetId)) {
             return res.status(400).json({ message: 'Invalid serial record' });
         }
         const result = await loadSerial(req.params.assetId);
-        if (!result) return res.status(404).json({ message: 'Sold serial number not found' });
+        if (!result) return res.status(404).json({ message: 'Serial number not found' });
         return res.json(result);
     } catch (error) {
         return res.status(500).json({ message: 'Failed to load the serial number', error: error.message });
@@ -323,8 +379,7 @@ exports.transferSerial = async (req, res) => {
             return res.json(await loadSerial(assetId));
         }
 
-        const asset = await Asset.findOne(addActiveBranchFilter({ _id: assetId, status: 'SOLD' })).populate(customerPopulate).lean();
-        if (!asset) throw httpError(404, 'Sold serial number not found');
+        const asset = await loadSoldSerial(assetId);
         const customer = await Customer.findById(customerId).select(CUSTOMER_SELECT).lean();
         if (!customer) throw httpError(404, 'Customer not found in Customer Master.');
         const user = { createdBy: req.user?.id || null, createdByName: req.user?.name || '' };
@@ -414,8 +469,7 @@ exports.addPastEntry = async (req, res) => {
             return res.json(await loadSerial(assetId));
         }
 
-        const asset = await Asset.findOne(addActiveBranchFilter({ _id: assetId, status: 'SOLD' })).populate(customerPopulate).lean();
-        if (!asset) throw httpError(404, 'Sold serial number not found');
+        const asset = await loadSoldSerial(assetId);
         const customer = await Customer.findById(req.body.customerId).select(CUSTOMER_SELECT).lean();
         if (!customer) throw httpError(404, 'Customer not found in Customer Master.');
         const user = { createdBy: req.user?.id || null, createdByName: req.user?.name || '' };
@@ -747,5 +801,346 @@ exports.exportActivity = async (req, res) => {
         return res.end();
     } catch (error) {
         return sendError(res, error, 'Failed to export the customer activity log');
+    }
+};
+
+/*
+ * Branch Transfer: moves serial numbers from one branch to another.
+ *
+ * The serial's Asset record takes the destination branch, so Invoice Bulk Upload and the Serial
+ * No List show it there from then on; its status, customer and invoice data are not touched. Its
+ * customer history (SerialTransfer) and Invoice Bulk Upload history (AssetHistory) move with it,
+ * since a serial's records belong to the branch that holds it. Every serial moved gets a
+ * SerialBranchTransfer record keeping both branches, which together form its branch history.
+ *
+ * These routes run across branches (acrossBranches in the routes); utils/serialBranchAccess.js
+ * decides which branches a user may move serials out of and which transfers they see.
+ */
+const MAX_SERIALS_PER_BRANCH_TRANSFER = 200;
+
+const loadBranch = async (req, branchId, label) => {
+    if (!mongoose.Types.ObjectId.isValid(branchId)) throw httpError(400, `Select the ${label}.`);
+    const branch = await Branch.findOne({ _id: branchId, companyId: req.user.companyId }).select('name code status').lean();
+    if (!branch) throw httpError(404, `The ${label} was not found.`);
+    return branch;
+};
+
+const assertCanMoveFrom = (req, branch) => {
+    if (!canMoveFrom(req, branch._id)) throw httpError(403, `You cannot move serial numbers out of ${branchLabel(branch)}.`);
+};
+
+const serialList = (assets) => {
+    const names = assets.slice(0, 5).map((asset) => asset.serialNumber).join(', ');
+    return assets.length > 5 ? `${names} and ${assets.length - 5} more` : names;
+};
+
+// The Indian financial year (April to March) a date falls in, as its first calendar year.
+const financialYearOf = (date) => {
+    const local = new Date(date.getTime() + BUSINESS_UTC_OFFSET_MS);
+    return local.getUTCMonth() >= 3 ? local.getUTCFullYear() : local.getUTCFullYear() - 1;
+};
+
+// BT/2026-27/0001: one number per branch transfer, counted per financial year. Taken inside the
+// transfer's transaction, so a transfer that fails does not use up a number.
+const nextBranchTransferNo = async (companyId, date, session) => {
+    const year = financialYearOf(date);
+    const counter = await Counter.findOneAndUpdate(
+        { companyId, type: 'serial_branch_transfer', prefix: 'BT', year },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true, setDefaultsOnInsert: true, session }
+    );
+    return `BT/${year}-${String(year + 1).slice(-2)}/${String(counter.seq).padStart(4, '0')}`;
+};
+
+// A saved branch transfer (all serials of one transferNo or requestId), or null.
+const branchTransferResult = async (filter) => {
+    const records = await SerialBranchTransfer.find(filter).sort({ serialKey: 1 }).lean();
+    if (!records.length) return null;
+    const [first] = records;
+    return {
+        transferNo: first.transferNo,
+        transferDate: first.transferDate,
+        fromBranchId: first.fromBranchId,
+        fromBranchName: first.fromBranchName,
+        toBranchId: first.toBranchId,
+        toBranchName: first.toBranchName,
+        reference: first.reference,
+        remarks: first.remarks,
+        createdByName: first.createdByName,
+        serials: records.map((record) => ({
+            assetId: record.assetId,
+            serialNumber: record.serialNumber,
+            productCode: record.productCode,
+            productName: record.productName,
+            status: record.status
+        }))
+    };
+};
+
+/** Branches for the Branch Transfer form and filters; `canMoveFrom` marks the possible source branches. */
+exports.listTransferBranches = async (req, res) => {
+    try {
+        const branches = await Branch.find({ companyId: req.user.companyId }).select('name code status').sort({ name: 1 }).lean();
+        return res.json({
+            branches: branches.map((branch) => ({
+                _id: branch._id,
+                name: branchLabel(branch),
+                code: branch.code || '',
+                active: branch.status !== 'Inactive',
+                canMoveFrom: canMoveFrom(req, branch._id)
+            })),
+            activeBranchId: req.user.activeBranchId || null,
+            branchLevel: Boolean(limitedBranchIds(req))
+        });
+    } catch (error) {
+        return sendError(res, error, 'Failed to load branches');
+    }
+};
+
+/** Serial numbers of the source branch for the Branch Transfer form (?fromBranchId&search&status). */
+exports.searchBranchSerials = async (req, res) => {
+    try {
+        const branch = await loadBranch(req, cleanText(req.query.fromBranchId), 'source branch');
+        assertCanMoveFrom(req, branch);
+        const query = { companyId: req.user.companyId, branchId: branch._id };
+        const status = assetStatusCondition(req.query.status);
+        if (status) query.status = status;
+        const search = cleanText(req.query.search);
+        if (search) {
+            const pattern = new RegExp(escapeRegex(search), 'i');
+            query.$or = [{ serialNumber: pattern }, { productCode: pattern }, { productName: pattern }, { invoiceNumber: pattern }, { customerNameStr: pattern }];
+        }
+        const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
+        const [assets, total] = await Promise.all([
+            Asset.find(query)
+                .select('serialNumber productCode productName status customerNameStr invoiceNumber')
+                .sort({ createdAt: -1, _id: -1 })
+                .limit(limit)
+                .lean(),
+            Asset.countDocuments(query)
+        ]);
+        return res.json({
+            data: assets.map((asset) => ({
+                _id: asset._id,
+                serialNumber: asset.serialNumber,
+                productCode: asset.productCode,
+                productName: asset.productName,
+                status: statusOf(asset),
+                customerName: asset.customerNameStr || '',
+                invoiceNumber: asset.invoiceNumber || '',
+                branchId: branch._id,
+                branchName: branchLabel(branch)
+            })),
+            total
+        });
+    } catch (error) {
+        return sendError(res, error, 'Failed to load serial numbers');
+    }
+};
+
+/**
+ * Moves the selected serials (body.assetIds) from fromBranchId to toBranchId. Everything is
+ * checked first and then saved in one transaction, so either every serial moves or none does.
+ * A serial moves only if it is still in the source branch at that moment, so two people moving
+ * the same serial at once cannot both succeed. The form sends a requestId with each save;
+ * repeating a request returns the transfer it already saved instead of moving anything again.
+ */
+exports.createBranchTransfer = async (req, res) => {
+    const requestId = cleanText(req.body.requestId).slice(0, 100) || undefined;
+    let session;
+    try {
+        const assetIds = Array.isArray(req.body.assetIds) ? req.body.assetIds.map((id) => String(id)) : [];
+        if (!assetIds.length) throw httpError(400, 'Select at least one serial number.');
+        if (assetIds.length > MAX_SERIALS_PER_BRANCH_TRANSFER) {
+            throw httpError(400, `A branch transfer can move up to ${MAX_SERIALS_PER_BRANCH_TRANSFER} serial numbers at a time.`);
+        }
+        if (!assetIds.every((id) => mongoose.Types.ObjectId.isValid(id))) throw httpError(400, 'Invalid serial record.');
+        if (new Set(assetIds).size !== assetIds.length) throw httpError(400, 'A serial number is selected more than once.');
+
+        if (requestId) {
+            const saved = await branchTransferResult({ requestId });
+            if (saved) return res.json(saved);
+        }
+
+        const [from, to] = await Promise.all([
+            loadBranch(req, req.body.fromBranchId, 'source branch'),
+            loadBranch(req, req.body.toBranchId, 'destination branch')
+        ]);
+        if (String(from._id) === String(to._id)) throw httpError(400, 'Source and destination branches must be different.');
+        assertCanMoveFrom(req, from);
+        if (to.status === 'Inactive') throw httpError(400, `${branchLabel(to)} is inactive. Serial numbers cannot be moved into it.`);
+
+        const companyId = req.user.companyId;
+        const assets = await Asset.find({ _id: { $in: assetIds }, companyId })
+            .select('serialNumber productId productCode productName status branchId')
+            .lean();
+        if (assets.length !== assetIds.length) {
+            throw httpError(404, 'Some of the selected serial numbers no longer exist. Reload and select them again.');
+        }
+        const elsewhere = assets.filter((asset) => String(asset.branchId || '') !== String(from._id));
+        if (elsewhere.length) {
+            throw httpError(400, `${serialList(elsewhere)} ${elsewhere.length === 1 ? 'is' : 'are'} not in ${branchLabel(from)}. Only serial numbers of the source branch can be transferred.`);
+        }
+
+        const transferDate = new Date();
+        const reference = cleanText(req.body.reference).slice(0, 100);
+        const remarks = cleanText(req.body.remarks).slice(0, 500);
+        let transferNo;
+        session = await mongoose.startSession();
+        await session.withTransaction(async () => {
+            transferNo = await nextBranchTransferNo(companyId, transferDate, session);
+            const moved = await Asset.updateMany(
+                { _id: { $in: assetIds }, companyId, branchId: from._id },
+                { $set: { branchId: to._id } },
+                { session }
+            );
+            if (moved.matchedCount !== assetIds.length) {
+                throw httpError(409, 'Some of these serial numbers were just moved by someone else. Reload and try again.');
+            }
+            await SerialTransfer.updateMany({ assetId: { $in: assetIds } }, { $set: { branchId: to._id } }, { session });
+            await AssetHistory.updateMany({ assetId: { $in: assetIds } }, { $set: { branchId: to._id } }, { session });
+            await SerialBranchTransfer.insertMany(assets.map((asset) => ({
+                transferNo,
+                assetId: asset._id,
+                serialNumber: asset.serialNumber,
+                serialKey: toKey(asset.serialNumber),
+                productId: asset.productId || null,
+                productCode: asset.productCode || '',
+                productName: asset.productName || '',
+                status: statusOf(asset),
+                fromBranchId: from._id,
+                fromBranchName: branchLabel(from),
+                toBranchId: to._id,
+                toBranchName: branchLabel(to),
+                transferDate,
+                reference,
+                remarks,
+                createdBy: req.user?.id || null,
+                createdByName: req.user?.name || '',
+                requestId
+            })), { session });
+        });
+
+        return res.status(201).json(await branchTransferResult({ transferNo }));
+    } catch (error) {
+        if (requestId && (error.status === 409 || error.code === 11000)) {
+            // The same request sent twice at once: the first one saved it.
+            const saved = await branchTransferResult({ requestId });
+            if (saved) return res.json(saved);
+        }
+        if (error.status) return res.status(error.status).json({ message: error.message });
+        if (error.code === 11000) {
+            return res.status(409).json({ message: 'These serial numbers were just changed by someone else. Reload and try again.' });
+        }
+        console.error('Serial branch transfer failed:', error);
+        return res.status(500).json({ message: `Failed to transfer the serial numbers: ${error.message}` });
+    } finally {
+        if (session) await session.endSession();
+    }
+};
+
+const assetLookup = [
+    {
+        $lookup: {
+            from: Asset.collection.name,
+            localField: 'assetId',
+            foreignField: '_id',
+            pipeline: [{ $project: { status: 1, branchId: 1 } }],
+            as: 'asset'
+        }
+    },
+    { $addFields: { asset: { $arrayElemAt: ['$asset', 0] } } }
+];
+
+/**
+ * Branch Transfer tab: every serial moved, newest first, with where it is and its status now
+ * (?search&fromBranchId&toBranchId&status&fromDate&toDate; status is the serial's current status).
+ */
+exports.listBranchTransfers = async (req, res) => {
+    try {
+        const { page, limit, skip } = getPagination(req.query);
+        const and = [{ companyId: new mongoose.Types.ObjectId(String(req.user.companyId)) }];
+        const visible = visibleTransfersCondition(req);
+        if (visible) and.push(visible);
+        for (const key of ['fromBranchId', 'toBranchId']) {
+            const value = cleanText(req.query[key]);
+            if (!value) continue;
+            if (!mongoose.Types.ObjectId.isValid(value)) throw httpError(400, 'Invalid branch filter.');
+            and.push({ [key]: new mongoose.Types.ObjectId(value) });
+        }
+        const search = cleanText(req.query.search);
+        if (search) {
+            const pattern = new RegExp(escapeRegex(search), 'i');
+            and.push({
+                $or: [
+                    { serialNumber: pattern }, { productCode: pattern }, { productName: pattern }, { transferNo: pattern },
+                    { reference: pattern }, { remarks: pattern }, { createdByName: pattern }
+                ]
+            });
+        }
+        const range = dateRange(req.query);
+        if (range) and.push({ transferDate: range });
+        const status = assetStatusCondition(req.query.status);
+
+        const pageStages = [{ $sort: { transferDate: -1, _id: -1 } }, { $skip: skip }, { $limit: limit }];
+        // The current status lives on the Asset; look it up for every match only when filtering by it.
+        const [result] = await SerialBranchTransfer.aggregate(status
+            ? [{ $match: { $and: and } }, ...assetLookup, { $match: { 'asset.status': status } }, { $facet: { rows: pageStages, total: [{ $count: 'count' }] } }]
+            : [{ $match: { $and: and } }, { $facet: { rows: [...pageStages, ...assetLookup], total: [{ $count: 'count' }] } }]);
+
+        const rows = result?.rows || [];
+        const branchIds = [...new Set(rows.map((row) => row.asset?.branchId).filter(Boolean).map(String))];
+        const branches = branchIds.length
+            ? await Branch.find({ _id: { $in: branchIds }, companyId: req.user.companyId }).select('name code').lean()
+            : [];
+        const branchName = new Map(branches.map((branch) => [String(branch._id), branchLabel(branch)]));
+
+        const data = rows.map(({ asset, requestId: _requestId, serialKey: _serialKey, status: statusAtTransfer, ...row }) => ({
+            ...row,
+            statusAtTransfer,
+            status: asset ? statusOf(asset) : statusAtTransfer,
+            currentBranchId: asset?.branchId || null,
+            currentBranchName: asset?.branchId ? branchName.get(String(asset.branchId)) || '' : ''
+        }));
+        const total = result?.total?.[0]?.count || 0;
+        return res.json({ data, pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
+    } catch (error) {
+        return sendError(res, error, 'Failed to load branch transfers');
+    }
+};
+
+/** One serial's complete branch history, oldest first, and where it is now (the transfer details view). */
+exports.getSerialBranchHistory = async (req, res) => {
+    try {
+        const { assetId } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(assetId)) throw httpError(400, 'Invalid serial record');
+        const asset = await Asset.findOne({ _id: assetId, companyId: req.user.companyId })
+            .select('serialNumber productCode productName status branchId customerNameStr invoiceNumber')
+            .populate(branchPopulate)
+            .lean();
+        if (!asset) throw httpError(404, 'Serial number not found');
+
+        const transfers = await SerialBranchTransfer.find({ assetId: asset._id }).sort({ transferDate: 1, _id: 1 }).lean();
+        // Under branch-level access the serial must be in, or have passed through, one of the user's branches.
+        const limited = limitedBranchIds(req);
+        const branchesSeen = [idOf(asset.branchId), ...transfers.flatMap((t) => [t.fromBranchId, t.toBranchId])].filter(Boolean).map(String);
+        if (limited && !branchesSeen.some((id) => limited.includes(id))) throw httpError(404, 'Serial number not found');
+
+        return res.json({
+            asset: {
+                _id: asset._id,
+                serialNumber: asset.serialNumber,
+                productCode: asset.productCode,
+                productName: asset.productName,
+                status: statusOf(asset),
+                branchId: idOf(asset.branchId),
+                branchName: branchLabel(asset.branchId),
+                customerName: asset.customerNameStr || '',
+                invoiceNumber: asset.invoiceNumber || ''
+            },
+            transfers: transfers.map(({ requestId: _requestId, serialKey: _serialKey, ...transfer }) => transfer)
+        });
+    } catch (error) {
+        return sendError(res, error, 'Failed to load the branch history');
     }
 };

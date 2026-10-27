@@ -1,0 +1,75 @@
+/*
+ * Dashboard clock (components/DashboardClock.jsx).
+ *
+ * The outer box sets the size: 17cm x 9cm, shrinking with the screen and keeping that shape.
+ * It is the size container, so everything inside is sized in cqw (1cqw = 1% of the box width)
+ * and scales with it on desktop, tablet and phone.
+ */
+.arcrm-clock {
+    container-type: inline-size;
+    box-sizing: border-box;
+    width: 17cm;
+    max-width: 100%;
+    aspect-ratio: 17 / 9;
+    margin: 0 auto;
+}
+
+.arcrm-clock *,
+.arcrm-clock *::before,
+.arcrm-clock *::after {
+    box-sizing: border-box;
+}
+
+.arcrm-clock__body {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5cqw;
+    padding: 3cqw 4cqw;
+    border-radius: 1.8cqw;
+    overflow: hidden;
+    color: #eaf3ff;
+    background:
+        radial-gradient(120% 90% at 15% 0%, #25357a 0%, rgba(37, 53, 122, 0) 55%),
+        linear-gradient(180deg, #0e1642 0%, #070b24 100%);
+    box-shadow: 0 10px 30px rgba(5, 10, 40, 0.35), inset 0 0 0 1px rgba(160, 190, 255, 0.12);
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+}
+
+.arcrm-clock__face {
+    flex: none;
+    width: 38cqw;
+    height: 38cqw;
+}
+
+.arcrm-clock__digital {
+    flex: none;
+}
+
+.arcrm-clock__time {
+    font-family: "Courier New", ui-monospace, Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 11.5cqw;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    color: #dff0ff;
+    text-shadow: 0 0 0.6cqw rgba(150, 200, 255, 0.9), 0 0 2.4cqw rgba(90, 150, 255, 0.55);
+}
+
+.arcrm-clock__sec {
+    font-size: 0.42em;
+    margin-left: 0.25em;
+    letter-spacing: 0.02em;
+}
+
+.arcrm-clock__date {
+    margin-top: 2.4cqw;
+    font-size: 3.5cqw;
+    white-space: nowrap;
+    color: #f2f7ff;
+    text-shadow: 0 0 1cqw rgba(150, 200, 255, 0.35);
+}

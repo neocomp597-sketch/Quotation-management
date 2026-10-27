@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { MdSearch, MdSwapHoriz, MdVisibility, MdArrowBack, MdPersonAdd, MdHistory, MdCheckCircle, MdFileDownload } from 'react-icons/md';
+import { MdSearch, MdSwapHoriz, MdVisibility, MdArrowBack, MdPersonAdd, MdHistory, MdCheckCircle, MdFileDownload, MdAdd, MdClose, MdArrowForward, MdStore } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { serialTransferService, customerService, csmService, mgrService } from '../services/api';
 import AssetActivityLog from '../components/AssetActivityLog';
 import PaginationControls from '../components/PaginationControls';
 import Modal from '../components/Modal';
 import Customers from './Customers';
-import { formatDate } from '../utils/helpers';
+import { formatDate, formatDateTime } from '../utils/helpers';
 import DateInput from '../components/DateInput';
 import usePermission from '../hooks/usePermission';
 import { useAuth } from '../context/AuthContext';
@@ -17,7 +17,37 @@ const TABS = [
     { key: 'serials', label: 'Serial No List' },
     { key: 'history', label: 'Transfer History' },
     { key: 'activity', label: 'Customer Activity Log' },
+    { key: 'branch', label: 'Branch Transfer' },
 ];
+
+// Invoice Bulk Upload statuses, as its own list shows them. The Return filter also finds RETURNED.
+const SERIAL_STATUSES = [
+    { value: 'SOLD', label: 'Sold' },
+    { value: 'IN_STOCK', label: 'In Stock' },
+    { value: 'ALLOCATED', label: 'Allocated' },
+    { value: 'RETURN', label: 'Return' },
+    { value: 'SCRAPPED', label: 'Scrapped' },
+];
+
+const STATUS_STYLES = {
+    SOLD: 'bg-blue-50 text-blue-600 border-blue-200',
+    IN_STOCK: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+    RETURN: 'bg-amber-50 text-amber-600 border-amber-200',
+    RETURNED: 'bg-amber-50 text-amber-600 border-amber-200',
+};
+
+const StatusBadge = ({ status }) => (
+    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border whitespace-nowrap ${STATUS_STYLES[status] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+        {status || 'IN_STOCK'}
+    </span>
+);
+
+const StatusFilter = ({ value, onChange }) => (
+    <select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Filter by status" className={selectClass}>
+        <option value="">All statuses</option>
+        {SERIAL_STATUSES.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
+    </select>
+);
 
 const todayInput = () => {
     const now = new Date();
@@ -187,14 +217,16 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
     const { canModify } = usePermission('master_serials');
     const [search, setSearch] = useStoredState('list.search', '');
     const [field, setField] = useStoredState('list.field', '');
-    const [status, setStatus] = useStoredState('list.status', '');
+    const [status, setStatus] = useStoredState('list.assetStatus', '');
+    const [ownership, setOwnership] = useStoredState('list.ownership', '');
     const [page, setPage] = useStoredState('list.page', 1);
     const [mgr4, setMgr4] = useStoredState('list.mgr4', '');
     const range = useDateRange('list');
     const debouncedSearch = useDebounced(search.trim());
 
     const { rows, pagination, loading } = useList(serialTransferService.listSerials, {
-        page, limit: PAGE_SIZE, search: debouncedSearch || undefined, field: field || undefined, status: status || undefined, mgr4: mgr4 || undefined, ...range.params,
+        page, limit: PAGE_SIZE, search: debouncedSearch || undefined, field: field || undefined, status: status || undefined,
+        ownership: ownership || undefined, mgr4: mgr4 || undefined, ...range.params,
     }, !range.invalid);
     const offset = (pagination.page - 1) * pagination.limit;
     // The row whose Download Customer Activity Log dialog is open.
@@ -220,10 +252,11 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                     <option value="product">Product</option>
                     <option value="customer">Customer</option>
                 </select>
-                <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className={selectClass}>
-                    <option value="">All serials</option>
+                <StatusFilter value={status} onChange={(value) => { setStatus(value); setPage(1); }} />
+                <select value={ownership} onChange={(e) => { setOwnership(e.target.value); setPage(1); }} aria-label="Filter by customer transfers" className={selectClass}>
+                    <option value="">All customers</option>
                     <option value="Sold">With original customer</option>
-                    <option value="Transferred">Transferred</option>
+                    <option value="Transferred">Transferred to another customer</option>
                 </select>
                 <Mgr4Filter value={mgr4} onChange={(value) => { setMgr4(value); setPage(1); }} />
                 <DateRangeFilter range={range} field="Sale Date" onChange={() => setPage(1)} />
@@ -235,7 +268,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50">
-                                        {['Sr No', 'Serial No', 'Product', 'Current Customer', 'Sale Date', 'Transfers', 'Status'].map((label) => (
+                                        {['Sr No', 'Serial No', 'Product', 'Branch', 'Current Customer', 'Sale Date', 'Transfers', 'Status'].map((label) => (
                                             <th key={label} className={thClass}>{label}</th>
                                         ))}
                                         <th className={`${thClass} text-right`}>Action</th>
@@ -250,13 +283,14 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                                                 <span className="font-bold text-slate-700">{row.productCode}</span>
                                                 {row.productName && <span className="block text-xs text-slate-500">{row.productName}</span>}
                                             </td>
+                                            <td className="p-4 font-bold text-slate-700 whitespace-nowrap">{row.branchName || '-'}</td>
                                             <td className="p-4">
                                                 <span className="font-bold text-slate-700">{row.customerName || '-'}</span>
                                                 {row.customerCode && <span className="block text-xs text-slate-500">{row.customerCode}</span>}
                                             </td>
                                             <td className="p-4 text-slate-500 whitespace-nowrap">{formatDate(row.saleDate)}</td>
                                             <td className="p-4 font-bold text-slate-700">{row.transfers}</td>
-                                            <td className="p-4"><FlagBadge active={row.status === 'Active'} /></td>
+                                            <td className="p-4"><StatusBadge status={row.status} /></td>
                                             <td className="p-4 text-right whitespace-nowrap">
                                                 <button type="button" title="View history" onClick={(e) => { e.stopPropagation(); onOpen(row._id); }} className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all">
                                                     <MdVisibility size={18} />
@@ -264,8 +298,8 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                                                 <button type="button" title="Download Customer Activity Log" aria-label={`Download customer activity log of ${row.serialNumber}`} onClick={(e) => { e.stopPropagation(); setDownloadFor(row); }} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all">
                                                     <MdFileDownload size={18} />
                                                 </button>
-                                                {canModify && (
-                                                    <button type="button" onClick={(e) => { e.stopPropagation(); onTransfer(row._id); }} className="ml-1 inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all">
+                                                {canModify && row.status === 'SOLD' && (
+                                                    <button type="button" title="Transfer to another customer" onClick={(e) => { e.stopPropagation(); onTransfer(row._id); }} className="ml-1 inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all">
                                                         <MdSwapHoriz size={16} /> Transfer
                                                     </button>
                                                 )}
@@ -273,7 +307,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                                         </tr>
                                     ))}
                                     {!rows.length && (
-                                        <tr><td colSpan={8} className="p-8 text-center text-slate-400 text-sm font-medium">{range.invalid ? 'Correct the date range to see results.' : 'No sold serial numbers match.'}</td></tr>
+                                        <tr><td colSpan={9} className="p-8 text-center text-slate-400 text-sm font-medium">{range.invalid ? 'Correct the date range to see results.' : 'No serial numbers match.'}</td></tr>
                                     )}
                                 </tbody>
                             </table>
@@ -693,6 +727,8 @@ export const SerialNoDetails = ({ transfer = false }) => {
 
     const history = data ? [...data.history].reverse() : [];
     const current = history.find((entry) => entry.isActive);
+    // Only a sold serial has a customer to transfer; other statuses are shown for reference.
+    const sold = data?.asset?.status === 'SOLD';
     const label = 'block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1';
 
     return (
@@ -716,7 +752,7 @@ export const SerialNoDetails = ({ transfer = false }) => {
                         </p>
                     )}
                 </div>
-                {data && !formMode && canModify && (
+                {data && sold && !formMode && canModify && (
                     <div className="flex flex-wrap gap-3">
                         <button
                             type="button"
@@ -741,7 +777,7 @@ export const SerialNoDetails = ({ transfer = false }) => {
             ) : (
                 <>
                     <div className="rounded-3xl border border-slate-100 bg-white shadow-sm">
-                        {formMode ? (
+                        {formMode && sold ? (
                             <TransferForm
                                 key={formMode}
                                 mode={formMode}
@@ -751,15 +787,22 @@ export const SerialNoDetails = ({ transfer = false }) => {
                                 onSaved={handleSaved}
                             />
                         ) : (
-                            <div className="grid grid-cols-1 gap-6 p-6 md:grid-cols-4">
+                            <div className="grid grid-cols-1 gap-6 p-6 sm:grid-cols-2 lg:grid-cols-6">
                                 <div><span className={label}>Serial Number</span><p className="text-sm font-bold text-slate-800">{data.asset.serialNumber}</p></div>
-                                <div><span className={label}>Product</span><p className="text-sm font-bold text-slate-800">{data.asset.productCode}</p><p className="text-xs text-slate-500">{data.asset.productName}</p></div>
+                                <div className="lg:col-span-2"><span className={label}>Product</span><p className="text-sm font-bold text-slate-800">{data.asset.productCode}</p><p className="text-xs text-slate-500">{data.asset.productName}</p></div>
+                                <div><span className={label}>Status</span><StatusBadge status={data.asset.status} /></div>
+                                <div><span className={label}>Branch</span><p className="text-sm font-bold text-slate-800">{data.asset.branchName || '-'}</p></div>
                                 <div>
                                     <span className={label}>Current Customer</span>
                                     <p className="text-sm font-bold text-slate-800">{current?.companyName || data.asset.customerName || '-'}</p>
                                     <p className="text-xs text-slate-500">{[current?.customerCode || data.asset.customerCode, current?.customerMobile, current?.customerCity].filter(Boolean).join(' · ')}</p>
+                                    {(current || sold) && <p className="text-xs text-slate-500">Since {formatDate(current?.transferDate || data.asset.saleDate)}</p>}
                                 </div>
-                                <div><span className={label}>Since</span><p className="text-sm font-bold text-slate-800">{formatDate(current?.transferDate || data.asset.saleDate)}</p></div>
+                                {!sold && (
+                                    <p className="sm:col-span-2 lg:col-span-6 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500">
+                                        Only sold serial numbers can be transferred to another customer. To move this serial to another branch, use the Branch Transfer tab.
+                                    </p>
+                                )}
                             </div>
                         )}
                     </div>
@@ -792,18 +835,23 @@ export const SerialNoDetails = ({ transfer = false }) => {
                                             <td className="p-4 text-slate-500 whitespace-nowrap">{entry.pending ? 'Invoice Bulk Upload' : (entry.createdByName || '-')}</td>
                                         </tr>
                                     ))}
+                                    {!history.length && (
+                                        <tr><td colSpan={7} className="p-8 text-center text-slate-400 text-sm font-medium">No customer history recorded for this serial number.</td></tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
                     </div>
 
-                    <div className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
-                        <h3 className="flex items-center gap-2 border-b border-slate-100 px-6 py-4 text-xs font-black uppercase tracking-widest text-slate-500">
-                            <MdFileDownload size={16} /> Customer Activity Log Download — {data.asset.serialNumber}
-                        </h3>
-                        {/* Remounted after a transfer so the Active/Inactive lists reload. */}
-                        <ActivityTab key={`${assetId}-${refreshCount}`} assetId={assetId} />
-                    </div>
+                    {sold && (
+                        <div className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+                            <h3 className="flex items-center gap-2 border-b border-slate-100 px-6 py-4 text-xs font-black uppercase tracking-widest text-slate-500">
+                                <MdFileDownload size={16} /> Customer Activity Log Download — {data.asset.serialNumber}
+                            </h3>
+                            {/* Remounted after a transfer so the Active/Inactive lists reload. */}
+                            <ActivityTab key={`${assetId}-${refreshCount}`} assetId={assetId} />
+                        </div>
+                    )}
 
                     <AssetActivityLog
                         variant="customer"
@@ -1029,6 +1077,529 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
     );
 };
 
+// ---- Branch Transfer: moving serial numbers to another branch ----
+
+const MAX_SERIALS_PER_BRANCH_TRANSFER = 200;
+const sameId = (a, b) => String(a || '') === String(b || '');
+const branchNameOf = (branches, id) => branches.find((branch) => sameId(branch._id, id))?.name || '';
+
+// Branches for the form and filters; `canMoveFrom` marks those serials may be moved out of.
+const useTransferBranches = () => {
+    const [state, setState] = useState({ branches: [], activeBranchId: null, loaded: false });
+    useEffect(() => {
+        let cancelled = false;
+        serialTransferService.getTransferBranches()
+            .then((res) => { if (!cancelled) setState({ branches: res.data?.branches || [], activeBranchId: res.data?.activeBranchId || null, loaded: true }); })
+            .catch((err) => {
+                if (cancelled) return;
+                toast.error(err.response?.data?.message || 'Failed to load branches');
+                setState((prev) => ({ ...prev, loaded: true }));
+            });
+        return () => { cancelled = true; };
+    }, []);
+    return state;
+};
+
+const BranchRoute = ({ from, to }) => (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap font-bold text-slate-700">
+        {from || '-'} <MdArrowForward className="text-primary-500" size={14} /> {to || '-'}
+    </span>
+);
+
+const SerialSummary = ({ serial }) => (
+    <>
+        <span className="font-bold text-slate-700">{serial.productCode}</span>
+        {serial.productName && <span className="block text-xs text-slate-500">{serial.productName}</span>}
+    </>
+);
+
+const BranchTransferList = ({ params, enabled, hasFilters, onPageChange, onOpen }) => {
+    const { rows, pagination, loading } = useList(serialTransferService.listBranchTransfers, params, enabled);
+
+    if (loading) return <Spinner />;
+    return (
+        <>
+            <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                    <thead>
+                        <tr className="bg-slate-50">
+                            {['Transfer', 'Serial No', 'Product', 'From / To Branch', 'Status', 'Reference / Remarks', 'Transferred By'].map((label) => (
+                                <th key={label} className={thClass}>{label}</th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows.map((row) => (
+                            <tr key={row._id} onClick={() => onOpen(row)} className="cursor-pointer border-b last:border-0 border-slate-50 hover:bg-slate-50/50 transition-colors text-sm">
+                                <td className="p-4 whitespace-nowrap">
+                                    <button
+                                        type="button"
+                                        title="View transfer details"
+                                        onClick={(e) => { e.stopPropagation(); onOpen(row); }}
+                                        className="inline-flex items-center gap-1 font-bold text-primary-600 hover:underline"
+                                    >
+                                        {row.transferNo} <MdVisibility size={14} />
+                                    </button>
+                                    <span className="block text-xs text-slate-500">{formatDate(row.transferDate)}</span>
+                                </td>
+                                <td className="p-4 font-bold text-slate-800 whitespace-nowrap">{row.serialNumber}</td>
+                                <td className="p-4 text-slate-600 min-w-[12rem]"><SerialSummary serial={row} /></td>
+                                <td className="p-4">
+                                    <BranchRoute from={row.fromBranchName} to={row.toBranchName} />
+                                    {row.currentBranchId && !sameId(row.currentBranchId, row.toBranchId) && (
+                                        <span className="block text-[10px] font-black uppercase tracking-widest text-amber-600 whitespace-nowrap">Moved again, now in {row.currentBranchName}</span>
+                                    )}
+                                </td>
+                                <td className="p-4"><StatusBadge status={row.status} /></td>
+                                <td className="p-4 text-slate-500 min-w-[10rem]">
+                                    {row.reference && <span className="block font-bold text-slate-700">{row.reference}</span>}
+                                    {row.remarks || (!row.reference ? '-' : '')}
+                                </td>
+                                <td className="p-4 text-slate-500 whitespace-nowrap">{row.createdByName || '-'}</td>
+                            </tr>
+                        ))}
+                        {!rows.length && (
+                            <tr>
+                                <td colSpan={7} className="p-8 text-center text-slate-400 text-sm font-medium">
+                                    {!enabled ? 'Correct the date range to see results.'
+                                        : hasFilters ? 'No branch transfers match.'
+                                            : 'No serial numbers have been moved to another branch yet.'}
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+            <PaginationControls pagination={pagination} onPageChange={onPageChange} />
+        </>
+    );
+};
+
+// Branch Transfer tab: every serial moved to another branch, with search, branch, status and date
+// filters; Create Branch Transfer opens the form and a row opens the serial's branch history.
+const BranchTransferTab = () => {
+    const { canModify } = usePermission('master_serials');
+    const { branches, activeBranchId, loaded } = useTransferBranches();
+    const [search, setSearch] = useStoredState('branch.search', '');
+    const [fromBranchId, setFromBranchId] = useStoredState('branch.from', '');
+    const [toBranchId, setToBranchId] = useStoredState('branch.to', '');
+    const [status, setStatus] = useStoredState('branch.status', '');
+    const [page, setPage] = useStoredState('branch.page', 1);
+    const range = useDateRange('branch');
+    const debouncedSearch = useDebounced(search.trim());
+    const [creating, setCreating] = useState(false);
+    const [details, setDetails] = useState(null);
+    // Bumped after a save so the list remounts and reloads.
+    const [savedCount, setSavedCount] = useState(0);
+
+    const params = {
+        page, limit: PAGE_SIZE, search: debouncedSearch || undefined, fromBranchId: fromBranchId || undefined,
+        toBranchId: toBranchId || undefined, status: status || undefined, ...range.params,
+    };
+    const hasFilters = Boolean(debouncedSearch || fromBranchId || toBranchId || status || range.fromDate || range.toDate);
+    const branchSelect = (value, setValue, allLabel, ariaLabel) => (
+        <select value={value} onChange={(e) => { setValue(e.target.value); setPage(1); }} aria-label={ariaLabel} className={selectClass}>
+            <option value="">{allLabel}</option>
+            {branches.map((branch) => <option key={branch._id} value={branch._id}>{branch.name}</option>)}
+        </select>
+    );
+
+    return (
+        <>
+            {creating && (
+                <BranchTransferForm
+                    branches={branches}
+                    activeBranchId={activeBranchId}
+                    onClose={() => setCreating(false)}
+                    onSaved={() => { setCreating(false); setPage(1); setSavedCount((count) => count + 1); }}
+                />
+            )}
+            {details && <BranchTransferDetails transfer={details} onClose={() => setDetails(null)} />}
+            <div className="p-4 border-b border-slate-100 bg-slate-50 space-y-3">
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="relative w-full max-w-md">
+                        <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                            placeholder="Search serial no, product, transfer no or reference"
+                            className={`${inputClass} pl-11`}
+                        />
+                    </div>
+                    {canModify && (
+                        <button
+                            type="button"
+                            onClick={() => setCreating(true)}
+                            disabled={!loaded || branches.length < 2}
+                            title={loaded && branches.length < 2 ? 'At least two branches are needed for a branch transfer' : undefined}
+                            className="ml-auto flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <MdAdd size={18} /> Create Branch Transfer
+                        </button>
+                    )}
+                </div>
+                <div className="flex flex-wrap items-end gap-3">
+                    {branchSelect(fromBranchId, setFromBranchId, 'All source branches', 'Filter by source branch')}
+                    {branchSelect(toBranchId, setToBranchId, 'All destination branches', 'Filter by destination branch')}
+                    <StatusFilter value={status} onChange={(value) => { setStatus(value); setPage(1); }} />
+                    <DateRangeFilter range={range} field="Transfer Date" onChange={() => setPage(1)} />
+                </div>
+            </div>
+            <div className="p-6">
+                <BranchTransferList
+                    key={savedCount}
+                    params={params}
+                    enabled={!range.invalid}
+                    hasFilters={hasFilters}
+                    onPageChange={setPage}
+                    onOpen={setDetails}
+                />
+            </div>
+        </>
+    );
+};
+
+// Create Branch Transfer: source and destination branch, the serials of the source branch to
+// move, an optional reference and remarks, then a confirmation step before anything is saved.
+const BranchTransferForm = ({ branches, activeBranchId, onClose, onSaved }) => {
+    const sources = branches.filter((branch) => branch.canMoveFrom);
+    const [fromBranchId, setFromBranchId] = useState(() => (sources.some((branch) => sameId(branch._id, activeBranchId)) ? String(activeBranchId) : ''));
+    const [toBranchId, setToBranchId] = useState('');
+    const [query, setQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
+    const debouncedQuery = useDebounced(query.trim());
+    const [results, setResults] = useState({ key: null, rows: [], total: 0 });
+    const [selected, setSelected] = useState([]);
+    const [reference, setReference] = useState('');
+    const [remarks, setRemarks] = useState('');
+    const [confirming, setConfirming] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState('');
+    const [requestId] = useState(newRequestId);
+
+    const searchKey = JSON.stringify({ fromBranchId, search: debouncedQuery, status: statusFilter });
+    useEffect(() => {
+        if (!fromBranchId) return undefined;
+        let cancelled = false;
+        serialTransferService.searchBranchSerials({ fromBranchId, search: debouncedQuery || undefined, status: statusFilter || undefined, limit: 20 })
+            .then((res) => { if (!cancelled) setResults({ key: searchKey, rows: res.data?.data || [], total: res.data?.total || 0 }); })
+            .catch((err) => {
+                if (cancelled) return;
+                toast.error(err.response?.data?.message || 'Failed to load serial numbers');
+                setResults({ key: searchKey, rows: [], total: 0 });
+            });
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchKey]);
+    const searching = Boolean(fromBranchId) && results.key !== searchKey;
+
+    const fromName = branchNameOf(branches, fromBranchId);
+    const toName = branchNameOf(branches, toBranchId);
+    const sameBranch = Boolean(fromBranchId) && sameId(fromBranchId, toBranchId);
+    const selectedIds = new Set(selected.map((serial) => serial._id));
+    const tooMany = selected.length > MAX_SERIALS_PER_BRANCH_TRANSFER;
+    const canReview = Boolean(fromBranchId && toBranchId) && !sameBranch && selected.length > 0 && !tooMany;
+    const notSelected = results.rows.filter((row) => !selectedIds.has(row._id));
+
+    // The selected serials belong to the source branch, so a new source starts a new selection.
+    const changeSource = (value) => {
+        setFromBranchId(value);
+        setSelected([]);
+        setSaveError('');
+        if (sameId(value, toBranchId)) setToBranchId('');
+    };
+    const add = (rows) => { setSelected((prev) => [...prev, ...rows.filter((row) => !prev.some((serial) => serial._id === row._id))]); setSaveError(''); };
+    const remove = (id) => { setSelected((prev) => prev.filter((serial) => serial._id !== id)); setSaveError(''); };
+
+    const save = async () => {
+        setSaving(true);
+        setSaveError('');
+        try {
+            const res = await serialTransferService.createBranchTransfer({
+                fromBranchId, toBranchId, assetIds: selected.map((serial) => serial._id),
+                reference: reference.trim(), remarks: remarks.trim(), requestId,
+            });
+            const count = res.data?.serials?.length || selected.length;
+            toast.success(`${res.data?.transferNo || 'Branch transfer'}: ${count} serial number${count === 1 ? '' : 's'} moved from ${fromName} to ${toName}`);
+            onSaved(res.data);
+        } catch (err) {
+            const message = err.response?.data?.message || (err.response ? 'Could not save the branch transfer.' : 'The server could not be reached. Check that the backend is running and try again.');
+            setSaveError(message);
+            toast.error(message);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const label = 'block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2';
+    const buttonBase = 'flex-1 md:flex-none w-full md:w-auto px-6 py-3.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-60';
+    const footer = confirming ? (
+        <>
+            <button type="button" onClick={() => setConfirming(false)} disabled={saving} className={`${buttonBase} bg-slate-100 hover:bg-slate-200 text-slate-600`}>Back</button>
+            <button type="button" onClick={save} disabled={saving} className={`${buttonBase} bg-primary-600 hover:bg-primary-700 text-white shadow-lg`}>
+                {saving ? 'Transferring…' : 'Confirm Transfer'}
+            </button>
+        </>
+    ) : (
+        <>
+            <button type="button" onClick={onClose} className={`${buttonBase} bg-slate-100 hover:bg-slate-200 text-slate-600`}>Cancel</button>
+            <button type="button" onClick={() => setConfirming(true)} disabled={!canReview} className={`${buttonBase} bg-primary-600 hover:bg-primary-700 text-white shadow-lg`}>
+                Review Transfer ({selected.length})
+            </button>
+        </>
+    );
+
+    const selectedTable = (removable) => (
+        <div className="overflow-x-auto rounded-2xl border border-slate-100">
+            <table className="w-full text-left border-collapse">
+                <thead>
+                    <tr className="bg-slate-50">
+                        {['Serial No', 'Product', 'Current Branch', 'Status'].map((text) => <th key={text} className={thClass}>{text}</th>)}
+                        {removable && <th className={thClass}><span className="sr-only">Remove</span></th>}
+                    </tr>
+                </thead>
+                <tbody>
+                    {selected.map((serial) => (
+                        <tr key={serial._id} className="border-b last:border-0 border-slate-50 text-sm">
+                            <td className="p-4 font-bold text-slate-800 whitespace-nowrap">{serial.serialNumber}</td>
+                            <td className="p-4 text-slate-600"><SerialSummary serial={serial} /></td>
+                            <td className="p-4 font-bold text-slate-700 whitespace-nowrap">{serial.branchName}</td>
+                            <td className="p-4"><StatusBadge status={serial.status} /></td>
+                            {removable && (
+                                <td className="p-4 text-right">
+                                    <button type="button" onClick={() => remove(serial._id)} aria-label={`Remove ${serial.serialNumber}`} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all">
+                                        <MdClose size={16} />
+                                    </button>
+                                </td>
+                            )}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+
+    return (
+        <Modal isOpen onClose={saving ? () => {} : onClose} title={confirming ? 'Confirm Branch Transfer' : 'Create Branch Transfer'} maxWidth="max-w-5xl" footer={footer}>
+            {confirming ? (
+                <div className="space-y-5">
+                    <div className="rounded-2xl border border-primary-100 bg-primary-50/50 px-5 py-4">
+                        <p className="text-sm font-black text-slate-800">
+                            Move {selected.length} serial number{selected.length === 1 ? '' : 's'} from {fromName} to {toName}?
+                        </p>
+                        <p className="mt-1 text-xs font-medium text-slate-500">
+                            {toName} becomes their current branch: Invoice Bulk Upload and the Serial No List show them there from now on. Their status, customer and invoice details stay as they are, and the move is kept in the branch transfer history.
+                        </p>
+                    </div>
+                    {selectedTable(false)}
+                    {(reference.trim() || remarks.trim()) && (
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 text-sm">
+                            <div><span className={label}>Reference</span><p className="font-bold text-slate-700">{reference.trim() || '-'}</p></div>
+                            <div><span className={label}>Remarks</span><p className="font-bold text-slate-700">{remarks.trim() || '-'}</p></div>
+                        </div>
+                    )}
+                    {saveError && <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{saveError}</p>}
+                </div>
+            ) : (
+                <div className="space-y-5">
+                    <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-[1fr_auto_1fr]">
+                        <div>
+                            <label className={label} htmlFor="branchTransferFrom">Source Branch <span className="text-rose-500">*</span></label>
+                            <select id="branchTransferFrom" value={fromBranchId} onChange={(e) => changeSource(e.target.value)} className={inputClass}>
+                                <option value="">Select source branch</option>
+                                {sources.map((branch) => <option key={branch._id} value={branch._id}>{branch.name}</option>)}
+                            </select>
+                        </div>
+                        <MdArrowForward className="hidden md:block mb-3.5 text-primary-500" size={22} />
+                        <div>
+                            <label className={label} htmlFor="branchTransferTo">Destination Branch <span className="text-rose-500">*</span></label>
+                            <select id="branchTransferTo" value={toBranchId} onChange={(e) => { setToBranchId(e.target.value); setSaveError(''); }} className={inputClass}>
+                                <option value="">Select destination branch</option>
+                                {branches.map((branch) => (
+                                    <option key={branch._id} value={branch._id} disabled={!branch.active || sameId(branch._id, fromBranchId)}>
+                                        {branch.name}{!branch.active ? ' (inactive)' : sameId(branch._id, fromBranchId) ? ' (source branch)' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                    {sameBranch && <p className="text-xs font-semibold text-rose-600">Source and destination branches must be different.</p>}
+
+                    <div>
+                        <span className={label}>Serial Numbers to Transfer <span className="text-rose-500">*</span></span>
+                        {!fromBranchId ? (
+                            <p className="flex items-center gap-2 rounded-2xl border border-dashed border-slate-300 px-4 py-4 text-sm font-semibold text-slate-500">
+                                <MdStore size={20} className="text-slate-400" /> Select the source branch to find its serial numbers.
+                            </p>
+                        ) : (
+                            <>
+                                <div className="flex flex-wrap gap-3">
+                                    <div className="relative min-w-[14rem] flex-1">
+                                        <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                                        <input
+                                            autoFocus
+                                            value={query}
+                                            onChange={(e) => setQuery(e.target.value)}
+                                            placeholder={`Search ${fromName} serials by serial no, product, invoice or customer`}
+                                            className={`${inputClass} pl-11`}
+                                        />
+                                    </div>
+                                    <StatusFilter value={statusFilter} onChange={setStatusFilter} />
+                                </div>
+                                <div className="mt-2 rounded-2xl border border-slate-100 bg-white">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-2 text-xs font-semibold text-slate-500">
+                                        <span>
+                                            {searching ? 'Searching…'
+                                                : results.total > results.rows.length ? `Showing ${results.rows.length} of ${results.total} serial numbers in ${fromName}. Search to narrow down.`
+                                                    : `${results.total} serial number${results.total === 1 ? '' : 's'} in ${fromName}${debouncedQuery || statusFilter ? ' match' : ''}`}
+                                        </span>
+                                        {!searching && notSelected.length > 1 && (
+                                            <button type="button" onClick={() => add(notSelected)} className="font-black uppercase tracking-widest text-[10px] text-primary-600 hover:underline">
+                                                Add all shown ({notSelected.length})
+                                            </button>
+                                        )}
+                                    </div>
+                                    <ul className="max-h-64 overflow-auto divide-y divide-slate-50">
+                                        {!searching && results.rows.map((row) => {
+                                            const added = selectedIds.has(row._id);
+                                            return (
+                                                <li key={row._id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                                                    <div className="min-w-0">
+                                                        <p className="flex flex-wrap items-center gap-2 text-sm font-bold text-slate-800">{row.serialNumber} <StatusBadge status={row.status} /></p>
+                                                        <p className="truncate text-xs text-slate-500">
+                                                            {[row.productCode, row.productName, row.customerName, row.invoiceNumber].filter(Boolean).join(' · ')}
+                                                        </p>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        disabled={added}
+                                                        onClick={() => add([row])}
+                                                        className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 text-[10px] font-black uppercase tracking-widest text-primary-600 hover:bg-primary-50 disabled:text-emerald-600 disabled:border-emerald-200 disabled:bg-emerald-50 disabled:cursor-default"
+                                                    >
+                                                        {added ? <><MdCheckCircle size={14} /> Added</> : <><MdAdd size={14} /> Add</>}
+                                                    </button>
+                                                </li>
+                                            );
+                                        })}
+                                        {!searching && !results.rows.length && (
+                                            <li className="px-4 py-3 text-sm text-slate-500">No serial numbers found in {fromName}.</li>
+                                        )}
+                                    </ul>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    {selected.length > 0 && (
+                        <div>
+                            <span className={label}>Selected ({selected.length})</span>
+                            {selectedTable(true)}
+                            {tooMany && (
+                                <p className="mt-2 text-xs font-semibold text-rose-600">
+                                    A branch transfer can move up to {MAX_SERIALS_PER_BRANCH_TRANSFER} serial numbers at a time. Remove {selected.length - MAX_SERIALS_PER_BRANCH_TRANSFER} to continue.
+                                </p>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <div>
+                            <label className={label} htmlFor="branchTransferReference">Transfer Reference</label>
+                            <input id="branchTransferReference" value={reference} maxLength={100} onChange={(e) => setReference(e.target.value)} placeholder="Optional, e.g. delivery challan no." className={inputClass} />
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className={label} htmlFor="branchTransferRemarks">Remarks</label>
+                            <input id="branchTransferRemarks" value={remarks} maxLength={500} onChange={(e) => setRemarks(e.target.value)} placeholder="Optional" className={inputClass} />
+                        </div>
+                    </div>
+                    {saveError && <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{saveError}</p>}
+                </div>
+            )}
+        </Modal>
+    );
+};
+
+// Details of one branch transfer row: the serial as it is now and its complete branch history.
+const BranchTransferDetails = ({ transfer, onClose }) => {
+    const [result, setResult] = useState({ id: null, data: null, error: '' });
+    useEffect(() => {
+        let cancelled = false;
+        serialTransferService.getSerialBranchHistory(transfer.assetId)
+            .then((res) => { if (!cancelled) setResult({ id: transfer.assetId, data: res.data, error: '' }); })
+            .catch((err) => { if (!cancelled) setResult({ id: transfer.assetId, data: null, error: err.response?.data?.message || 'Failed to load the branch history' }); });
+        return () => { cancelled = true; };
+    }, [transfer.assetId]);
+
+    const { data, error } = result;
+    const label = 'block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1';
+
+    return (
+        <Modal
+            isOpen
+            onClose={onClose}
+            title={`Branch Transfer ${transfer.transferNo}`}
+            maxWidth="max-w-5xl"
+            footer={<button type="button" onClick={onClose} className="w-full md:w-auto px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Close</button>}
+        >
+            <div className="space-y-5">
+                <div className="grid grid-cols-1 gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div><span className={label}>Transfer No / Date</span><p className="text-sm font-bold text-slate-800">{transfer.transferNo}</p><p className="text-xs text-slate-500">{formatDateTime(transfer.transferDate)}</p></div>
+                    <div><span className={label}>Branches</span><BranchRoute from={transfer.fromBranchName} to={transfer.toBranchName} /></div>
+                    <div><span className={label}>Status When Moved</span><StatusBadge status={transfer.statusAtTransfer} /></div>
+                    <div><span className={label}>Transferred By</span><p className="text-sm font-bold text-slate-800">{transfer.createdByName || '-'}</p></div>
+                    <div className="sm:col-span-2"><span className={label}>Reference</span><p className="text-sm font-bold text-slate-800">{transfer.reference || '-'}</p></div>
+                    <div className="sm:col-span-2"><span className={label}>Remarks</span><p className="text-sm font-medium text-slate-700">{transfer.remarks || '-'}</p></div>
+                </div>
+
+                {result.id !== transfer.assetId ? <Spinner /> : error ? (
+                    <p className="rounded-2xl bg-rose-50 p-4 text-center text-sm font-medium text-rose-600">{error}</p>
+                ) : (
+                    <>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                            <div><span className={label}>Serial Number</span><p className="text-sm font-bold text-slate-800">{data.asset.serialNumber}</p></div>
+                            <div><span className={label}>Product</span><p className="text-sm text-slate-600"><SerialSummary serial={data.asset} /></p></div>
+                            <div><span className={label}>Current Branch</span><p className="text-sm font-bold text-slate-800">{data.asset.branchName || '-'}</p></div>
+                            <div><span className={label}>Current Status</span><StatusBadge status={data.asset.status} /></div>
+                        </div>
+                        <div className="rounded-2xl border border-slate-100">
+                            <h4 className="flex items-center gap-2 border-b border-slate-100 px-4 py-3 text-xs font-black uppercase tracking-widest text-slate-500">
+                                <MdHistory size={16} /> Complete Branch History ({data.transfers.length})
+                            </h4>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50">
+                                            {['Transfer No / Date', 'From / To Branch', 'Status When Moved', 'Reference / Remarks', 'Transferred By'].map((text) => <th key={text} className={thClass}>{text}</th>)}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {data.transfers.map((entry) => (
+                                            <tr key={entry._id} className={`border-b last:border-0 border-slate-50 text-sm ${sameId(entry._id, transfer._id) ? 'bg-primary-50/50' : ''}`}>
+                                                <td className="p-4 whitespace-nowrap">
+                                                    <span className="font-bold text-slate-800">{entry.transferNo}</span>
+                                                    <span className="block text-xs text-slate-500">{formatDateTime(entry.transferDate)}</span>
+                                                </td>
+                                                <td className="p-4"><BranchRoute from={entry.fromBranchName} to={entry.toBranchName} /></td>
+                                                <td className="p-4"><StatusBadge status={entry.status} /></td>
+                                                <td className="p-4 text-slate-500 min-w-[10rem]">
+                                                    {entry.reference && <span className="block font-bold text-slate-700">{entry.reference}</span>}
+                                                    {entry.remarks || (!entry.reference ? '-' : '')}
+                                                </td>
+                                                <td className="p-4 text-slate-500 whitespace-nowrap">{entry.createdByName || '-'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </>
+                )}
+            </div>
+        </Modal>
+    );
+};
+
 const SerialNoTransfer = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const tab = TABS.some((item) => item.key === searchParams.get('tab')) ? searchParams.get('tab') : 'serials';
@@ -1039,17 +1610,17 @@ const SerialNoTransfer = () => {
         <div className="space-y-6">
             <div>
                 <h1 className="text-3xl font-black text-slate-900 tracking-tight">Serial No Transfer</h1>
-                <p className="text-slate-500 font-medium">Customer-wise ownership history of sold serial numbers. Only the latest customer of a serial is active.</p>
+                <p className="text-slate-500 font-medium">Every Invoice Bulk Upload serial number with its branch and status. Move sold serials to another customer, or any serial to another branch.</p>
             </div>
 
             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                <div className="flex gap-1 border-b border-slate-100 px-4 pt-4">
+                <div className="flex gap-1 overflow-x-auto border-b border-slate-100 px-4 pt-4">
                     {TABS.map((item) => (
                         <button
                             key={item.key}
                             type="button"
                             onClick={() => setSearchParams(item.key === 'serials' ? {} : { tab: item.key })}
-                            className={`px-5 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${tab === item.key ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-400 hover:text-slate-700'}`}
+                            className={`shrink-0 whitespace-nowrap px-5 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${tab === item.key ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-400 hover:text-slate-700'}`}
                         >
                             {item.label}
                         </button>
@@ -1060,6 +1631,7 @@ const SerialNoTransfer = () => {
                 )}
                 {tab === 'history' && <HistoryTab onOpen={openSerial} />}
                 {tab === 'activity' && <ActivityTab onOpen={openSerial} />}
+                {tab === 'branch' && <BranchTransferTab />}
             </div>
         </div>
     );

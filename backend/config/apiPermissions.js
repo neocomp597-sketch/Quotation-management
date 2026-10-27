@@ -103,7 +103,7 @@ const API_PERMISSION_RULES = [
     },
     {
         prefix: '/api/serial-transfers', key: 'master_serials',
-        routes: { 'POST /serials/:assetId/transfer': 'modify', 'POST /serials/:assetId/past-entry': 'modify' }
+        routes: { 'POST /serials/:assetId/transfer': 'modify', 'POST /serials/:assetId/past-entry': 'modify', 'POST /branch-transfers': 'modify' }
     },
     {
         prefix: '/api/payroll/employees', key: 'payroll_employees', openRead: true,
