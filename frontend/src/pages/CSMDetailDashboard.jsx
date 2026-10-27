@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { csmService } from '../services/api';
 import { formatDateTime } from '../utils/helpers';
 import {
@@ -10,7 +10,8 @@ import {
     MdLocationOn, MdPerson, MdTune, MdInsights
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import CSMDashboardFilter, { CSMDashboardHeader, useCSMDashboardFilters } from '../components/csm/CSMDashboardFilter';
+import CSMDashboardFilter, { CSMDashboardHeader } from '../components/csm/CSMDashboardFilter';
+import { useCSMDashboardFilters } from '../hooks/useCSMDashboardFilters';
 
 const COLORS = ['#0d9488', '#0ea5e9', '#8b5cf6', '#f59e0b', '#f43f5e', '#64748b'];
 
@@ -40,7 +41,7 @@ const getVisitStatusBadge = (status) => {
 const formatVisitDate = (dateString) => {
     try {
         return formatDateTime(dateString, dateString);
-    } catch (e) {
+    } catch {
         return dateString;
     }
 };
@@ -54,7 +55,7 @@ const CSMDetailDashboard = () => {
     const [seeding, setSeeding] = useState(false);
     const latestRequest = useRef(0);
 
-    const loadStats = async () => {
+    const loadStats = useCallback(async () => {
         // Ignore responses that arrive after a newer filter change
         const requestId = ++latestRequest.current;
         setLoading(true);
@@ -72,7 +73,7 @@ const CSMDetailDashboard = () => {
         } finally {
             if (requestId === latestRequest.current) setLoading(false);
         }
-    };
+    }, [filters.params]);
 
     const handleSeedMhData = async () => {
         setSeeding(true);
@@ -105,7 +106,7 @@ const CSMDetailDashboard = () => {
         return () => {
             window.removeEventListener('onCsmDataSeeded', loadStats);
         };
-    }, [filters.params]);
+    }, [loadStats]);
 
     const statusData = stats?.statusBreakdown || [];
     const categoryData = stats?.categoryBreakdown || [];

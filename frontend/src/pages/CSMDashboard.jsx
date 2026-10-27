@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { csmService } from '../services/api';
 import { MdFlashOn } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import CSMDashboardFilter, { CSMDashboardHeader, useCSMDashboardFilters } from '../components/csm/CSMDashboardFilter';
+import CSMDashboardFilter, { CSMDashboardHeader } from '../components/csm/CSMDashboardFilter';
+import { useCSMDashboardFilters } from '../hooks/useCSMDashboardFilters';
 
 // Charts, SLA compliance, field service log and engineer performance live on the
 // CSM Detail Dashboard (/csm/detail-dashboard); this page only shows the ticket counts.
@@ -14,7 +15,7 @@ const CSMDashboard = () => {
     const [metrics, setMetrics] = useState(null);
     const latestRequest = useRef(0);
 
-    const loadStats = async () => {
+    const loadStats = useCallback(async () => {
         // Ignore responses that arrive after a newer filter change
         const requestId = ++latestRequest.current;
         setLoading(true);
@@ -27,7 +28,7 @@ const CSMDashboard = () => {
         } finally {
             if (requestId === latestRequest.current) setLoading(false);
         }
-    };
+    }, [filters.params]);
 
     useEffect(() => {
         loadStats();
@@ -35,7 +36,7 @@ const CSMDashboard = () => {
         return () => {
             window.removeEventListener('onCsmDataSeeded', loadStats);
         };
-    }, [filters.params]);
+    }, [loadStats]);
 
     const m = metrics || {};
 

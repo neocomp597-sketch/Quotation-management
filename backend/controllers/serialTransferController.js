@@ -648,7 +648,11 @@ const withMasterData = async (rows) => {
             customerName: cleanText(row.customerName) || customerLabel(customer),
             customerCode: cleanText(row.customerCode) || cleanText(customer?.externalCode),
             email: cleanText(customer?.email),
-            pincode: cleanText(row.customerPincode) || cleanText(customer?.billingAddress?.pincode)
+            // A current owner shows the Customer Master pincode as it is now; a past owner keeps
+            // the one recorded at the time.
+            pincode: row.ownership === 'Active'
+                ? cleanText(customer?.billingAddress?.pincode) || cleanText(row.customerPincode)
+                : cleanText(row.customerPincode) || cleanText(customer?.billingAddress?.pincode)
         };
     });
 };

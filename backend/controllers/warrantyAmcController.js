@@ -11,6 +11,7 @@ const mongoose = require('mongoose');
 const ExcelJS = require('exceljs');
 require('../models/MGR');
 const { productMgrPopulate, applyProductMgrs, applyProductMgrsToAll, stripMgrFields } = require('../utils/productMgr');
+const { customerPostalCodeOf, applyCustomerPostalCode } = require('../utils/customerPostalCode');
 const { loadDivisionSegmentLookup, resolveDivisionSegment } = require('../utils/divisionSegment');
 
 // Division / Segment of an Invoice Bulk Upload record, shown as code + description.
@@ -662,7 +663,10 @@ exports.returnAsset = async (req, res) => {
             return res.status(400).json({ message: 'Return reason is required' });
         }
 
-        const asset = await Asset.findOne({ _id: id, companyId }).populate('productId').populate('customerId');
+        // The customer may belong to another branch; load it by id like the other asset reads do.
+        const asset = await Asset.findOne({ _id: id, companyId })
+            .populate('productId')
+            .populate({ path: 'customerId', options: { bypassTenant: true } });
         if (!asset) {
             return res.status(404).json({ message: 'Asset entry not found' });
         }
@@ -687,7 +691,7 @@ exports.returnAsset = async (req, res) => {
             productId: asset.productId?._id,
             customerId: asset.customerId?._id,
             customerName: asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || '',
-            customerPostalCode: asset.customerPostalCode || '',
+            customerPostalCode: customerPostalCodeOf(asset),
             invoiceNumber: asset.invoiceNumber || '',
             saleDate: asset.saleDate || asset.invoiceDate || null,
             returnDate: now,
@@ -782,7 +786,7 @@ exports.getAssets = async (req, res) => {
         ]);
 
         res.json({
-            data: applyProductMgrsToAll(docs),
+            data: applyProductMgrsToAll(docs).map(applyCustomerPostalCode),
             pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
             summary: { total: allAssets, inStock, sold, returned }
         });
@@ -911,7 +915,7 @@ exports.exportAssets = async (req, res) => {
                 status: asset.status || 'IN_STOCK',
                 customerCode: asset.customerCode || asset.customerId?.externalCode || '',
                 customer: custName,
-                customerPostalCode: asset.customerPostalCode || '',
+                customerPostalCode: customerPostalCodeOf(asset),
                 invoiceNumber: asset.invoiceNumber || '',
                 saleDate: sDate ? formatDate(sDate, '') : '',
                 location: asset.location || '',
@@ -1148,8 +1152,10 @@ exports.getAssetSummary = async (req, res) => {
             serialNumber: buildExactRegex(asset.serialNumber)
         }).sort({ createdAt: -1 }).lean();
 
-        // MGR 1-5 always reflect the current Product Master assignment.
+        // MGR 1-5 always reflect the current Product Master assignment, and the
+        // postal code the current Customer Master pincode.
         applyProductMgrs(asset);
+        applyCustomerPostalCode(asset);
 
         res.json({
             asset,
@@ -1423,7 +1429,7 @@ exports.searchSerialNumbers = async (req, res) => {
                 productName: a.productId?.productName || a.productName || '',
                 customerId: a.customerId,
                 customerName: a.customerId?.companyName || a.customerId?.customerName || a.customerNameStr || '',
-                customerPostalCode: a.customerPostalCode || '',
+                customerPostalCode: customerPostalCodeOf(a),
                 customerMobile: a.customerMobile || a.customerId?.mobile || '',
                 invoiceNumber: a.invoiceNumber || (a.invoiceId?.voucherNumber || ''),
                 saleDate: a.saleDate || a.invoiceDate || null,
