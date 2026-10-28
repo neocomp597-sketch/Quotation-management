@@ -796,5 +796,143 @@ html, body {
   }
 }
 
+/* ==========================================================================
+   Invoice Bulk Upload & Serial No Transfer: phone view
+   From 768px up the tables show as they are. Below it each table row is a
+   card (components/SerialMobileCards.jsx) and the filters stack. These
+   classes only lay things out; colours come from the utility classes, so the
+   dark theme covers the cards too.
+   ========================================================================== */
+.serial-mobile-list {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .serial-desktop-table {
+    display: none;
+  }
+
+  .serial-mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .serial-mobile-card {
+    border-radius: 1rem;
+    padding: 0.875rem 1rem;
+    box-shadow: 0 10px 24px -18px rgba(15, 23, 42, 0.45);
+  }
+
+  .serial-mobile-card.is-clickable {
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .serial-mobile-card.is-clickable:active {
+    transform: scale(0.99);
+  }
+
+  .serial-mobile-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .serial-mobile-title {
+    font-size: 0.875rem;
+    font-weight: 900;
+    overflow-wrap: anywhere;
+  }
+
+  .serial-mobile-subtitle {
+    margin-top: 0.125rem;
+    font-size: 0.75rem;
+    overflow-wrap: anywhere;
+  }
+
+  .serial-mobile-aside {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .serial-mobile-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.625rem 0.75rem;
+    margin: 0.75rem 0 0;
+    padding-top: 0.75rem;
+    border-top-width: 1px;
+    border-top-style: dashed;
+  }
+
+  .serial-mobile-field.is-wide {
+    grid-column: 1 / -1;
+  }
+
+  .serial-mobile-label {
+    font-size: 0.625rem;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .serial-mobile-value {
+    margin: 0.125rem 0 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .serial-mobile-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+
+  .serial-mobile-actions > * {
+    flex: 1 1 0;
+    justify-content: center;
+    min-height: 2.5rem;
+  }
+
+  .serial-mobile-empty {
+    padding: 2rem 1rem;
+    text-align: center;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  /* Filter bars: search and dates take a whole row, dropdowns two to a row. */
+  .serial-filter-bar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: end;
+  }
+
+  .serial-filter-bar > .serial-filter-wide,
+  .serial-filter-bar > .serial-date-range {
+    grid-column: 1 / -1;
+    max-width: none;
+  }
+
+  .serial-filter-bar select {
+    width: 100%;
+    max-width: none;
+  }
+
+  .serial-date-range > label {
+    flex: 1 1 9.5rem;
+  }
+
+  .serial-date-range .serial-date-input {
+    width: 100%;
+  }
+}
+
 
 
