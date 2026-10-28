@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const tenantPlugin = require('./plugins/tenantPlugin');
 
 /**
- * Customer-wise ownership history of a sold serial number (Serial No Transfer).
+ * Customer-wise ownership history of a serial number (Serial No Transfer).
  *
  * One record per customer who has held the serial: the original sale ("Sold") and every
  * later transfer ("Transferred"). Records are never edited or deleted; a transfer switches
