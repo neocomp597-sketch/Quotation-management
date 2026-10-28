@@ -11,6 +11,7 @@ import { formatDate, formatDateTime } from '../utils/helpers';
 import DateInput from '../components/DateInput';
 import usePermission from '../hooks/usePermission';
 import { useAuth } from '../context/AuthContext';
+import { MobileCard, MobileCardActions, MobileCardHead, MobileCardList, MobileEmpty, MobileField, MobileFields } from '../components/SerialMobileCards';
 
 const PAGE_SIZE = 20;
 const TABS = [
@@ -186,9 +187,9 @@ const Mgr4Filter = ({ value, onChange }) => {
 
 const DateRangeFilter = ({ range, field, onChange }) => {
     const set = (setter) => (e) => { setter(e.target.value); onChange(); };
-    const dateClass = `${fieldClass} w-auto py-2.5`;
+    const dateClass = `${fieldClass} w-auto py-2.5 serial-date-input`;
     return (
-        <div className="flex flex-wrap items-end gap-2">
+        <div className="serial-date-range flex flex-wrap items-end gap-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                 From Date <span className="normal-case tracking-normal font-semibold">({field})</span>
                 <DateInput type="date" value={range.fromDate} onChange={set(range.setFromDate)} className={`${dateClass} mt-1 block`} />
@@ -235,8 +236,8 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
     return (
         <>
             {downloadFor && <SerialActivityDownloadDialog serial={downloadFor} onClose={() => setDownloadFor(null)} />}
-            <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-wrap items-center gap-3">
-                <div className="relative w-full max-w-md">
+            <div className="serial-filter-bar p-4 border-b border-slate-100 bg-slate-50 flex flex-wrap items-center gap-3">
+                <div className="serial-filter-wide relative w-full max-w-md">
                     <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                     <input
                         type="text"
@@ -259,16 +260,51 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                     <option value="Transferred">Transferred to another customer</option>
                 </select>
                 <Mgr4Filter value={mgr4} onChange={(value) => { setMgr4(value); setPage(1); }} />
-                <DateRangeFilter range={range} field="Sale Date" onChange={() => setPage(1)} />
+                <DateRangeFilter range={range} field="Invoice Date" onChange={() => setPage(1)} />
             </div>
-            <div className="p-6">
+            <div className="p-3 md:p-6">
                 {loading ? <Spinner /> : (
                     <>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
+                        <MobileCardList>
+                            {rows.map((row, index) => (
+                                <MobileCard key={row._id} onClick={() => onOpen(row._id)}>
+                                    <MobileCardHead
+                                        title={<><span className="text-slate-400 font-bold">{offset + index + 1}.</span> {row.serialNumber}</>}
+                                        subtitle={[row.productCode, row.productName].filter(Boolean).join(' · ')}
+                                        aside={<StatusBadge status={row.status} />}
+                                    />
+                                    <MobileFields>
+                                        <MobileField label="Branch">{row.branchName || '-'}</MobileField>
+                                        <MobileField label="Transfers">{row.transfers}</MobileField>
+                                        <MobileField label="Current Customer" wide>
+                                            {row.customerName || '-'}
+                                            {row.customerCode && <span className="block text-xs text-slate-500">{row.customerCode}</span>}
+                                        </MobileField>
+                                        <MobileField label="Invoice Number">{row.invoiceNumber || '-'}</MobileField>
+                                        <MobileField label="Invoice Date">{formatDate(row.saleDate)}</MobileField>
+                                    </MobileFields>
+                                    <MobileCardActions>
+                                        <button type="button" onClick={() => onOpen(row._id)} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 bg-white text-primary-600 font-black uppercase text-[10px] tracking-widest">
+                                            <MdVisibility size={16} /> View
+                                        </button>
+                                        <button type="button" onClick={() => setDownloadFor(row)} aria-label={`Download customer activity log of ${row.serialNumber}`} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 bg-white text-emerald-600 font-black uppercase text-[10px] tracking-widest">
+                                            <MdFileDownload size={16} /> Log
+                                        </button>
+                                        {canModify && row.status === 'SOLD' && (
+                                            <button type="button" onClick={() => onTransfer(row._id)} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 font-black uppercase text-[10px] tracking-widest">
+                                                <MdSwapHoriz size={16} /> Transfer
+                                            </button>
+                                        )}
+                                    </MobileCardActions>
+                                </MobileCard>
+                            ))}
+                            {!rows.length && <MobileEmpty>{range.invalid ? 'Correct the date range to see results.' : 'No serial numbers match.'}</MobileEmpty>}
+                        </MobileCardList>
+                        <div className="serial-desktop-table overflow-x-auto">
+                            <table className="serial-list-compact w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50">
-                                        {['Sr No', 'Serial No', 'Product', 'Branch', 'Current Customer', 'Sale Date', 'Transfers', 'Status'].map((label) => (
+                                        {['Sr No', 'Serial No', 'Product', 'Branch', 'Current Customer', 'Invoice Number', 'Invoice Date', 'Transfers', 'Status'].map((label) => (
                                             <th key={label} className={thClass}>{label}</th>
                                         ))}
                                         <th className={`${thClass} text-right`}>Action</th>
@@ -288,6 +324,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                                                 <span className="font-bold text-slate-700">{row.customerName || '-'}</span>
                                                 {row.customerCode && <span className="block text-xs text-slate-500">{row.customerCode}</span>}
                                             </td>
+                                            <td className="p-4 text-slate-600 whitespace-nowrap">{row.invoiceNumber || '-'}</td>
                                             <td className="p-4 text-slate-500 whitespace-nowrap">{formatDate(row.saleDate)}</td>
                                             <td className="p-4 font-bold text-slate-700">{row.transfers}</td>
                                             <td className="p-4"><StatusBadge status={row.status} /></td>
@@ -307,7 +344,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                                         </tr>
                                     ))}
                                     {!rows.length && (
-                                        <tr><td colSpan={9} className="p-8 text-center text-slate-400 text-sm font-medium">{range.invalid ? 'Correct the date range to see results.' : 'No serial numbers match.'}</td></tr>
+                                        <tr><td colSpan={10} className="p-8 text-center text-slate-400 text-sm font-medium">{range.invalid ? 'Correct the date range to see results.' : 'No serial numbers match.'}</td></tr>
                                     )}
                                 </tbody>
                             </table>
@@ -333,10 +370,14 @@ const HistoryTab = ({ onOpen }) => {
         page, limit: PAGE_SIZE, search: debouncedSearch || undefined, flag: flag || undefined, entryType: entryType || undefined, mgr4: mgr4 || undefined, ...range.params,
     }, !range.invalid);
 
+    const emptyText = range.invalid ? 'Correct the date range to see results.'
+        : debouncedSearch || flag || entryType || mgr4 || range.fromDate || range.toDate ? 'No history records match.'
+            : 'No transfers recorded yet. Transfer a serial number from the Serial No List.';
+
     return (
         <>
-            <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-wrap items-center gap-3">
-                <div className="relative w-full max-w-md">
+            <div className="serial-filter-bar p-4 border-b border-slate-100 bg-slate-50 flex flex-wrap items-center gap-3">
+                <div className="serial-filter-wide relative w-full max-w-md">
                     <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                     <input
                         type="text"
@@ -360,10 +401,29 @@ const HistoryTab = ({ onOpen }) => {
                 <Mgr4Filter value={mgr4} onChange={(value) => { setMgr4(value); setPage(1); }} />
                 <DateRangeFilter range={range} field="Transfer Date" onChange={() => setPage(1)} />
             </div>
-            <div className="p-6">
+            <div className="p-3 md:p-6">
                 {loading ? <Spinner /> : (
                     <>
-                        <div className="overflow-x-auto">
+                        <MobileCardList>
+                            {rows.map((entry) => (
+                                <MobileCard key={entry._id} onClick={() => onOpen(entry.assetId)}>
+                                    <MobileCardHead
+                                        title={entry.serialNumber}
+                                        subtitle={[entry.productCode, entry.productName].filter(Boolean).join(' · ')}
+                                        aside={<TypeBadge type={entry.entryType} />}
+                                    />
+                                    <MobileFields>
+                                        <MobileField label="Date">{formatDate(entry.transferDate)}</MobileField>
+                                        <MobileField label="Status"><FlagBadge active={entry.isActive} /></MobileField>
+                                        <MobileField label="Customer" wide><CustomerCell entry={entry} /></MobileField>
+                                        <MobileField label="Remarks" wide>{entry.remarks || (entry.entryType === 'Sold' && entry.invoiceNumber ? `Invoice ${entry.invoiceNumber}` : '-')}</MobileField>
+                                        <MobileField label="Recorded By" wide>{entry.createdByName || '-'} · {formatDate(entry.createdAt)}</MobileField>
+                                    </MobileFields>
+                                </MobileCard>
+                            ))}
+                            {!rows.length && <MobileEmpty>{emptyText}</MobileEmpty>}
+                        </MobileCardList>
+                        <div className="serial-desktop-table overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50">
@@ -393,11 +453,7 @@ const HistoryTab = ({ onOpen }) => {
                                     ))}
                                     {!rows.length && (
                                         <tr>
-                                            <td colSpan={8} className="p-8 text-center text-slate-400 text-sm font-medium">
-                                                {range.invalid ? 'Correct the date range to see results.'
-                                                    : debouncedSearch || flag || entryType || mgr4 || range.fromDate || range.toDate ? 'No history records match.'
-                                                        : 'No transfers recorded yet. Transfer a serial number from the Serial No List.'}
-                                            </td>
+                                            <td colSpan={8} className="p-8 text-center text-slate-400 text-sm font-medium">{emptyText}</td>
                                         </tr>
                                     )}
                                 </tbody>
@@ -547,6 +603,11 @@ const ActivityTab = ({ onOpen, assetId }) => {
     const { rows, pagination, loading } = useList(serialTransferService.listActivity, { ...filters, page, limit: PAGE_SIZE }, !range.invalid);
     const offset = (pagination.page - 1) * pagination.limit;
     const inactive = ownership === 'Inactive';
+    const emptyText = assetId
+        ? (inactive ? 'This serial number has never been transferred, so it has no inactive (earlier) customers to download.' : 'No current customer found for this serial number.')
+        : range.invalid ? 'Correct the date range to see results.'
+            : inactive && !debouncedSearch && !mgr4 && !range.fromDate && !range.toDate ? 'No earlier customers yet. A customer becomes inactive when the serial is transferred.'
+                : 'No customer records match.';
 
     const download = async () => {
         setDownloading(true);
@@ -566,7 +627,7 @@ const ActivityTab = ({ onOpen, assetId }) => {
                     {OWNERSHIP_OPTIONS.map((option) => (
                         <label
                             key={option.value}
-                            className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 transition-all ${ownership === option.value ? 'border-primary-500 bg-primary-50/60' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+                            className={`flex w-full sm:w-auto cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 transition-all ${ownership === option.value ? 'border-primary-500 bg-primary-50/60' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
                         >
                             <input
                                 type="radio"
@@ -586,14 +647,14 @@ const ActivityTab = ({ onOpen, assetId }) => {
                         type="button"
                         onClick={download}
                         disabled={downloading || loading || range.invalid || !pagination.total}
-                        className="ml-auto flex items-center gap-2 px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-xs tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full sm:w-auto sm:ml-auto flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-xs tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <MdFileDownload size={18} /> {downloading ? 'Preparing…' : 'Download Excel'}
                     </button>
                 </div>
                 {!assetId && (
-                    <div className="flex flex-wrap items-end gap-3">
-                        <div className="relative w-full max-w-md">
+                    <div className="serial-filter-bar flex flex-wrap items-end gap-3">
+                        <div className="serial-filter-wide relative w-full max-w-md">
                             <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                             <input
                                 type="text"
@@ -608,13 +669,41 @@ const ActivityTab = ({ onOpen, assetId }) => {
                     </div>
                 )}
             </div>
-            <div className="p-6">
+            <div className="p-3 md:p-6">
                 {loading ? <Spinner /> : (
                     <>
                         <p className="mb-3 text-xs font-bold text-slate-500">
                             {pagination.total} {inactive ? 'inactive (earlier)' : 'active (current)'} customer record{pagination.total === 1 ? '' : 's'}
                         </p>
-                        <div className="overflow-x-auto">
+                        <MobileCardList>
+                            {rows.map((row, index) => (
+                                <MobileCard key={row._id} onClick={onOpen ? () => onOpen(row.assetId) : undefined}>
+                                    <MobileCardHead
+                                        title={<><span className="text-slate-400 font-bold">{offset + index + 1}.</span> {row.serialNumber}</>}
+                                        subtitle={[row.productCode, row.productName].filter(Boolean).join(' · ')}
+                                        aside={<FlagBadge active={row.ownership === 'Active'} />}
+                                    />
+                                    {row.mgr1 && <p className="mt-1 text-[10px] font-semibold text-emerald-600">{[row.mgr1, row.mgr2, row.mgr3, row.mgr4, row.mgr5].filter(Boolean).join(' · ')}</p>}
+                                    <MobileFields>
+                                        <MobileField label="Customer" wide>
+                                            {row.customerName || '-'}
+                                            {row.customerCode && <span className="block text-xs text-slate-500">{row.customerCode}</span>}
+                                        </MobileField>
+                                        <MobileField label="Email" wide>{row.email || '-'}</MobileField>
+                                        <MobileField label="Pincode">{row.pincode || '-'}</MobileField>
+                                        <MobileField label="Invoice">
+                                            {row.invoiceNumber || '-'}
+                                            {row.invoiceDate && <span className="block text-xs text-slate-500">{formatDate(row.invoiceDate)}</span>}
+                                        </MobileField>
+                                        <MobileField label={inactive ? 'Customer Period' : 'Customer Since'} wide>
+                                            {formatDate(row.ownerSince)}{inactive && row.ownerUntil ? ` to ${formatDate(row.ownerUntil)}` : ''}
+                                        </MobileField>
+                                    </MobileFields>
+                                </MobileCard>
+                            ))}
+                            {!rows.length && <MobileEmpty>{emptyText}</MobileEmpty>}
+                        </MobileCardList>
+                        <div className="serial-desktop-table overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50">
@@ -652,13 +741,7 @@ const ActivityTab = ({ onOpen, assetId }) => {
                                     ))}
                                     {!rows.length && (
                                         <tr>
-                                            <td colSpan={9} className="p-8 text-center text-slate-400 text-sm font-medium">
-                                                {assetId
-                                                    ? (inactive ? 'This serial number has never been transferred, so it has no inactive (earlier) customers to download.' : 'No current customer found for this serial number.')
-                                                    : range.invalid ? 'Correct the date range to see results.'
-                                                        : inactive && !debouncedSearch && !mgr4 && !range.fromDate && !range.toDate ? 'No earlier customers yet. A customer becomes inactive when the serial is transferred.'
-                                                            : 'No customer records match.'}
-                                            </td>
+                                            <td colSpan={9} className="p-8 text-center text-slate-400 text-sm font-medium">{emptyText}</td>
                                         </tr>
                                     )}
                                 </tbody>
@@ -732,7 +815,7 @@ export const SerialNoDetails = ({ transfer = false }) => {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-wrap items-center gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+            <div className="flex flex-wrap items-center gap-4 bg-white p-4 md:p-6 rounded-3xl border border-slate-100 shadow-sm">
                 <button
                     type="button"
                     onClick={goBack}
@@ -740,21 +823,37 @@ export const SerialNoDetails = ({ transfer = false }) => {
                 >
                     <MdArrowBack size={20} />
                 </button>
+<<<<<<< HEAD
                 {/* Serial number and product are shown once, in the details card or form below. */}
                 <h1 className="min-w-0 flex-1 text-xl font-black text-slate-900">Serial No Transfer</h1>
                 {data && !formMode && canModify && (
                     <div className="flex flex-wrap gap-3">
+=======
+                <div className="min-w-0 flex-1">
+                    <h1 className="text-xl font-black text-slate-900">
+                        Serial No Transfer
+                        {data && <span className="ml-2 text-primary-600">{data.asset.serialNumber}</span>}
+                    </h1>
+                    {data && (
+                        <p className="mt-0.5 text-xs font-medium text-slate-500">
+                            {data.asset.productCode}{data.asset.productName ? ` · ${data.asset.productName}` : ''}
+                        </p>
+                    )}
+                </div>
+                {data && sold && !formMode && canModify && (
+                    <div className="flex w-full sm:w-auto flex-wrap gap-3">
+>>>>>>> f06da8202d682688814cc0c79f79cc6b501d3d21
                         <button
                             type="button"
                             onClick={() => setFormMode('past')}
-                            className="flex items-center gap-2 px-5 py-3 rounded-2xl border border-slate-200 bg-white text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all"
+                            className="flex flex-1 sm:flex-none items-center justify-center gap-2 px-5 py-3 rounded-2xl border border-slate-200 bg-white text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all"
                         >
                             <MdHistory size={18} /> Add Past Entry
                         </button>
                         <button
                             type="button"
                             onClick={() => setFormMode('transfer')}
-                            className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                            className="flex flex-1 sm:flex-none items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
                         >
                             <MdSwapHoriz size={18} /> Transfer Serial No
                         </button>
@@ -777,7 +876,7 @@ export const SerialNoDetails = ({ transfer = false }) => {
                                 onSaved={handleSaved}
                             />
                         ) : (
-                            <div className="grid grid-cols-1 gap-6 p-6 sm:grid-cols-2 lg:grid-cols-6">
+                            <div className="grid grid-cols-1 gap-6 p-4 md:p-6 sm:grid-cols-2 lg:grid-cols-6">
                                 <div><span className={label}>Serial Number</span><p className="text-sm font-bold text-slate-800">{data.asset.serialNumber}</p></div>
                                 <div className="lg:col-span-2"><span className={label}>Product</span><p className="text-sm font-bold text-slate-800">{data.asset.productCode}</p><p className="text-xs text-slate-500">{data.asset.productName}</p></div>
                                 <div><span className={label}>Status</span><StatusBadge status={data.asset.status} /></div>
@@ -796,7 +895,28 @@ export const SerialNoDetails = ({ transfer = false }) => {
                         <h3 className="flex items-center gap-2 border-b border-slate-100 px-6 py-4 text-xs font-black uppercase tracking-widest text-slate-500">
                             <MdHistory size={16} /> Serial Number Sale History ({history.length})
                         </h3>
-                        <div className="overflow-x-auto p-4">
+                        <div className="p-3 md:hidden">
+                            <MobileCardList>
+                                {history.map((entry) => (
+                                    <MobileCard key={entry._id || 'sale'} tone={entry.isActive ? 'active' : 'default'}>
+                                        <MobileCardHead
+                                            title={entry.companyName || entry.customerName || '-'}
+                                            subtitle={[entry.customerCode, entry.customerMobile, [entry.customerCity, entry.customerState].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}
+                                            aside={<TypeBadge type={entry.entryType} />}
+                                        />
+                                        <MobileFields>
+                                            <MobileField label="Date">{formatDate(entry.transferDate)}</MobileField>
+                                            <MobileField label="Status"><FlagBadge active={entry.isActive} /></MobileField>
+                                            <MobileField label="Product" wide>{[entry.productCode, entry.productName].filter(Boolean).join(' · ') || '-'}</MobileField>
+                                            <MobileField label="Remarks" wide>{entry.remarks || (entry.invoiceNumber && entry.entryType === 'Sold' ? `Invoice ${entry.invoiceNumber}` : '-')}</MobileField>
+                                            <MobileField label="Recorded By" wide>{entry.pending ? 'Invoice Bulk Upload' : (entry.createdByName || '-')}</MobileField>
+                                        </MobileFields>
+                                    </MobileCard>
+                                ))}
+                                {!history.length && <MobileEmpty>No customer history recorded for this serial number.</MobileEmpty>}
+                            </MobileCardList>
+                        </div>
+                        <div className="serial-desktop-table overflow-x-auto p-4">
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50">
@@ -939,7 +1059,7 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
 
     return (
         <>
-        <form onSubmit={save} className="p-6 space-y-5">
+        <form onSubmit={save} className="p-4 md:p-6 space-y-5">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div><span className={label}>Serial Number</span><p className={readOnly}>{data.asset.serialNumber}</p></div>
                 <div><span className={label}>Product</span><p className={readOnly}>{data.asset.productCode}{data.asset.productName ? ` · ${data.asset.productName}` : ''}</p></div>
@@ -964,13 +1084,13 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
                 ) : (
                     <>
                         {canAddCustomer && (
-                        <div className="mb-3 inline-flex rounded-2xl border border-slate-200 p-1">
+                        <div className="mb-3 flex w-full sm:inline-flex sm:w-auto rounded-2xl border border-slate-200 p-1">
                             {[['existing', 'Select Existing Customer'], ['new', 'Add New Customer']].map(([value, text]) => (
                                 <button
                                     key={value}
                                     type="button"
                                     onClick={() => { setCustomerMode(value); if (value === 'new') setAddingCustomer(true); }}
-                                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${customerMode === value ? 'bg-primary-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+                                    className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${customerMode === value ? 'bg-primary-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
                                 >
                                     {text}
                                 </button>
@@ -1051,10 +1171,10 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
             )}
 
             <div className="flex justify-end gap-3">
-                <button type="button" onClick={onCancel} disabled={saving} className="px-5 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all disabled:opacity-60">
+                <button type="button" onClick={onCancel} disabled={saving} className="flex-1 sm:flex-none px-5 py-3 rounded-2xl border border-slate-200 text-slate-600 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all disabled:opacity-60">
                     Cancel
                 </button>
-                <button type="submit" disabled={saving || !customer} className="px-6 py-3 rounded-2xl bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-xs tracking-widest transition-all disabled:opacity-60">
+                <button type="submit" disabled={saving || !customer} className="flex-1 sm:flex-none px-6 py-3 rounded-2xl bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-xs tracking-widest transition-all disabled:opacity-60">
                     {saving ? 'Saving…' : past ? 'Save Past Entry' : 'Save Transfer'}
                 </button>
             </div>
@@ -1104,9 +1224,41 @@ const BranchTransferList = ({ params, enabled, hasFilters, onPageChange, onOpen 
     const { rows, pagination, loading } = useList(serialTransferService.listBranchTransfers, params, enabled);
 
     if (loading) return <Spinner />;
+    const emptyText = !enabled ? 'Correct the date range to see results.'
+        : hasFilters ? 'No branch transfers match.'
+            : 'No serial numbers have been moved to another branch yet.';
     return (
         <>
-            <div className="overflow-x-auto">
+            <MobileCardList>
+                {rows.map((row) => (
+                    <MobileCard key={row._id} onClick={() => onOpen(row)}>
+                        <MobileCardHead
+                            title={<span className="inline-flex items-center gap-1 text-primary-600">{row.transferNo} <MdVisibility size={14} /></span>}
+                            subtitle={formatDate(row.transferDate)}
+                            aside={<StatusBadge status={row.status} />}
+                        />
+                        <MobileFields>
+                            <MobileField label="Serial No">{row.serialNumber}</MobileField>
+                            <MobileField label="Product"><SerialSummary serial={row} /></MobileField>
+                            <MobileField label="From / To Branch" wide>
+                                <BranchRoute from={row.fromBranchName} to={row.toBranchName} />
+                                {row.currentBranchId && !sameId(row.currentBranchId, row.toBranchId) && (
+                                    <span className="block text-[10px] font-black uppercase tracking-widest text-amber-600">Moved again, now in {row.currentBranchName}</span>
+                                )}
+                            </MobileField>
+                            {(row.reference || row.remarks) && (
+                                <MobileField label="Reference / Remarks" wide>
+                                    {row.reference && <span className="block font-bold text-slate-700">{row.reference}</span>}
+                                    {row.remarks}
+                                </MobileField>
+                            )}
+                            <MobileField label="Transferred By" wide>{row.createdByName || '-'}</MobileField>
+                        </MobileFields>
+                    </MobileCard>
+                ))}
+                {!rows.length && <MobileEmpty>{emptyText}</MobileEmpty>}
+            </MobileCardList>
+            <div className="serial-desktop-table overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="bg-slate-50">
@@ -1147,11 +1299,7 @@ const BranchTransferList = ({ params, enabled, hasFilters, onPageChange, onOpen 
                         ))}
                         {!rows.length && (
                             <tr>
-                                <td colSpan={7} className="p-8 text-center text-slate-400 text-sm font-medium">
-                                    {!enabled ? 'Correct the date range to see results.'
-                                        : hasFilters ? 'No branch transfers match.'
-                                            : 'No serial numbers have been moved to another branch yet.'}
-                                </td>
+                                <td colSpan={7} className="p-8 text-center text-slate-400 text-sm font-medium">{emptyText}</td>
                             </tr>
                         )}
                     </tbody>
@@ -1203,8 +1351,8 @@ const BranchTransferTab = () => {
             )}
             {details && <BranchTransferDetails transfer={details} onClose={() => setDetails(null)} />}
             <div className="p-4 border-b border-slate-100 bg-slate-50 space-y-3">
-                <div className="flex flex-wrap items-center gap-3">
-                    <div className="relative w-full max-w-md">
+                <div className="serial-filter-bar flex flex-wrap items-center gap-3">
+                    <div className="serial-filter-wide relative w-full max-w-md">
                         <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                         <input
                             type="text"
@@ -1220,20 +1368,20 @@ const BranchTransferTab = () => {
                             onClick={() => setCreating(true)}
                             disabled={!loaded || branches.length < 2}
                             title={loaded && branches.length < 2 ? 'At least two branches are needed for a branch transfer' : undefined}
-                            className="ml-auto flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="serial-filter-wide ml-auto flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <MdAdd size={18} /> Create Branch Transfer
                         </button>
                     )}
                 </div>
-                <div className="flex flex-wrap items-end gap-3">
+                <div className="serial-filter-bar flex flex-wrap items-end gap-3">
                     {branchSelect(fromBranchId, setFromBranchId, 'All source branches', 'Filter by source branch')}
                     {branchSelect(toBranchId, setToBranchId, 'All destination branches', 'Filter by destination branch')}
                     <StatusFilter value={status} onChange={(value) => { setStatus(value); setPage(1); }} />
                     <DateRangeFilter range={range} field="Transfer Date" onChange={() => setPage(1)} />
                 </div>
             </div>
-            <div className="p-6">
+            <div className="p-3 md:p-6">
                 <BranchTransferList
                     key={savedCount}
                     params={params}
@@ -1338,7 +1486,31 @@ const BranchTransferForm = ({ branches, activeBranchId, onClose, onSaved }) => {
     );
 
     const selectedTable = (removable) => (
-        <div className="overflow-x-auto rounded-2xl border border-slate-100">
+        <>
+        <MobileCardList>
+            {selected.map((serial) => (
+                <MobileCard key={serial._id}>
+                    <MobileCardHead
+                        title={serial.serialNumber}
+                        subtitle={[serial.productCode, serial.productName].filter(Boolean).join(' · ')}
+                        aside={(
+                            <>
+                                <StatusBadge status={serial.status} />
+                                {removable && (
+                                    <button type="button" onClick={() => remove(serial._id)} aria-label={`Remove ${serial.serialNumber}`} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all">
+                                        <MdClose size={16} />
+                                    </button>
+                                )}
+                            </>
+                        )}
+                    />
+                    <MobileFields>
+                        <MobileField label="Current Branch" wide>{serial.branchName}</MobileField>
+                    </MobileFields>
+                </MobileCard>
+            ))}
+        </MobileCardList>
+        <div className="serial-desktop-table overflow-x-auto rounded-2xl border border-slate-100">
             <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="bg-slate-50">
@@ -1365,6 +1537,7 @@ const BranchTransferForm = ({ branches, activeBranchId, onClose, onSaved }) => {
                 </tbody>
             </table>
         </div>
+        </>
     );
 
     return (
@@ -1553,7 +1726,30 @@ const BranchTransferDetails = ({ transfer, onClose }) => {
                             <h4 className="flex items-center gap-2 border-b border-slate-100 px-4 py-3 text-xs font-black uppercase tracking-widest text-slate-500">
                                 <MdHistory size={16} /> Complete Branch History ({data.transfers.length})
                             </h4>
-                            <div className="overflow-x-auto">
+                            <div className="p-3 md:hidden">
+                                <MobileCardList>
+                                    {data.transfers.map((entry) => (
+                                        <MobileCard key={entry._id} tone={sameId(entry._id, transfer._id) ? 'selected' : 'default'}>
+                                            <MobileCardHead
+                                                title={entry.transferNo}
+                                                subtitle={formatDateTime(entry.transferDate)}
+                                                aside={<StatusBadge status={entry.status} />}
+                                            />
+                                            <MobileFields>
+                                                <MobileField label="From / To Branch" wide><BranchRoute from={entry.fromBranchName} to={entry.toBranchName} /></MobileField>
+                                                {(entry.reference || entry.remarks) && (
+                                                    <MobileField label="Reference / Remarks" wide>
+                                                        {entry.reference && <span className="block font-bold text-slate-700">{entry.reference}</span>}
+                                                        {entry.remarks}
+                                                    </MobileField>
+                                                )}
+                                                <MobileField label="Transferred By" wide>{entry.createdByName || '-'}</MobileField>
+                                            </MobileFields>
+                                        </MobileCard>
+                                    ))}
+                                </MobileCardList>
+                            </div>
+                            <div className="serial-desktop-table overflow-x-auto">
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="bg-slate-50">
@@ -1596,18 +1792,23 @@ const SerialNoTransfer = () => {
     return (
         <div className="space-y-6">
             <div>
+<<<<<<< HEAD
                 <h1 className="text-3xl font-black text-slate-900 tracking-tight">Serial No Transfer</h1>
                 <p className="text-slate-500 font-medium">Every Invoice Bulk Upload serial number with its branch and status. Move any serial to another customer or to another branch.</p>
+=======
+                <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Serial No Transfer</h1>
+                <p className="text-sm sm:text-base text-slate-500 font-medium">Every Invoice Bulk Upload serial number with its branch and status. Move sold serials to another customer, or any serial to another branch.</p>
+>>>>>>> f06da8202d682688814cc0c79f79cc6b501d3d21
             </div>
 
             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                <div className="flex gap-1 overflow-x-auto border-b border-slate-100 px-4 pt-4">
+                <div className="flex gap-1 overflow-x-auto border-b border-slate-100 px-2 sm:px-4 pt-2 sm:pt-4">
                     {TABS.map((item) => (
                         <button
                             key={item.key}
                             type="button"
                             onClick={() => setSearchParams(item.key === 'serials' ? {} : { tab: item.key })}
-                            className={`shrink-0 whitespace-nowrap px-5 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${tab === item.key ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-400 hover:text-slate-700'}`}
+                            className={`shrink-0 whitespace-nowrap px-3 sm:px-5 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${tab === item.key ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-400 hover:text-slate-700'}`}
                         >
                             {item.label}
                         </button>

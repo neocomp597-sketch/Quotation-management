@@ -12,7 +12,8 @@ import { useAuth } from '../context/AuthContext';
 const Layout = ({ children }) => {
     const navigate = useNavigate();
     const { activeBranchId } = useAuth();
-    const [sidebarOpen, setSidebarOpen] = useState(true);
+    // Below 768px the sidebar is an overlay over the page (see Sidebar), so phones start with it closed.
+    const [sidebarOpen, setSidebarOpen] = useState(() => typeof window === 'undefined' || window.innerWidth >= 768);
     const [footerPages, setFooterPages] = useState([
         { slug: 'privacy-policy', label: 'Privacy Policy' },
         { slug: 'terms-of-service', label: 'Terms of Service' },

@@ -1,5 +1,6 @@
 import { MdHistory } from 'react-icons/md';
 import { ACTIVITY_CATEGORIES, filterActivity, formatActivityDate } from '../utils/assetActivity';
+import { MobileCard, MobileCardHead, MobileCardList, MobileEmpty, MobileField, MobileFields } from './SerialMobileCards';
 
 // Activity Log of one serial number, as returned by csmService.getAssetActivity: lifecycle
 // entries, customer transfers, tickets and service visits. Asset Lifecycle Detail and Serial No
@@ -41,7 +42,47 @@ const AssetActivityLog = ({ activity = [], category = 'All', onCategoryChange, l
                     </div>
                 )}
             </div>
-            <div className="overflow-x-auto p-4">
+            <div className="p-3 md:hidden">
+                <MobileCardList>
+                    {visible.map((a, i) => (isCustomer ? (
+                        <MobileCard key={`${a.date}-${i}`} tone={a.flag === 'Active' ? 'active' : 'default'}>
+                            <MobileCardHead
+                                title={a.action}
+                                subtitle={formatActivityDate(a.date) || '-'}
+                                aside={<span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${a.flag === 'Active' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>{a.flag || '-'}</span>}
+                            />
+                            <MobileFields>
+                                <MobileField label="Serial Number" wide><span className="font-mono">{a.serialNumber || '-'}</span></MobileField>
+                                <MobileField label="Previous Customer">{a.previousCustomer || '-'}</MobileField>
+                                <MobileField label="New Customer">{a.newCustomer || a.customer || '-'}</MobileField>
+                                <MobileField label="Remarks" wide>{a.remarks || a.reference || '-'}</MobileField>
+                                <MobileField label="Performed By" wide>{a.by || '-'}</MobileField>
+                            </MobileFields>
+                        </MobileCard>
+                    ) : (
+                        <MobileCard key={`${a.category}-${a.reference}-${a.date}-${i}`}>
+                            <MobileCardHead
+                                title={a.action}
+                                subtitle={formatActivityDate(a.date) || '-'}
+                                aside={<span className={`px-2 py-0.5 rounded-md border text-[10px] font-black uppercase ${CATEGORY_STYLES[a.category] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>{a.category}</span>}
+                            />
+                            <MobileFields>
+                                <MobileField label="Reference"><span className="font-mono">{a.reference || '-'}</span></MobileField>
+                                <MobileField label="Status">{a.status || '-'}</MobileField>
+                                <MobileField label="Customer" wide>{a.customer || '-'}</MobileField>
+                                <MobileField label="Details" wide>{a.details || '-'}</MobileField>
+                                <MobileField label="By" wide>{a.by || '-'}</MobileField>
+                            </MobileFields>
+                        </MobileCard>
+                    )))}
+                    {!visible.length && (
+                        <MobileEmpty>
+                            {loading ? 'Loading activity…' : isCustomer ? 'No customer activity recorded for this serial.' : 'No activity recorded for this serial.'}
+                        </MobileEmpty>
+                    )}
+                </MobileCardList>
+            </div>
+            <div className="serial-desktop-table overflow-x-auto p-4">
                 {isCustomer ? (
                 <table className="w-full text-left border-collapse">
                     <thead>

@@ -15,6 +15,7 @@ import { formatDate } from '../utils/helpers';
 import DateInput from '../components/DateInput';
 import usePermission from '../hooks/usePermission';
 import { useAuth } from '../context/AuthContext';
+import { MobileCard, MobileCardActions, MobileCardHead, MobileCardList, MobileEmpty, MobileField, MobileFields } from '../components/SerialMobileCards';
 
 const PAGE_SIZE = 15;
 
@@ -123,6 +124,19 @@ const MgrLine = ({ record }) => {
         </span>
     );
 };
+
+const ASSET_STATUS_STYLES = {
+    SOLD: 'bg-blue-50 text-blue-600 border-blue-200',
+    IN_STOCK: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+    RETURN: 'bg-amber-50 text-amber-600 border-amber-200',
+    RETURNED: 'bg-amber-50 text-amber-600 border-amber-200'
+};
+
+const AssetStatusBadge = ({ status }) => (
+    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border whitespace-nowrap ${ASSET_STATUS_STYLES[status] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+        {status || 'IN_STOCK'}
+    </span>
+);
 
 const SerialNoMaster = () => {
     const navigate = useNavigate();
@@ -469,7 +483,7 @@ const SerialNoMaster = () => {
         try {
             if (isEditing) {
                 const changes = { ...singleForm };
-                // An untouched Sale Date is left out so the entry keeps its saved date (an imported
+                // An untouched Invoice Date is left out so the entry keeps its saved date (an imported
                 // entry may only have an invoice date, which the form shows in its place).
                 if (changes.saleDate === formFromAsset(editingAsset).saleDate) delete changes.saleDate;
                 await csmService.updateAsset(editingAsset._id, changes);
@@ -662,7 +676,7 @@ const SerialNoMaster = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Sale Date</label>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Invoice Date</label>
                                     <DateInput
                                         type="date"
                                         value={singleForm.saleDate}
@@ -785,7 +799,7 @@ const SerialNoMaster = () => {
                     </h1>
                     <p className="text-slate-500 font-semibold text-sm">Track serial numbers, invoice information, customers and product transactions.</p>
                 </div>
-                <div className="flex flex-wrap gap-3 items-center justify-start md:justify-end">
+                <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-center justify-start md:justify-end">
                     {canCreate && (
                     <button
                         onClick={() => openSingleEntry()}
@@ -827,20 +841,20 @@ const SerialNoMaster = () => {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="p-5 bg-white border border-slate-200/80 rounded-[2rem] shadow-sm hover:shadow-md transition-all flex items-center gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                <div className="p-4 sm:p-5 bg-white border border-slate-200/80 rounded-[2rem] shadow-sm hover:shadow-md transition-all flex items-center gap-3 sm:gap-4">
                     <div className="p-3.5 bg-slate-100 text-slate-600 rounded-2xl"><MdTag size={24} /></div>
                     <div><span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Total Serials</span><span className="text-2xl font-black text-slate-900">{stats.total}</span></div>
                 </div>
-                <div className="p-5 bg-white border border-slate-200/80 rounded-[2rem] shadow-sm hover:shadow-md transition-all flex items-center gap-4">
+                <div className="p-4 sm:p-5 bg-white border border-slate-200/80 rounded-[2rem] shadow-sm hover:shadow-md transition-all flex items-center gap-3 sm:gap-4">
                     <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl"><MdLocalOffer size={24} /></div>
                     <div><span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">In Stock</span><span className="text-2xl font-black text-emerald-600">{stats.inStock}</span></div>
                 </div>
-                <div className="p-5 bg-white border border-slate-200/80 rounded-[2rem] shadow-sm hover:shadow-md transition-all flex items-center gap-4">
+                <div className="p-4 sm:p-5 bg-white border border-slate-200/80 rounded-[2rem] shadow-sm hover:shadow-md transition-all flex items-center gap-3 sm:gap-4">
                     <div className="p-3.5 bg-blue-50 text-blue-600 rounded-2xl"><MdPeople size={24} /></div>
                     <div><span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Sold (Customer)</span><span className="text-2xl font-black text-blue-600">{stats.sold}</span></div>
                 </div>
-                <div className="p-5 bg-white border border-slate-200/80 rounded-[2rem] shadow-sm hover:shadow-md transition-all flex items-center gap-4">
+                <div className="p-4 sm:p-5 bg-white border border-slate-200/80 rounded-[2rem] shadow-sm hover:shadow-md transition-all flex items-center gap-3 sm:gap-4">
                     <div className="p-3.5 bg-amber-50 text-amber-600 rounded-2xl"><MdUndo size={24} /></div>
                     <div><span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Returned</span><span className="text-2xl font-black text-amber-600">{stats.returned}</span></div>
                 </div>
@@ -872,10 +886,10 @@ const SerialNoMaster = () => {
 
             {/* View Mode Header Switcher & Toolbar Filters (Requirement #10, #16) */}
             <div className="bg-white rounded-[2rem] border border-slate-200/80 p-5 shadow-sm space-y-4">
-                <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+                <div className="grid grid-cols-2 sm:flex items-center gap-3 border-b border-slate-100 pb-3">
                     <button
                         onClick={() => handleTabChange('active')}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                        className={`flex items-center justify-center gap-2 px-3 sm:px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                             activeTab === 'active'
                                 ? 'bg-teal-600 text-white shadow-lg shadow-teal-600/20 scale-100'
                                 : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/60'
@@ -886,7 +900,7 @@ const SerialNoMaster = () => {
                     </button>
                     <button
                         onClick={() => handleTabChange('returns')}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                        className={`flex items-center justify-center gap-2 px-3 sm:px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                             activeTab === 'returns'
                                 ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20 scale-100'
                                 : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/60'
@@ -943,7 +957,7 @@ const SerialNoMaster = () => {
 
             {/* List Table (Requirement #16) */}
             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-6">
+                <div className="p-3 md:p-6">
                     {loading || (activeTab === 'returns' && loadingHistory) ? (
                         <div className="py-20 text-center text-slate-400 font-medium">
                             <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary-500 border-t-transparent mb-4"></div>
@@ -952,7 +966,26 @@ const SerialNoMaster = () => {
                     ) : activeTab === 'returns' ? (
                         /* RETURN HISTORY TABLE (Requirement #9) */
                         <>
-                            <div className="overflow-x-auto">
+                            <MobileCardList>
+                                {paginatedAssets.map(item => (
+                                    <MobileCard key={item._id}>
+                                        <MobileCardHead
+                                            title={<span className="font-mono tracking-wide">{item.serialNumber}</span>}
+                                            subtitle={[item.productId?.productName || item.productName, item.productId?.productCode || item.productCode].filter(Boolean).join(' · ') || 'N/A'}
+                                            aside={<AssetStatusBadge status="RETURN" />}
+                                        />
+                                        <MgrLine record={item} />
+                                        <MobileFields>
+                                            <MobileField label="Customer" wide>{item.customerId?.companyName || item.customerId?.customerName || item.customerName || 'Customer'}</MobileField>
+                                            <MobileField label="Invoice Number">{item.invoiceNumber || '-'}</MobileField>
+                                            <MobileField label="Return Date">{formatDate(item.returnDate || item.createdAt)}</MobileField>
+                                            <MobileField label="Return Reason" wide>{item.returnReason || 'Product Fault / Return'}</MobileField>
+                                        </MobileFields>
+                                    </MobileCard>
+                                ))}
+                                {filteredReturns.length === 0 && <MobileEmpty>No returned product history records found.</MobileEmpty>}
+                            </MobileCardList>
+                            <div className="serial-desktop-table overflow-x-auto">
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="bg-slate-50 rounded-xl text-xs font-black text-slate-400 uppercase tracking-widest">
@@ -1018,7 +1051,66 @@ const SerialNoMaster = () => {
                     ) : (
                         /* ACTIVE INVENTORY TABLE (Requirement #16) */
                         <>
-                            <div className="overflow-x-auto">
+                            <MobileCardList>
+                                {paginatedAssets.map(asset => {
+                                    const custDisplay = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || (asset.customerId ? 'Customer' : '');
+                                    const canReturn = asset.status === 'SOLD' && canModify;
+                                    const actionClass = 'inline-flex items-center gap-1 px-3 py-2 rounded-xl border bg-white font-black uppercase text-[10px] tracking-widest';
+                                    return (
+                                        <MobileCard key={asset._id}>
+                                            <MobileCardHead
+                                                title={<span className="font-mono tracking-wide">{asset.serialNumber}</span>}
+                                                subtitle={[asset.productId?.productName, asset.productId?.productCode].filter(Boolean).join(' · ') || 'N/A'}
+                                                aside={<AssetStatusBadge status={asset.status} />}
+                                            />
+                                            {asset.indicatorField && (
+                                                <span className="block mt-1 text-[10px] font-bold text-primary-600 tracking-wider">Indicator: {asset.indicatorField}</span>
+                                            )}
+                                            <MgrLine record={asset} />
+                                            <MobileFields>
+                                                <MobileField label="Customer" wide>
+                                                    {custDisplay || <span className="text-slate-400 font-normal italic">Stock (Unsold)</span>}
+                                                    {asset.customerPostalCode && <span className="block text-[10px] text-slate-400 font-bold">Pin: {asset.customerPostalCode}</span>}
+                                                </MobileField>
+                                                <MobileField label="Invoice Number">
+                                                    {asset.invoiceNumber || '-'}
+                                                    {(asset.projectCode || asset.projectName) && (
+                                                        <span className="block text-[10px] text-slate-400 font-bold">Project: {[asset.projectCode, asset.projectName].filter(Boolean).join(' - ')}</span>
+                                                    )}
+                                                </MobileField>
+                                                <MobileField label="Invoice Date">{asset.saleDate || asset.invoiceDate ? formatDate(asset.saleDate || asset.invoiceDate) : '-'}</MobileField>
+                                                <MobileField label="Location" wide>
+                                                    {asset.location || '-'}
+                                                    {(asset.divisionId?.code || asset.segmentId?.code) && (
+                                                        <span className="block text-[10px] text-slate-400 font-bold">{[asset.divisionId?.code, asset.segmentId?.code].filter(Boolean).join(' / ')}</span>
+                                                    )}
+                                                </MobileField>
+                                            </MobileFields>
+                                            {(canViewDetails || canEdit || canReturn) && (
+                                                <MobileCardActions>
+                                                    {canViewDetails && (
+                                                        <button type="button" onClick={() => handleViewDetail(asset.serialNumber)} className={`${actionClass} border-slate-200 text-slate-700`}>
+                                                            <MdInfoOutline size={16} /> Details
+                                                        </button>
+                                                    )}
+                                                    {canEdit && (
+                                                        <button type="button" onClick={() => openEditEntry(asset)} className={`${actionClass} border-primary-200 text-primary-700`}>
+                                                            <MdEdit size={16} /> Edit
+                                                        </button>
+                                                    )}
+                                                    {canReturn && (
+                                                        <button type="button" onClick={() => handleOpenReturnModal(asset)} className={`${actionClass} border-amber-200 text-amber-700`}>
+                                                            <MdUndo size={16} /> Return
+                                                        </button>
+                                                    )}
+                                                </MobileCardActions>
+                                            )}
+                                        </MobileCard>
+                                    );
+                                })}
+                                {filteredAssets.length === 0 && <MobileEmpty>No serial number assets found matching filters.</MobileEmpty>}
+                            </MobileCardList>
+                            <div className="serial-desktop-table overflow-x-auto">
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="bg-slate-50 rounded-xl text-xs font-black text-slate-400 uppercase tracking-widest">
@@ -1026,8 +1118,8 @@ const SerialNoMaster = () => {
                                             <th className="p-4">Product Details</th>
                                             <th className="p-4">Status</th>
                                             <th className="p-4">Customer</th>
-                                            <th className="p-4">Invoice Ref</th>
-                                            <th className="p-4">Sale Date</th>
+                                            <th className="p-4">Invoice Number</th>
+                                            <th className="p-4">Invoice Date</th>
                                             <th className="p-4">Location</th>
                                             <th className="p-4 text-right last:rounded-r-xl">Actions</th>
                                         </tr>
@@ -1053,17 +1145,7 @@ const SerialNoMaster = () => {
                                                         <MgrLine record={asset} />
                                                     </td>
                                                     <td className="p-4">
-                                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-                                                            asset.status === 'SOLD'
-                                                                ? 'bg-blue-50 text-blue-600 border-blue-200'
-                                                                : asset.status === 'IN_STOCK'
-                                                                ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                                                                : asset.status === 'RETURN' || asset.status === 'RETURNED'
-                                                                ? 'bg-amber-50 text-amber-600 border-amber-200'
-                                                                : 'bg-slate-50 text-slate-600 border-slate-200'
-                                                        }`}>
-                                                            {asset.status || 'IN_STOCK'}
-                                                        </span>
+                                                        <AssetStatusBadge status={asset.status} />
                                                     </td>
                                                     <td className="p-4 text-sm font-semibold text-slate-700">
                                                         {custDisplay ? (
@@ -1202,7 +1284,7 @@ const SerialNoMaster = () => {
                                 <span className="font-bold text-slate-900">{returnTargetAsset.customerId?.companyName || returnTargetAsset.customerId?.customerName || returnTargetAsset.customerNameStr || 'N/A'}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-slate-400 uppercase font-black text-[9px]">Invoice Ref:</span>
+                                <span className="text-slate-400 uppercase font-black text-[9px]">Invoice Number:</span>
                                 <span className="font-bold text-slate-900">{returnTargetAsset.invoiceNumber || 'N/A'}</span>
                             </div>
                         </div>
