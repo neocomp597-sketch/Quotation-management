@@ -301,7 +301,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                             {!rows.length && <MobileEmpty>{range.invalid ? 'Correct the date range to see results.' : 'No serial numbers match.'}</MobileEmpty>}
                         </MobileCardList>
                         <div className="serial-desktop-table overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
+                            <table className="serial-list-compact w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50">
                                         {['Sr No', 'Serial No', 'Product', 'Branch', 'Current Customer', 'Invoice Number', 'Invoice Date', 'Transfers', 'Status'].map((label) => (
