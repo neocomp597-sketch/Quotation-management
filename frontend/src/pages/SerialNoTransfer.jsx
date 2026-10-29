@@ -88,6 +88,16 @@ const CustomerCell = ({ entry }) => (
     </div>
 );
 
+// The invoice of a history record; a transfer carries the invoice over from the sale.
+const InvoiceCell = ({ entry }) => (
+    entry.invoiceNumber ? (
+        <div>
+            <p className="font-bold text-slate-700 whitespace-nowrap">{entry.invoiceNumber}</p>
+            {entry.invoiceDate && <p className="text-xs text-slate-500">{formatDate(entry.invoiceDate)}</p>}
+        </div>
+    ) : '-'
+);
+
 const EMPTY_PAGINATION = { page: 1, limit: PAGE_SIZE, total: 0, pages: 1 };
 
 // Debounced list loader shared by the tabs: rows are "loading" until they belong to the current
@@ -416,7 +426,8 @@ const HistoryTab = ({ onOpen }) => {
                                         <MobileField label="Date">{formatDate(entry.transferDate)}</MobileField>
                                         <MobileField label="Status"><FlagBadge active={entry.isActive} /></MobileField>
                                         <MobileField label="Customer" wide><CustomerCell entry={entry} /></MobileField>
-                                        <MobileField label="Remarks" wide>{entry.remarks || (entry.entryType === 'Sold' && entry.invoiceNumber ? `Invoice ${entry.invoiceNumber}` : '-')}</MobileField>
+                                        <MobileField label="Invoice" wide><InvoiceCell entry={entry} /></MobileField>
+                                        <MobileField label="Remarks" wide>{entry.remarks || '-'}</MobileField>
                                         <MobileField label="Recorded By" wide>{entry.createdByName || '-'} · {formatDate(entry.createdAt)}</MobileField>
                                     </MobileFields>
                                 </MobileCard>
@@ -424,10 +435,10 @@ const HistoryTab = ({ onOpen }) => {
                             {!rows.length && <MobileEmpty>{emptyText}</MobileEmpty>}
                         </MobileCardList>
                         <div className="serial-desktop-table overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
+                            <table className="serial-list-compact w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50">
-                                        {['Date', 'Serial No', 'Product', 'Customer', 'Status', 'Entry', 'Remarks', 'Recorded By'].map((label) => (
+                                        {['Date', 'Serial No', 'Product', 'Customer', 'Status', 'Entry', 'Invoice', 'Remarks', 'Recorded By'].map((label) => (
                                             <th key={label} className={thClass}>{label}</th>
                                         ))}
                                     </tr>
@@ -444,7 +455,8 @@ const HistoryTab = ({ onOpen }) => {
                                             <td className="p-4"><CustomerCell entry={entry} /></td>
                                             <td className="p-4"><FlagBadge active={entry.isActive} /></td>
                                             <td className="p-4"><TypeBadge type={entry.entryType} /></td>
-                                            <td className="p-4 text-slate-500 min-w-[10rem]">{entry.remarks || (entry.entryType === 'Sold' && entry.invoiceNumber ? `Invoice ${entry.invoiceNumber}` : '-')}</td>
+                                            <td className="p-4 text-slate-500"><InvoiceCell entry={entry} /></td>
+                                            <td className="p-4 text-slate-500 min-w-[10rem]">{entry.remarks || '-'}</td>
                                             <td className="p-4 text-slate-500 whitespace-nowrap">
                                                 {entry.createdByName || '-'}
                                                 <span className="block text-xs">{formatDate(entry.createdAt)}</span>
@@ -453,7 +465,7 @@ const HistoryTab = ({ onOpen }) => {
                                     ))}
                                     {!rows.length && (
                                         <tr>
-                                            <td colSpan={8} className="p-8 text-center text-slate-400 text-sm font-medium">{emptyText}</td>
+                                            <td colSpan={9} className="p-8 text-center text-slate-400 text-sm font-medium">{emptyText}</td>
                                         </tr>
                                     )}
                                 </tbody>
@@ -907,7 +919,8 @@ export const SerialNoDetails = ({ transfer = false }) => {
                                             <MobileField label="Date">{formatDate(entry.transferDate)}</MobileField>
                                             <MobileField label="Status"><FlagBadge active={entry.isActive} /></MobileField>
                                             <MobileField label="Product" wide>{[entry.productCode, entry.productName].filter(Boolean).join(' · ') || '-'}</MobileField>
-                                            <MobileField label="Remarks" wide>{entry.remarks || (entry.invoiceNumber && entry.entryType === 'Sold' ? `Invoice ${entry.invoiceNumber}` : '-')}</MobileField>
+                                            <MobileField label="Invoice" wide><InvoiceCell entry={entry} /></MobileField>
+                                            <MobileField label="Remarks" wide>{entry.remarks || '-'}</MobileField>
                                             <MobileField label="Recorded By" wide>{entry.pending ? 'Invoice Bulk Upload' : (entry.createdByName || '-')}</MobileField>
                                         </MobileFields>
                                     </MobileCard>
@@ -919,7 +932,7 @@ export const SerialNoDetails = ({ transfer = false }) => {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50">
-                                        {['Product', 'Date', 'Customer', 'Status', 'Entry', 'Remarks', 'Recorded By'].map((text) => (
+                                        {['Product', 'Date', 'Customer', 'Status', 'Entry', 'Invoice', 'Remarks', 'Recorded By'].map((text) => (
                                             <th key={text} className={thClass}>{text}</th>
                                         ))}
                                     </tr>
@@ -935,12 +948,13 @@ export const SerialNoDetails = ({ transfer = false }) => {
                                             <td className="p-4"><CustomerCell entry={entry} /></td>
                                             <td className="p-4"><FlagBadge active={entry.isActive} /></td>
                                             <td className="p-4"><TypeBadge type={entry.entryType} /></td>
-                                            <td className="p-4 text-slate-500">{entry.remarks || (entry.invoiceNumber && entry.entryType === 'Sold' ? `Invoice ${entry.invoiceNumber}` : '-')}</td>
+                                            <td className="p-4 text-slate-500"><InvoiceCell entry={entry} /></td>
+                                            <td className="p-4 text-slate-500">{entry.remarks || '-'}</td>
                                             <td className="p-4 text-slate-500 whitespace-nowrap">{entry.pending ? 'Invoice Bulk Upload' : (entry.createdByName || '-')}</td>
                                         </tr>
                                     ))}
                                     {!history.length && (
-                                        <tr><td colSpan={7} className="p-8 text-center text-slate-400 text-sm font-medium">No customer history recorded for this serial number.</td></tr>
+                                        <tr><td colSpan={8} className="p-8 text-center text-slate-400 text-sm font-medium">No customer history recorded for this serial number.</td></tr>
                                     )}
                                 </tbody>
                             </table>
@@ -1011,6 +1025,8 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
 
     const searching = Boolean(debouncedQuery) && matches.key !== debouncedQuery;
     const currentId = data.asset.customerId;
+    // The invoice the API carries over to the new customer: the current record's, else the serial's.
+    const invoice = data.history.find((entry) => entry.isActive) || data.asset;
 
     const save = async (event) => {
         event.preventDefault();
@@ -1059,10 +1075,16 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
     return (
         <>
         <form onSubmit={save} className="p-4 md:p-6 space-y-5">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className={`grid grid-cols-1 gap-4 ${past ? 'md:grid-cols-3' : 'md:grid-cols-2 lg:grid-cols-4'}`}>
                 <div><span className={label}>Serial Number</span><p className={readOnly}>{data.asset.serialNumber}</p></div>
                 <div><span className={label}>Product</span><p className={readOnly}>{data.asset.productCode}{data.asset.productName ? ` · ${data.asset.productName}` : ''}</p></div>
                 <div><span className={label}>{past ? 'Current Customer (stays active)' : 'Previous Customer'}</span><p className={readOnly}>{data.asset.customerName || '-'}{data.asset.customerCode ? ` (${data.asset.customerCode})` : ''}</p></div>
+                {!past && (
+                    <div>
+                        <span className={label}>Invoice (moves to new customer)</span>
+                        <p className={readOnly}>{invoice.invoiceNumber || '-'}{invoice.invoiceDate ? ` · ${formatDate(invoice.invoiceDate)}` : ''}</p>
+                    </div>
+                )}
             </div>
 
             <div>

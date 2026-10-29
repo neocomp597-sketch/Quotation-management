@@ -58,6 +58,7 @@ router.get('/entitlements/verify', protect, warrantyAmcController.verifyEntitlem
 router.get('/assets/summary', protect, warrantyAmcController.getAssetSummary);
 router.get('/assets/activity', protect, warrantyAmcController.getAssetActivity);
 router.get('/assets/search-serials', protect, warrantyAmcController.searchSerialNumbers);
+router.get('/assets/customer-lookup', protect, warrantyAmcController.lookupEntryCustomer);
 router.get('/assets/return-history', protect, warrantyAmcController.getReturnHistory);
 router.get('/assets/export', protect, warrantyAmcController.exportAssets);
 router.get('/warranties/serial-lookup', protect, warrantyAmcController.lookupWarrantySerial);

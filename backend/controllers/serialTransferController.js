@@ -155,6 +155,17 @@ const customerSnapshot = (customer, fallback = {}) => ({
 });
 
 const saleDateOf = (asset) => asset.saleDate || asset.invoiceDate || asset.createdAt || new Date();
+// The Invoice Date of an Invoice Bulk Upload row, as its form shows it.
+const invoiceDateOf = (asset) => asset?.saleDate || asset?.invoiceDate || null;
+
+// The invoice a history record shows. Sold and Transferred records saved before transfers carried
+// the invoice over have none of their own, and show the serial's invoice they were sold on.
+const withInvoice = (entry, asset) => {
+    if (entry.entryType === 'Past Entry' || !asset) return entry;
+    const invoiceNumber = entry.invoiceNumber || asset.invoiceNumber || '';
+    const sameInvoice = invoiceNumber === (asset.invoiceNumber || '');
+    return { ...entry, invoiceNumber, invoiceDate: entry.invoiceDate || (sameInvoice ? invoiceDateOf(asset) : null) };
+};
 
 // The original sale, as a history record built from the Invoice Bulk Upload row.
 const saleRecord = (asset) => ({
@@ -174,6 +185,7 @@ const saleRecord = (asset) => ({
     entryType: 'Sold',
     transferDate: saleDateOf(asset),
     invoiceNumber: asset.invoiceNumber || '',
+    invoiceDate: invoiceDateOf(asset),
     isActive: true,
     branchId: idOf(asset.branchId)
 });
@@ -294,7 +306,7 @@ const loadSerial = async (assetId) => {
     const asset = await Asset.findOne(addActiveBranchFilter({ _id: assetId })).populate(customerPopulate).populate(branchPopulate).lean();
     if (!asset) return null;
 
-    let history = await historyOf(asset._id);
+    let history = (await historyOf(asset._id)).map((entry) => withInvoice(entry, asset));
     // Not transferred yet: the sale is shown from the invoice row until the first transfer saves it.
     if (!history.length && asset.status === 'SOLD') history = [{ ...saleRecord(asset), _id: null, pending: true }];
 
@@ -308,6 +320,7 @@ const loadSerial = async (assetId) => {
             branchId: idOf(asset.branchId),
             branchName: branchLabel(asset.branchId),
             invoiceNumber: asset.invoiceNumber,
+            invoiceDate: invoiceDateOf(asset),
             saleDate: saleDateOf(asset),
             customerId: asset.customerId?._id || null,
             customerCode: cleanText(asset.customerId?.externalCode) || asset.customerCode,
@@ -401,6 +414,8 @@ exports.transferSerial = async (req, res) => {
             if (current) {
                 await SerialTransfer.updateOne({ _id: current._id }, { $set: { isActive: false, endedAt: transferDate } }, { session });
             }
+            // The invoice flows to the new customer: the current record's, else the serial's own.
+            const invoice = withInvoice(current || { entryType: 'Sold' }, asset);
             const snapshot = customerSnapshot(customer);
             await SerialTransfer.create([{
                 assetId: asset._id,
@@ -416,6 +431,8 @@ exports.transferSerial = async (req, res) => {
                 entryType: 'Transferred',
                 transferDate,
                 isActive: true,
+                invoiceNumber: invoice.invoiceNumber || '',
+                invoiceDate: invoice.invoiceDate || null,
                 remarks: cleanText(req.body.remarks),
                 requestId,
                 ...user,
@@ -535,10 +552,16 @@ exports.listHistory = async (req, res) => {
         const products = await mgrProductFilter(req.query);
         if (products) query.productId = products;
 
-        const [data, total] = await Promise.all([
+        const [records, total] = await Promise.all([
             SerialTransfer.find(query).sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit).lean(),
             SerialTransfer.countDocuments(query)
         ]);
+        const assets = records.length
+            ? await Asset.find({ _id: { $in: [...new Set(records.map((r) => String(r.assetId)))] } })
+                .select('invoiceNumber invoiceDate saleDate').lean()
+            : [];
+        const assetById = new Map(assets.map((asset) => [String(asset._id), asset]));
+        const data = records.map((record) => withInvoice(record, assetById.get(String(record.assetId))));
         return res.json({ data, pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
     } catch (error) {
         return sendError(res, error, 'Failed to load the transfer history');

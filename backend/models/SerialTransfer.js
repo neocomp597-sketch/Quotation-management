@@ -37,7 +37,9 @@ const SerialTransferSchema = new mongoose.Schema({
     entryType: { type: String, enum: ['Sold', 'Transferred', 'Past Entry'], required: true },
     transferDate: { type: Date, required: true },
     isActive: { type: Boolean, default: true },
+    // The invoice the serial was sold on. A transfer carries it over from the record it replaces.
     invoiceNumber: { type: String, default: '' },
+    invoiceDate: { type: Date, default: null },
     remarks: { type: String, trim: true, default: '' },
     // Set when this record stops being the current one.
     endedAt: { type: Date, default: null },

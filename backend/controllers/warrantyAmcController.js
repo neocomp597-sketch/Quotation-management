@@ -414,6 +414,31 @@ const resolveEntryProduct = async (companyId, cleanProductCode, productName) => 
     return product;
 };
 
+// The existing Customer Master record whose code (else name) is `searchTarget`, or null.
+const findEntryCustomer = async (companyId, searchTarget) => {
+    const customer = await Customer.findOne({
+        companyId,
+        $or: [
+            { externalCode: buildExactRegex(searchTarget) },
+            { customerName: buildExactRegex(searchTarget) },
+            { companyName: buildExactRegex(searchTarget) }
+        ]
+    });
+    if (customer) return customer;
+    // Customer codes are unique in the whole company: a customer of another branch
+    // with this code is the same customer (creating it again would be refused).
+    return Customer.findOne({ companyId, externalCode: searchTarget })
+        .collation(Customer.CUSTOMER_CODE_COLLATION)
+        .setOptions({ bypassBranch: true });
+};
+
+// Postal Code is strictly derived from Customer Master with 6-digit validation
+const entryPostalCode = (customer) => {
+    const rawPin = customer.billingAddress?.pincode || customer.pincode || '';
+    const cleanPin = String(rawPin).trim().replace(/\D/g, '');
+    return cleanPin.length === 6 ? cleanPin : String(rawPin).trim();
+};
+
 // Customer of an Invoice Bulk Upload entry (Add Single Entry and Edit), from the Customer
 // Master by Customer Code, else Customer Name; created when missing. Returns the customer
 // and the code, postal code and mobile the entry stores.
@@ -425,21 +450,7 @@ const resolveEntryCustomer = async (req, { companyId, customerCode, customerInpu
     const searchTarget = finalCustomerCode || (customerInput ? String(customerInput).trim() : '');
 
     if (searchTarget) {
-        customer = await Customer.findOne({
-            companyId,
-            $or: [
-                { externalCode: buildExactRegex(searchTarget) },
-                { customerName: buildExactRegex(searchTarget) },
-                { companyName: buildExactRegex(searchTarget) }
-            ]
-        });
-        if (!customer) {
-            // Customer codes are unique in the whole company: a customer of another branch
-            // with this code is the same customer (creating it again would be refused).
-            customer = await Customer.findOne({ companyId, externalCode: searchTarget })
-                .collation(Customer.CUSTOMER_CODE_COLLATION)
-                .setOptions({ bypassBranch: true });
-        }
+        customer = await findEntryCustomer(companyId, searchTarget);
 
         if (!customer) {
             customer = await Customer.create({
@@ -462,13 +473,31 @@ const resolveEntryCustomer = async (req, { companyId, customerCode, customerInpu
                 await customer.save();
             }
             finalCustomerCode = customer.externalCode || searchTarget;
-            // Postal Code is strictly derived from Customer Master with 6-digit validation
-            const rawPin = customer.billingAddress?.pincode || customer.pincode || '';
-            const cleanPin = String(rawPin).trim().replace(/\D/g, '');
-            finalCustomerPostalCode = cleanPin.length === 6 ? cleanPin : String(rawPin).trim();
+            finalCustomerPostalCode = entryPostalCode(customer);
         }
     }
     return { customer, finalCustomerCode, finalCustomerPostalCode, cleanMobile };
+};
+
+// Add Single Entry fills the Customer Name from the typed Customer Code, using the same match
+// as the save, so the name shown is the customer the entry will be saved under.
+exports.lookupEntryCustomer = async (req, res) => {
+    try {
+        const code = String(req.query.code || '').trim();
+        const customer = code ? await findEntryCustomer(req.user?.companyId, code) : null;
+        if (!customer) return res.json({ customer: null });
+        return res.json({
+            customer: {
+                _id: customer._id,
+                customerCode: customer.externalCode || code,
+                customerName: customer.companyName || customer.customerName || '',
+                postalCode: entryPostalCode(customer)
+            }
+        });
+    } catch (error) {
+        console.error('Customer lookup error:', error);
+        return res.status(500).json({ message: 'Failed to look up the customer' });
+    }
 };
 
 // Single Entry Creation (Requirement #15, #3, #4, #8, #17)

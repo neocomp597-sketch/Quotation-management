@@ -214,16 +214,6 @@ const createCustomer = async (req, res) => {
 const getAllCustomers = async (req, res) => {
     try {
         const query = await buildCustomerQuery(req);
-        
-        // Write customer records including logoUrl to debug_customers.json
-        try {
-            const fs = require('fs');
-            const path = require('path');
-            const debugCustomers = await Customer.find({}, { companyName: 1, customerName: 1, logoUrl: 1, gstin: 1 }).lean();
-            fs.writeFileSync(path.resolve(__dirname, '..', 'debug_customers.json'), JSON.stringify(debugCustomers, null, 2));
-        } catch (err) {
-            console.error('Debug logging error:', err);
-        }
 
         const cacheKey = makeCacheKey('customers:list', req);
         const { redis, value: cachedCustomers } = await getCachedJson(cacheKey);
