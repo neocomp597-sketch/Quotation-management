@@ -1404,8 +1404,9 @@ const customerText = (name, code) => [name, code ? `(${code})` : ''].filter(Bool
 
 /**
  * Customer entries of the activity log, from the Serial No Transfer history (SerialTransfer):
- * "Customer Added" for the first customer and "Customer Transferred" for every change after
- * it. A serial that was never transferred shows its invoice customer as the one added.
+ * "Customer Added" for the first customer, "Customer Transferred" / "Customer Assigned" for every
+ * change after it and "Customer Returned" for a return. A serial with no history shows the
+ * customer on its invoice row as the one added (sold, or allocated when the serial is not sold).
  */
 const customerActivity = async (assetDocs, serialNumber) => {
     const SerialTransfer = require('../models/SerialTransfer');
@@ -1417,10 +1418,10 @@ const customerActivity = async (assetDocs, serialNumber) => {
         : [];
 
     const entries = records.length ? records : assetDocs
-        .filter((a) => a.status === 'SOLD' && (a.customerId || a.customerNameStr))
+        .filter((a) => a.customerId || a.customerNameStr)
         .map((a) => ({
             serialNumber: a.serialNumber,
-            entryType: 'Sold',
+            entryType: ['ALLOCATED', 'IN_STOCK'].includes(a.status || 'IN_STOCK') ? 'Allocated' : 'Sold',
             transferDate: a.saleDate || a.invoiceDate || a.createdAt,
             companyName: a.customerId?.companyName || a.customerId?.customerName || a.customerNameStr || '',
             customerCode: a.customerId?.externalCode || a.customerCode || '',
@@ -1432,10 +1433,14 @@ const customerActivity = async (assetDocs, serialNumber) => {
     return entries.map((r, index) => {
         const before = entries[index - 1];
         const first = index === 0;
-        const newCustomer = customerText(r.companyName || r.customerName, r.customerCode);
-        const previousCustomer = first ? '' : customerText(before.companyName || before.customerName, before.customerCode);
-        const suffix = { 'Past Entry': ' (Past Entry)', Sold: first ? '' : ' (Invoice Sale)' }[r.entryType] || '';
-        const action = `${first ? 'Customer Added' : 'Customer Transferred'}${suffix}`;
+        const returned = r.entryType === 'Returned';
+        const holder = customerText(r.companyName || r.customerName, r.customerCode);
+        // A return moves the serial from the customer who returned it to no one.
+        const newCustomer = returned ? 'None (returned)' : holder;
+        const previousCustomer = returned ? holder : first ? '' : customerText(before.companyName || before.customerName, before.customerCode);
+        const suffix = { 'Past Entry': ' (Past Entry)', Sold: first ? '' : ' (Invoice Sale)', Allocated: first ? '' : ' (Invoice Allocation)' }[r.entryType] || '';
+        const action = returned ? 'Customer Returned'
+            : `${first ? 'Customer Added' : r.entryType === 'Assigned' ? 'Customer Assigned' : 'Customer Transferred'}${suffix}`;
         return {
             date: r.transferDate,
             category: 'Customer',

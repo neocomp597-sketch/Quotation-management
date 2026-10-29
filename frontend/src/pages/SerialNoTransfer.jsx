@@ -7,7 +7,7 @@ import AssetActivityLog from '../components/AssetActivityLog';
 import PaginationControls from '../components/PaginationControls';
 import Modal from '../components/Modal';
 import Customers from './Customers';
-import { formatDate, formatDateTime } from '../utils/helpers';
+import { formatDate, formatDateTime, contactPersonOf } from '../utils/helpers';
 import DateInput from '../components/DateInput';
 import usePermission from '../hooks/usePermission';
 import { useAuth } from '../context/AuthContext';
@@ -43,6 +43,13 @@ const StatusBadge = ({ status }) => (
     </span>
 );
 
+// A new customer of a sold serial is a transfer; of any other serial an assignment, which leaves
+// the status as it is. Scrapped serials keep their history but take no new customer.
+const isSold = (status) => status === 'SOLD';
+const canTakeCustomer = (status) => status !== 'SCRAPPED';
+const assignLabel = (status) => (isSold(status) ? 'Transfer' : 'Assign');
+const statusText = (status) => SERIAL_STATUSES.find((option) => option.value === (status === 'RETURNED' ? 'RETURN' : status || 'IN_STOCK'))?.label || status;
+
 const StatusFilter = ({ value, onChange }) => (
     <select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Filter by status" className={selectClass}>
         <option value="">All statuses</option>
@@ -68,10 +75,24 @@ const FlagBadge = ({ active }) => (
     </span>
 );
 
-const TYPE_STYLES = { Transferred: 'bg-amber-50 text-amber-600', 'Past Entry': 'bg-violet-50 text-violet-600' };
-// How a customer came to hold the serial. "Sold" is the invoice sale; the ownership status itself
-// is the Active/Inactive flag.
+const TYPE_STYLES = {
+    Transferred: 'bg-amber-50 text-amber-600',
+    Assigned: 'bg-teal-50 text-teal-600',
+    Allocated: 'bg-indigo-50 text-indigo-600',
+    Returned: 'bg-rose-50 text-rose-600',
+    'Past Entry': 'bg-violet-50 text-violet-600',
+};
+// How a customer came to hold the serial. "Sold" is the invoice sale and "Allocated" the invoice
+// row's customer of a serial that is not sold; the ownership status itself is the Active/Inactive flag.
 const TYPE_LABELS = { Sold: 'Original Sale' };
+const ENTRY_OPTIONS = [
+    ['Sold', 'Original Sale'],
+    ['Allocated', 'Allocated'],
+    ['Transferred', 'Transferred'],
+    ['Assigned', 'Assigned'],
+    ['Returned', 'Returned'],
+    ['Past Entry', 'Past Entry'],
+];
 
 const TypeBadge = ({ type }) => (
     <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest whitespace-nowrap ${TYPE_STYLES[type] || 'bg-sky-50 text-sky-600'}`}>
@@ -267,7 +288,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                 <select value={ownership} onChange={(e) => { setOwnership(e.target.value); setPage(1); }} aria-label="Filter by customer transfers" className={selectClass}>
                     <option value="">All customers</option>
                     <option value="Sold">With original customer</option>
-                    <option value="Transferred">Transferred to another customer</option>
+                    <option value="Transferred">Transferred / assigned to a new customer</option>
                 </select>
                 <Mgr4Filter value={mgr4} onChange={(value) => { setMgr4(value); setPage(1); }} />
                 <DateRangeFilter range={range} field="Invoice Date" onChange={() => setPage(1)} />
@@ -300,9 +321,9 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                                         <button type="button" onClick={() => setDownloadFor(row)} aria-label={`Download customer activity log of ${row.serialNumber}`} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 bg-white text-emerald-600 font-black uppercase text-[10px] tracking-widest">
                                             <MdFileDownload size={16} /> Log
                                         </button>
-                                        {canModify && (
+                                        {canModify && canTakeCustomer(row.status) && (
                                             <button type="button" onClick={() => onTransfer(row._id)} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 font-black uppercase text-[10px] tracking-widest">
-                                                <MdSwapHoriz size={16} /> Transfer
+                                                <MdSwapHoriz size={16} /> {assignLabel(row.status)}
                                             </button>
                                         )}
                                     </MobileCardActions>
@@ -345,9 +366,9 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                                                 <button type="button" title="Download Customer Activity Log" aria-label={`Download customer activity log of ${row.serialNumber}`} onClick={(e) => { e.stopPropagation(); setDownloadFor(row); }} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all">
                                                     <MdFileDownload size={18} />
                                                 </button>
-                                                {canModify && (
-                                                    <button type="button" title="Transfer to another customer" onClick={(e) => { e.stopPropagation(); onTransfer(row._id); }} className="ml-1 inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all">
-                                                        <MdSwapHoriz size={16} /> Transfer
+                                                {canModify && canTakeCustomer(row.status) && (
+                                                    <button type="button" title={isSold(row.status) ? 'Transfer to another customer' : 'Assign a customer (status stays the same)'} onClick={(e) => { e.stopPropagation(); onTransfer(row._id); }} className="ml-1 inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all">
+                                                        <MdSwapHoriz size={16} /> {assignLabel(row.status)}
                                                     </button>
                                                 )}
                                             </td>
@@ -399,9 +420,7 @@ const HistoryTab = ({ onOpen }) => {
                 </div>
                 <select value={entryType} onChange={(e) => { setEntryType(e.target.value); setPage(1); }} className={selectClass}>
                     <option value="">All entries</option>
-                    <option value="Sold">Original Sale</option>
-                    <option value="Transferred">Transferred</option>
-                    <option value="Past Entry">Past Entry</option>
+                    {ENTRY_OPTIONS.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
                 </select>
                 <select value={flag} onChange={(e) => { setFlag(e.target.value); setPage(1); }} className={selectClass}>
                     <option value="">Active and inactive</option>
@@ -821,8 +840,12 @@ export const SerialNoDetails = ({ transfer = false }) => {
     };
 
     const history = data ? [...data.history].reverse() : [];
-    // A serial of any status can be transferred; `current` is its customer now, if it has one.
+    // `current` is the serial's customer now, if it has one; a returned serial has none until the next one.
     const current = history.find((entry) => entry.isActive);
+    const returnedBy = !current && history[0]?.entryType === 'Returned' ? history[0] : null;
+    const status = data?.asset?.status;
+    // A scrapped serial opened at its transfer address shows its details; only a past entry can be added.
+    const openForm = formMode === 'transfer' && data && !canTakeCustomer(status) ? null : formMode;
     const label = 'block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1';
 
     return (
@@ -837,7 +860,7 @@ export const SerialNoDetails = ({ transfer = false }) => {
                 </button>
                 {/* Serial number and product are shown once, in the details card or form below. */}
                 <h1 className="min-w-0 flex-1 text-xl font-black text-slate-900">Serial No Transfer</h1>
-                {data && !formMode && canModify && (
+                {data && !openForm && canModify && (
                     <div className="flex w-full sm:w-auto flex-wrap gap-3">
                         <button
                             type="button"
@@ -846,13 +869,15 @@ export const SerialNoDetails = ({ transfer = false }) => {
                         >
                             <MdHistory size={18} /> Add Past Entry
                         </button>
-                        <button
-                            type="button"
-                            onClick={() => setFormMode('transfer')}
-                            className="flex flex-1 sm:flex-none items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
-                        >
-                            <MdSwapHoriz size={18} /> Transfer Serial No
-                        </button>
+                        {canTakeCustomer(status) && (
+                            <button
+                                type="button"
+                                onClick={() => setFormMode('transfer')}
+                                className="flex flex-1 sm:flex-none items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
+                            >
+                                <MdSwapHoriz size={18} /> {isSold(status) ? 'Transfer Serial No' : 'Assign Customer'}
+                            </button>
+                        )}
                     </div>
                 )}
             </div>
@@ -862,10 +887,10 @@ export const SerialNoDetails = ({ transfer = false }) => {
             ) : (
                 <>
                     <div className="rounded-3xl border border-slate-100 bg-white shadow-sm">
-                        {formMode ? (
+                        {openForm ? (
                             <TransferForm
-                                key={formMode}
-                                mode={formMode}
+                                key={openForm}
+                                mode={openForm}
                                 data={data}
                                 currentSince={current?.transferDate}
                                 onCancel={() => (transfer ? goBack() : setFormMode(null))}
@@ -877,12 +902,28 @@ export const SerialNoDetails = ({ transfer = false }) => {
                                 <div className="lg:col-span-2"><span className={label}>Product</span><p className="text-sm font-bold text-slate-800">{data.asset.productCode}</p><p className="text-xs text-slate-500">{data.asset.productName}</p></div>
                                 <div><span className={label}>Status</span><StatusBadge status={data.asset.status} /></div>
                                 <div><span className={label}>Branch</span><p className="text-sm font-bold text-slate-800">{data.asset.branchName || '-'}</p></div>
-                                <div>
-                                    <span className={label}>Current Customer</span>
-                                    <p className="text-sm font-bold text-slate-800">{current?.companyName || data.asset.customerName || '-'}</p>
-                                    <p className="text-xs text-slate-500">{[current?.customerCode || data.asset.customerCode, current?.customerMobile, current?.customerCity].filter(Boolean).join(' · ')}</p>
-                                    {current && <p className="text-xs text-slate-500">Since {formatDate(current.transferDate)}</p>}
-                                </div>
+                                {returnedBy ? (
+                                    <div>
+                                        <span className={label}>Current Customer</span>
+                                        <p className="text-sm font-bold text-slate-800">None (returned)</p>
+                                        <p className="text-xs text-slate-500">
+                                            Returned by {returnedBy.companyName || returnedBy.customerName || '-'}
+                                            {returnedBy.transferDate ? ` on ${formatDate(returnedBy.transferDate)}` : ''}
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <span className={label}>Current Customer</span>
+                                        <p className="text-sm font-bold text-slate-800">{current?.companyName || data.asset.customerName || '-'}</p>
+                                        <p className="text-xs text-slate-500">{[current?.customerCode || data.asset.customerCode, current?.customerMobile, current?.customerCity].filter(Boolean).join(' · ')}</p>
+                                        {current && <p className="text-xs text-slate-500">Since {formatDate(current.transferDate)}</p>}
+                                    </div>
+                                )}
+                                {!canTakeCustomer(status) && (
+                                    <p className="sm:col-span-2 lg:col-span-6 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+                                        This serial number is scrapped. Its customer history is kept, but it cannot be assigned or transferred to a customer.
+                                    </p>
+                                )}
                             </div>
                         )}
                     </div>
@@ -894,7 +935,7 @@ export const SerialNoDetails = ({ transfer = false }) => {
                         <div className="p-3 md:hidden">
                             <MobileCardList>
                                 {history.map((entry) => (
-                                    <MobileCard key={entry._id || 'sale'} tone={entry.isActive ? 'active' : 'default'}>
+                                    <MobileCard key={entry._id || `pending-${entry.entryType}`} tone={entry.isActive ? 'active' : 'default'}>
                                         <MobileCardHead
                                             title={entry.companyName || entry.customerName || '-'}
                                             subtitle={[entry.customerCode, entry.customerMobile, [entry.customerCity, entry.customerState].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}
@@ -924,7 +965,7 @@ export const SerialNoDetails = ({ transfer = false }) => {
                                 </thead>
                                 <tbody>
                                     {history.map((entry) => (
-                                        <tr key={entry._id || 'sale'} className={`border-b last:border-0 border-slate-50 text-sm ${entry.isActive ? 'bg-emerald-50/40' : ''}`}>
+                                        <tr key={entry._id || `pending-${entry.entryType}`} className={`border-b last:border-0 border-slate-50 text-sm ${entry.isActive ? 'bg-emerald-50/40' : ''}`}>
                                             <td className="p-4 text-slate-600">
                                                 <span className="font-bold text-slate-700">{entry.productCode}</span>
                                                 {entry.productName && <span className="block text-xs text-slate-500">{entry.productName}</span>}
@@ -1012,6 +1053,9 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
     const currentId = data.asset.customerId;
     // The invoice the API carries over to the new customer: the current record's, else the serial's.
     const invoice = data.history.find((entry) => entry.isActive) || data.asset;
+    // Not sold: the customer is an assignment and the status stays as it is.
+    const sold = isSold(data.asset.status);
+    const pendingReturn = data.history.find((entry) => entry.pending && entry.entryType === 'Returned');
 
     const save = async (event) => {
         event.preventDefault();
@@ -1063,7 +1107,7 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
             <div className={`grid grid-cols-1 gap-4 ${past ? 'md:grid-cols-3' : 'md:grid-cols-2 lg:grid-cols-4'}`}>
                 <div><span className={label}>Serial Number</span><p className={readOnly}>{data.asset.serialNumber}</p></div>
                 <div><span className={label}>Product</span><p className={readOnly}>{data.asset.productCode}{data.asset.productName ? ` · ${data.asset.productName}` : ''}</p></div>
-                <div><span className={label}>{past ? 'Current Customer (stays active)' : 'Previous Customer'}</span><p className={readOnly}>{data.asset.customerName || '-'}{data.asset.customerCode ? ` (${data.asset.customerCode})` : ''}</p></div>
+                <div><span className={label}>{past ? (pendingReturn ? 'Returned By' : 'Current Customer (stays active)') : 'Previous Customer'}</span><p className={readOnly}>{data.asset.customerName || '-'}{data.asset.customerCode ? ` (${data.asset.customerCode})` : ''}</p></div>
                 {!past && (
                     <div>
                         <span className={label}>Invoice (moves to new customer)</span>
@@ -1129,7 +1173,7 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
                                                     >
                                                         <span className="block text-sm font-bold text-slate-800">{customerTitle(c)}{isCurrent ? ' (current customer)' : ''}</span>
                                                         <span className="block text-xs text-slate-500">
-                                                            {[c.externalCode, c.customerName !== c.companyName ? c.customerName : '', c.mobile, c.gstin, c.billingAddress?.city].filter(Boolean).join(' · ')}
+                                                            {[c.externalCode, contactPersonOf(c), c.mobile, c.gstin, c.billingAddress?.city].filter(Boolean).join(' · ')}
                                                         </span>
                                                     </button>
                                                 </li>
@@ -1155,7 +1199,7 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div>
-                    <label className={label} htmlFor="transferDate">{past ? 'Date With This Customer' : 'Transfer Date'} <span className="text-rose-500">*</span></label>
+                    <label className={label} htmlFor="transferDate">{past ? 'Date With This Customer' : sold ? 'Transfer Date' : 'Assignment Date'} <span className="text-rose-500">*</span></label>
                     <DateInput id="transferDate" type="date" required max={past ? latestPastDate : todayInput()} value={transferDate} onChange={(e) => setTransferDate(e.target.value)} className={inputClass} />
                 </div>
                 <div className="md:col-span-2">
@@ -1169,7 +1213,7 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
                     ? (currentSince
                         ? `A past entry records an earlier customer as Inactive history, dated on or before ${formatDate(currentSince)} (when the current customer received it). The current customer stays Active.`
                         : 'A past entry records an earlier customer as Inactive history.')
-                    : 'Saving keeps every earlier customer in the history as Inactive and makes the new customer the only Active one.'}
+                    : `${pendingReturn ? `The return by ${pendingReturn.companyName || pendingReturn.customerName || 'the previous customer'} is saved first. ` : ''}${sold ? '' : `The serial stays ${statusText(data.asset.status)}: the customer is recorded as Assigned, not as a sale. `}Saving keeps every earlier customer in the history as Inactive and makes the new customer the only Active one.`}
             </p>
 
             {saveError && (
@@ -1181,7 +1225,7 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
                     Cancel
                 </button>
                 <button type="submit" disabled={saving || !customer} className="flex-1 sm:flex-none px-6 py-3 rounded-2xl bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-xs tracking-widest transition-all disabled:opacity-60">
-                    {saving ? 'Saving…' : past ? 'Save Past Entry' : 'Save Transfer'}
+                    {saving ? 'Saving…' : past ? 'Save Past Entry' : sold ? 'Save Transfer' : 'Save Assignment'}
                 </button>
             </div>
         </form>

@@ -572,7 +572,7 @@ const importCustomers = async (req, res) => {
         const cleanHeaders = headers.map(h => String(h || '').trim().toLowerCase());
         
         const hasCustomerName = cleanHeaders.some(h => [
-            'customer name', 'customername', 'name', 'contact person', 'bp name', 'company name', 'companyname', 'company'
+            'customer name', 'customername', 'name', 'contact person', 'bp name', 'company name', 'companyname', 'company trade name', 'company'
         ].includes(h));
         
         if (!hasCustomerName) {
@@ -624,25 +624,30 @@ const importCustomers = async (req, res) => {
             try {
                 const customerData = {
                     externalCode: pickFirstNonEmpty(row['Customer Code'], row.customerCode, row['Code'], row['BP Code']),
+                    // The customer's own name; a Contact Person column is used only when the sheet
+                    // has no name or company column.
                     customerName: pickFirstNonEmpty(
                         row['Customer Name'],
                         row.customerName,
                         row['Name'],
-                        row['Contact Person'],
                         row['BP Name'],
                         row['Company Name'],
                         row.companyName,
-                        row['Company']
+                        row['Company Trade Name'],
+                        row['Company'],
+                        row['Contact Person']
                     ),
                     companyName: pickFirstNonEmpty(
                         row['Company Name'],
                         row.companyName,
+                        row['Company Trade Name'],
                         row['Company'],
                         row['BP Name'],
                         row['Customer Name'],
                         row.customerName,
                         row['Name']
                     ),
+                    contactPerson: pickFirstNonEmpty(row['Contact Person'], row.contactPerson),
                     gstin: pickFirstNonEmpty(row['GSTIN'], row.gstin, row['GST No'], row['Federal Tax ID'], row['Unified Federal Tax ID'], row['VAT Reg. Number'], row['Registration No.']),
                     mobile: pickFirstNonEmpty(row['Mobile'], row.mobile, row['Phone'], row['Mobile Phone'], row['Telephone 1'], row['Telephone 2']),
                     email: pickFirstNonEmpty(row['Email'], row.email, row['E-Mail'], row.EmailCC),
@@ -669,6 +674,8 @@ const importCustomers = async (req, res) => {
                 if (!customerData.customerName || !customerData.companyName) {
                     throw new Error('Missing required fields: Customer Name or Company Name');
                 }
+                // A sheet without a contact person keeps the one already saved.
+                if (!customerData.contactPerson) delete customerData.contactPerson;
 
                 if (customerData.billingAddress.pincode) {
                     const cleanPin = String(customerData.billingAddress.pincode).trim().replace(/\D/g, '');
@@ -1210,8 +1217,8 @@ const getCustomerTemplate = async (req, res) => {
         const templateData = [
             {
                 'Customer Code': 'CUST-001',
-                'Customer Name': 'John Doe',
                 'Company Name': 'ABC Enterprises Pvt Ltd',
+                'Contact Person': 'John Doe',
                 'GSTIN': '27AABCU9603R1ZM',
                 'Mobile': '9876543210',
                 'Email': 'john@abc.com',
@@ -1236,16 +1243,16 @@ const getCustomerTemplate = async (req, res) => {
 
         const notesSheet = XLSX.utils.aoa_to_sheet([
             ['Customer Import Notes'],
-            ['Required columns', 'Customer Code, Customer Name, Company Name'],
-            ['Meaning', 'Customer Code = external customer code, Customer Name = contact/person, Company Name = trade name/company'],
+            ['Required columns', 'Customer Code, Company Name'],
+            ['Meaning', 'Customer Code = external customer code, Company Name = trade name/company, Contact Person = the person to contact (optional)'],
             ['Optional columns', 'GSTIN, Mobile, Email, Billing/Shipping address columns, Default Discount, Logo URL'],
-            ['Accepted source formats', 'This importer also accepts BP Code, BP Name, Contact Person and related SAP-style columns']
+            ['Accepted source formats', 'This importer also accepts Customer Name, Company Trade Name, BP Code, BP Name and related SAP-style columns']
         ]);
         XLSX.utils.book_append_sheet(workbook, notesSheet, 'Instructions');
 
         // Set column widths
         worksheet['!cols'] = [
-            { wch: 15 }, { wch: 20 }, { wch: 28 }, { wch: 20 }, { wch: 15 }, { wch: 25 },
+            { wch: 15 }, { wch: 28 }, { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 25 },
             { wch: 25 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 10 },
             { wch: 28 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 10 },
             { wch: 15 }, { wch: 40 }

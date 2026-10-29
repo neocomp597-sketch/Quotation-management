@@ -3,8 +3,12 @@ const tenantPlugin = require('./plugins/tenantPlugin');
 
 const CustomerSchema = new mongoose.Schema({
     externalCode: { type: String, default: '', index: true },
-        customerName: { type: String, required: true },
+    // The customer's own name, shown by the other modules; the Customer form does not edit it and
+    // it follows the Company Trade Name (customerController). Not the contact person.
+    customerName: { type: String, required: true },
     companyName: { type: String, required: true },
+    // The person to contact at the customer (Customer form "Contact Person").
+    contactPerson: { type: String, trim: true, default: '' },
     gstin: { type: String, default: '' },
     billingAddress: {
         line1: String,

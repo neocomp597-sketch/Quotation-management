@@ -19,12 +19,17 @@ const { limitedBranchIds, canMoveFrom, visibleTransfersCondition } = require('..
  * the Asset records so nothing is copied and every status (sold, in stock, allocated, return,
  * scrapped) is listed as Invoice Bulk Upload shows it.
  *
- * Customer transfers apply to serials of any status; the status itself is not changed. The first
- * customer is the one on the invoice row; that "Sold" record is written the first time the serial
- * is transferred, from the invoice data (a serial whose row names no customer starts with the
- * transfer). Each transfer switches the current record off and adds a new active one, so history
- * is never overwritten and only the latest customer is active. The Asset's customer is moved to
- * the new customer as well, so complaints, AMC and the Invoice Bulk Upload list show the
+ * Customer history is kept for serials of any status, and recording a customer never changes the
+ * status. The first customer is the one on the invoice row, written from the invoice data the
+ * first time a record is saved for the serial (a serial whose row names no customer starts with
+ * the first customer recorded here): the original sale ("Sold") of a sold, returned or scrapped
+ * serial, or an allocation ("Allocated") of an allocated or in-stock one. A new customer of a sold
+ * serial is a transfer ("Transferred"); of any other serial an assignment ("Assigned"), so an
+ * unsold serial is never recorded as sold. A returned serial's return is saved as its own record
+ * ("Returned") before its next customer. A scrapped serial keeps its history but cannot be given a
+ * new customer. Each new customer switches the current record off and adds a new active one, so
+ * history is never overwritten and only the latest customer is active. The Asset's customer is
+ * moved to the new customer as well, so complaints, AMC and the Invoice Bulk Upload list show the
  * current holder.
  *
  * Branch transfers (bottom of this file) move serials of any status to another branch.
@@ -171,7 +176,16 @@ const withInvoice = (entry, asset) => {
 // Whether the invoice row gives the serial a first customer (always true for a sold serial).
 const hasSaleCustomer = (asset) => asset.status === 'SOLD' || Boolean(asset.customerId || cleanText(asset.customerNameStr));
 
-// The original sale, as a history record built from the Invoice Bulk Upload row.
+const isReturned = (asset) => asset.status === 'RETURN' || asset.status === 'RETURNED';
+// The invoice row's customer of an allocated or in-stock serial is an allocation, not a sale.
+const originType = (asset) => (['ALLOCATED', 'IN_STOCK'].includes(statusOf(asset)) ? 'Allocated' : 'Sold');
+// A new customer recorded here: a transfer of a sold serial, else an assignment.
+const changeType = (asset) => (asset.status === 'SOLD' ? 'Transferred' : 'Assigned');
+// The entries that give a serial to a new customer (counted as its transfers).
+const CHANGE_TYPES = ['Transferred', 'Assigned'];
+const ENTRY_TYPES = SerialTransfer.schema.path('entryType').enumValues;
+
+// The first customer, as a history record built from the Invoice Bulk Upload row.
 const saleRecord = (asset) => ({
     assetId: asset._id,
     serialNumber: asset.serialNumber,
@@ -186,7 +200,7 @@ const saleRecord = (asset) => ({
         customerPostalCode: asset.customerPostalCode
     }),
     customerId: asset.customerId?._id || asset.customerId || null,
-    entryType: 'Sold',
+    entryType: originType(asset),
     transferDate: saleDateOf(asset),
     invoiceNumber: asset.invoiceNumber || '',
     invoiceDate: invoiceDateOf(asset),
@@ -194,16 +208,71 @@ const saleRecord = (asset) => ({
     branchId: idOf(asset.branchId)
 });
 
+const CUSTOMER_FIELDS = ['customerId', 'customerCode', 'customerName', 'companyName', 'customerMobile', 'customerGstin', 'customerCity', 'customerState', 'customerPincode'];
+
+// The return of a returned serial, as an inactive record of the customer who gave it back.
+const returnRecord = (asset, holder, date) => {
+    const invoice = withInvoice(holder, asset);
+    return {
+        assetId: asset._id,
+        serialNumber: asset.serialNumber,
+        serialKey: toKey(asset.serialNumber),
+        productId: holder.productId || null,
+        productCode: holder.productCode || '',
+        productName: holder.productName || '',
+        ...Object.fromEntries(CUSTOMER_FIELDS.map((key) => [key, holder[key]])),
+        entryType: 'Returned',
+        transferDate: date,
+        isActive: false,
+        endedAt: date,
+        invoiceNumber: invoice.invoiceNumber || '',
+        invoiceDate: invoice.invoiceDate || null,
+        remarks: cleanText(asset.returnReason),
+        branchId: idOf(asset.branchId) || holder.branchId || null
+    };
+};
+
+/**
+ * The record of the customer who returned a returned serial, while that return is not in its
+ * history yet (it is saved with the serial's next customer); else null. A return made before the
+ * current customer received the serial was an earlier holder's and is not recorded for them.
+ */
+const unrecordedReturn = (asset, records) => {
+    if (!isReturned(asset)) return null;
+    const since = asset.returnedAt ? startOfDay(asset.returnedAt) : null;
+    if (records.some((record) => record.entryType === 'Returned' && (!since || record.transferDate >= since))) return null;
+    const holder = records.find((record) => record.isActive);
+    if (!holder || (since && since < startOfDay(holder.transferDate))) return null;
+    return holder;
+};
+
+// The date of a return: the sales return's, else (a status set by an upload, with no return date)
+// the fallback; never before the returning customer received the serial.
+const returnDateOf = (asset, holder, fallback) => {
+    const date = asset.returnedAt || fallback;
+    if (!date) return null;
+    return holder.transferDate && date < holder.transferDate ? holder.transferDate : date;
+};
+
+// The serial's saved records, inside a transaction. The first time, the invoice row's customer is
+// saved as the first record.
+const savedHistory = async (asset, user, session) => {
+    const records = await SerialTransfer.find({ assetId: asset._id }).session(session).lean();
+    if (records.length || !hasSaleCustomer(asset)) return records;
+    const [first] = await SerialTransfer.create([{ ...saleRecord(asset), ...user }], { session });
+    return [first.toObject()];
+};
+
 const historyOf = (assetId) => SerialTransfer.find(addActiveBranchFilter({ assetId }))
     .sort({ transferDate: 1, createdAt: 1 })
     .lean();
 
 // ?ownership=Sold: sold serials still with the customer they were sold to; Transferred: serials
-// that have changed customer at least once.
+// that have been transferred or assigned to a new customer at least once.
 const ownershipFilter = async (ownership) => {
     if (ownership !== 'Transferred' && ownership !== 'Sold') return null;
     const rows = await SerialTransfer.aggregate([
-        { $match: { entryType: 'Transferred' } },
+        { $match: { entryType: { $in: CHANGE_TYPES } } },
         { $group: { _id: '$assetId' } }
     ]);
     const ids = rows.map((row) => row._id);
@@ -213,7 +282,8 @@ const ownershipFilter = async (ownership) => {
 /**
  * Serial No List: every Invoice Bulk Upload serial, of every status, with its current branch and
  * current customer (?status filters by status). The list follows the same branch rule as Invoice
- * Bulk Upload. `transferred` says whether a sold serial has changed customer since the sale.
+ * Bulk Upload. `transfers` counts the new customers recorded for the serial (transfers and
+ * assignments); `transferred` says whether it has any.
  */
 exports.listSerials = async (req, res) => {
     try {
@@ -269,7 +339,7 @@ exports.listSerials = async (req, res) => {
                 {
                     $group: {
                         _id: '$assetId',
-                        transfers: { $sum: { $cond: [{ $eq: ['$entryType', 'Transferred'] }, 1, 0] } },
+                        transfers: { $sum: { $cond: [{ $in: ['$entryType', CHANGE_TYPES] }, 1, 0] } },
                         lastTransferDate: { $max: '$transferDate' }
                     }
                 }
@@ -311,8 +381,17 @@ const loadSerial = async (assetId) => {
     if (!asset) return null;
 
     let history = (await historyOf(asset._id)).map((entry) => withInvoice(entry, asset));
-    // Not transferred yet: the sale is shown from the invoice row until the first transfer saves it.
+    // Nothing saved yet: the invoice row's customer is shown until the first record saves it.
     if (!history.length && hasSaleCustomer(asset)) history = [{ ...saleRecord(asset), _id: null, pending: true }];
+    // A return not saved yet is shown as it will be saved with the next customer.
+    const returning = unrecordedReturn(asset, history);
+    if (returning) {
+        const date = returnDateOf(asset, returning, null);
+        history = [
+            ...history.map((entry) => (entry === returning ? { ...entry, isActive: false, endedAt: date } : entry)),
+            { ...returnRecord(asset, returning, date), _id: null, pending: true }
+        ];
+    }
 
     return {
         asset: {
@@ -369,10 +448,11 @@ const transferMoment = (value) => {
 const startOfDay = (value) => new Date(new Date(value).setHours(0, 0, 0, 0));
 
 /**
- * Assigns a serial number to another customer. In one transaction: the original sale is saved
- * as the first record if this is the first change, the current record becomes inactive, a new
- * active record is added for the new customer and the asset moves to that customer. Either all
- * of it is saved or none of it. Nothing earlier is changed or removed.
+ * Assigns a serial number to another customer. In one transaction: the invoice row's customer is
+ * saved as the first record if this is the first change, a returned serial's return is saved, the
+ * current record becomes inactive, a new active record is added for the new customer and the
+ * asset moves to that customer. Either all of it is saved or none of it. Nothing earlier is
+ * changed or removed, and the serial's status stays as it is. Scrapped serials are refused.
  *
  * The form sends a requestId with each save; repeating a request returns the record it already
  * created instead of adding a second one.
@@ -394,29 +474,43 @@ exports.transferSerial = async (req, res) => {
         }
 
         const asset = await loadTransferSerial(assetId);
+        if (asset.status === 'SCRAPPED') {
+            throw httpError(400, `${asset.serialNumber} is scrapped. Its customer history is kept, but a scrapped serial number cannot be assigned or transferred to a customer.`);
+        }
         const customer = await Customer.findById(customerId).select(CUSTOMER_SELECT).lean();
         if (!customer) throw httpError(404, 'Customer not found in Customer Master.');
         const user = { createdBy: req.user?.id || null, createdByName: req.user?.name || '' };
 
         session = await mongoose.startSession();
         await session.withTransaction(async () => {
-            let current = await SerialTransfer.findOne({ assetId: asset._id, isActive: true }).session(session).lean();
-            if (!current && hasSaleCustomer(asset) && !(await SerialTransfer.exists({ assetId: asset._id }).session(session))) {
-                // The original sale becomes the first record of the history.
-                [current] = await SerialTransfer.create([{ ...saleRecord(asset), ...user }], { session });
+            const records = await savedHistory(asset, user, session);
+            let current = records.find((record) => record.isActive) || null;
+            // A returned serial: the return ends the current record and is saved before the new customer.
+            let returned = null;
+            const returning = unrecordedReturn(asset, records);
+            if (returning) {
+                const date = returnDateOf(asset, returning, transferDate);
+                await SerialTransfer.updateOne({ _id: returning._id }, { $set: { isActive: false, endedAt: date } }, { session });
+                const [saved] = await SerialTransfer.create([{ ...returnRecord(asset, returning, date), ...user }], { session });
+                returned = saved.toObject();
+                current = null;
             }
+            const previous = current || returned;
             if (current?.customerId && String(current.customerId) === String(customer._id)) {
                 throw httpError(400, `${customerLabel(customer)} is already the current customer of ${asset.serialNumber}.`);
             }
-            if (current && transferDate < startOfDay(current.transferDate)) {
-                throw httpError(400, `Transfer date cannot be before ${formatDate(current.transferDate)}, when the current customer (${current.companyName || current.customerName || 'previous customer'}) received it.`);
+            if (previous && transferDate < startOfDay(previous.transferDate)) {
+                const holder = previous.companyName || previous.customerName || 'previous customer';
+                throw httpError(400, returned
+                    ? `Transfer date cannot be before ${formatDate(previous.transferDate)}, when ${holder} returned it.`
+                    : `Transfer date cannot be before ${formatDate(previous.transferDate)}, when the current customer (${holder}) received it.`);
             }
 
             if (current) {
                 await SerialTransfer.updateOne({ _id: current._id }, { $set: { isActive: false, endedAt: transferDate } }, { session });
             }
-            // The invoice flows to the new customer: the current record's, else the serial's own.
-            const invoice = withInvoice(current || { entryType: 'Sold' }, asset);
+            // The invoice flows to the new customer: the previous record's, else the serial's own.
+            const invoice = withInvoice(previous || { entryType: 'Sold' }, asset);
             const snapshot = customerSnapshot(customer);
             await SerialTransfer.create([{
                 assetId: asset._id,
@@ -426,10 +520,10 @@ exports.transferSerial = async (req, res) => {
                 productCode: asset.productCode || '',
                 productName: asset.productName || '',
                 ...snapshot,
-                previousCustomerId: current?.customerId || null,
-                previousCustomerCode: current?.customerCode || '',
-                previousCustomerName: current?.companyName || current?.customerName || '',
-                entryType: 'Transferred',
+                previousCustomerId: previous?.customerId || null,
+                previousCustomerCode: previous?.customerCode || '',
+                previousCustomerName: previous?.companyName || previous?.customerName || '',
+                entryType: changeType(asset),
                 transferDate,
                 isActive: true,
                 invoiceNumber: invoice.invoiceNumber || '',
@@ -437,7 +531,7 @@ exports.transferSerial = async (req, res) => {
                 remarks: cleanText(req.body.remarks),
                 requestId,
                 ...user,
-                branchId: asset.branchId || current?.branchId || null
+                branchId: asset.branchId || previous?.branchId || null
             }], { session });
 
             await Asset.updateOne({ _id: asset._id }, {
@@ -469,7 +563,8 @@ exports.transferSerial = async (req, res) => {
 /**
  * Records an earlier customer of a serial number (Add Past Entry). The record is inactive and
  * dated on or before the current customer's date; the current customer and the asset are not
- * changed. The original sale is saved as a record first if the serial has no history yet.
+ * changed. The invoice row's customer is saved as the first record if the serial has no history
+ * yet. Allowed for every status, scrapped included: it adds history, not a current customer.
  */
 exports.addPastEntry = async (req, res) => {
     const { assetId } = req.params;
@@ -494,10 +589,7 @@ exports.addPastEntry = async (req, res) => {
 
         session = await mongoose.startSession();
         await session.withTransaction(async () => {
-            let current = await SerialTransfer.findOne({ assetId: asset._id, isActive: true }).session(session).lean();
-            if (!current && hasSaleCustomer(asset) && !(await SerialTransfer.exists({ assetId: asset._id }).session(session))) {
-                [current] = await SerialTransfer.create([{ ...saleRecord(asset), ...user }], { session });
-            }
+            const current = (await savedHistory(asset, user, session)).find((record) => record.isActive);
             if (current && startOfDay(entryDate) > startOfDay(current.transferDate)) {
                 throw httpError(400, `A past entry must be dated on or before ${formatDate(current.transferDate)}, when the current customer (${current.companyName || current.customerName || 'current customer'}) received it. Use Transfer Serial No for a newer customer.`);
             }
@@ -547,7 +639,7 @@ exports.listHistory = async (req, res) => {
         }
         if (req.query.flag === 'Active') query.isActive = true;
         if (req.query.flag === 'Inactive') query.isActive = false;
-        if (['Sold', 'Transferred', 'Past Entry'].includes(req.query.entryType)) query.entryType = req.query.entryType;
+        if (ENTRY_TYPES.includes(req.query.entryType)) query.entryType = req.query.entryType;
         const range = dateRange(req.query);
         if (range) query.transferDate = range;
         const products = await mgrProductFilter(req.query);
