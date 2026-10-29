@@ -495,16 +495,17 @@ const SerialNoMaster = () => {
                     'Product Name': prodName,
                     'Product Code': prodCode,
                     'Status': asset.status || 'IN_STOCK',
+                    // Customer fields in the screen order: name, code, segment, postal code.
+                    'Customer Name': custName,
                     'Customer Code': asset.customerCode || asset.customerId?.externalCode || '',
-                    'Customer': custName,
-                    'Customer Postal Code': asset.customerPostalCode || '',
-                    'Invoice Ref': asset.invoiceNumber || '',
-                    'Sale Date': formatDate(sDate, ''),
-                    'Location': asset.location || '',
                     'Division_Code': asset.divisionId?.code || '',
                     'Division_Desc': asset.divisionId?.description || '',
                     'Segment_Code': asset.segmentId?.code || '',
                     'Segment_Desc': asset.segmentId?.description || '',
+                    'Customer Postal Code': asset.customerPostalCode || '',
+                    'Invoice Ref': asset.invoiceNumber || '',
+                    'Sale Date': formatDate(sDate, ''),
+                    'Location': asset.location || '',
                     'Mgr 1': resolveAssetMgr(asset, 'mgr1'),
                     'Mgr 2': resolveAssetMgr(asset, 'mgr2'),
                     'Mgr 3': resolveAssetMgr(asset, 'mgr3'),
@@ -560,16 +561,17 @@ const SerialNoMaster = () => {
                     'Product Name': prodName,
                     'Product Code': prodCode,
                     'Status': asset.status || 'IN_STOCK',
+                    // Customer fields in the screen order: name, code, segment, postal code.
+                    'Customer Name': custName,
                     'Customer Code': asset.customerCode || asset.customerId?.externalCode || '',
-                    'Customer': custName,
-                    'Customer Postal Code': asset.customerPostalCode || '',
-                    'Invoice Ref': asset.invoiceNumber || '',
-                    'Sale Date': formatDate(sDate, ''),
-                    'Location': asset.location || '',
                     'Division_Code': asset.divisionId?.code || '',
                     'Division_Desc': asset.divisionId?.description || '',
                     'Segment_Code': asset.segmentId?.code || '',
                     'Segment_Desc': asset.segmentId?.description || '',
+                    'Customer Postal Code': asset.customerPostalCode || '',
+                    'Invoice Ref': asset.invoiceNumber || '',
+                    'Sale Date': formatDate(sDate, ''),
+                    'Location': asset.location || '',
                     'Mgr 1': resolveAssetMgr(asset, 'mgr1'),
                     'Mgr 2': resolveAssetMgr(asset, 'mgr2'),
                     'Mgr 3': resolveAssetMgr(asset, 'mgr3'),
@@ -737,6 +739,15 @@ const SerialNoMaster = () => {
         return activeList.slice(startIndex, startIndex + PAGE_SIZE);
     }, [activeTab, activeList, assets, currentPage]);
 
+    // Total Count: every record matching the search and filters (the server's count for Active
+    // Inventory), shown apart from the rows on this page.
+    const matchingTotal = activeTab === 'returns' ? filteredReturns.length : assetPagination.total;
+    const shownPage = activeTab === 'returns' ? currentPage : assetPagination.page;
+    const pageFrom = paginatedAssets.length ? (shownPage - 1) * PAGE_SIZE + 1 : 0;
+    const pageTo = paginatedAssets.length ? pageFrom + paginatedAssets.length - 1 : 0;
+    const filtersApplied = Boolean(searchQuery.trim())
+        || (activeTab === 'active' && (selectedStatus !== 'ALL' || Object.values(mgrFilters).some((value) => value !== 'ALL')));
+
     useEffect(() => {
         setCurrentPage(1);
     }, [searchQuery, selectedStatus, mgrFilters, activeTab]);
@@ -853,28 +864,6 @@ const SerialNoMaster = () => {
                                         </p>
                                     )}
                                 </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Code</label>
-                                    <input
-                                        type="text"
-                                        autoComplete="off"
-                                        placeholder="e.g. C-10023"
-                                        value={singleForm.customerCode}
-                                        onChange={(e) => handleCustomerCodeChange(e.target.value)}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
-                                    />
-                                    {typedCustomerCode && (
-                                        <p className={`mt-1.5 text-[10px] font-semibold ${matchedCustomer ? 'text-emerald-600' : 'text-slate-400'}`}>
-                                            {lookingUpCustomer
-                                                ? 'Checking Customer Master…'
-                                                : matchedCustomer
-                                                    ? 'Found in Customer Master'
-                                                    : customerMatch.failed
-                                                        ? 'Could not check Customer Master'
-                                                        : 'Not in Customer Master: saving adds this customer with the name entered'}
-                                        </p>
-                                    )}
-                                </div>
                                 <div className="relative">
                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Name</label>
                                     <input
@@ -917,33 +906,26 @@ const SerialNoMaster = () => {
                                     )}
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Invoice Number</label>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Code</label>
                                     <input
                                         type="text"
-                                        placeholder="e.g. INV-2026-001"
-                                        value={singleForm.invoiceNumber}
-                                        onChange={(e) => setSingleForm({ ...singleForm, invoiceNumber: e.target.value })}
+                                        autoComplete="off"
+                                        placeholder="e.g. C-10023"
+                                        value={singleForm.customerCode}
+                                        onChange={(e) => handleCustomerCodeChange(e.target.value)}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
                                     />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Invoice Date</label>
-                                    <DateInput
-                                        type="date"
-                                        value={singleForm.saleDate}
-                                        onChange={(e) => setSingleForm({ ...singleForm, saleDate: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Location</label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g. Client Site Alpha"
-                                        value={singleForm.location}
-                                        onChange={(e) => setSingleForm({ ...singleForm, location: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
-                                    />
+                                    {typedCustomerCode && (
+                                        <p className={`mt-1.5 text-[10px] font-semibold ${matchedCustomer ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                            {lookingUpCustomer
+                                                ? 'Checking Customer Master…'
+                                                : matchedCustomer
+                                                    ? 'Found in Customer Master'
+                                                    : customerMatch.failed
+                                                        ? 'Could not check Customer Master'
+                                                        : 'Not in Customer Master: saving adds this customer with the name entered'}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Division *</label>
@@ -988,6 +970,35 @@ const SerialNoMaster = () => {
                                         placeholder="e.g. 400001"
                                         value={singleForm.customerPostalCode}
                                         onChange={(e) => setSingleForm({ ...singleForm, customerPostalCode: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Invoice Number</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. INV-2026-001"
+                                        value={singleForm.invoiceNumber}
+                                        onChange={(e) => setSingleForm({ ...singleForm, invoiceNumber: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Invoice Date</label>
+                                    <DateInput
+                                        type="date"
+                                        value={singleForm.saleDate}
+                                        onChange={(e) => setSingleForm({ ...singleForm, saleDate: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Location</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. Client Site Alpha"
+                                        value={singleForm.location}
+                                        onChange={(e) => setSingleForm({ ...singleForm, location: e.target.value })}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
                                     />
                                 </div>
@@ -1147,7 +1158,7 @@ const SerialNoMaster = () => {
                         }`}
                     >
                         <span>Active Inventory</span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeTab === 'active' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'}`}>{assets.length}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeTab === 'active' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'}`}>{assetPagination.total.toLocaleString('en-IN')}</span>
                     </button>
                     <button
                         onClick={() => handleTabChange('returns')}
@@ -1203,6 +1214,21 @@ const SerialNoMaster = () => {
                             ))}
                         </div>
                     )}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-2xl border border-primary-100 bg-primary-50/60 px-4 py-3">
+                    <p className="text-sm font-bold text-slate-700">
+                        Total Count:{' '}
+                        <span className="text-lg font-black text-primary-700">
+                            {loading || (activeTab === 'returns' && loadingHistory) ? '…' : matchingTotal.toLocaleString('en-IN')}
+                        </span>{' '}
+                        <span className="text-xs font-semibold text-slate-500">
+                            {activeTab === 'returns' ? 'return records' : 'serial numbers'}{filtersApplied ? ' matching the search and filters' : ''}
+                        </span>
+                    </p>
+                    <p className="text-xs font-bold text-slate-500">
+                        {pageTo ? `Showing ${pageFrom.toLocaleString('en-IN')}–${pageTo.toLocaleString('en-IN')} on this page` : 'No records on this page'}
+                    </p>
                 </div>
             </div>
 

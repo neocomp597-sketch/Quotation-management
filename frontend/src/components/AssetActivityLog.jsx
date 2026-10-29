@@ -1,4 +1,4 @@
-import { MdHistory } from 'react-icons/md';
+import { MdExpandMore, MdHistory } from 'react-icons/md';
 import { ACTIVITY_CATEGORIES, filterActivity, formatActivityDate } from '../utils/assetActivity';
 import { MobileCard, MobileCardHead, MobileCardList, MobileEmpty, MobileField, MobileFields } from './SerialMobileCards';
 
@@ -16,17 +16,29 @@ const CATEGORY_STYLES = {
 // variant "customer": only the customer entries (added / transferred), with their own columns.
 const CUSTOMER_COLUMNS = ['Date & Time', 'Serial Number', 'Previous Customer', 'New Customer', 'Activity', 'Remarks', 'Flag', 'Performed By'];
 
-const AssetActivityLog = ({ activity = [], category = 'All', onCategoryChange, loading = false, title = 'Activity Log', variant = 'all' }) => {
+// With `onToggle` the heading opens and closes the log (`open`); without it the log is always shown.
+const AssetActivityLog = ({ activity = [], category = 'All', onCategoryChange, loading = false, title = 'Activity Log', variant = 'all', open = true, onToggle }) => {
     const isCustomer = variant === 'customer';
     const visible = filterActivity(activity, isCustomer ? 'Customer' : category);
+    const heading = (
+        <>
+            <MdHistory size={18} className="text-primary-600" /> {title}
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-600">{visible.length}</span>
+        </>
+    );
 
     return (
         <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
-            <div className="p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <span className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-700">
-                    <MdHistory size={18} className="text-primary-600" /> {title}
-                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-600">{visible.length}</span>
-                </span>
+            <div className={`p-5 flex flex-col md:flex-row md:items-center justify-between gap-3 ${open ? 'border-b border-slate-100' : ''}`}>
+                {onToggle ? (
+                    <button type="button" onClick={onToggle} aria-expanded={open} className="flex flex-1 items-center gap-2 text-left text-xs font-black uppercase tracking-wider text-slate-700">
+                        <MdExpandMore size={20} className={`shrink-0 text-primary-600 transition-transform ${open ? '' : '-rotate-90'}`} />
+                        {heading}
+                        <span className="ml-auto text-[10px] tracking-widest text-slate-400">{open ? 'Collapse' : 'Expand'}</span>
+                    </button>
+                ) : (
+                    <span className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-700">{heading}</span>
+                )}
                 {onCategoryChange && !isCustomer && (
                     <div className="flex flex-wrap gap-2">
                         {ACTIVITY_CATEGORIES.map((c) => (
@@ -42,6 +54,8 @@ const AssetActivityLog = ({ activity = [], category = 'All', onCategoryChange, l
                     </div>
                 )}
             </div>
+            {open && (
+            <>
             <div className="p-3 md:hidden">
                 <MobileCardList>
                     {visible.map((a, i) => (isCustomer ? (
@@ -154,6 +168,8 @@ const AssetActivityLog = ({ activity = [], category = 'All', onCategoryChange, l
                 </table>
                 )}
             </div>
+            </>
+            )}
         </div>
     );
 };

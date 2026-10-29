@@ -193,7 +193,7 @@ const CSMTickets = () => {
         description: '',
         responseSlaHours: '1',
         resolutionSlaHours: '4',
-        color: '#3b82f6'
+        color: '#0d9488'
     });
     const [miniMasterSearch, setMiniMasterSearch] = useState('');
     const [editingItemId, setEditingItemId] = useState(null);
@@ -202,7 +202,7 @@ const CSMTickets = () => {
         description: '',
         responseSlaHours: '1',
         resolutionSlaHours: '4',
-        color: '#3b82f6'
+        color: '#0d9488'
     });
     // Problem Master & Quick Add State
     const [problems, setProblems] = useState([]);
@@ -1702,7 +1702,7 @@ const CSMTickets = () => {
             description: '',
             responseSlaHours: '1',
             resolutionSlaHours: '4',
-            color: '#3b82f6'
+            color: '#0d9488'
         });
         setMiniMasterSearch('');
         setEditingItemId(null);
@@ -1759,7 +1759,7 @@ const CSMTickets = () => {
             description: item.description || '',
             responseSlaHours: item.responseSlaHours || '1',
             resolutionSlaHours: item.resolutionSlaHours || '4',
-            color: item.color || '#3b82f6'
+            color: item.color || '#0d9488'
         });
     };
 
@@ -2102,7 +2102,7 @@ const CSMTickets = () => {
                 name,
                 responseSlaHours: 1,
                 resolutionSlaHours: 4,
-                color: '#3b82f6'
+                color: '#0d9488'
             });
             toast.success('Priority added!');
             const priRes = await csmService.getPriorities();

@@ -401,7 +401,7 @@ const Simulations = () => {
                           y2="100%"
                         >
                           <stop offset="0%" stopColor="#10b981" />
-                          <stop offset="100%" stopColor="#6366f1" />
+                          <stop offset="100%" stopColor="#0d9488" />
                         </linearGradient>
                       </defs>
                     </svg>

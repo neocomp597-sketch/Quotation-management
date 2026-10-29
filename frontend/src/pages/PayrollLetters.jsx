@@ -192,7 +192,7 @@ const buildProfessionalLetterHtml = (letter, companySettings) => {
                 ${companySettings?.logoUrl ? `
                     <img src="${escapeHtml(resolveImageUrl(companySettings.logoUrl))}" alt="Logo" style="height: 48px; max-width: 200px; object-fit: contain; display: block;" />
                 ` : `
-                    <h2 style="font-size: 26px; font-weight: 800; color: #1e3a8a; margin: 0; font-family: 'Poppins', sans-serif; letter-spacing: -0.5px;">${escapeHtml(companyName)}</h2>
+                    <h2 style="font-size: 26px; font-weight: 800; color: #134e4a; margin: 0; font-family: 'Poppins', sans-serif; letter-spacing: -0.5px;">${escapeHtml(companyName)}</h2>
                 `}
                 ${companyTagline ? `<p style="font-size: 10px; color: #6b7280; margin-top: 2px; font-weight: 500;">${escapeHtml(companyTagline)}</p>` : ''}
             </div>
@@ -501,7 +501,7 @@ const buildProfessionalLetterHtml = (letter, companySettings) => {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 2px solid #1e3a8a;
+            border-bottom: 2px solid #134e4a;
             padding-bottom: 12px;
             margin-bottom: 18px;
         }
@@ -520,7 +520,7 @@ const buildProfessionalLetterHtml = (letter, companySettings) => {
         
         .top-bar {
             height: 6px;
-            background: linear-gradient(90deg, #2563eb, #1d4ed8, #3b82f6);
+            background: linear-gradient(90deg, #0d9488, #0f766e, #0d9488);
         }
         
         .title-offer {
@@ -550,7 +550,7 @@ const buildProfessionalLetterHtml = (letter, companySettings) => {
             padding: 10px 15px;
             border-radius: 8px;
             width: 48%;
-            border: 1px solid #dbeafe;
+            border: 1px solid #ccfbf1;
         }
         .reference-offer .ref-box label {
             display: block;
@@ -563,7 +563,7 @@ const buildProfessionalLetterHtml = (letter, companySettings) => {
         }
         .reference-offer .ref-box strong {
             font-size: 13px;
-            color: #1e3a8a;
+            color: #134e4a;
         }
         
         .card-offer {
@@ -573,7 +573,7 @@ const buildProfessionalLetterHtml = (letter, companySettings) => {
             margin-bottom: 15px;
         }
         .card-offer .card-header {
-            background: #2563eb;
+            background: #0d9488;
             color: #fff;
             padding: 10px 18px;
             font-size: 14px;
@@ -598,15 +598,15 @@ const buildProfessionalLetterHtml = (letter, companySettings) => {
         }
         
         .salary-offer {
-            background: #eff6ff;
-            border: 2px dashed #3b82f6;
+            background: #f0fdfa;
+            border: 2px dashed #0d9488;
             padding: 15px;
             border-radius: 10px;
             margin: 15px 0;
             text-align: center;
         }
         .salary-offer h3 {
-            color: #1d4ed8;
+            color: #0f766e;
             margin-bottom: 4px;
             font-size: 14px;
         }
@@ -630,7 +630,7 @@ const buildProfessionalLetterHtml = (letter, companySettings) => {
         }
         .terms-offer h3 {
             margin-bottom: 10px;
-            color: #1d4ed8;
+            color: #0f766e;
             font-size: 14px;
             font-weight: 600;
         }
@@ -684,12 +684,12 @@ const buildProfessionalLetterHtml = (letter, companySettings) => {
         
         .subject-inc {
             background: #f3f6ff;
-            border-left: 5px solid #1e3a8a;
+            border-left: 5px solid #134e4a;
             padding: 12px 18px;
             margin-bottom: 18px;
             font-size: 14px;
             font-weight: 700;
-            color: #1e3a8a;
+            color: #134e4a;
             border-radius: 0 6px 6px 0;
         }
         
@@ -705,7 +705,7 @@ const buildProfessionalLetterHtml = (letter, companySettings) => {
             border-collapse: collapse;
         }
         .salary-box-inc th {
-            background: #1e3a8a;
+            background: #134e4a;
             color: #fff;
             padding: 10px 12px;
             font-size: 13px;
@@ -729,7 +729,7 @@ const buildProfessionalLetterHtml = (letter, companySettings) => {
             margin-top: 15px;
         }
         .conditions-inc h3 {
-            color: #1e3a8a;
+            color: #134e4a;
             margin-bottom: 10px;
             font-size: 14px;
             font-weight: 600;

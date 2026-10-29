@@ -7,7 +7,7 @@ import {
     PieChart, Pie, Cell, FunnelChart, Funnel, LabelList
 } from 'recharts';
 
-const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#f97316', '#14b8a6'];
+const COLORS = ['#0d9488', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#64748b', '#f97316', '#5eead4'];
 
 const formatCurrency = (val) => {
     if (!val) return '₹0';
@@ -168,7 +168,7 @@ const SalesReports = () => {
                                 <XAxis type="number" tick={{ fontSize: 12 }} stroke="#94a3b8" tickFormatter={formatCurrency} />
                                 <YAxis type="category" dataKey="_id" tick={{ fontSize: 11 }} stroke="#94a3b8" width={100} />
                                 <Tooltip formatter={(val) => formatCurrency(val)} />
-                                <Bar dataKey="totalRevenue" fill="#6366f1" radius={[0, 8, 8, 0]} name="Revenue" />
+                                <Bar dataKey="totalRevenue" fill="#0d9488" radius={[0, 8, 8, 0]} name="Revenue" />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
@@ -186,7 +186,7 @@ const SalesReports = () => {
                                 <Tooltip formatter={(val) => formatCurrency(val)} />
                                 <Legend />
                                 <Bar dataKey="revenue" name="Won Revenue" fill="#10b981" radius={[8, 8, 0, 0]} />
-                                <Bar dataKey="count" name="Deals" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+                                <Bar dataKey="count" name="Deals" fill="#0d9488" radius={[8, 8, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>

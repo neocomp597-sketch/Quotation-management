@@ -47,9 +47,9 @@ const TABS = [
     { key: 'followups', label: 'Follow-ups', icon: <MdNotifications size={18} /> },
 ];
 
-const COLORS = ['#6366f1', '#0d9488', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+const COLORS = ['#0d9488', '#5eead4', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b', '#84cc16'];
 const STATUS_COLORS = {
-    'New': '#6366f1', 'Follow-up': '#f59e0b', 'Quotation Pending': '#06b6d4',
+    'New': '#0d9488', 'Follow-up': '#f59e0b', 'Quotation Pending': '#5eead4',
     'Quotation Received': '#8b5cf6', 'Negotiation': '#ec4899', 'PO Received': '#10b981',
     'Lost': '#ef4444', 'Finalized': '#059669',
 };
@@ -1415,8 +1415,8 @@ const Reports = () => {
                                     <AreaChart data={enquiryTrends}>
                                         <defs>
                                             <linearGradient id="colorEnquiries" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
-                                                <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                                                <stop offset="5%" stopColor="#0d9488" stopOpacity={0.2} />
+                                                <stop offset="95%" stopColor="#0d9488" stopOpacity={0} />
                                             </linearGradient>
                                             <linearGradient id="colorWon" x1="0" y1="0" x2="0" y2="1">
                                                 <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
@@ -1427,7 +1427,7 @@ const Reports = () => {
                                         <XAxis dataKey="_id" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} />
                                         <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} />
                                         <Tooltip contentStyle={{ borderRadius: '1rem', border: '1px solid #334155', backgroundColor: '#0f172a', color: '#f8fafc', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.5)' }} />
-                                        <Area type="monotone" dataKey="count" stroke="#6366f1" strokeWidth={2} fill="url(#colorEnquiries)" name="Enquiries" />
+                                        <Area type="monotone" dataKey="count" stroke="#0d9488" strokeWidth={2} fill="url(#colorEnquiries)" name="Enquiries" />
                                         <Area type="monotone" dataKey="wonCount" stroke="#10b981" strokeWidth={2} fill="url(#colorWon)" name="Won" />
                                     </AreaChart>
                                 </ResponsiveContainer>
@@ -1463,7 +1463,7 @@ const Reports = () => {
                                             <td className="px-6 py-4 text-sm font-semibold text-slate-500 dark:text-slate-400">{pct}%</td>
                                             <td className="px-6 py-4 w-48">
                                                 <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                                    <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: STATUS_COLORS[s.name] || '#6366f1' }}></div>
+                                                    <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: STATUS_COLORS[s.name] || '#0d9488' }}></div>
                                                 </div>
                                             </td>
                                         </tr>
@@ -1590,7 +1590,7 @@ const Reports = () => {
                                 <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} />
                                 <YAxis type="category" dataKey="name" width={140} axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: '#94a3b8' }} />
                                 <Tooltip contentStyle={{ borderRadius: '1rem', border: '1px solid #334155', backgroundColor: '#0f172a', color: '#f8fafc', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.5)' }} />
-                                <Bar dataKey="enquiries" fill="#6366f1" radius={[0, 8, 8, 0]} barSize={22} name="Enquiries" />
+                                <Bar dataKey="enquiries" fill="#0d9488" radius={[0, 8, 8, 0]} barSize={22} name="Enquiries" />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>

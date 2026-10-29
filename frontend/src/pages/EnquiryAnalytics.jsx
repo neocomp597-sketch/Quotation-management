@@ -14,7 +14,7 @@ import {
 } from 'recharts';
 import DateInput from '../components/DateInput';
 
-const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
+const COLORS = ['#0D9488', '#F59E0B', '#8B5CF6', '#EF4444', '#10B981', '#EC4899', '#5EEAD4', '#F97316'];
 
 // Health Score Badge Component
 const HealthScoreBadge = ({ score }) => {
@@ -289,8 +289,8 @@ const EnquiryAnalytics = () => {
                         <AreaChart data={trends} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                             <defs>
                                 <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8} />
-                                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
+                                    <stop offset="5%" stopColor="#0D9488" stopOpacity={0.8} />
+                                    <stop offset="95%" stopColor="#0D9488" stopOpacity={0} />
                                 </linearGradient>
                                 <linearGradient id="colorWon" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor="#10B981" stopOpacity={0.8} />
@@ -302,7 +302,7 @@ const EnquiryAnalytics = () => {
                             <YAxis stroke="#94a3b8" style={{ fontSize: '12px' }} />
                             <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
                             <Legend />
-                            <Area type="monotone" dataKey="totalEnquiries" stroke="#3B82F6" fillOpacity={1} fill="url(#colorTotal)" name="Total" />
+                            <Area type="monotone" dataKey="totalEnquiries" stroke="#0D9488" fillOpacity={1} fill="url(#colorTotal)" name="Total" />
                             <Area type="monotone" dataKey="wonEnquiries" stroke="#10B981" fillOpacity={1} fill="url(#colorWon)" name="Won" />
                         </AreaChart>
                     </ResponsiveContainer>
@@ -507,7 +507,7 @@ const EnquiryAnalytics = () => {
                                 <XAxis dataKey="_id" stroke="#94a3b8" style={{ fontSize: '12px' }} />
                                 <YAxis stroke="#94a3b8" style={{ fontSize: '12px' }} />
                                 <Tooltip />
-                                <Bar dataKey="enquiryCount" fill="#3B82F6" name="Enquiries" radius={[8, 8, 0, 0]} />
+                                <Bar dataKey="enquiryCount" fill="#0D9488" name="Enquiries" radius={[8, 8, 0, 0]} />
                                 <Bar dataKey="wonCount" fill="#10B981" name="Won" radius={[8, 8, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>

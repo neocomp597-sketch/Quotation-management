@@ -184,7 +184,7 @@ const SalesForecasting = () => {
                             <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" tickFormatter={formatCurrency} />
                             <Tooltip formatter={(val) => formatCurrency(val)} />
                             <Legend />
-                            <Bar dataKey="weightedForecast" name="Forecast" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="weightedForecast" name="Forecast" fill="#0d9488" radius={[4, 4, 0, 0]} />
                             <Bar dataKey="actualRevenue" name="Actual" fill="#10b981" radius={[4, 4, 0, 0]} />
                         </BarChart>
                     </ResponsiveContainer>

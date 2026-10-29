@@ -20,7 +20,7 @@ const RevenueAnalytics = () => {
         { month: 'Jun', TotalDiscount: 95000, LostMargin: 22 }
     ];
 
-    const COLORS = ['#6366F1', '#10B981', '#F59E0B', '#3B82F6', '#EF4444'];
+    const COLORS = ['#0D9488', '#F59E0B', '#10B981', '#8B5CF6', '#EF4444'];
 
     return (
         <div className="space-y-6">
@@ -64,7 +64,7 @@ const RevenueAnalytics = () => {
                                 <XAxis dataKey="name" stroke="#94A3B8" fontSize={12} tickLine={false} />
                                 <YAxis stroke="#94A3B8" fontSize={12} tickLine={false} />
                                 <Tooltip cursor={{ fill: 'rgba(0,0,0,0.02)' }} />
-                                <Bar dataKey="Revenue" fill="#6366F1" radius={[8, 8, 0, 0]} />
+                                <Bar dataKey="Revenue" fill="#0D9488" radius={[8, 8, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>

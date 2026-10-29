@@ -13,7 +13,7 @@ import {
     MdTrendingUp, MdPayment, MdCategory, MdInfo 
 } from 'react-icons/md';
 
-const COLORS = ['#0f766e', '#14b8a6', '#0d9488', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899'];
+const COLORS = ['#0f766e', '#14b8a6', '#0d9488', '#5eead4', '#115e59', '#99f6e4', '#8b5cf6', '#ec4899'];
 
 const PayrollReports = () => {
     const [reportType, setReportType] = useState('monthly-register');

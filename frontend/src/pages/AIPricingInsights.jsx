@@ -365,7 +365,7 @@ const AIPricingInsights = () => {
                                         <PolarGrid stroke="#F1F5F9" />
                                         <PolarAngleAxis dataKey="subject" stroke="#64748B" fontSize={9} />
                                         <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} stroke="#E2E8F0" />
-                                        <Radar name="Deal Score" dataKey="A" stroke="#6366F1" fill="#6366F1" fillOpacity={0.2} />
+                                        <Radar name="Deal Score" dataKey="A" stroke="#0D9488" fill="#0D9488" fillOpacity={0.2} />
                                     </RadarChart>
                                 </ResponsiveContainer>
                             </div>
@@ -452,13 +452,13 @@ const AIPricingInsights = () => {
                                 <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
                                 <XAxis dataKey="name" stroke="#94A3B8" fontSize={11} tickLine={false} />
                                 <YAxis stroke="#94A3B8" fontSize={11} tickLine={false} label={{ value: 'Discount %', angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: '#64748B', fontWeight: 700 } }} />
-                                <Tooltip cursor={{ fill: 'rgba(99, 102, 241, 0.03)' }} />
-                                <Bar dataKey="AvgDiscount" fill="#818CF8" radius={[6, 6, 0, 0]}>
+                                <Tooltip cursor={{ fill: 'rgba(13, 148, 136, 0.03)' }} />
+                                <Bar dataKey="AvgDiscount" fill="#5EEAD4" radius={[6, 6, 0, 0]}>
                                     {/* Highlight selected region */}
                                     {regionalData.map((entry, idx) => (
                                         <Cell 
                                             key={`cell-${idx}`} 
-                                            fill={entry.name === region ? '#4F46E5' : '#818CF8'} 
+                                            fill={entry.name === region ? '#0D9488' : '#5EEAD4'} 
                                         />
                                     ))}
                                 </Bar>

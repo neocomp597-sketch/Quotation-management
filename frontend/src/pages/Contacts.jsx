@@ -94,7 +94,7 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
         description: '',
         responseSlaHours: '1',
         resolutionSlaHours: '4',
-        color: '#3b82f6'
+        color: '#0d9488'
     });
     const [miniMasterSearch, setMiniMasterSearch] = useState('');
     const [editingItemId, setEditingItemId] = useState(null);
@@ -103,7 +103,7 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
         description: '',
         responseSlaHours: '1',
         resolutionSlaHours: '4',
-        color: '#3b82f6'
+        color: '#0d9488'
     });
 
     // Load customer and designation master data
@@ -161,7 +161,7 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
             description: '',
             responseSlaHours: '1',
             resolutionSlaHours: '4',
-            color: '#3b82f6'
+            color: '#0d9488'
         });
         setMiniMasterSearch('');
         setEditingItemId(null);
@@ -192,7 +192,7 @@ const Contacts = ({ isCreatePage, isEditPage }) => {
             description: item.description || '',
             responseSlaHours: item.responseSlaHours || '1',
             resolutionSlaHours: item.resolutionSlaHours || '4',
-            color: item.color || '#3b82f6'
+            color: item.color || '#0d9488'
         });
     };
 

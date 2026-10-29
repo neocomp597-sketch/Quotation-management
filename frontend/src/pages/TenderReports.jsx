@@ -21,7 +21,7 @@ const REPORT_TABS = [
     { key: 'activities', label: 'Activity Logs', icon: <MdAssignment size={18} />, desc: 'Unified audit trail of actions taken on tenders.' }
 ];
 
-const COLORS = ['#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+const COLORS = ['#0d9488', '#f59e0b', '#8b5cf6', '#ef4444', '#10b981', '#64748b'];
 const STATUS_BADGES = {
     'Active': 'bg-primary-50 text-primary-700 border-primary-100',
     'Submitted': 'bg-amber-50 text-amber-700 border-amber-100',

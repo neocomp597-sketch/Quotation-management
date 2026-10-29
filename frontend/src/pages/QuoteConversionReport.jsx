@@ -6,7 +6,7 @@ import { ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Ba
 import { formatCurrency, formatDate } from '../utils/helpers';
 import * as XLSX from 'xlsx-js-style';
 
-const PIE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4'];
+const PIE_COLORS = ['#0d9488', '#f59e0b', '#8b5cf6', '#ec4899', '#10b981', '#64748b'];
 
 const StatCard = ({ icon, label, value, color, description }) => {
     const colorClasses = {
@@ -221,7 +221,7 @@ const QuoteConversionReport = () => {
                                     contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
                                 />
                                 <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }} />
-                                <Bar name="Quotes Created" dataKey="created" fill="#6366f1" radius={[6, 6, 0, 0]} barSize={20} />
+                                <Bar name="Quotes Created" dataKey="created" fill="#0d9488" radius={[6, 6, 0, 0]} barSize={20} />
                                 <Bar name="Quotes Converted" dataKey="converted" fill="#10b981" radius={[6, 6, 0, 0]} barSize={20} />
                             </BarChart>
                         </ResponsiveContainer>

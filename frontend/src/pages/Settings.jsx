@@ -988,7 +988,7 @@ const [logoUploading, setLogoUploading] = useState(false);
                             <div className="flex items-center gap-3">
                                 <input
                                     type="color"
-                                    value={companySettings.primaryBrandColor || '#6366f1'}
+                                    value={companySettings.primaryBrandColor || '#0d9488'}
                                     onChange={(e) => setCompanySettings({ ...companySettings, primaryBrandColor: e.target.value })}
                                     className="w-12 h-12 rounded-xl border-2 border-slate-200 cursor-pointer p-1"
                                 />
@@ -998,7 +998,7 @@ const [logoUploading, setLogoUploading] = useState(false);
                                     value={companySettings.primaryBrandColor || ''}
                                     onChange={handleCompanyChange}
                                     className={`${inputClass} flex-1`}
-                                    placeholder="#6366f1 (leave blank for default)"
+                                    placeholder="#0d9488 (leave blank for default)"
                                 />
                             </div>
                             <p className="text-[10px] text-slate-400 mt-1 font-bold">Used for the sidebar logo badge accent color.</p>

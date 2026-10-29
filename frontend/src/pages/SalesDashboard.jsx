@@ -11,7 +11,7 @@ import {
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
 
-const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#f97316', '#14b8a6'];
+const COLORS = ['#0d9488', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#64748b', '#f97316', '#5eead4'];
 
 const formatCurrency = (val) => {
     if (val >= 10000000) return `₹${(val / 10000000).toFixed(1)} Cr`;
@@ -119,7 +119,7 @@ const SalesDashboard = () => {
                                 <XAxis dataKey="_id" tick={{ fontSize: 12 }} stroke="#94a3b8" />
                                 <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" tickFormatter={formatCurrency} />
                                 <Tooltip formatter={(val) => formatCurrency(val)} />
-                                <Bar dataKey="revenue" fill="#6366f1" radius={[8, 8, 0, 0]} name="Revenue" />
+                                <Bar dataKey="revenue" fill="#0d9488" radius={[8, 8, 0, 0]} name="Revenue" />
                             </BarChart>
                         </ResponsiveContainer>
                     ) : (

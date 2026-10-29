@@ -15,11 +15,11 @@ import {
 import { toast } from 'react-toastify';
 import DateInput from '../components/DateInput';
 
-const COLORS = ['#0d9488', '#0ea5e9', '#8b5cf6', '#f59e0b', '#f43f5e', '#64748b'];
+const COLORS = ['#0d9488', '#5eead4', '#8b5cf6', '#f59e0b', '#f43f5e', '#64748b'];
 
 const STATUS_COLORS = {
     'Open': '#10b981',       // Emerald
-    'Assigned': '#3b82f6',   // Blue
+    'Assigned': '#5eead4',   // Light teal
     'In Progress': '#8b5cf6',// Purple
     'Pending Customer': '#f59e0b', // Amber
     'Resolved': '#0d9488',   // Teal
@@ -889,7 +889,7 @@ const CSMReports = () => {
                                                 <XAxis type="category" dataKey="name" tick={{ fontSize: 9, fontWeight: 'bold' }} />
                                                 <YAxis type="number" tick={{ fontSize: 9 }} />
                                                 <Tooltip />
-                                                <Bar dataKey="value" fill="#0ea5e9" radius={[8, 8, 0, 0]} />
+                                                <Bar dataKey="value" fill="#0d9488" radius={[8, 8, 0, 0]} />
                                             </BarChart>
                                         </ResponsiveContainer>
                                     </div>

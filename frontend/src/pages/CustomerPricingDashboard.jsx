@@ -285,7 +285,7 @@ const CustomerPricingDashboard = ({ customerId: propCustomerId, inlineMode = fal
                                         <YAxis yAxisId="right" orientation="right" stroke="#94A3B8" fontSize={10} tickLine={false} unit="%" />
                                         <Tooltip />
                                         <Legend verticalAlign="top" height={36} iconType="circle" fontSize={11} />
-                                        <Area yAxisId="left" type="monotone" dataKey="Revenue" name="Revenue (₹)" stroke="#6366F1" fill="rgba(99, 102, 241, 0.05)" strokeWidth={2} />
+                                        <Area yAxisId="left" type="monotone" dataKey="Revenue" name="Revenue (₹)" stroke="#0D9488" fill="rgba(13, 148, 136, 0.05)" strokeWidth={2} />
                                         <Area yAxisId="right" type="monotone" dataKey="Margin" name="Margin %" stroke="#10B981" fill="rgba(16, 185, 129, 0.05)" strokeWidth={2} />
                                     </AreaChart>
                                 </ResponsiveContainer>

@@ -17,7 +17,7 @@ import DateInput from '../components/DateInput';
 
 const COLORS = ['#0d9488', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
 const STATUS_COLORS = {
-    'Active': '#0ea5e9', // Sky blue for Active
+    'Active': '#0d9488', // Theme teal for Active
     'Submitted': '#f59e0b',
     'Won': '#10b981',
     'Lost': '#ef4444',
@@ -345,7 +345,7 @@ const TenderDashboard = () => {
                             <BarChart data={charts.wonVsLost} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} />
-                                <YAxis yAxisId="left" orientation="left" stroke="#0ea5e9" tickLine={false} label={{ value: 'Tenders Count', angle: -90, position: 'insideLeft', offset: 0, style: { fontSize: '10px', fill: '#94a3b8', fontWeight: 'bold' } }} />
+                                <YAxis yAxisId="left" orientation="left" stroke="#0d9488" tickLine={false} label={{ value: 'Tenders Count', angle: -90, position: 'insideLeft', offset: 0, style: { fontSize: '10px', fill: '#94a3b8', fontWeight: 'bold' } }} />
                                 <YAxis yAxisId="right" orientation="right" stroke="#10b981" tickLine={false} label={{ value: 'Tender Value (₹)', angle: 90, position: 'insideRight', offset: 0, style: { fontSize: '10px', fill: '#94a3b8', fontWeight: 'bold' } }} />
                                 <Tooltip 
                                     formatter={(value, name) => name === 'value' ? [formatCurrency(value), 'Total Value'] : [`${value} Tenders`, 'Count']}
@@ -378,7 +378,7 @@ const TenderDashboard = () => {
                                 />
                                 <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 'bold' }} />
                                 <Line yAxisId="left" type="monotone" dataKey="count" stroke="#0d9488" strokeWidth={3} dot={{ r: 4 }} name="Tenders Count" />
-                                <Line yAxisId="right" type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} name="Portfolio Value" />
+                                <Line yAxisId="right" type="monotone" dataKey="value" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} name="Portfolio Value" />
                                 <Line yAxisId="right" type="monotone" dataKey="wonValue" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} name="Won Value" />
                             </LineChart>
                         </ResponsiveContainer>

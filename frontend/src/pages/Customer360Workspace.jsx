@@ -715,15 +715,15 @@ const Customer360Workspace = () => {
                                 ]}>
                                     <defs>
                                         <linearGradient id="clvColor" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.3}/>
-                                            <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
+                                            <stop offset="5%" stopColor="#0d9488" stopOpacity={0.3}/>
+                                            <stop offset="95%" stopColor="#0d9488" stopOpacity={0}/>
                                         </linearGradient>
                                     </defs>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                     <XAxis dataKey="date" tick={{ fontSize: 10, fontWeight: 'bold' }} />
                                     <YAxis tick={{ fontSize: 10, fontWeight: 'bold' }} />
                                     <Tooltip />
-                                    <Area type="monotone" dataKey="revenue" name="Customer Revenue" stroke="#4f46e5" fillOpacity={1} fill="url(#clvColor)" strokeWidth={3} />
+                                    <Area type="monotone" dataKey="revenue" name="Customer Revenue" stroke="#0d9488" fillOpacity={1} fill="url(#clvColor)" strokeWidth={3} />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>

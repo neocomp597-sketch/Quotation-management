@@ -58,7 +58,7 @@ const TABS = [
     { id: 'reports', label: 'Structured Reports', icon: <MdFolder size={18} /> }
 ];
 
-const COLORS = ['#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
+const COLORS = ['#0d9488', '#f59e0b', '#8b5cf6', '#ef4444', '#5eead4', '#ec4899', '#10b981', '#64748b'];
 
 const CustomerAnalytics = () => {
     const navigate = useNavigate();
@@ -899,15 +899,15 @@ const CustomerAnalytics = () => {
                                 <AreaChart data={repeatData}>
                                     <defs>
                                         <linearGradient id="growthColor" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                                            <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                                            <stop offset="5%" stopColor="#0d9488" stopOpacity={0.3}/>
+                                            <stop offset="95%" stopColor="#0d9488" stopOpacity={0}/>
                                         </linearGradient>
                                     </defs>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                     <XAxis dataKey="month" tick={{ fontSize: 10, fontWeight: 'bold' }} />
                                     <YAxis tick={{ fontSize: 10, fontWeight: 'bold' }} />
                                     <Tooltip />
-                                    <Area type="monotone" dataKey="newCustomers" name="New Acquisitions" stroke="#6366f1" fillOpacity={1} fill="url(#growthColor)" strokeWidth={3} />
+                                    <Area type="monotone" dataKey="newCustomers" name="New Acquisitions" stroke="#0d9488" fillOpacity={1} fill="url(#growthColor)" strokeWidth={3} />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
@@ -1036,7 +1036,7 @@ const CustomerAnalytics = () => {
                                     <XAxis dataKey="range" tick={{ fontSize: 10, fontWeight: 'bold' }} />
                                     <YAxis tick={{ fontSize: 10, fontWeight: 'bold' }} />
                                     <Tooltip />
-                                    <Bar dataKey="count" name="Customers count" fill="#6366f1" radius={[8, 8, 0, 0]} />
+                                    <Bar dataKey="count" name="Customers count" fill="#0d9488" radius={[8, 8, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>

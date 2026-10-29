@@ -30,11 +30,11 @@ import { formatDate } from '../utils/helpers';
 
 const NODE_TYPES = [
     { type: 'start', label: 'Start', color: '#10b981', shape: 'pill' },
-    { type: 'process', label: 'Process Step', color: '#3b82f6', shape: 'rect' },
+    { type: 'process', label: 'Process Step', color: '#0d9488', shape: 'rect' },
     { type: 'decision', label: 'Decision (If/Else)', color: '#f59e0b', shape: 'diamond' },
     { type: 'input_output', label: 'Input / Output', color: '#8b5cf6', shape: 'parallelogram' },
     { type: 'database', label: 'Database', color: '#ec4899', shape: 'cylinder' },
-    { type: 'document', label: 'Document / Report', color: '#06b6d4', shape: 'document' },
+    { type: 'document', label: 'Document / Report', color: '#64748b', shape: 'document' },
     { type: 'delay', label: 'Delay / Wait', color: '#f97316', shape: 'delay' },
     { type: 'end', label: 'End', color: '#ef4444', shape: 'pill' }
 ];
@@ -294,7 +294,7 @@ const FlowchartCanvas = ({
     // Render node SVG shapes based on type
     const renderNodeShape = (node) => {
         const { width, height, type, style } = node;
-        const fill = style?.fill || '#3b82f6';
+        const fill = style?.fill || '#0d9488';
         const isSelected = selectedNode?.id === node.id;
         const isConnectSource = connectSourceId === node.id;
         const strokeColor = isConnectSource ? '#f59e0b' : isSelected ? '#10b981' : '#ffffff';
@@ -1014,7 +1014,7 @@ const FlowchartCanvas = ({
                                 <div>
                                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Fill Color</label>
                                     <div className="flex items-center gap-2 mt-1.5">
-                                        {['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#ef4444', '#64748b'].map(c => (
+                                        {['#10b981', '#0d9488', '#f59e0b', '#8b5cf6', '#ec4899', '#ef4444', '#64748b'].map(c => (
                                             <button
                                                 key={c}
                                                 type="button"

@@ -5,7 +5,7 @@ import { MdAdd, MdEdit, MdDelete, MdClose, MdSave, MdStar, MdBuildCircle } from 
 import Modal from '../components/Modal';
 import usePermission from '../hooks/usePermission';
 
-const DEFAULT_COLORS = ['#94a3b8', '#3b82f6', '#8b5cf6', '#f59e0b', '#f97316', '#10b981', '#22c55e', '#ec4899', '#ef4444'];
+const DEFAULT_COLORS = ['#94a3b8', '#0d9488', '#8b5cf6', '#f59e0b', '#f97316', '#10b981', '#22c55e', '#ec4899', '#ef4444'];
 
 const SalesPipelines = () => {
     const { canCreate, canModify, canDelete } = usePermission('sales_pipelines');
@@ -35,7 +35,7 @@ const SalesPipelines = () => {
             name: '', description: '', isDefault: false,
             stages: [
                 { name: 'Lead', probability: 10, color: '#94a3b8', sortOrder: 1 },
-                { name: 'Qualified', probability: 25, color: '#3b82f6', sortOrder: 2 },
+                { name: 'Qualified', probability: 25, color: '#0d9488', sortOrder: 2 },
                 { name: 'Proposal Sent', probability: 60, color: '#f59e0b', sortOrder: 3 },
                 { name: 'Negotiation', probability: 80, color: '#f97316', sortOrder: 4 },
                 { name: 'Won', probability: 100, color: '#22c55e', sortOrder: 5 }

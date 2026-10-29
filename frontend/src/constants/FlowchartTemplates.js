@@ -18,12 +18,12 @@ Generate PDF & send to Customer`,
         nodes: [
             { id: 'n1', type: 'start', label: 'Create Quotation', x: 500, y: 40, width: 170, height: 60, style: { fill: '#10b981', color: '#fff' }, data: { description: 'Sales rep enters items and pricing' } },
             { id: 'n2', type: 'decision', label: 'Value > ₹10,00,000?', x: 500, y: 140, width: 170, height: 90, style: { fill: '#f59e0b', color: '#fff' }, data: { description: 'Check discount threshold' } },
-            { id: 'n3', type: 'process', label: 'RSM Approval Request', x: 280, y: 270, width: 170, height: 60, style: { fill: '#3b82f6', color: '#fff' }, data: { description: 'Manager reviews pricing structure' } },
+            { id: 'n3', type: 'process', label: 'RSM Approval Request', x: 280, y: 270, width: 170, height: 60, style: { fill: '#0d9488', color: '#fff' }, data: { description: 'Manager reviews pricing structure' } },
             { id: 'n4', type: 'process', label: 'Auto-Approve Quote', x: 720, y: 270, width: 170, height: 60, style: { fill: '#10b981', color: '#fff' }, data: { description: 'Direct approval without escalation' } },
             { id: 'n5', type: 'decision', label: 'RSM Approved?', x: 280, y: 370, width: 160, height: 90, style: { fill: '#f59e0b', color: '#fff' }, data: { description: 'Manager decision' } },
             { id: 'n6', type: 'process', label: 'Finance Director Review', x: 180, y: 500, width: 170, height: 60, style: { fill: '#8b5cf6', color: '#fff' }, data: { description: 'Financial margin audit' } },
             { id: 'n7', type: 'process', label: 'Reject & Request Revision', x: 380, y: 500, width: 170, height: 60, style: { fill: '#ef4444', color: '#fff' }, data: { description: 'Return quote to draft' } },
-            { id: 'n8', type: 'end', label: 'Send Quote PDF', x: 500, y: 620, width: 170, height: 60, style: { fill: '#06b6d4', color: '#fff' }, data: { description: 'Email customer PDF document' } }
+            { id: 'n8', type: 'end', label: 'Send Quote PDF', x: 500, y: 620, width: 170, height: 60, style: { fill: '#64748b', color: '#fff' }, data: { description: 'Email customer PDF document' } }
         ],
         edges: [
             { id: 'e1', source: 'n1', target: 'n2', label: '' },
@@ -56,7 +56,7 @@ Close Ticket with Resolution Report`,
         nodes: [
             { id: 'n1', type: 'start', label: 'Ticket Logged', x: 500, y: 40, width: 170, height: 60, style: { fill: '#10b981', color: '#fff' }, data: { description: 'Support ticket registered in CRM' } },
             { id: 'n2', type: 'decision', label: 'Active Warranty / AMC?', x: 500, y: 140, width: 180, height: 90, style: { fill: '#f59e0b', color: '#fff' }, data: { description: 'Check contract database' } },
-            { id: 'n3', type: 'process', label: 'Dispatch Field Engineer', x: 300, y: 270, width: 180, height: 60, style: { fill: '#3b82f6', color: '#fff' }, data: { description: 'Schedule engineer visit' } },
+            { id: 'n3', type: 'process', label: 'Dispatch Field Engineer', x: 300, y: 270, width: 180, height: 60, style: { fill: '#0d9488', color: '#fff' }, data: { description: 'Schedule engineer visit' } },
             { id: 'n4', type: 'input_output', label: 'Paid Quote Generated', x: 700, y: 270, width: 180, height: 60, style: { fill: '#8b5cf6', color: '#fff' }, data: { description: 'Estimate out-of-warranty charges' } },
             { id: 'n5', type: 'end', label: 'Close Ticket Resolved', x: 500, y: 450, width: 180, height: 60, style: { fill: '#10b981', color: '#fff' }, data: { description: 'Customer signoff' } }
         ],
@@ -86,7 +86,7 @@ Close Pipeline Stage`,
         nodes: [
             { id: 'n1', type: 'start', label: 'Lead Received', x: 500, y: 40, width: 160, height: 60, style: { fill: '#10b981', color: '#fff' }, data: { description: 'Inbound or outbound lead' } },
             { id: 'n2', type: 'decision', label: 'Lead Qualified?', x: 500, y: 140, width: 170, height: 90, style: { fill: '#f59e0b', color: '#fff' }, data: { description: 'BANT criteria check' } },
-            { id: 'n3', type: 'process', label: 'Product Demo & Quote', x: 300, y: 270, width: 180, height: 60, style: { fill: '#3b82f6', color: '#fff' }, data: { description: 'Guided selling presentation' } },
+            { id: 'n3', type: 'process', label: 'Product Demo & Quote', x: 300, y: 270, width: 180, height: 60, style: { fill: '#0d9488', color: '#fff' }, data: { description: 'Guided selling presentation' } },
             { id: 'n4', type: 'end', label: 'Sales Order & Contract', x: 300, y: 400, width: 180, height: 60, style: { fill: '#10b981', color: '#fff' }, data: { description: 'Deal Won' } },
             { id: 'n5', type: 'end', label: 'Archived / Lost', x: 700, y: 270, width: 160, height: 60, style: { fill: '#ef4444', color: '#fff' }, data: { description: 'Deal Lost' } }
         ],
@@ -116,7 +116,7 @@ Issue Warranty Certificate & Complete Order`,
         nodes: [
             { id: 'n1', type: 'start', label: 'Work Order Created', x: 500, y: 40, width: 180, height: 60, style: { fill: '#10b981', color: '#fff' }, data: { description: 'Order converted to installation task' } },
             { id: 'n2', type: 'decision', label: 'Site Ready?', x: 500, y: 140, width: 160, height: 90, style: { fill: '#f59e0b', color: '#fff' }, data: { description: 'Pre-check power, foundation, and safety' } },
-            { id: 'n3', type: 'process', label: 'Ship Equipment & Tools', x: 300, y: 270, width: 180, height: 60, style: { fill: '#3b82f6', color: '#fff' }, data: { description: 'Logistics dispatch' } },
+            { id: 'n3', type: 'process', label: 'Ship Equipment & Tools', x: 300, y: 270, width: 180, height: 60, style: { fill: '#0d9488', color: '#fff' }, data: { description: 'Logistics dispatch' } },
             { id: 'n4', type: 'process', label: 'Setup & Safety Testing', x: 300, y: 370, width: 180, height: 60, style: { fill: '#8b5cf6', color: '#fff' }, data: { description: 'Engineer assembly' } },
             { id: 'n5', type: 'decision', label: 'Test Passed?', x: 300, y: 470, width: 160, height: 90, style: { fill: '#f59e0b', color: '#fff' }, data: { description: 'Safety inspection' } },
             { id: 'n6', type: 'end', label: 'Client Signoff & Warranty', x: 300, y: 600, width: 190, height: 60, style: { fill: '#10b981', color: '#fff' }, data: { description: 'Final commissioning' } },
@@ -148,8 +148,8 @@ Escalate to Account Manager for Special Discount
 Close Renewal Task`,
         nodes: [
             { id: 'n1', type: 'start', label: 'AMC Alert (60 Days)', x: 500, y: 40, width: 180, height: 60, style: { fill: '#f59e0b', color: '#fff' }, data: { description: 'Automated contract expiration alert' } },
-            { id: 'n2', type: 'process', label: 'Audit Maintenance Log', x: 500, y: 140, width: 180, height: 60, style: { fill: '#3b82f6', color: '#fff' }, data: { description: 'Check past service visits' } },
-            { id: 'n3', type: 'input_output', label: 'Renewal Proposal Sent', x: 500, y: 240, width: 180, height: 60, style: { fill: '#06b6d4', color: '#fff' }, data: { description: 'Send proposal via email' } },
+            { id: 'n2', type: 'process', label: 'Audit Maintenance Log', x: 500, y: 140, width: 180, height: 60, style: { fill: '#0d9488', color: '#fff' }, data: { description: 'Check past service visits' } },
+            { id: 'n3', type: 'input_output', label: 'Renewal Proposal Sent', x: 500, y: 240, width: 180, height: 60, style: { fill: '#64748b', color: '#fff' }, data: { description: 'Send proposal via email' } },
             { id: 'n4', type: 'decision', label: 'Client Approved?', x: 500, y: 340, width: 170, height: 90, style: { fill: '#f59e0b', color: '#fff' }, data: { description: 'Client decision' } },
             { id: 'n5', type: 'end', label: 'Issue AMC Contract', x: 300, y: 470, width: 180, height: 60, style: { fill: '#10b981', color: '#fff' }, data: { description: 'Active renewal' } },
             { id: 'n6', type: 'process', label: 'AM Negotiation & Discount', x: 700, y: 470, width: 190, height: 60, style: { fill: '#8b5cf6', color: '#fff' }, data: { description: 'Account manager outreach' } }
@@ -181,7 +181,7 @@ Reject Request & Enforce Advance Payment`,
             { id: 'n2', type: 'database', label: 'Check Payment History', x: 500, y: 140, width: 180, height: 60, style: { fill: '#ec4899', color: '#fff' }, data: { description: 'Database credit check' } },
             { id: 'n3', type: 'decision', label: 'Risk Score Level?', x: 500, y: 240, width: 170, height: 90, style: { fill: '#f59e0b', color: '#fff' }, data: { description: 'Automated scoring' } },
             { id: 'n4', type: 'end', label: 'Auto-Approve Credit', x: 280, y: 370, width: 170, height: 60, style: { fill: '#10b981', color: '#fff' }, data: { description: 'Low Risk' } },
-            { id: 'n5', type: 'process', label: 'Finance Controller Review', x: 500, y: 370, width: 180, height: 60, style: { fill: '#3b82f6', color: '#fff' }, data: { description: 'Medium Risk' } },
+            { id: 'n5', type: 'process', label: 'Finance Controller Review', x: 500, y: 370, width: 180, height: 60, style: { fill: '#0d9488', color: '#fff' }, data: { description: 'Medium Risk' } },
             { id: 'n6', type: 'end', label: 'Require Advance Payment', x: 720, y: 370, width: 180, height: 60, style: { fill: '#ef4444', color: '#fff' }, data: { description: 'High Risk' } }
         ],
         edges: [
