@@ -300,7 +300,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                                         <button type="button" onClick={() => setDownloadFor(row)} aria-label={`Download customer activity log of ${row.serialNumber}`} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 bg-white text-emerald-600 font-black uppercase text-[10px] tracking-widest">
                                             <MdFileDownload size={16} /> Log
                                         </button>
-                                        {canModify && row.status === 'SOLD' && (
+                                        {canModify && (
                                             <button type="button" onClick={() => onTransfer(row._id)} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 font-black uppercase text-[10px] tracking-widest">
                                                 <MdSwapHoriz size={16} /> Transfer
                                             </button>
@@ -835,26 +835,10 @@ export const SerialNoDetails = ({ transfer = false }) => {
                 >
                     <MdArrowBack size={20} />
                 </button>
-<<<<<<< HEAD
                 {/* Serial number and product are shown once, in the details card or form below. */}
                 <h1 className="min-w-0 flex-1 text-xl font-black text-slate-900">Serial No Transfer</h1>
                 {data && !formMode && canModify && (
-                    <div className="flex flex-wrap gap-3">
-=======
-                <div className="min-w-0 flex-1">
-                    <h1 className="text-xl font-black text-slate-900">
-                        Serial No Transfer
-                        {data && <span className="ml-2 text-primary-600">{data.asset.serialNumber}</span>}
-                    </h1>
-                    {data && (
-                        <p className="mt-0.5 text-xs font-medium text-slate-500">
-                            {data.asset.productCode}{data.asset.productName ? ` · ${data.asset.productName}` : ''}
-                        </p>
-                    )}
-                </div>
-                {data && sold && !formMode && canModify && (
                     <div className="flex w-full sm:w-auto flex-wrap gap-3">
->>>>>>> f06da8202d682688814cc0c79f79cc6b501d3d21
                         <button
                             type="button"
                             onClick={() => setFormMode('past')}
@@ -1814,13 +1798,8 @@ const SerialNoTransfer = () => {
     return (
         <div className="space-y-6">
             <div>
-<<<<<<< HEAD
-                <h1 className="text-3xl font-black text-slate-900 tracking-tight">Serial No Transfer</h1>
-                <p className="text-slate-500 font-medium">Every Invoice Bulk Upload serial number with its branch and status. Move any serial to another customer or to another branch.</p>
-=======
                 <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Serial No Transfer</h1>
-                <p className="text-sm sm:text-base text-slate-500 font-medium">Every Invoice Bulk Upload serial number with its branch and status. Move sold serials to another customer, or any serial to another branch.</p>
->>>>>>> f06da8202d682688814cc0c79f79cc6b501d3d21
+                <p className="text-sm sm:text-base text-slate-500 font-medium">Every Invoice Bulk Upload serial number with its branch and status. Move any serial to another customer or to another branch.</p>
             </div>
 
             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">

@@ -3,7 +3,7 @@ const AMC = require('../models/AMC');
 const Asset = require('../models/Asset');
 const AssetHistory = require('../models/AssetHistory');
 const Product = require('../models/Product');
-const { findDuplicate } = require('../utils/productUniqueness');
+const { findDuplicate, normalizeProductKey } = require('../utils/productUniqueness');
 const Customer = require('../models/Customer');
 const SerialTransfer = require('../models/SerialTransfer');
 const { formatDate } = require('../utils/dateFormat');
@@ -360,19 +360,27 @@ exports.createAsset = async (req, res) => {
     }
 };
 
-// Product of an Invoice Bulk Upload entry (Add Single Entry and Edit): found by code, then
-// name, in this company and then in any company; else created.
+const entryValidationError = (message) => Object.assign(new Error(message), { statusCode: 400 });
+
+// Product of an Invoice Bulk Upload entry (Add Single Entry and Edit): found by code in this
+// company, then in any company; else created. The code and name must name one Product Master
+// record, as in Excel bulk upload: a known code with another name, or a new code with the name
+// of an existing product, is refused instead of being saved under a product it does not name.
 const resolveEntryProduct = async (companyId, cleanProductCode, productName) => {
+    const cleanName = String(productName || '').trim();
     let product = await Product.findOne({
         companyId,
         productCode: buildExactRegex(cleanProductCode)
     });
 
-    if (!product && productName) {
-        product = await Product.findOne({
-            companyId,
-            productName: buildExactRegex(productName)
-        });
+    if (product && cleanName && normalizeProductKey(cleanName) !== normalizeProductKey(product.productName)) {
+        throw entryValidationError(`Product Code "${product.productCode}" is "${product.productName}" in Product Master, not "${cleanName}". Use the Product Master name, or correct the Product Code.`);
+    }
+    if (!product && cleanName) {
+        const namedProduct = await findDuplicate('productName', cleanName, { companyId });
+        if (namedProduct) {
+            throw entryValidationError(`"${cleanName}" belongs to Product Code "${namedProduct.productCode}" in Product Master. Use code ${namedProduct.productCode}, or give the new product a different name.`);
+        }
     }
 
     if (!product && cleanProductCode) {
@@ -491,7 +499,8 @@ exports.lookupEntryCustomer = async (req, res) => {
                 _id: customer._id,
                 customerCode: customer.externalCode || code,
                 customerName: customer.companyName || customer.customerName || '',
-                postalCode: entryPostalCode(customer)
+                postalCode: entryPostalCode(customer),
+                city: String(customer.billingAddress?.city || '').trim()
             }
         });
     } catch (error) {
@@ -685,8 +694,8 @@ exports.createSingleAsset = async (req, res) => {
         );
         res.status(201).json({ message: 'Single entry added successfully', data: createdDoc });
     } catch (error) {
-        console.error('createSingleAsset error:', error);
-        res.status(500).json({ message: error.message || 'Error creating single entry' });
+        if (!error.statusCode) console.error('createSingleAsset error:', error);
+        res.status(error.statusCode || 500).json({ message: error.message || 'Error creating single entry' });
     }
 };
 
@@ -847,8 +856,8 @@ exports.updateAsset = async (req, res) => {
 
         res.json({ message: 'Entry updated successfully', data: updatedDoc });
     } catch (error) {
-        console.error('updateAsset error:', error);
-        res.status(500).json({ message: error.message || 'Error updating entry' });
+        if (!error.statusCode) console.error('updateAsset error:', error);
+        res.status(error.statusCode || 500).json({ message: error.message || 'Error updating entry' });
     }
 };
 
