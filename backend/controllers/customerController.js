@@ -19,6 +19,14 @@ const normalizeCustomerName = (value = '') => String(value || '').trim();
 
 const buildExactMatch = (value = '') => new RegExp(`^${escapeRegex(String(value).trim())}$`, 'i');
 
+// Whether customerName is a copy of the Company Trade Name (with the "-2" style suffix
+// getUniqueCustomerName adds when another customer has that name), not a name saved on its own.
+const followsCompanyName = (customer) => {
+    const name = normalizeCustomerName(customer?.customerName).toLowerCase();
+    const company = normalizeCustomerName(customer?.companyName).toLowerCase();
+    return !name || name === company || name.replace(/-\d+$/, '') === company;
+};
+
 const getUniqueCustomerName = async (customerName, excludeId) => {
     const baseName = normalizeCustomerName(customerName);
     if (!baseName) return baseName;
@@ -75,6 +83,8 @@ const buildCustomerQuery = async (req) => {
         const searchOr = [
             { customerName: regex },
             { companyName: regex },
+            { externalCode: regex },
+            { contactPerson: regex },
             { gstin: regex },
             { mobile: regex },
             { email: regex },
@@ -140,7 +150,7 @@ const isDuplicateCodeError = (error) => error?.code === 11000 && Boolean(error?.
 const createCustomer = async (req, res) => {
     let cleanExternalCode = '';
     try {
-        const { externalCode, customerCode, code, customerName, companyName, gstin, billingAddress, shippingAddress, mobile, email, logoUrl, defaultDiscount, territory } = req.body;
+        const { externalCode, customerCode, code, customerName, companyName, contactPerson, gstin, billingAddress, shippingAddress, mobile, email, logoUrl, defaultDiscount, territory } = req.body;
 
         cleanExternalCode = String(externalCode || customerCode || code || '').trim();
 
@@ -186,6 +196,7 @@ const createCustomer = async (req, res) => {
             externalCode: cleanExternalCode,
             customerName: uniqueCustomerName,
             companyName: companyName?.trim() || uniqueCustomerName,
+            contactPerson: normalizeCustomerName(contactPerson),
             gstin: gstin?.trim().toUpperCase(),
             billingAddress,
             shippingAddress,
@@ -214,16 +225,6 @@ const createCustomer = async (req, res) => {
 const getAllCustomers = async (req, res) => {
     try {
         const query = await buildCustomerQuery(req);
-        
-        // Write customer records including logoUrl to debug_customers.json
-        try {
-            const fs = require('fs');
-            const path = require('path');
-            const debugCustomers = await Customer.find({}, { companyName: 1, customerName: 1, logoUrl: 1, gstin: 1 }).lean();
-            fs.writeFileSync(path.resolve(__dirname, '..', 'debug_customers.json'), JSON.stringify(debugCustomers, null, 2));
-        } catch (err) {
-            console.error('Debug logging error:', err);
-        }
 
         const cacheKey = makeCacheKey('customers:list', req);
         const { redis, value: cachedCustomers } = await getCachedJson(cacheKey);
@@ -233,7 +234,7 @@ const getAllCustomers = async (req, res) => {
 
         if (!hasListParams(req.query) && req.query.all !== 'false') {
             const customers = await Customer.find(query)
-                .select('externalCode customerName companyName gstin billingAddress mobile email logoUrl defaultDiscount territory createdAt')
+                .select('externalCode customerName companyName contactPerson gstin billingAddress mobile email logoUrl defaultDiscount territory createdAt')
                 .populate('territory', 'name type')
                 .sort({ createdAt: -1 })
                 .lean();
@@ -244,7 +245,7 @@ const getAllCustomers = async (req, res) => {
         const { page, limit, skip } = getPagination(req.query);
         const [customers, total] = await Promise.all([
             Customer.find(query)
-                .select('externalCode customerName companyName gstin billingAddress mobile email logoUrl defaultDiscount territory createdAt')
+                .select('externalCode customerName companyName contactPerson gstin billingAddress mobile email logoUrl defaultDiscount territory createdAt')
                 .populate('territory', 'name type')
                 .sort({ createdAt: -1 })
                 .skip(skip)
@@ -280,7 +281,7 @@ const getCustomerById = async (req, res) => {
         }
 
         const customer = await Customer.findById(req.params.id)
-            .select('externalCode customerName companyName gstin billingAddress shippingAddress mobile email logoUrl defaultDiscount territory createdAt')
+            .select('externalCode customerName companyName contactPerson gstin billingAddress shippingAddress mobile email logoUrl defaultDiscount territory createdAt')
             .populate('territory', 'name type')
             .lean();
         if (!customer) {
@@ -298,7 +299,7 @@ const getCustomerById = async (req, res) => {
 const updateCustomer = async (req, res) => {
     let cleanExternalCode;
     try {
-        const { externalCode, customerCode, code, customerName, companyName, gstin, billingAddress, shippingAddress, mobile, email, logoUrl, defaultDiscount, territory } = req.body;
+        const { externalCode, customerCode, code, customerName, companyName, contactPerson, gstin, billingAddress, shippingAddress, mobile, email, logoUrl, defaultDiscount, territory } = req.body;
 
         cleanExternalCode = externalCode !== undefined || customerCode !== undefined || code !== undefined
             ? String(externalCode || customerCode || code || '').trim()
@@ -329,7 +330,15 @@ const updateCustomer = async (req, res) => {
         }
         const sameCode = await findCustomerWithCode(cleanExternalCode, req.params.id);
         if (sameCode) return duplicateCodeResponse(res, cleanExternalCode, sameCode);
-        const targetCustName = customerName?.trim() || companyName?.trim() || cleanExternalCode || 'Customer';
+
+        const existing = await Customer.findById(req.params.id).select('customerName companyName').lean();
+        if (!existing) return res.status(404).json({ message: 'Customer not found' });
+        // The Customer form does not send customerName: a copy of the Company Trade Name follows the
+        // new company name, and a different name saved earlier (an import's Customer Name) is kept.
+        const newCompanyName = companyName?.trim() || existing.companyName;
+        const targetCustName = customerName?.trim()
+            || (followsCompanyName(existing) ? newCompanyName : existing.customerName)
+            || cleanExternalCode || 'Customer';
         const uniqueCustomerName = await getUniqueCustomerName(targetCustName, req.params.id);
 
         let assignedTerritory = territory;
@@ -341,7 +350,7 @@ const updateCustomer = async (req, res) => {
 
         const updatePayload = {
             customerName: uniqueCustomerName,
-            companyName: companyName?.trim() || uniqueCustomerName,
+            companyName: newCompanyName || uniqueCustomerName,
             gstin: gstin?.trim().toUpperCase(),
             billingAddress,
             shippingAddress,
@@ -353,6 +362,9 @@ const updateCustomer = async (req, res) => {
         };
         if (cleanExternalCode !== undefined) {
             updatePayload.externalCode = cleanExternalCode;
+        }
+        if (contactPerson !== undefined) {
+            updatePayload.contactPerson = normalizeCustomerName(contactPerson);
         }
 
         const updatedCustomer = await Customer.findByIdAndUpdate(req.params.id, updatePayload, { new: true }).populate('territory', 'name type').lean();

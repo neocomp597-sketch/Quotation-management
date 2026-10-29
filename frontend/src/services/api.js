@@ -1011,6 +1011,7 @@ export const csmService = {
   getAssetSummary: (params = {}) => api.get("/csm/assets/summary", { params }),
   getAssetActivity: (serialNumber) => api.get("/csm/assets/activity", { params: { serialNumber } }),
   searchSerialNumbers: (q) => api.get("/csm/assets/search-serials", { params: { q } }),
+  lookupEntryCustomer: (code) => api.get("/csm/assets/customer-lookup", { params: { code }, cache: false }),
 
   getArticles: (params = {}) => api.get("/csm/kb", { params }),
   getArticleById: (id) => api.get(`/csm/kb/${id}`),

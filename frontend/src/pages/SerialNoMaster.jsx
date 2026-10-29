@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { csmService, productService, importService, divisionService, segmentService, invalidateApiCache } from '../services/api';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { csmService, productService, customerService, importService, divisionService, segmentService, invalidateApiCache } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
@@ -113,6 +113,17 @@ const findProductByCode = (products, code) => {
     return products.find((p) => String(p.productCode || '').trim().toLowerCase() === clean) || null;
 };
 
+// Product names match ignoring case and spacing, as the API compares them.
+const nameKey = (value) => String(value ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+const findProductByName = (products, name) => {
+    const clean = nameKey(name);
+    if (!clean) return null;
+    const matches = products.filter((p) => nameKey(p.productName) === clean);
+    // A name shared by several products does not say which code is meant.
+    return matches.length === 1 ? matches[0] : null;
+};
+
 // Compact "MGR 1: … · MGR 2: …" line for a table row; renders nothing when none is assigned.
 const MgrLine = ({ record }) => {
     const assigned = assignedMgrsOf(record);
@@ -202,6 +213,176 @@ const SerialNoMaster = () => {
         () => findProductByCode(products, singleForm.productCode),
         [products, singleForm.productCode]
     );
+    // Suggestions for the Product Code and Product Name fields (built once per product list).
+    const productOptions = useMemo(() => (
+        <>
+            <datalist id="single-entry-product-codes">
+                {products.filter((p) => p.productCode).map((p) => <option key={p._id} value={p.productCode}>{p.productName}</option>)}
+            </datalist>
+            <datalist id="single-entry-product-names">
+                {products.filter((p) => p.productName).map((p) => <option key={p._id} value={p.productName}>{p.productCode}</option>)}
+            </datalist>
+        </>
+    ), [products]);
+
+    // A Product Code from Product Master fills its Product Name, and a Product Name its code. The
+    // filled field is remembered so it can be cleared again when the typed value stops matching,
+    // while a value the user typed in that field is never changed.
+    const productAutoFill = useRef(null);
+    const handleProductFieldChange = (field, value) => {
+        const other = field === 'productCode' ? 'productName' : 'productCode';
+        const product = field === 'productCode' ? findProductByCode(products, value) : findProductByName(products, value);
+        const next = { ...singleForm, [field]: value };
+        const filled = productAutoFill.current;
+        if (product && product[other]) {
+            // Already this product's value (e.g. a code the user typed): leave it, and do not count
+            // it as filled in, so it is never cleared later.
+            if (nameKey(singleForm[other]) !== nameKey(product[other])) {
+                next[other] = product[other];
+                productAutoFill.current = { field: other, value: product[other] };
+            }
+        } else if (filled?.field === other && singleForm[other] === filled.value) {
+            next[other] = '';
+            productAutoFill.current = null;
+        }
+        setSingleForm(next);
+    };
+
+    // The typed Product Code and Name must name one Product Master record, as the save and Excel
+    // bulk upload require. `error` blocks saving; a product not in the master is added on save.
+    const productCheck = useMemo(() => {
+        const code = singleForm.productCode.trim();
+        const name = singleForm.productName.trim();
+        // Edit re-checks the product only when its code changes (as the API does).
+        if (!code || (isEditing && code.toLowerCase() === formFromAsset(editingAsset).productCode.trim().toLowerCase())) return null;
+        const byCode = findProductByCode(products, code);
+        if (byCode) {
+            return name && nameKey(name) !== nameKey(byCode.productName)
+                ? { error: `Product Code ${byCode.productCode} is "${byCode.productName}" in Product Master. Use that name, or correct the code.` }
+                : { found: 'Found in Product Master' };
+        }
+        const named = name ? products.find((p) => nameKey(p.productName) === nameKey(name)) : null;
+        if (named) {
+            return { error: `"${name}" belongs to Product Code ${named.productCode} in Product Master. Use that code, or give the new product a different name.` };
+        }
+        return { notice: 'Not in Product Master: saving adds it as a new product' };
+    }, [products, singleForm.productCode, singleForm.productName, isEditing, editingAsset]);
+
+    // Customer Code -> Customer Name, looked up the way the save looks it up, so the name shown is
+    // the customer the entry is saved under. A code not found is added to Customer Master on save
+    // with the name typed here.
+    const [customerMatch, setCustomerMatch] = useState({ code: '', customer: null });
+    const customerAutoFill = useRef(null);
+    const typedCustomerCode = singleForm.customerCode.trim();
+    const matchedCustomer = customerMatch.code === typedCustomerCode ? customerMatch.customer : null;
+    const lookingUpCustomer = Boolean(typedCustomerCode) && customerMatch.code !== typedCustomerCode;
+
+    useEffect(() => {
+        if (pageView !== 'single' || !typedCustomerCode) return undefined;
+        let cancelled = false;
+        const timer = setTimeout(() => {
+            csmService.lookupEntryCustomer(typedCustomerCode)
+                .then((res) => {
+                    if (cancelled) return;
+                    const customer = res.data?.customer || null;
+                    setCustomerMatch({ code: typedCustomerCode, customer });
+                    if (!customer) return;
+                    setSingleForm((prev) => {
+                        // Location takes the customer's city only when none was entered (or it was
+                        // filled in from the customer picked a moment ago).
+                        const filledLocation = customerAutoFill.current?.location;
+                        const fillLocation = (!prev.location.trim() || prev.location === filledLocation) && customer.city;
+                        customerAutoFill.current = {
+                            customer: customer.customerName,
+                            customerPostalCode: customer.postalCode,
+                            location: fillLocation ? customer.city : undefined
+                        };
+                        return {
+                            ...prev,
+                            customer: customer.customerName || prev.customer,
+                            customerPostalCode: customer.postalCode || prev.customerPostalCode,
+                            location: fillLocation ? customer.city : prev.location
+                        };
+                    });
+                })
+                .catch((err) => {
+                    console.warn('Customer lookup failed:', err);
+                    if (!cancelled) setCustomerMatch({ code: typedCustomerCode, customer: null, failed: true });
+                });
+        }, 400);
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [pageView, typedCustomerCode]);
+
+    const handleCustomerCodeChange = (customerCode) => {
+        const next = { ...singleForm, customerCode };
+        // Another code: what was filled in for the previous one no longer applies.
+        const filled = customerAutoFill.current;
+        if (filled) {
+            ['customer', 'customerPostalCode', 'location'].forEach((key) => {
+                if (filled[key] && singleForm[key] === filled[key]) next[key] = '';
+            });
+            customerAutoFill.current = null;
+        }
+        setSingleForm(next);
+    };
+
+    // Customer Name -> search Customer Master; picking a customer fills its code (and, through the
+    // code lookup above, its name, postal code and location). Each suggestion shows the code, city
+    // and pincode so customers with the same name can be told apart.
+    const [customerNameFocused, setCustomerNameFocused] = useState(false);
+    const [customerSuggestions, setCustomerSuggestions] = useState({ query: '', rows: [] });
+    const typedCustomerName = singleForm.customer.trim();
+    const searchingCustomerNames = pageView === 'single' && !matchedCustomer && typedCustomerName.length >= 2;
+    const customerSuggestionsReady = customerSuggestions.query === typedCustomerName;
+
+    useEffect(() => {
+        // Searched only while the name is being typed; the last result stays for the message.
+        if (!searchingCustomerNames || !customerNameFocused) return undefined;
+        let cancelled = false;
+        const timer = setTimeout(() => {
+            customerService.getAll({ search: typedCustomerName, limit: 8 })
+                .then((res) => {
+                    const rows = Array.isArray(res.data) ? res.data : res.data?.data || [];
+                    if (!cancelled) setCustomerSuggestions({ query: typedCustomerName, rows });
+                })
+                .catch((err) => {
+                    console.warn('Customer search failed:', err);
+                    if (!cancelled) setCustomerSuggestions({ query: typedCustomerName, rows: [], failed: true });
+                });
+        }, 300);
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [searchingCustomerNames, customerNameFocused, typedCustomerName]);
+
+    const selectCustomer = (customer) => {
+        const name = customer.companyName || customer.customerName || '';
+        const code = String(customer.externalCode || '').trim();
+        const city = String(customer.billingAddress?.city || '').trim();
+        const rawPin = String(customer.billingAddress?.pincode || '').trim();
+        const pin = rawPin.replace(/\D/g, '').length === 6 ? rawPin.replace(/\D/g, '') : rawPin;
+        const fillLocation = !singleForm.location.trim() && city;
+        customerAutoFill.current = { customer: name, customerPostalCode: pin || undefined, location: fillLocation ? city : undefined };
+        setSingleForm({
+            ...singleForm,
+            customerCode: code,
+            customer: name,
+            customerPostalCode: pin || singleForm.customerPostalCode,
+            location: fillLocation ? city : singleForm.location
+        });
+        setCustomerNameFocused(false);
+    };
+
+    const resetAutoFill = () => {
+        productAutoFill.current = null;
+        customerAutoFill.current = null;
+        setCustomerMatch({ code: '', customer: null });
+        setCustomerSuggestions({ query: '', rows: [] });
+    };
 
     // --- SALES RETURN MODAL ---
     const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
@@ -209,8 +390,8 @@ const SerialNoMaster = () => {
     const [returnReason, setReturnReason] = useState('');
     const [returnSaving, setReturnSaving] = useState(false);
 
+    // The list itself is loaded by the filter effect below, which also runs on open.
     useEffect(() => {
-        fetchData();
         loadReferenceData();
     }, []);
 
@@ -228,7 +409,12 @@ const SerialNoMaster = () => {
         else console.warn('Could not load segments list:', segmentsResult.reason);
     };
 
-    const fetchData = async () => {
+    const latestFetch = useRef(0);
+    const fetchData = useCallback(async () => {
+        // Only the newest request may update the list: an older one answering late (e.g. while
+        // the search is typed) would otherwise replace newer results.
+        const requestId = ++latestFetch.current;
+        const isLatest = () => requestId === latestFetch.current;
         setLoading(true);
         setFetchError(null);
         try {
@@ -246,11 +432,13 @@ const SerialNoMaster = () => {
             });
 
             const result = await csmService.getAssets(params);
+            if (!isLatest()) return;
             const payload = result.data || {};
             setAssets(payload.data || []);
             setAssetPagination(payload.pagination || { page: currentPage, limit: PAGE_SIZE, total: 0, pages: 1 });
             setAssetSummary(payload.summary || { total: 0, inStock: 0, sold: 0, returned: 0 });
         } catch (err) {
+            if (!isLatest()) return;
             const status = err?.response?.status;
             const serverMsg = err?.response?.data?.message || err?.message || 'Unknown error';
             const detail = status ? `[HTTP ${status}] ${serverMsg}` : serverMsg;
@@ -258,15 +446,15 @@ const SerialNoMaster = () => {
             setFetchError({ message: serverMsg, status });
             toast.error(`Failed to load invoice bulk upload data: ${detail}`);
         } finally {
-            setLoading(false);
+            if (isLatest()) setLoading(false);
         }
-    };
+    }, [currentPage, searchQuery, selectedStatus, mgrFilters, products]);
 
     useEffect(() => {
         if (activeTab !== 'active') return undefined;
         const timer = setTimeout(fetchData, searchQuery.trim() ? 300 : 0);
         return () => clearTimeout(timer);
-    }, [activeTab, currentPage, searchQuery, selectedStatus, mgrFilters, products]);
+    }, [activeTab, fetchData, searchQuery]);
 
     const fetchReturnHistory = async () => {
         setLoadingHistory(true);
@@ -336,8 +524,10 @@ const SerialNoMaster = () => {
             return;
         }
 
-        // Active inventory: fetch ALL records from backend (bypassing page-size cap)
-        setLoading(true);
+        // Active inventory: fetch ALL records from backend (bypassing page-size cap). The list stays
+        // on screen; the Export button shows the progress and ignores clicks until it finishes.
+        if (isExporting) return;
+        setIsExporting(true);
         try {
             const params = {
                 export: 'true',
@@ -400,7 +590,7 @@ const SerialNoMaster = () => {
             console.error('Export error:', err);
             toast.error('Failed to export records');
         } finally {
-            setLoading(false);
+            setIsExporting(false);
         }
     };
 
@@ -444,12 +634,14 @@ const SerialNoMaster = () => {
     const openSingleEntry = () => {
         setEditingAsset(null);
         setSingleForm(EMPTY_SINGLE_FORM);
+        resetAutoFill();
         setPageView('single');
     };
 
     const openEditEntry = (asset) => {
         setEditingAsset(asset);
         setSingleForm(formFromAsset(asset));
+        resetAutoFill();
         setPageView('single');
     };
 
@@ -457,6 +649,7 @@ const SerialNoMaster = () => {
         setPageView('list');
         setEditingAsset(null);
         setSingleForm(EMPTY_SINGLE_FORM);
+        resetAutoFill();
     };
 
     const handleDivisionChange = (divisionId) => {
@@ -468,6 +661,9 @@ const SerialNoMaster = () => {
         e.preventDefault();
         if (!singleForm.serialNumber.trim() || !singleForm.productCode.trim()) {
             return toast.error('Serial Number and Product Code are required');
+        }
+        if (productCheck?.error) {
+            return toast.error(productCheck.error);
         }
         if (!singleForm.divisionId) {
             return toast.error('Division is required');
@@ -608,22 +804,34 @@ const SerialNoMaster = () => {
                                     <input
                                         type="text"
                                         required
+                                        list="single-entry-product-codes"
+                                        autoComplete="off"
                                         placeholder="e.g. PROD-001"
                                         value={singleForm.productCode}
-                                        onChange={(e) => setSingleForm({ ...singleForm, productCode: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                        onChange={(e) => handleProductFieldChange('productCode', e.target.value)}
+                                        aria-invalid={Boolean(productCheck?.error)}
+                                        className={`w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900 ${productCheck?.error ? 'border-rose-400' : 'border-slate-200'}`}
                                     />
+                                    {productCheck && (
+                                        <p className={`mt-1.5 text-[10px] font-semibold ${productCheck.error ? 'text-rose-600' : productCheck.found ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                            {productCheck.error || productCheck.found || productCheck.notice}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Product Name *</label>
                                     <input
                                         type="text"
                                         required
+                                        list="single-entry-product-names"
+                                        autoComplete="off"
                                         placeholder="e.g. 10KVA Transformer"
                                         value={singleForm.productName}
-                                        onChange={(e) => setSingleForm({ ...singleForm, productName: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
+                                        onChange={(e) => handleProductFieldChange('productName', e.target.value)}
+                                        aria-invalid={Boolean(productCheck?.error)}
+                                        className={`w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900 ${productCheck?.error ? 'border-rose-400' : 'border-slate-200'}`}
                                     />
+                                    {productOptions}
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Status</label>
@@ -646,24 +854,67 @@ const SerialNoMaster = () => {
                                     )}
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Name</label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g. Apex Industrial"
-                                        value={singleForm.customer}
-                                        onChange={(e) => setSingleForm({ ...singleForm, customer: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
-                                    />
-                                </div>
-                                <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Code</label>
                                     <input
                                         type="text"
+                                        autoComplete="off"
                                         placeholder="e.g. C-10023"
                                         value={singleForm.customerCode}
-                                        onChange={(e) => setSingleForm({ ...singleForm, customerCode: e.target.value })}
+                                        onChange={(e) => handleCustomerCodeChange(e.target.value)}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all outline-none font-semibold text-slate-900"
                                     />
+                                    {typedCustomerCode && (
+                                        <p className={`mt-1.5 text-[10px] font-semibold ${matchedCustomer ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                            {lookingUpCustomer
+                                                ? 'Checking Customer Master…'
+                                                : matchedCustomer
+                                                    ? 'Found in Customer Master'
+                                                    : customerMatch.failed
+                                                        ? 'Could not check Customer Master'
+                                                        : 'Not in Customer Master: saving adds this customer with the name entered'}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="relative">
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Customer Name</label>
+                                    <input
+                                        type="text"
+                                        autoComplete="off"
+                                        placeholder={matchedCustomer ? '' : 'Type to search Customer Master'}
+                                        value={singleForm.customer}
+                                        readOnly={Boolean(matchedCustomer)}
+                                        title={matchedCustomer ? 'The name of this customer code in Customer Master' : undefined}
+                                        onChange={(e) => setSingleForm({ ...singleForm, customer: e.target.value })}
+                                        onFocus={() => setCustomerNameFocused(true)}
+                                        onBlur={() => setCustomerNameFocused(false)}
+                                        className={`w-full px-4 py-3 border border-slate-200 rounded-xl transition-all outline-none font-semibold ${matchedCustomer ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-slate-50 text-slate-900 focus:ring-2 focus:ring-primary-500 focus:bg-white'}`}
+                                    />
+                                    {customerNameFocused && searchingCustomerNames && customerSuggestionsReady && customerSuggestions.rows.length > 0 && (
+                                        <ul role="listbox" className="absolute z-20 left-0 right-0 mt-1 max-h-64 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                                            {customerSuggestions.rows.map((c) => (
+                                                <li key={c._id}>
+                                                    <button
+                                                        type="button"
+                                                        // mousedown runs before the field's blur closes the list
+                                                        onMouseDown={(e) => { e.preventDefault(); selectCustomer(c); }}
+                                                        className="w-full px-4 py-2.5 text-left hover:bg-slate-50"
+                                                    >
+                                                        <span className="block text-xs font-bold text-slate-800">{c.companyName || c.customerName}</span>
+                                                        <span className="block text-[10px] font-semibold text-slate-500">
+                                                            {[c.externalCode || 'No code', c.billingAddress?.city, c.billingAddress?.pincode].filter(Boolean).join(' · ')}
+                                                        </span>
+                                                    </button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                    {!matchedCustomer && searchingCustomerNames && customerSuggestionsReady && !customerSuggestions.rows.length && (
+                                        <p className="mt-1.5 text-[10px] font-semibold text-amber-600">
+                                            {customerSuggestions.failed
+                                                ? 'Could not search Customer Master'
+                                                : 'No customer with this name in Customer Master: saving adds it as a new customer'}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Invoice Number</label>

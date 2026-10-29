@@ -379,3 +379,16 @@ export const buildSalesExecutiveList = ({ fetchedSalespersons = [], fetchedUsers
   return Array.from(mergedMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 };
 
+
+// A customer's Contact Person. Customers saved before it had its own field have none saved
+// (the key is missing) and may have it in customerName, the old "Contact Person / Customer Name"
+// box, which otherwise copies the Company Trade Name (with a "-2" style suffix when two customers
+// share the name); a different name there is shown until the customer is saved again.
+export const contactPersonOf = (customer) => {
+  if (!customer) return '';
+  if (typeof customer.contactPerson === 'string') return customer.contactPerson.trim();
+  const name = String(customer.customerName || '').trim();
+  const company = String(customer.companyName || '').trim().toLowerCase();
+  const key = name.toLowerCase();
+  return !name || key === company || key.replace(/-\d+$/, '') === company ? '' : name;
+};

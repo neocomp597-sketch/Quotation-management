@@ -771,8 +771,8 @@ html, body {
   display: none;
 }
 
-/* Serial No List has the most columns: headings may wrap and cells are a
-   little narrower so the whole row, Action included, fits a laptop screen. */
+/* Serial No List and Transfer History have the most columns: headings may wrap
+   and cells are a little narrower so the whole row fits a laptop screen. */
 .serial-list-compact th,
 .serial-list-compact td {
   padding-left: 0.75rem;

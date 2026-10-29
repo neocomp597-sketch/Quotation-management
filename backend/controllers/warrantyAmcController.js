@@ -3,7 +3,7 @@ const AMC = require('../models/AMC');
 const Asset = require('../models/Asset');
 const AssetHistory = require('../models/AssetHistory');
 const Product = require('../models/Product');
-const { findDuplicate } = require('../utils/productUniqueness');
+const { findDuplicate, normalizeProductKey } = require('../utils/productUniqueness');
 const Customer = require('../models/Customer');
 const SerialTransfer = require('../models/SerialTransfer');
 const { formatDate } = require('../utils/dateFormat');
@@ -360,19 +360,27 @@ exports.createAsset = async (req, res) => {
     }
 };
 
-// Product of an Invoice Bulk Upload entry (Add Single Entry and Edit): found by code, then
-// name, in this company and then in any company; else created.
+const entryValidationError = (message) => Object.assign(new Error(message), { statusCode: 400 });
+
+// Product of an Invoice Bulk Upload entry (Add Single Entry and Edit): found by code in this
+// company, then in any company; else created. The code and name must name one Product Master
+// record, as in Excel bulk upload: a known code with another name, or a new code with the name
+// of an existing product, is refused instead of being saved under a product it does not name.
 const resolveEntryProduct = async (companyId, cleanProductCode, productName) => {
+    const cleanName = String(productName || '').trim();
     let product = await Product.findOne({
         companyId,
         productCode: buildExactRegex(cleanProductCode)
     });
 
-    if (!product && productName) {
-        product = await Product.findOne({
-            companyId,
-            productName: buildExactRegex(productName)
-        });
+    if (product && cleanName && normalizeProductKey(cleanName) !== normalizeProductKey(product.productName)) {
+        throw entryValidationError(`Product Code "${product.productCode}" is "${product.productName}" in Product Master, not "${cleanName}". Use the Product Master name, or correct the Product Code.`);
+    }
+    if (!product && cleanName) {
+        const namedProduct = await findDuplicate('productName', cleanName, { companyId });
+        if (namedProduct) {
+            throw entryValidationError(`"${cleanName}" belongs to Product Code "${namedProduct.productCode}" in Product Master. Use code ${namedProduct.productCode}, or give the new product a different name.`);
+        }
     }
 
     if (!product && cleanProductCode) {
@@ -414,6 +422,31 @@ const resolveEntryProduct = async (companyId, cleanProductCode, productName) => 
     return product;
 };
 
+// The existing Customer Master record whose code (else name) is `searchTarget`, or null.
+const findEntryCustomer = async (companyId, searchTarget) => {
+    const customer = await Customer.findOne({
+        companyId,
+        $or: [
+            { externalCode: buildExactRegex(searchTarget) },
+            { customerName: buildExactRegex(searchTarget) },
+            { companyName: buildExactRegex(searchTarget) }
+        ]
+    });
+    if (customer) return customer;
+    // Customer codes are unique in the whole company: a customer of another branch
+    // with this code is the same customer (creating it again would be refused).
+    return Customer.findOne({ companyId, externalCode: searchTarget })
+        .collation(Customer.CUSTOMER_CODE_COLLATION)
+        .setOptions({ bypassBranch: true });
+};
+
+// Postal Code is strictly derived from Customer Master with 6-digit validation
+const entryPostalCode = (customer) => {
+    const rawPin = customer.billingAddress?.pincode || customer.pincode || '';
+    const cleanPin = String(rawPin).trim().replace(/\D/g, '');
+    return cleanPin.length === 6 ? cleanPin : String(rawPin).trim();
+};
+
 // Customer of an Invoice Bulk Upload entry (Add Single Entry and Edit), from the Customer
 // Master by Customer Code, else Customer Name; created when missing. Returns the customer
 // and the code, postal code and mobile the entry stores.
@@ -425,21 +458,7 @@ const resolveEntryCustomer = async (req, { companyId, customerCode, customerInpu
     const searchTarget = finalCustomerCode || (customerInput ? String(customerInput).trim() : '');
 
     if (searchTarget) {
-        customer = await Customer.findOne({
-            companyId,
-            $or: [
-                { externalCode: buildExactRegex(searchTarget) },
-                { customerName: buildExactRegex(searchTarget) },
-                { companyName: buildExactRegex(searchTarget) }
-            ]
-        });
-        if (!customer) {
-            // Customer codes are unique in the whole company: a customer of another branch
-            // with this code is the same customer (creating it again would be refused).
-            customer = await Customer.findOne({ companyId, externalCode: searchTarget })
-                .collation(Customer.CUSTOMER_CODE_COLLATION)
-                .setOptions({ bypassBranch: true });
-        }
+        customer = await findEntryCustomer(companyId, searchTarget);
 
         if (!customer) {
             customer = await Customer.create({
@@ -462,13 +481,32 @@ const resolveEntryCustomer = async (req, { companyId, customerCode, customerInpu
                 await customer.save();
             }
             finalCustomerCode = customer.externalCode || searchTarget;
-            // Postal Code is strictly derived from Customer Master with 6-digit validation
-            const rawPin = customer.billingAddress?.pincode || customer.pincode || '';
-            const cleanPin = String(rawPin).trim().replace(/\D/g, '');
-            finalCustomerPostalCode = cleanPin.length === 6 ? cleanPin : String(rawPin).trim();
+            finalCustomerPostalCode = entryPostalCode(customer);
         }
     }
     return { customer, finalCustomerCode, finalCustomerPostalCode, cleanMobile };
+};
+
+// Add Single Entry fills the Customer Name from the typed Customer Code, using the same match
+// as the save, so the name shown is the customer the entry will be saved under.
+exports.lookupEntryCustomer = async (req, res) => {
+    try {
+        const code = String(req.query.code || '').trim();
+        const customer = code ? await findEntryCustomer(req.user?.companyId, code) : null;
+        if (!customer) return res.json({ customer: null });
+        return res.json({
+            customer: {
+                _id: customer._id,
+                customerCode: customer.externalCode || code,
+                customerName: customer.companyName || customer.customerName || '',
+                postalCode: entryPostalCode(customer),
+                city: String(customer.billingAddress?.city || '').trim()
+            }
+        });
+    } catch (error) {
+        console.error('Customer lookup error:', error);
+        return res.status(500).json({ message: 'Failed to look up the customer' });
+    }
 };
 
 // Single Entry Creation (Requirement #15, #3, #4, #8, #17)
@@ -656,8 +694,8 @@ exports.createSingleAsset = async (req, res) => {
         );
         res.status(201).json({ message: 'Single entry added successfully', data: createdDoc });
     } catch (error) {
-        console.error('createSingleAsset error:', error);
-        res.status(500).json({ message: error.message || 'Error creating single entry' });
+        if (!error.statusCode) console.error('createSingleAsset error:', error);
+        res.status(error.statusCode || 500).json({ message: error.message || 'Error creating single entry' });
     }
 };
 
@@ -818,8 +856,8 @@ exports.updateAsset = async (req, res) => {
 
         res.json({ message: 'Entry updated successfully', data: updatedDoc });
     } catch (error) {
-        console.error('updateAsset error:', error);
-        res.status(500).json({ message: error.message || 'Error updating entry' });
+        if (!error.statusCode) console.error('updateAsset error:', error);
+        res.status(error.statusCode || 500).json({ message: error.message || 'Error updating entry' });
     }
 };
 
@@ -1366,8 +1404,9 @@ const customerText = (name, code) => [name, code ? `(${code})` : ''].filter(Bool
 
 /**
  * Customer entries of the activity log, from the Serial No Transfer history (SerialTransfer):
- * "Customer Added" for the first customer and "Customer Transferred" for every change after
- * it. A serial that was never transferred shows its invoice customer as the one added.
+ * "Customer Added" for the first customer, "Customer Transferred" / "Customer Assigned" for every
+ * change after it and "Customer Returned" for a return. A serial with no history shows the
+ * customer on its invoice row as the one added (sold, or allocated when the serial is not sold).
  */
 const customerActivity = async (assetDocs, serialNumber) => {
     const SerialTransfer = require('../models/SerialTransfer');
@@ -1379,10 +1418,10 @@ const customerActivity = async (assetDocs, serialNumber) => {
         : [];
 
     const entries = records.length ? records : assetDocs
-        .filter((a) => a.status === 'SOLD' && (a.customerId || a.customerNameStr))
+        .filter((a) => a.customerId || a.customerNameStr)
         .map((a) => ({
             serialNumber: a.serialNumber,
-            entryType: 'Sold',
+            entryType: ['ALLOCATED', 'IN_STOCK'].includes(a.status || 'IN_STOCK') ? 'Allocated' : 'Sold',
             transferDate: a.saleDate || a.invoiceDate || a.createdAt,
             companyName: a.customerId?.companyName || a.customerId?.customerName || a.customerNameStr || '',
             customerCode: a.customerId?.externalCode || a.customerCode || '',
@@ -1394,10 +1433,14 @@ const customerActivity = async (assetDocs, serialNumber) => {
     return entries.map((r, index) => {
         const before = entries[index - 1];
         const first = index === 0;
-        const newCustomer = customerText(r.companyName || r.customerName, r.customerCode);
-        const previousCustomer = first ? '' : customerText(before.companyName || before.customerName, before.customerCode);
-        const suffix = { 'Past Entry': ' (Past Entry)', Sold: first ? '' : ' (Invoice Sale)' }[r.entryType] || '';
-        const action = `${first ? 'Customer Added' : 'Customer Transferred'}${suffix}`;
+        const returned = r.entryType === 'Returned';
+        const holder = customerText(r.companyName || r.customerName, r.customerCode);
+        // A return moves the serial from the customer who returned it to no one.
+        const newCustomer = returned ? 'None (returned)' : holder;
+        const previousCustomer = returned ? holder : first ? '' : customerText(before.companyName || before.customerName, before.customerCode);
+        const suffix = { 'Past Entry': ' (Past Entry)', Sold: first ? '' : ' (Invoice Sale)', Allocated: first ? '' : ' (Invoice Allocation)' }[r.entryType] || '';
+        const action = returned ? 'Customer Returned'
+            : `${first ? 'Customer Added' : r.entryType === 'Assigned' ? 'Customer Assigned' : 'Customer Transferred'}${suffix}`;
         return {
             date: r.transferDate,
             category: 'Customer',

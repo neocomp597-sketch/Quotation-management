@@ -7,7 +7,7 @@ import { customerService, uploadService, importService, territoryService, userSe
 import Modal from '../components/Modal';
 import ImportWizard from '../components/import/ImportWizard';
 import PaginationControls from '../components/PaginationControls';
-import { resolveImageUrl, formatDate } from '../utils/helpers';
+import { resolveImageUrl, formatDate, contactPersonOf } from '../utils/helpers';
 import { isValidGSTIN, isValidPAN, isValidMobile } from '../utils/validation';
 import CustomerPricingDashboard from './CustomerPricingDashboard';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
@@ -47,8 +47,8 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
 
     const [formData, setFormData] = useState({
         externalCode: '',
-        customerName: '',
         companyName: '',
+        contactPerson: '',
         mobile: '',
         email: '',
         gstin: '',
@@ -132,8 +132,9 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
         if (isCreatePage) {
             setEditingCustomer(null);
             setFormData({
-                customerName: '',
+                externalCode: '',
                 companyName: '',
+                contactPerson: '',
                 mobile: '',
                 email: '',
                 gstin: '',
@@ -157,6 +158,7 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
                 setEditingCustomer(found);
                 setFormData({
                     ...found,
+                    contactPerson: contactPersonOf(found),
                     billingAddress: { ...found.billingAddress },
                     territory: found.territory?._id || found.territory || '',
                     owner: found.owner?._id || found.owner || '',
@@ -174,6 +176,7 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
                         setEditingCustomer(item);
                         setFormData({
                             ...item,
+                            contactPerson: contactPersonOf(item),
                             billingAddress: { ...item.billingAddress },
                             territory: item.territory?._id || item.territory || '',
                             owner: item.owner?._id || item.owner || '',
@@ -275,7 +278,9 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
             const payload = {
                 ...formData,
                 externalCode: formData.externalCode?.trim(),
-                customerName: formData.customerName?.trim() || formData.companyName?.trim() || formData.externalCode?.trim(),
+                contactPerson: formData.contactPerson?.trim() || '',
+                // Not edited here; the server keeps it in step with the Company Trade Name.
+                customerName: undefined,
                 territory: formData.territory || undefined
             };
             if (editingCustomer) {
@@ -357,12 +362,20 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
     const exportToExcel = async () => {
         setLoading(true);
         try {
-            const res = await customerService.getAll({
-                limit: 10000,
-                search: debouncedSearch || undefined,
-                territory: selectedTerritory || undefined,
-            });
-            const exportCustomers = Array.isArray(res.data) ? res.data : res.data?.data || [];
+            // The list API returns at most 100 customers a page, so every page is read.
+            const exportCustomers = [];
+            for (let exportPage = 1; ; exportPage += 1) {
+                const res = await customerService.getAll({
+                    page: exportPage,
+                    limit: 100,
+                    search: debouncedSearch || undefined,
+                    territory: selectedTerritory || undefined,
+                });
+                const payload = res.data;
+                const rows = Array.isArray(payload) ? payload : payload?.data || [];
+                exportCustomers.push(...rows);
+                if (Array.isArray(payload) || !rows.length || exportPage >= (payload?.pagination?.pages || 1)) break;
+            }
             if (!exportCustomers.length) {
                 toast.info('No customers found to export');
                 return;
@@ -370,7 +383,8 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
 
             const exportData = exportCustomers.map((c) => ({
                 'Company Trade Name': c.companyName || '',
-                'Customer Code': c.customerName || '',
+                'Customer Code': c.externalCode || '',
+                'Contact Person': contactPersonOf(c),
                 'Mobile': c.mobile || '',
                 'Email': c.email || '',
                 'GSTIN': c.gstin || '',
@@ -528,7 +542,7 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
                                                 >
                                                     {c.companyName}
                                                 </div>
-                                                <div className="text-xs text-slate-500">{c.customerName}</div>
+                                                <div className="text-xs text-slate-500">{[c.externalCode, contactPersonOf(c)].filter(Boolean).join(' · ')}</div>
                                             </div>
                                         </div>
                                         <button
@@ -658,7 +672,7 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
                                                         >
                                                             {c.companyName}
                                                         </div>
-                                                        <div className="text-xs text-slate-400 font-medium">{c.customerName}</div>
+                                                        <div className="text-xs text-slate-400 font-medium">{[c.externalCode, contactPersonOf(c)].filter(Boolean).join(' · ')}</div>
                                                     </div>
                                                 </div>
                                             </td>
@@ -801,13 +815,13 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
                                             </div>
 
                                             <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contact Person / Customer Name</label>
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contact Person</label>
                                                 <div className="relative">
                                                     <MdPerson className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                                                     <input
                                                         type="text"
-                                                        name="customerName"
-                                                        value={formData.customerName || ''}
+                                                        name="contactPerson"
+                                                        value={formData.contactPerson || ''}
                                                         onChange={handleFormChange}
                                                         className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all outline-none text-sm font-bold placeholder:font-normal placeholder:text-slate-300"
                                                         placeholder="Enter Contact Person name"
@@ -1141,7 +1155,7 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
                             </div>
                             <div>
                                 <h3 className="text-lg font-black text-slate-900">{viewCustomer.companyName}</h3>
-                                <p className="text-xs font-bold text-slate-400">{viewCustomer.customerName}</p>
+                                <p className="text-xs font-bold text-slate-400">Customer Code: {viewCustomer.externalCode || '-'}</p>
                             </div>
                             <div className="flex gap-2">
                                 <span className="px-3 py-1 bg-primary-50 text-primary-700 text-[10px] font-black uppercase tracking-widest rounded-lg border border-primary-100">
@@ -1200,6 +1214,13 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
                                     <div>
                                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Contact Information</h4>
                                         <div className="space-y-4">
+                                            <div className="flex items-start gap-3">
+                                                <div className="p-2 bg-slate-50 text-slate-400 rounded-lg"><MdPerson /></div>
+                                                <div>
+                                                    <div className="text-xs font-bold text-slate-400">Contact Person</div>
+                                                    <div className="text-sm font-bold text-slate-900">{contactPersonOf(viewCustomer) || '-'}</div>
+                                                </div>
+                                            </div>
                                             <div className="flex items-start gap-3">
                                                 <div className="p-2 bg-slate-50 text-slate-400 rounded-lg"><MdPhone /></div>
                                                 <div>
