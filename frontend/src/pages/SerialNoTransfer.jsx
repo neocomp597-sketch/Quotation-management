@@ -345,7 +345,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                                                 <button type="button" title="Download Customer Activity Log" aria-label={`Download customer activity log of ${row.serialNumber}`} onClick={(e) => { e.stopPropagation(); setDownloadFor(row); }} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all">
                                                     <MdFileDownload size={18} />
                                                 </button>
-                                                {canModify && row.status === 'SOLD' && (
+                                                {canModify && (
                                                     <button type="button" title="Transfer to another customer" onClick={(e) => { e.stopPropagation(); onTransfer(row._id); }} className="ml-1 inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all">
                                                         <MdSwapHoriz size={16} /> Transfer
                                                     </button>
@@ -480,7 +480,7 @@ const HistoryTab = ({ onOpen }) => {
 };
 
 const OWNERSHIP_OPTIONS = [
-    { value: 'Active', label: 'Active Customer Log', hint: 'Current customer of each sold serial number' },
+    { value: 'Active', label: 'Active Customer Log', hint: 'Current customer of each serial number' },
     { value: 'Inactive', label: 'Inactive Customer Log', hint: 'Earlier customers, before a transfer' },
 ];
 
@@ -595,7 +595,7 @@ const SerialActivityDownloadDialog = ({ serial, onClose }) => {
     );
 };
 
-// Customer Activity Log: Active (current owners) or Inactive (earlier owners) of sold serials,
+// Customer Activity Log: Active (current owners) or Inactive (earlier owners) of serials,
 // with search and a Customer Since date range; Download Excel exports every matching row.
 // With `assetId` it is the log of that one serial number (its details page): the server filters
 // by the serial, and search and dates are not shown.
@@ -821,9 +821,8 @@ export const SerialNoDetails = ({ transfer = false }) => {
     };
 
     const history = data ? [...data.history].reverse() : [];
+    // A serial of any status can be transferred; `current` is its customer now, if it has one.
     const current = history.find((entry) => entry.isActive);
-    // Only a sold serial has a customer to transfer; other statuses are shown for reference.
-    const sold = data?.asset?.status === 'SOLD';
     const label = 'block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1';
 
     return (
@@ -836,6 +835,12 @@ export const SerialNoDetails = ({ transfer = false }) => {
                 >
                     <MdArrowBack size={20} />
                 </button>
+<<<<<<< HEAD
+                {/* Serial number and product are shown once, in the details card or form below. */}
+                <h1 className="min-w-0 flex-1 text-xl font-black text-slate-900">Serial No Transfer</h1>
+                {data && !formMode && canModify && (
+                    <div className="flex flex-wrap gap-3">
+=======
                 <div className="min-w-0 flex-1">
                     <h1 className="text-xl font-black text-slate-900">
                         Serial No Transfer
@@ -849,6 +854,7 @@ export const SerialNoDetails = ({ transfer = false }) => {
                 </div>
                 {data && sold && !formMode && canModify && (
                     <div className="flex w-full sm:w-auto flex-wrap gap-3">
+>>>>>>> f06da8202d682688814cc0c79f79cc6b501d3d21
                         <button
                             type="button"
                             onClick={() => setFormMode('past')}
@@ -872,12 +878,12 @@ export const SerialNoDetails = ({ transfer = false }) => {
             ) : (
                 <>
                     <div className="rounded-3xl border border-slate-100 bg-white shadow-sm">
-                        {formMode && sold ? (
+                        {formMode ? (
                             <TransferForm
                                 key={formMode}
                                 mode={formMode}
                                 data={data}
-                                currentSince={current?.transferDate || data.asset.saleDate}
+                                currentSince={current?.transferDate}
                                 onCancel={() => (transfer ? goBack() : setFormMode(null))}
                                 onSaved={handleSaved}
                             />
@@ -891,13 +897,8 @@ export const SerialNoDetails = ({ transfer = false }) => {
                                     <span className={label}>Current Customer</span>
                                     <p className="text-sm font-bold text-slate-800">{current?.companyName || data.asset.customerName || '-'}</p>
                                     <p className="text-xs text-slate-500">{[current?.customerCode || data.asset.customerCode, current?.customerMobile, current?.customerCity].filter(Boolean).join(' · ')}</p>
-                                    {(current || sold) && <p className="text-xs text-slate-500">Since {formatDate(current?.transferDate || data.asset.saleDate)}</p>}
+                                    {current && <p className="text-xs text-slate-500">Since {formatDate(current.transferDate)}</p>}
                                 </div>
-                                {!sold && (
-                                    <p className="sm:col-span-2 lg:col-span-6 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500">
-                                        Only sold serial numbers can be transferred to another customer. To move this serial to another branch, use the Branch Transfer tab.
-                                    </p>
-                                )}
                             </div>
                         )}
                     </div>
@@ -961,7 +962,7 @@ export const SerialNoDetails = ({ transfer = false }) => {
                         </div>
                     </div>
 
-                    {sold && (
+                    {history.length > 0 && (
                         <div className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
                             <h3 className="flex items-center gap-2 border-b border-slate-100 px-6 py-4 text-xs font-black uppercase tracking-widest text-slate-500">
                                 <MdFileDownload size={16} /> Customer Activity Log Download — {data.asset.serialNumber}
@@ -1181,7 +1182,9 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
 
             <p className="text-xs font-medium text-slate-500">
                 {past
-                    ? `A past entry records an earlier customer as Inactive history, dated on or before ${formatDate(currentSince)} (when the current customer received it). The current customer stays Active.`
+                    ? (currentSince
+                        ? `A past entry records an earlier customer as Inactive history, dated on or before ${formatDate(currentSince)} (when the current customer received it). The current customer stays Active.`
+                        : 'A past entry records an earlier customer as Inactive history.')
                     : 'Saving keeps every earlier customer in the history as Inactive and makes the new customer the only Active one.'}
             </p>
 
@@ -1811,8 +1814,13 @@ const SerialNoTransfer = () => {
     return (
         <div className="space-y-6">
             <div>
+<<<<<<< HEAD
+                <h1 className="text-3xl font-black text-slate-900 tracking-tight">Serial No Transfer</h1>
+                <p className="text-slate-500 font-medium">Every Invoice Bulk Upload serial number with its branch and status. Move any serial to another customer or to another branch.</p>
+=======
                 <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Serial No Transfer</h1>
                 <p className="text-sm sm:text-base text-slate-500 font-medium">Every Invoice Bulk Upload serial number with its branch and status. Move sold serials to another customer, or any serial to another branch.</p>
+>>>>>>> f06da8202d682688814cc0c79f79cc6b501d3d21
             </div>
 
             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">

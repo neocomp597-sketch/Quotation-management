@@ -19,10 +19,11 @@ const { limitedBranchIds, canMoveFrom, visibleTransfersCondition } = require('..
  * the Asset records so nothing is copied and every status (sold, in stock, allocated, return,
  * scrapped) is listed as Invoice Bulk Upload shows it.
  *
- * Customer transfers apply to SOLD serials. The first customer is the one the serial was sold
- * to; that "Sold" record is written the first time the serial is transferred, from the invoice
- * data. Each transfer switches the current record off and adds a new active one, so history is
- * never overwritten and only the latest customer is active. The Asset's customer is moved to
+ * Customer transfers apply to serials of any status; the status itself is not changed. The first
+ * customer is the one on the invoice row; that "Sold" record is written the first time the serial
+ * is transferred, from the invoice data (a serial whose row names no customer starts with the
+ * transfer). Each transfer switches the current record off and adds a new active one, so history
+ * is never overwritten and only the latest customer is active. The Asset's customer is moved to
  * the new customer as well, so complaints, AMC and the Invoice Bulk Upload list show the
  * current holder.
  *
@@ -167,6 +168,9 @@ const withInvoice = (entry, asset) => {
     return { ...entry, invoiceNumber, invoiceDate: entry.invoiceDate || (sameInvoice ? invoiceDateOf(asset) : null) };
 };
 
+// Whether the invoice row gives the serial a first customer (always true for a sold serial).
+const hasSaleCustomer = (asset) => asset.status === 'SOLD' || Boolean(asset.customerId || cleanText(asset.customerNameStr));
+
 // The original sale, as a history record built from the Invoice Bulk Upload row.
 const saleRecord = (asset) => ({
     assetId: asset._id,
@@ -308,7 +312,7 @@ const loadSerial = async (assetId) => {
 
     let history = (await historyOf(asset._id)).map((entry) => withInvoice(entry, asset));
     // Not transferred yet: the sale is shown from the invoice row until the first transfer saves it.
-    if (!history.length && asset.status === 'SOLD') history = [{ ...saleRecord(asset), _id: null, pending: true }];
+    if (!history.length && hasSaleCustomer(asset)) history = [{ ...saleRecord(asset), _id: null, pending: true }];
 
     return {
         asset: {
@@ -330,13 +334,10 @@ const loadSerial = async (assetId) => {
     };
 };
 
-// The serial a customer transfer or past entry is saved for; only sold serials have a customer to change.
-const loadSoldSerial = async (assetId) => {
+// The serial a customer transfer or past entry is saved for, of any status.
+const loadTransferSerial = async (assetId) => {
     const asset = await Asset.findOne(addActiveBranchFilter({ _id: assetId })).populate(customerPopulate).lean();
     if (!asset) throw httpError(404, 'Serial number not found');
-    if (asset.status !== 'SOLD') {
-        throw httpError(400, `${asset.serialNumber} is ${statusOf(asset).replace(/_/g, ' ')}. Only sold serial numbers can be moved to another customer.`);
-    }
     return asset;
 };
 
@@ -392,7 +393,7 @@ exports.transferSerial = async (req, res) => {
             return res.json(await loadSerial(assetId));
         }
 
-        const asset = await loadSoldSerial(assetId);
+        const asset = await loadTransferSerial(assetId);
         const customer = await Customer.findById(customerId).select(CUSTOMER_SELECT).lean();
         if (!customer) throw httpError(404, 'Customer not found in Customer Master.');
         const user = { createdBy: req.user?.id || null, createdByName: req.user?.name || '' };
@@ -400,7 +401,7 @@ exports.transferSerial = async (req, res) => {
         session = await mongoose.startSession();
         await session.withTransaction(async () => {
             let current = await SerialTransfer.findOne({ assetId: asset._id, isActive: true }).session(session).lean();
-            if (!current && !(await SerialTransfer.exists({ assetId: asset._id }).session(session))) {
+            if (!current && hasSaleCustomer(asset) && !(await SerialTransfer.exists({ assetId: asset._id }).session(session))) {
                 // The original sale becomes the first record of the history.
                 [current] = await SerialTransfer.create([{ ...saleRecord(asset), ...user }], { session });
             }
@@ -486,7 +487,7 @@ exports.addPastEntry = async (req, res) => {
             return res.json(await loadSerial(assetId));
         }
 
-        const asset = await loadSoldSerial(assetId);
+        const asset = await loadTransferSerial(assetId);
         const customer = await Customer.findById(req.body.customerId).select(CUSTOMER_SELECT).lean();
         if (!customer) throw httpError(404, 'Customer not found in Customer Master.');
         const user = { createdBy: req.user?.id || null, createdByName: req.user?.name || '' };
@@ -494,7 +495,7 @@ exports.addPastEntry = async (req, res) => {
         session = await mongoose.startSession();
         await session.withTransaction(async () => {
             let current = await SerialTransfer.findOne({ assetId: asset._id, isActive: true }).session(session).lean();
-            if (!current && !(await SerialTransfer.exists({ assetId: asset._id }).session(session))) {
+            if (!current && hasSaleCustomer(asset) && !(await SerialTransfer.exists({ assetId: asset._id }).session(session))) {
                 [current] = await SerialTransfer.create([{ ...saleRecord(asset), ...user }], { session });
             }
             if (current && startOfDay(entryDate) > startOfDay(current.transferDate)) {
@@ -571,9 +572,10 @@ exports.listHistory = async (req, res) => {
 /*
  * Customer Activity Log: one row per customer ownership of a serial number.
  *
- * Active: the current owner of every sold serial. A transferred serial's owner is its active
- * history record; a serial never transferred has no history record yet, so its owner is read from
- * the Invoice Bulk Upload row (nothing is written for it). Inactive: every history record that is
+ * Active: the current owner of every sold serial, and of every serial of another status that has
+ * been transferred to a customer. A transferred serial's owner is its active history record; a
+ * sold serial never transferred has no history record yet, so its owner is read from the Invoice
+ * Bulk Upload row (nothing is written for it). Inactive: every history record that is
  * no longer current (owners before a transfer, and Past Entries). Each row is exactly one history
  * record or one asset, so the product/customer lookups below never multiply rows.
  *
@@ -583,7 +585,9 @@ exports.listHistory = async (req, res) => {
 const OWNERSHIPS = ['Active', 'Inactive'];
 
 const activeOwners = async ({ search, range, assetId, products, skip, limit }) => {
-    const match = { status: 'SOLD' };
+    // Serials with an active history record have a current owner whatever their status.
+    const owned = await SerialTransfer.find({ isActive: true }).select('assetId').lean();
+    const match = { $and: [{ $or: [{ status: 'SOLD' }, { _id: { $in: owned.map((record) => record.assetId) } }] }] };
     const branchFilter = activeBranchFilter();
     if (branchFilter) Object.assign(match, branchFilter);
     // Aggregation does not cast, so the ids must already be ObjectIds (distinct returns ObjectIds).
@@ -591,10 +595,12 @@ const activeOwners = async ({ search, range, assetId, products, skip, limit }) =
     if (products) match.productId = products;
     if (search) {
         const pattern = new RegExp(escapeRegex(search), 'i');
-        match.$or = [
-            { serialNumber: pattern }, { productCode: pattern }, { productName: pattern },
-            { customerNameStr: pattern }, { customerCode: pattern }
-        ];
+        match.$and.push({
+            $or: [
+                { serialNumber: pattern }, { productCode: pattern }, { productName: pattern },
+                { customerNameStr: pattern }, { customerCode: pattern }
+            ]
+        });
     }
     const page = [{ $sort: { ownerSince: -1, _id: -1 } }];
     if (skip) page.push({ $skip: skip });
@@ -738,8 +744,8 @@ const withMasterData = async (rows) => {
 const activitySerial = async (assetId) => {
     if (!assetId) return null;
     if (!mongoose.Types.ObjectId.isValid(assetId)) throw httpError(400, 'Invalid serial record');
-    const asset = await Asset.findOne(addActiveBranchFilter({ _id: assetId, status: 'SOLD' })).select('serialNumber').lean();
-    if (!asset) throw httpError(404, 'Sold serial number not found');
+    const asset = await Asset.findOne(addActiveBranchFilter({ _id: assetId })).select('serialNumber').lean();
+    if (!asset) throw httpError(404, 'Serial number not found');
     return asset;
 };
 
