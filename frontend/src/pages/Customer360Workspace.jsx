@@ -37,7 +37,7 @@ import {
     Tooltip
 } from 'recharts';
 import { customerAnalyticsService } from '../services/api';
-import { resolveImageUrl, formatDate, formatDateTime } from '../utils/helpers';
+import { resolveImageUrl, formatDate, formatDateTime, contactPersonOf } from '../utils/helpers';
 
 // Fallback icon for contact list
 const MdPeople360 = () => (
@@ -141,7 +141,7 @@ const Customer360Workspace = () => {
                         <div className="flex items-center gap-3 flex-wrap">
                             <h1 className="text-2xl font-black text-slate-900 leading-tight">{customer.companyName}</h1>
                             <span className="text-[10px] font-black uppercase tracking-wider bg-slate-50 border border-slate-100 text-slate-500 px-3 py-1 rounded-full">
-                                {customer.customerName}
+                                {customer.externalCode || 'No Customer Code'}
                             </span>
                             <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full border ${
                                 customer.status === 'Active' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-slate-50 border-slate-100 text-slate-600'
@@ -152,7 +152,8 @@ const Customer360Workspace = () => {
                         <p className="text-slate-500 font-semibold mt-2 text-sm">
                             {customer.industry || 'Other'} Industry Sector • {customer.segment || 'Retail'} Segment
                         </p>
-                        <div className="mt-3 flex items-center gap-4 text-xs font-bold text-slate-400">
+                        <div className="mt-3 flex flex-wrap items-center gap-4 text-xs font-bold text-slate-400">
+                            <span className="flex items-center gap-1"><MdPerson /> {contactPersonOf(customer) || 'No Contact Person'}</span>
                             <span className="flex items-center gap-1"><MdPhone /> {customer.mobile || 'No Mobile'}</span>
                             <span className="flex items-center gap-1"><MdEmail /> {customer.email || 'No Email'}</span>
                         </div>
