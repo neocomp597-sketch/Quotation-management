@@ -4,7 +4,7 @@ const TONES = {
     green: 'bg-emerald-50 text-emerald-700 border-emerald-100',
     red: 'bg-rose-50 text-rose-700 border-rose-100',
     amber: 'bg-amber-50 text-amber-700 border-amber-100',
-    sky: 'bg-sky-50 text-sky-700 border-sky-100',
+    sky: 'bg-primary-50 text-primary-700 border-primary-100',
     slate: 'bg-slate-50 text-slate-600 border-slate-200',
     violet: 'bg-violet-50 text-violet-700 border-violet-100'
 };

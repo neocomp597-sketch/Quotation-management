@@ -54,7 +54,7 @@ const customerTypeBadge = (type) => {
     const styles = {
         Customer: 'bg-emerald-50 text-emerald-600 border-emerald-100',
         Prospect: 'bg-amber-50 text-amber-600 border-amber-100',
-        Vendor: 'bg-blue-50 text-blue-600 border-blue-100',
+        Vendor: 'bg-primary-50 text-primary-600 border-primary-100',
         Partner: 'bg-purple-50 text-purple-600 border-purple-100',
     };
     if (!type) return null;

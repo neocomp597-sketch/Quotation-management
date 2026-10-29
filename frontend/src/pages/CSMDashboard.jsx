@@ -68,14 +68,14 @@ const CSMDashboard = () => {
     const cardRows = [
         [
             { label: 'Open', value: m.open, color: 'from-teal-500 to-emerald-600', link: '/csm/tickets?status=open_tickets&tab=all' },
-            { label: 'Unassigned', value: m.unassigned, color: 'from-purple-500 to-indigo-600', link: '/csm/tickets?unassigned=true&tab=all' },
+            { label: 'Unassigned', value: m.unassigned, color: 'from-purple-500 to-primary-600', link: '/csm/tickets?unassigned=true&tab=all' },
             { label: 'Pending', value: m.pending, color: 'from-amber-400 to-orange-500', link: '/csm/tickets?status=Pending Customer&tab=all' }
         ],
         [
-            { label: 'Created Yesterday', value: m.createdYesterday, color: 'from-indigo-400 to-blue-600', link: '/csm/tickets?createdOn=yesterday&tab=all' },
+            { label: 'Created Yesterday', value: m.createdYesterday, color: 'from-primary-400 to-primary-600', link: '/csm/tickets?createdOn=yesterday&tab=all' },
             { label: 'Resolved Yesterday', value: m.resolvedYesterday, color: 'from-emerald-500 to-green-600', link: '/csm/tickets?resolvedOn=yesterday&tab=all' },
-            { label: 'Created Today', value: m.createdToday, color: 'from-blue-500 to-blue-700', link: '/csm/tickets?createdOn=today&tab=all' },
-            { label: 'Resolved Today', value: m.resolvedToday, color: 'from-sky-500 to-cyan-600', link: '/csm/tickets?resolvedOn=today&tab=all' }
+            { label: 'Created Today', value: m.createdToday, color: 'from-primary-500 to-primary-700', link: '/csm/tickets?createdOn=today&tab=all' },
+            { label: 'Resolved Today', value: m.resolvedToday, color: 'from-primary-500 to-primary-600', link: '/csm/tickets?resolvedOn=today&tab=all' }
         ]
     ];
 

@@ -37,7 +37,7 @@ export const ROW_STATUS = {
     attention: { label: 'Needs attention', className: 'bg-amber-50 text-amber-800 border-amber-200' },
     failed: { label: 'Not saved', className: 'bg-rose-50 text-rose-700 border-rose-200' },
     excluded: { label: 'Skipped by you', className: 'bg-slate-100 text-slate-600 border-slate-200' },
-    importing: { label: 'Saving…', className: 'bg-blue-50 text-blue-700 border-blue-200' },
+    importing: { label: 'Saving…', className: 'bg-primary-50 text-primary-700 border-primary-200' },
     imported: { label: 'Imported', className: 'bg-primary-50 text-primary-700 border-primary-200' },
     blank: { label: 'Blank', className: 'bg-slate-50 text-slate-400 border-slate-200' }
 };

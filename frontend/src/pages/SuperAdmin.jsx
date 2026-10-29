@@ -197,7 +197,7 @@ const SuperAdmin = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <StatCard label="Total Companies" value={stats.totalCompanies ?? companies.length} icon={<MdBusiness size={24} />} tone="bg-primary-50 text-primary-700" />
                 <StatCard label="Active Companies" value={stats.activeCompanies ?? activeCompanies} icon={<MdCheckCircle size={24} />} tone="bg-emerald-50 text-emerald-700" />
-                <StatCard label="Active Users" value={stats.activeUsers ?? 0} icon={<MdPeople size={24} />} tone="bg-sky-50 text-sky-700" />
+                <StatCard label="Active Users" value={stats.activeUsers ?? 0} icon={<MdPeople size={24} />} tone="bg-primary-50 text-primary-700" />
             </div>
 
             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">

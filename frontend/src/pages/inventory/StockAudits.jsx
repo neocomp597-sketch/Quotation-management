@@ -51,7 +51,7 @@ const StockAudits = () => {
     const getStatusBadge = (status) => {
         switch (status) {
             case 'In_Progress':
-                return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300">In Progress</span>;
+                return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-primary-100 text-primary-800 dark:bg-primary-950 dark:text-primary-300">In Progress</span>;
             case 'Pending_Review':
                 return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">Pending Review</span>;
             case 'Completed':
@@ -138,7 +138,7 @@ const StockAudits = () => {
                                             {canModify && ['In_Progress', 'Pending_Review'].includes(cnt.status) && (
                                                 <button
                                                     onClick={() => navigate(`/inventory/counts/record/${cnt._id}`)}
-                                                    className="px-3 py-1 bg-sky-100 hover:bg-sky-200 text-sky-800 text-xs font-semibold rounded-lg inline-flex items-center gap-1"
+                                                    className="px-3 py-1 bg-primary-100 hover:bg-primary-200 text-primary-800 text-xs font-semibold rounded-lg inline-flex items-center gap-1"
                                                 >
                                                     <MdEdit /> Record Count Page
                                                 </button>

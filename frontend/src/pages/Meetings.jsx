@@ -467,7 +467,7 @@ const Meetings = () => {
     const getStatusColor = (status) => {
         switch (status) {
             case 'Scheduled':
-                return { bg: 'bg-blue-50 hover:bg-blue-100/70', text: 'text-blue-700', border: 'border-blue-200 border-l-blue-600', dot: 'bg-blue-600' };
+                return { bg: 'bg-primary-50 hover:bg-primary-100/70', text: 'text-primary-700', border: 'border-primary-200 border-l-primary-600', dot: 'bg-primary-600' };
             case 'Confirmed':
                 return { bg: 'bg-emerald-50 hover:bg-emerald-100/70', text: 'text-emerald-700', border: 'border-emerald-200 border-l-emerald-600', dot: 'bg-emerald-600' };
             case 'Completed':
@@ -915,7 +915,7 @@ const Meetings = () => {
             {/* KPI Cards above calendar */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="p-4 bg-white rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-                    <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 bg-primary-50 text-primary-600 rounded-xl flex items-center justify-center shrink-0">
                         <MdSchedule size={20} />
                     </div>
                     <div>
@@ -924,7 +924,7 @@ const Meetings = () => {
                     </div>
                 </div>
                 <div className="p-4 bg-white rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-                    <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 bg-primary-50 text-primary-600 rounded-xl flex items-center justify-center shrink-0">
                         <MdCalendarMonth size={20} />
                     </div>
                     <div>
@@ -1185,7 +1185,7 @@ const Meetings = () => {
                                                         <span className={`inline-flex px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
                                                             m.status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
                                                             m.status === 'Cancelled' ? 'bg-rose-50 text-rose-600 border border-rose-100' :
-                                                            m.status === 'Scheduled' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
+                                                            m.status === 'Scheduled' ? 'bg-primary-50 text-primary-600 border border-primary-100' :
                                                             'bg-amber-50 text-amber-600 border border-amber-100'
                                                         }`}>
                                                             {m.status}

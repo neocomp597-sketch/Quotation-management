@@ -13,14 +13,14 @@ import usePermission from '../hooks/usePermission';
 const StatusPill = ({ status }) => {
     const styles = {
         'Open': 'bg-teal-50 text-teal-700 border-teal-200',
-        'Assigned': 'bg-indigo-50 text-indigo-700 border-indigo-200',
+        'Assigned': 'bg-primary-50 text-primary-700 border-primary-200',
         'In Progress': 'bg-amber-50 text-amber-700 border-amber-200',
         'Pending Customer': 'bg-purple-50 text-purple-700 border-purple-200',
         'Resolved': 'bg-emerald-50 text-emerald-700 border-emerald-200',
         'Closed': 'bg-slate-100 text-slate-700 border-slate-200',
         'Cancelled': 'bg-rose-50 text-rose-700 border-rose-200',
-        'New': 'bg-blue-50 text-blue-600 border-blue-100',
-        'Contacted': 'bg-indigo-50 text-indigo-600 border-indigo-100',
+        'New': 'bg-primary-50 text-primary-600 border-primary-100',
+        'Contacted': 'bg-primary-50 text-primary-600 border-primary-100',
         'Quotation Pending': 'bg-amber-50 text-amber-600 border-amber-100',
         'Quotation Received': 'bg-fuchsia-50 text-fuchsia-600 border-fuchsia-100',
         'Negotiation': 'bg-purple-50 text-purple-600 border-purple-100',
@@ -38,9 +38,9 @@ const StatusPill = ({ status }) => {
 const ActionStatusPill = ({ status }) => {
     const colorMap = {
         'VISIT CUSTOMER': 'bg-slate-50 text-slate-600',
-        'Quotation given': 'bg-sky-50 text-sky-600',
+        'Quotation given': 'bg-primary-50 text-primary-600',
         'Followup date time': 'bg-amber-50 text-amber-600',
-        'quotation revise': 'bg-indigo-50 text-indigo-600',
+        'quotation revise': 'bg-primary-50 text-primary-600',
         'quotation finalise': 'bg-purple-50 text-purple-600',
         'po received': 'bg-emerald-50 text-emerald-600',
         'enquiry won': 'bg-emerald-100 text-emerald-700'
@@ -55,7 +55,7 @@ const ActionStatusPill = ({ status }) => {
 const VisitStatusPill = ({ status }) => {
     const styles = {
         'Scheduled': 'bg-amber-50 text-amber-700 border-amber-300',
-        'Visited': 'bg-sky-50 text-sky-700 border-sky-300',
+        'Visited': 'bg-primary-50 text-primary-700 border-primary-300',
         'Follow-up Required': 'bg-purple-50 text-purple-700 border-purple-300',
         'Completed': 'bg-emerald-50 text-emerald-700 border-emerald-300',
         'Cancelled': 'bg-rose-50 text-rose-700 border-rose-300'

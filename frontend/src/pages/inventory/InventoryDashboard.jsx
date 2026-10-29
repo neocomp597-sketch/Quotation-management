@@ -90,7 +90,7 @@ const InventoryDashboard = () => {
                 return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">Stock Out</span>;
             case 'TRANSFER_IN':
             case 'TRANSFER_OUT':
-                return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">Transfer</span>;
+                return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-primary-100 text-primary-800 dark:bg-primary-950 dark:text-primary-300">Transfer</span>;
             case 'ADJUSTMENT_ADD':
             case 'ADJUSTMENT_SUB':
                 return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">Adjustment</span>;
@@ -151,7 +151,7 @@ const InventoryDashboard = () => {
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
                     <div className="flex items-center justify-between">
                         <p className="text-xs uppercase font-semibold text-slate-500 dark:text-slate-400">Pending Transfers</p>
-                        <MdCompareArrows className="text-indigo-500 text-xl" />
+                        <MdCompareArrows className="text-primary-500 text-xl" />
                     </div>
                     <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-2">{stats.pendingTransfersCount}</h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">Awaiting manager approval</p>
@@ -180,9 +180,9 @@ const InventoryDashboard = () => {
                     <MdArrowForward className="text-slate-400 group-hover:translate-x-1 transition-transform" />
                 </Link>
 
-                <Link to="/inventory/transfers" className="p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-500 transition-all flex items-center justify-between group shadow-sm">
+                <Link to="/inventory/transfers" className="p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary-500 dark:hover:border-primary-500 transition-all flex items-center justify-between group shadow-sm">
                     <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300 rounded-lg">
+                        <div className="p-2.5 bg-primary-50 dark:bg-primary-950 text-primary-600 dark:text-primary-300 rounded-lg">
                             <MdCompareArrows className="text-xl" />
                         </div>
                         <span className="font-semibold text-sm text-slate-900 dark:text-white">Stock Transfers</span>

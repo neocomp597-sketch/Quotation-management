@@ -575,7 +575,7 @@ const LandingPlanManager = () => {
                     {/* Tab Info Bar */}
                     <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="space-y-1">
-                            <div className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Editing Category Tab</div>
+                            <div className="text-[10px] font-black uppercase text-primary-400 tracking-widest">Editing Category Tab</div>
                             <input
                                 type="text"
                                 value={activePlan.tabName}
@@ -583,7 +583,7 @@ const LandingPlanManager = () => {
                                     const val = e.target.value;
                                     setPlansData(prev => prev.map(p => p.tabKey === activeTabKey ? { ...p, tabName: val } : p));
                                 }}
-                                className="text-xl font-black bg-transparent border-b border-slate-700 focus:border-indigo-400 outline-none text-white px-1 py-0.5"
+                                className="text-xl font-black bg-transparent border-b border-slate-700 focus:border-primary-400 outline-none text-white px-1 py-0.5"
                             />
                         </div>
 
@@ -702,13 +702,13 @@ const LandingPlanManager = () => {
                                                     {cat.items.map((item, itemIdx) => (
                                                         <div key={itemIdx} className="bg-white p-3 rounded-xl border border-slate-200/80 space-y-2 text-left">
                                                             <div className="flex items-center gap-2">
-                                                                <span className="text-indigo-600 text-xs font-black">▶</span>
+                                                                <span className="text-primary-600 text-xs font-black">▶</span>
                                                                 <input
                                                                     type="text"
                                                                     value={item.title}
                                                                     onChange={(e) => updateFeatureItem(tierIdx, catIdx, itemIdx, 'title', e.target.value)}
                                                                     placeholder="Feature title (e.g. Org Structure Management)"
-                                                                    className="w-full text-xs font-bold text-slate-800 outline-none border-b border-transparent focus:border-indigo-400"
+                                                                    className="w-full text-xs font-bold text-slate-800 outline-none border-b border-transparent focus:border-primary-400"
                                                                 />
                                                                 <button
                                                                     onClick={() => deleteFeatureItem(tierIdx, catIdx, itemIdx)}
@@ -752,7 +752,7 @@ const LandingPlanManager = () => {
                             value={newTabTitle}
                             onChange={(e) => setNewTabTitle(e.target.value)}
                             placeholder="Enter tab title..."
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-600"
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-primary-600"
                         />
                         <div className="flex justify-end gap-3 pt-2">
                             <button
@@ -763,7 +763,7 @@ const LandingPlanManager = () => {
                             </button>
                             <button
                                 onClick={handleAddNewTab}
-                                className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-wider"
+                                className="px-5 py-2.5 bg-primary-600 text-white rounded-xl text-xs font-black uppercase tracking-wider"
                             >
                                 Create Tab
                             </button>

@@ -557,7 +557,7 @@ const CSMRcaReport = () => {
                             {viewMode === 'form' && selectedReportId && (
                                 <button
                                     onClick={() => setViewMode('view')}
-                                    className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+                                    className="flex items-center gap-1.5 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
                                 >
                                     <MdVisibility size={18} /> View Document
                                 </button>
@@ -671,7 +671,7 @@ const CSMRcaReport = () => {
                                                 {/* View Button */}
                                                 <button
                                                     onClick={() => handleView(report)}
-                                                    className="p-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 bg-indigo-50 dark:bg-indigo-950/60 rounded-xl hover:bg-indigo-100 transition-all border border-indigo-200/50 dark:border-indigo-800/50"
+                                                    className="p-2 text-primary-600 dark:text-primary-400 hover:text-primary-800 bg-primary-50 dark:bg-primary-950/60 rounded-xl hover:bg-primary-100 transition-all border border-primary-200/50 dark:border-primary-800/50"
                                                     title="View RCA Document"
                                                 >
                                                     <MdVisibility size={16} />

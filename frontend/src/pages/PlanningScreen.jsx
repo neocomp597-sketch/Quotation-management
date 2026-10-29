@@ -2212,7 +2212,7 @@ const PlanningScreen = () => {
                           <button
                             onClick={handleSaveEntry}
                             disabled={isSavingEntry}
-                            className={`flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-white text-xs font-bold transition-colors ${isSavingEntry ? "bg-slate-400 cursor-not-allowed" : (editingId ? "bg-blue-600 hover:bg-blue-700" : "bg-emerald-600 hover:bg-emerald-700")}`}
+                            className={`flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-white text-xs font-bold transition-colors ${isSavingEntry ? "bg-slate-400 cursor-not-allowed" : (editingId ? "bg-primary-600 hover:bg-primary-700" : "bg-emerald-600 hover:bg-emerald-700")}`}
                           >
                             {isSavingEntry ? (
                               <>
@@ -2277,7 +2277,7 @@ const PlanningScreen = () => {
                       </td>
                       <td className="py-3 px-2 text-xs whitespace-nowrap border border-slate-200 dark:border-slate-800">
                         <span
-                          className="block truncate px-2 py-1 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 rounded font-bold"
+                          className="block truncate px-2 py-1 bg-primary-50 dark:bg-primary-950/50 text-primary-700 dark:text-primary-300 rounded font-bold"
                           title={getCanonicalMgrCode(entry.mgrCode, mgrList)}
                         >
                           {getCanonicalMgrCode(entry.mgrCode, mgrList)}
@@ -2285,7 +2285,7 @@ const PlanningScreen = () => {
                       </td>
                       <td className="py-3 px-2 text-xs whitespace-nowrap border border-slate-200 dark:border-slate-800">
                         <span
-                          className="block truncate px-2 py-1 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 rounded font-bold"
+                          className="block truncate px-2 py-1 bg-primary-50 dark:bg-primary-950/50 text-primary-700 dark:text-primary-300 rounded font-bold"
                           title={
                             getCanonicalMgrCode(
                               entry.mgrCode2 || "",
@@ -2378,16 +2378,16 @@ const PlanningScreen = () => {
       {hasAccess('planning_view_sbu_wise') && (
         <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100/80 dark:border-slate-800 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60 dark:hover:border-slate-700">
           <div
-            className="p-5 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-slate-50/80 to-indigo-50/10 dark:from-slate-800/80 dark:to-indigo-950/20 flex justify-between items-center cursor-pointer select-none group"
+            className="p-5 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-slate-50/80 to-primary-50/10 dark:from-slate-800/80 dark:to-primary-950/20 flex justify-between items-center cursor-pointer select-none group"
             onClick={() => setIsReportExpanded(!isReportExpanded)}
           >
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-xs shadow-sm transition-all group-hover:scale-110">
+              <div className="w-8 h-8 rounded-xl bg-primary-50 dark:bg-primary-950/80 text-primary-600 dark:text-primary-400 flex items-center justify-center font-black text-xs shadow-sm transition-all group-hover:scale-110">
                 SBU
               </div>
               <h2 className="text-xs font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-widest flex items-center gap-2">
                 <MdKeyboardArrowDown
-                  className={`text-slate-400 transition-transform duration-300 ${!isReportExpanded ? "-rotate-90 text-slate-400" : "text-indigo-600 dark:text-indigo-400"}`}
+                  className={`text-slate-400 transition-transform duration-300 ${!isReportExpanded ? "-rotate-90 text-slate-400" : "text-primary-600 dark:text-primary-400"}`}
                   size={20}
                 />
                 SBU Wise - FY {financialYear}
@@ -2481,13 +2481,13 @@ const PlanningScreen = () => {
                           <React.Fragment key={monthLabel}>
                             {/* MONTH ROW */}
                             <tr
-                              className="bg-indigo-50/20 dark:bg-indigo-950/30 hover:bg-indigo-50/40 dark:hover:bg-indigo-950/50 border-l-4 border-l-indigo-500 transition-all border-b border-slate-100 dark:border-slate-800 font-bold cursor-pointer"
+                              className="bg-primary-50/20 dark:bg-primary-950/30 hover:bg-primary-50/40 dark:hover:bg-primary-950/50 border-l-4 border-l-primary-500 transition-all border-b border-slate-100 dark:border-slate-800 font-bold cursor-pointer"
                               onClick={() => toggleSbuWiseMonth(monthLabel)}
                             >
                               <td className="py-3.5 px-4 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-800">
                                 <div className="flex items-center gap-2">
                                   <MdKeyboardArrowDown
-                                    className={`text-indigo-500 dark:text-indigo-400 transition-transform duration-300 ${!expandedSbuWiseMonths[monthLabel] ? "-rotate-90" : ""}`}
+                                    className={`text-primary-500 dark:text-primary-400 transition-transform duration-300 ${!expandedSbuWiseMonths[monthLabel] ? "-rotate-90" : ""}`}
                                     size={18}
                                   />
                                   <span className="font-extrabold text-xs tracking-wide">
@@ -2503,7 +2503,7 @@ const PlanningScreen = () => {
                                     className="py-3.5 px-4 text-right border border-slate-200 dark:border-slate-800"
                                   >
                                     {cellValue > 0 ? (
-                                      <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-indigo-50/70 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 text-[11px] font-black min-w-[70px] border border-indigo-100/40 dark:border-indigo-900/50 shadow-sm hover:scale-105 transition-all">
+                                      <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-primary-50/70 dark:bg-primary-950/60 text-primary-700 dark:text-primary-300 text-[11px] font-black min-w-[70px] border border-primary-100/40 dark:border-primary-900/50 shadow-sm hover:scale-105 transition-all">
                                         {formatReportValue(cellValue, 2)}
                                       </span>
                                     ) : (
@@ -2512,9 +2512,9 @@ const PlanningScreen = () => {
                                   </td>
                                 );
                               })}
-                              <td className="py-3.5 px-4 text-right border border-slate-200 dark:border-slate-800 bg-indigo-50/10 dark:bg-indigo-950/20">
+                              <td className="py-3.5 px-4 text-right border border-slate-200 dark:border-slate-800 bg-primary-50/10 dark:bg-primary-950/20">
                                 {monthTotal > 0 ? (
-                                  <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-indigo-100/50 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 text-[11px] font-black min-w-[70px] border border-indigo-200/30 dark:border-indigo-800/40 shadow-sm">
+                                  <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-primary-100/50 dark:bg-primary-900/50 text-primary-800 dark:text-primary-200 text-[11px] font-black min-w-[70px] border border-primary-200/30 dark:border-primary-800/40 shadow-sm">
                                     {formatReportValue(monthTotal, 2)}
                                   </span>
                                 ) : (
@@ -2634,16 +2634,16 @@ const PlanningScreen = () => {
       {hasAccess('planning_view_segment_wise') && (
         <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100/80 dark:border-slate-800 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-200/60 dark:hover:border-slate-700">
           <div
-            className="p-5 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-slate-50/80 to-sky-50/10 dark:from-slate-800/80 dark:to-sky-950/20 flex justify-between items-center cursor-pointer select-none group"
+            className="p-5 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-slate-50/80 to-primary-50/10 dark:from-slate-800/80 dark:to-primary-950/20 flex justify-between items-center cursor-pointer select-none group"
             onClick={() => setIsReportExpanded2(!isReportExpanded2)}
           >
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-sky-50 dark:bg-sky-950/80 text-sky-600 dark:text-sky-400 flex items-center justify-center font-black text-xs shadow-sm transition-all group-hover:scale-110">
+              <div className="w-8 h-8 rounded-xl bg-primary-50 dark:bg-primary-950/80 text-primary-600 dark:text-primary-400 flex items-center justify-center font-black text-xs shadow-sm transition-all group-hover:scale-110">
                 SEG
               </div>
               <h2 className="text-xs font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-widest flex items-center gap-2">
                 <MdKeyboardArrowDown
-                  className={`text-slate-400 transition-transform duration-300 ${!isReportExpanded2 ? "-rotate-90 text-slate-400" : "text-sky-600 dark:text-sky-400"}`}
+                  className={`text-slate-400 transition-transform duration-300 ${!isReportExpanded2 ? "-rotate-90 text-slate-400" : "text-primary-600 dark:text-primary-400"}`}
                   size={20}
                 />
                 Segment Wise - FY {financialYear}
@@ -2706,13 +2706,13 @@ const PlanningScreen = () => {
                       return (
                         <React.Fragment key={monthLabel}>
                           <tr
-                            className="bg-sky-50/20 dark:bg-sky-950/30 hover:bg-sky-50/40 dark:hover:bg-sky-950/50 border-l-4 border-l-sky-500 transition-all border-b border-slate-100 dark:border-slate-800 font-bold cursor-pointer"
+                            className="bg-primary-50/20 dark:bg-primary-950/30 hover:bg-primary-50/40 dark:hover:bg-primary-950/50 border-l-4 border-l-primary-500 transition-all border-b border-slate-100 dark:border-slate-800 font-bold cursor-pointer"
                             onClick={() => toggleSegmentMonth(monthLabel)}
                           >
                             <td className="py-3.5 px-4 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-800">
                               <div className="flex items-center gap-2">
                                 <MdKeyboardArrowDown
-                                  className={`text-sky-500 dark:text-sky-400 transition-transform duration-300 ${!expandedSegmentMonths[monthLabel] ? "-rotate-90" : ""}`}
+                                  className={`text-primary-500 dark:text-primary-400 transition-transform duration-300 ${!expandedSegmentMonths[monthLabel] ? "-rotate-90" : ""}`}
                                   size={18}
                                 />
                                 <span className="font-extrabold text-xs tracking-wide">{monthRow.month}</span>
@@ -2726,7 +2726,7 @@ const PlanningScreen = () => {
                                   className="py-3.5 px-4 text-right border border-slate-200 dark:border-slate-800"
                                 >
                                   {cellValue > 0 ? (
-                                    <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-sky-50/70 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 text-[11px] font-black min-w-[70px] border border-sky-100/40 dark:border-sky-900/50 shadow-sm hover:scale-105 transition-all">
+                                    <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-primary-50/70 dark:bg-primary-950/60 text-primary-700 dark:text-primary-300 text-[11px] font-black min-w-[70px] border border-primary-100/40 dark:border-primary-900/50 shadow-sm hover:scale-105 transition-all">
                                       {formatReportValue(cellValue, 3)}
                                     </span>
                                   ) : (
@@ -2736,10 +2736,10 @@ const PlanningScreen = () => {
                               );
                             })}
                             <td
-                              className="py-3.5 px-4 text-right bg-sky-50/10 dark:bg-sky-950/20 border border-slate-200 dark:border-slate-800"
+                              className="py-3.5 px-4 text-right bg-primary-50/10 dark:bg-primary-950/20 border border-slate-200 dark:border-slate-800"
                             >
                               {Number(monthRow.total || 0) > 0 ? (
-                                <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-sky-100/50 dark:bg-sky-900/50 text-sky-800 dark:text-sky-200 text-[11px] font-black min-w-[70px] border border-sky-200/30 dark:border-sky-800/40 shadow-sm">
+                                <span className="inline-flex items-center justify-end px-2.5 py-1 rounded-full bg-primary-100/50 dark:bg-primary-900/50 text-primary-800 dark:text-primary-200 text-[11px] font-black min-w-[70px] border border-primary-200/30 dark:border-primary-800/40 shadow-sm">
                                   {formatReportValue(monthRow.total || 0, 3)}
                                 </span>
                               ) : (
@@ -3138,7 +3138,7 @@ const PlanningScreen = () => {
                     return (
                       <tr
                         key={`status-breakdown-${summaryRow.key}`}
-                        className={`border-b border-slate-200/60 dark:border-slate-800/60 transition-colors ${isYellowLabel ? "border-t border-emerald-100 dark:border-emerald-900/60 bg-emerald-50/60 dark:bg-emerald-950/40 font-black text-emerald-900 dark:text-emerald-200" : "border-t border-indigo-100 dark:border-indigo-900/60 bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-200"}`}
+                        className={`border-b border-slate-200/60 dark:border-slate-800/60 transition-colors ${isYellowLabel ? "border-t border-emerald-100 dark:border-emerald-900/60 bg-emerald-50/60 dark:bg-emerald-950/40 font-black text-emerald-900 dark:text-emerald-200" : "border-t border-primary-100 dark:border-primary-900/60 bg-primary-50/50 dark:bg-primary-950/40 text-primary-900 dark:text-primary-200"}`}
                       >
                         <td
                           colSpan={3}
@@ -3156,7 +3156,7 @@ const PlanningScreen = () => {
                               {cellValue > 0 ? (
                                 <span className={`inline-flex items-center justify-end px-2.5 py-1 rounded-full text-[11px] font-black min-w-[70px] border ${isYellowLabel
                                   ? "bg-emerald-100/50 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-200 border-emerald-200/40 dark:border-emerald-800/40"
-                                  : "bg-indigo-100/50 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 border-indigo-200/40 dark:border-indigo-800/40"
+                                  : "bg-primary-100/50 dark:bg-primary-900/50 text-primary-800 dark:text-primary-200 border-primary-200/40 dark:border-primary-800/40"
                                   }`}>
                                   {summaryRow.isPercentage || summaryRow.isTotalPercentage
                                     ? formatReportPercentage(cellValue)

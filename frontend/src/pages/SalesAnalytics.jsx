@@ -44,7 +44,7 @@ const SalesAnalytics = () => {
     };
 
     if (loading) {
-        return <div className="flex items-center justify-center h-96"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>;
+        return <div className="flex items-center justify-center h-96"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div></div>;
     }
 
     return (
@@ -63,12 +63,12 @@ const SalesAnalytics = () => {
             {velocity && (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                     {[
-                        { label: 'Avg Sales Cycle', value: `${velocity.avgCycleDays} days`, color: 'from-indigo-500 to-blue-600' },
+                        { label: 'Avg Sales Cycle', value: `${velocity.avgCycleDays} days`, color: 'from-primary-500 to-primary-600' },
                         { label: 'Min Cycle', value: `${velocity.minCycleDays} days`, color: 'from-emerald-500 to-green-600' },
                         { label: 'Max Cycle', value: `${velocity.maxCycleDays} days`, color: 'from-red-500 to-pink-600' },
                         { label: 'Win Rate', value: `${velocity.winRate}%`, color: 'from-amber-500 to-orange-600' },
                         { label: 'Velocity', value: formatCurrency(velocity.pipelineVelocity), color: 'from-violet-500 to-purple-600' },
-                        { label: 'Won Deals', value: velocity.totalWonDeals, color: 'from-teal-500 to-cyan-600' },
+                        { label: 'Won Deals', value: velocity.totalWonDeals, color: 'from-teal-500 to-primary-600' },
                     ].map((card, i) => (
                         <div key={i} className="bg-white dark:bg-slate-900/60 rounded-2xl border border-slate-100 dark:border-slate-800 p-4 hover:shadow-lg transition-all">
                             <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${card.color} flex items-center justify-center text-white mb-2`}>
@@ -138,17 +138,17 @@ const SalesAnalytics = () => {
                         {/* 7+ days */}
                         {stuck.sevenDays?.length > 0 && (
                             <div>
-                                <h4 className="text-xs font-black text-blue-600 dark:text-blue-400 uppercase mb-2 flex items-center gap-1">
-                                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                                <h4 className="text-xs font-black text-primary-600 dark:text-primary-400 uppercase mb-2 flex items-center gap-1">
+                                    <span className="w-2 h-2 rounded-full bg-primary-500" />
                                     7+ Days ({stuck.sevenDays.length})
                                 </h4>
                                 <div className="space-y-2">
                                     {stuck.sevenDays.slice(0, 5).map((d, i) => (
-                                        <div key={i} className="p-3 bg-blue-50/50 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/40">
+                                        <div key={i} className="p-3 bg-primary-50/50 dark:bg-primary-950/30 rounded-xl border border-primary-100 dark:border-primary-900/40">
                                             <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{d.title}</p>
                                             <div className="flex items-center justify-between mt-1">
                                                 <span className="text-xs text-slate-500 dark:text-slate-400">{d.ownerId?.name || '—'}</span>
-                                                <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{daysSince(d.updatedAt)} inactive</span>
+                                                <span className="text-xs font-bold text-primary-600 dark:text-primary-400">{daysSince(d.updatedAt)} inactive</span>
                                             </div>
                                             <p className="text-sm font-black text-slate-900 dark:text-slate-100 mt-1">{formatCurrency(d.value)}</p>
                                         </div>
@@ -170,7 +170,7 @@ const SalesAnalytics = () => {
             {performers.length > 0 && (
                 <div className="bg-white dark:bg-slate-900/60 rounded-2xl border border-slate-100 dark:border-slate-800 p-6">
                     <div className="flex items-center gap-2 mb-4">
-                        <MdPerson className="text-indigo-500" size={22} />
+                        <MdPerson className="text-primary-500" size={22} />
                         <h3 className="text-lg font-black text-slate-900 dark:text-slate-100">Salesperson Performance</h3>
                     </div>
                     <div className="overflow-x-auto">
@@ -192,11 +192,11 @@ const SalesAnalytics = () => {
                                     <tr key={i} className="border-b border-slate-50 dark:border-slate-800/60 hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
                                         <td className="py-3 px-4 font-bold text-slate-900 dark:text-slate-100">{p.userName || 'Unknown'}</td>
                                         <td className="py-3 px-4 text-right text-slate-600 dark:text-slate-400">{p.totalDeals}</td>
-                                        <td className="py-3 px-4 text-right text-blue-600 dark:text-blue-400 font-semibold">{p.openDeals}</td>
+                                        <td className="py-3 px-4 text-right text-primary-600 dark:text-primary-400 font-semibold">{p.openDeals}</td>
                                         <td className="py-3 px-4 text-right text-emerald-600 dark:text-emerald-400 font-bold">{p.wonDeals}</td>
                                         <td className="py-3 px-4 text-right text-red-500 dark:text-red-400">{p.lostDeals}</td>
                                         <td className="py-3 px-4 text-right font-black text-slate-900 dark:text-slate-100">{formatCurrency(p.totalRevenue)}</td>
-                                        <td className="py-3 px-4 text-right text-indigo-600 dark:text-indigo-400 font-bold">{formatCurrency(p.pipelineValue)}</td>
+                                        <td className="py-3 px-4 text-right text-primary-600 dark:text-primary-400 font-bold">{formatCurrency(p.pipelineValue)}</td>
                                         <td className="py-3 px-4 text-right">
                                             <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${
                                                 p.conversionRate >= 50 ? 'bg-emerald-50 text-emerald-700' :

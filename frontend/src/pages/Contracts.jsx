@@ -902,7 +902,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                         {/* Workspace header */}
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-6">
                             <div>
-                                <span className="px-3 py-1 rounded-xl text-[9px] font-black uppercase bg-indigo-50 text-indigo-600 border border-indigo-100">
+                                <span className="px-3 py-1 rounded-xl text-[9px] font-black uppercase bg-primary-50 text-primary-600 border border-primary-100">
                                     Contract Workspace
                                 </span>
                                 <h2 className="text-2xl font-black text-slate-900 mt-2">{activeWorkspaceContract.title}</h2>
@@ -973,7 +973,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                 <div className="space-y-4">
                                     <div className="p-6 bg-white border border-slate-200 rounded-[2rem] text-center">
                                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Risk Index</div>
-                                        <div className="text-2xl font-black text-indigo-600 mt-2">{activeWorkspaceContract.riskScore || 'Low'}</div>
+                                        <div className="text-2xl font-black text-primary-600 mt-2">{activeWorkspaceContract.riskScore || 'Low'}</div>
                                     </div>
                                     <div className="p-6 bg-white border border-slate-200 rounded-[2rem] text-center">
                                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Signature Progress</div>
@@ -1185,7 +1185,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                                 <div className="text-xs font-black text-slate-900">{att.name}</div>
                                                 <div className="text-[10px] text-slate-400 mt-1">{att.size} • {att.type}</div>
                                             </div>
-                                            <span className="text-[10px] font-bold text-indigo-600 uppercase">View File</span>
+                                            <span className="text-[10px] font-bold text-primary-600 uppercase">View File</span>
                                         </div>
                                     ))}
                                 </div>
@@ -1225,7 +1225,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                             <div className="flex-1 w-full p-5 bg-slate-50 border border-slate-100 rounded-3xl flex items-center gap-3 relative">
                                                 <div className={`h-8 w-8 rounded-xl flex items-center justify-center font-bold text-xs ${
                                                     step.status === 'Approved' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
-                                                    step.status === 'Current' ? 'bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-sm animate-pulse' :
+                                                    step.status === 'Current' ? 'bg-primary-50 text-primary-600 border border-primary-100 shadow-sm animate-pulse' :
                                                     'bg-slate-100 text-slate-400 border border-slate-200'
                                                 }`}>
                                                     {idx + 1}
@@ -1260,7 +1260,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                                     <div className="text-xs font-black text-slate-900">Version {v.version}</div>
                                                     <div className="text-[10px] text-slate-400 mt-1">Compiled: {formatDateTime(v.createdAt)}</div>
                                                 </div>
-                                                <span className="text-[10px] font-bold text-indigo-600 uppercase">View Snapshot</span>
+                                                <span className="text-[10px] font-bold text-primary-600 uppercase">View Snapshot</span>
                                             </button>
                                         ))
                                     )}
@@ -1292,7 +1292,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                             placeholder="Write internal note..."
                                             className="flex-1 px-4 py-2 border border-slate-250 rounded-xl outline-none text-xs font-semibold"
                                         />
-                                        <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase">Post</button>
+                                        <button type="submit" className="px-4 py-2 bg-primary-600 text-white rounded-xl text-xs font-bold uppercase">Post</button>
                                     </form>
                                     <div className="space-y-3">
                                         {workspaceComments.map((com, idx) => (
@@ -1315,7 +1315,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                             { event: 'Pricing locked for 5 items', user: 'Sales Exec', time: '10:16 AM' }
                                         ].map((log, idx) => (
                                             <div key={idx} className="relative">
-                                                <div className="absolute -left-[30px] top-1.5 h-3 w-3 bg-indigo-500 rounded-full border border-white" />
+                                                <div className="absolute -left-[30px] top-1.5 h-3 w-3 bg-primary-500 rounded-full border border-white" />
                                                 <div className="text-xs font-bold text-slate-800">{log.event}</div>
                                                 <div className="text-[9px] text-slate-400 mt-0.5">{log.time} by {log.user}</div>
                                             </div>
@@ -1340,7 +1340,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                 {/* Metrics */}
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                                     <div className="p-6 bg-white border border-slate-100 rounded-[2rem] shadow-sm flex items-center gap-4">
-                                        <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                        <div className="h-12 w-12 rounded-2xl bg-primary-50 text-primary-600 flex items-center justify-center">
                                             <MdAttachMoney size={24} />
                                         </div>
                                         <div>
@@ -1412,7 +1412,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                                         <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
                                                             <div 
                                                                 style={{ width: `${Math.min(100, Math.max(5, (cust.value / (dashboardData.charts.topCustomers[0]?.value || 1)) * 100))}%` }} 
-                                                                className="h-full bg-gradient-to-r from-indigo-500 to-primary-600 rounded-full"
+                                                                className="h-full bg-gradient-to-r from-primary-500 to-primary-600 rounded-full"
                                                             />
                                                         </div>
                                                     </div>
@@ -1525,7 +1525,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                                             <div className="text-slate-900 font-bold">₹{(c.value || 0).toLocaleString()}</div>
                                                         </td>
                                                         <td className="px-8 py-5">
-                                                            <span className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase bg-indigo-50 text-indigo-600 border border-indigo-100">
+                                                            <span className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase bg-primary-50 text-primary-600 border border-primary-100">
                                                                 {c.category}
                                                             </span>
                                                         </td>
@@ -1541,7 +1541,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                                         <td className="px-8 py-5 text-right">
                                                             <button 
                                                                 onClick={() => openWorkspace(c)}
-                                                                className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-black transition-all active:scale-95"
+                                                                className="px-4 py-2 bg-primary-50 hover:bg-primary-100 text-primary-600 rounded-xl text-xs font-black transition-all active:scale-95"
                                                             >
                                                                 Workspace
                                                             </button>
@@ -1588,7 +1588,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                                         setTemplateForm({ name: t.name, category: t.category, htmlContent: t.htmlContent, cssContent: t.cssContent || '' });
                                                         setIsTemplateModalOpen(true);
                                                     }}
-                                                    className="text-xs font-black text-indigo-600 hover:underline"
+                                                    className="text-xs font-black text-primary-600 hover:underline"
                                                 >
                                                     Edit Layout
                                                 </button>}
@@ -1620,7 +1620,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                         <div key={cl._id} className="p-6 bg-white border border-slate-100 rounded-[2rem] shadow-sm space-y-4">
                                             <div className="flex justify-between items-start">
                                                 <h4 className="font-black text-slate-900 text-sm leading-snug">{cl.title}</h4>
-                                                <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase bg-indigo-50 text-indigo-600 border border-indigo-100">
+                                                <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase bg-primary-50 text-primary-600 border border-primary-100">
                                                     {cl.category}
                                                 </span>
                                             </div>
@@ -1664,7 +1664,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                                             <div className="text-[10px] text-slate-400 mt-1 uppercase font-black tracking-wider">{c.contractNumber}</div>
                                                         </td>
                                                         <td className="px-8 py-5">
-                                                            <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-indigo-50 text-indigo-600 border border-indigo-100">
+                                                            <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-primary-50 text-primary-600 border border-primary-100">
                                                                 {c.category}
                                                             </span>
                                                         </td>
@@ -1677,7 +1677,7 @@ const Contracts = ({ mode = 'dashboard' }) => {
                                                         <td className="px-8 py-5 text-right">
                                                             <button 
                                                                 onClick={() => openWorkspace(c)}
-                                                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all"
+                                                                className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold transition-all"
                                                             >
                                                                 Review & Sign
                                                             </button>
@@ -1701,8 +1701,8 @@ const Contracts = ({ mode = 'dashboard' }) => {
 
                                 <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                                     {[
-                                        { key: 'Due in 90 Days', title: '90 Days Due', bg: 'bg-indigo-50 border-indigo-100 text-indigo-800' },
-                                        { key: 'Due in 60 Days', title: '60 Days Due', bg: 'bg-blue-50 border-blue-100 text-blue-800' },
+                                        { key: 'Due in 90 Days', title: '90 Days Due', bg: 'bg-primary-50 border-primary-100 text-primary-800' },
+                                        { key: 'Due in 60 Days', title: '60 Days Due', bg: 'bg-primary-50 border-primary-100 text-primary-800' },
                                         { key: 'Due in 30 Days', title: '30 Days Due', bg: 'bg-amber-50 border-amber-100 text-amber-800' },
                                         { key: 'Today', title: 'Due Today', bg: 'bg-rose-50 border-rose-100 text-rose-800' },
                                         { key: 'Renewed', title: 'Renewed', bg: 'bg-emerald-50 border-emerald-100 text-emerald-800' },

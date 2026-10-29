@@ -222,7 +222,7 @@ const PayrollDashboard = () => {
                             to="/payroll/employees" 
                             className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col items-center justify-center text-center gap-3 hover:-translate-y-0.5 duration-200"
                         >
-                            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                            <div className="w-10 h-10 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center">
                                 <MdPeople size={20} />
                             </div>
                             <span className="text-sm font-bold text-slate-700">Salary Profiles</span>

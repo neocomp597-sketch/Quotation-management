@@ -53,20 +53,20 @@ const SalesDashboard = () => {
     };
 
     const kpiCards = kpis ? [
-        { label: 'Revenue Forecast', value: formatCurrency(kpis.revenueForecast), icon: <MdTrendingUp />, color: 'from-indigo-500 to-purple-600', sub: 'Weighted pipeline' },
-        { label: 'Pipeline Value', value: formatCurrency(kpis.pipelineValue), icon: <MdAccountBalance />, color: 'from-blue-500 to-cyan-500', sub: `${kpis.dealCount} open deals` },
+        { label: 'Revenue Forecast', value: formatCurrency(kpis.revenueForecast), icon: <MdTrendingUp />, color: 'from-primary-500 to-purple-600', sub: 'Weighted pipeline' },
+        { label: 'Pipeline Value', value: formatCurrency(kpis.pipelineValue), icon: <MdAccountBalance />, color: 'from-primary-500 to-primary-500', sub: `${kpis.dealCount} open deals` },
         { label: 'Weighted Forecast', value: formatCurrency(kpis.weightedForecast), icon: <MdBarChart />, color: 'from-violet-500 to-fuchsia-500', sub: 'Probability adjusted' },
         { label: 'Closed Revenue', value: formatCurrency(kpis.closedRevenue), icon: <MdEmojiEvents />, color: 'from-emerald-500 to-green-600', sub: `${kpis.closedCount} deals this month` },
         { label: 'Win Rate', value: `${kpis.winRate}%`, icon: <MdTrackChanges />, color: 'from-amber-500 to-orange-500', sub: 'Last 90 days' },
         { label: 'Avg Deal Size', value: formatCurrency(kpis.avgDealSize), icon: <MdShowChart />, color: 'from-pink-500 to-rose-500', sub: 'Across open deals' },
         { label: 'Sales Cycle', value: `${kpis.salesCycleDays} Days`, icon: <MdTimer />, color: 'from-teal-500 to-emerald-500', sub: 'Avg time to win' },
-        { label: 'Forecast Accuracy', value: `${kpis.forecastAccuracy}%`, icon: <MdSpeed />, color: 'from-sky-500 to-blue-600', sub: 'Last month snapshot' },
+        { label: 'Forecast Accuracy', value: `${kpis.forecastAccuracy}%`, icon: <MdSpeed />, color: 'from-primary-500 to-primary-600', sub: 'Last month snapshot' },
     ] : [];
 
     if (loading) {
         return (
             <div className="flex items-center justify-center h-96">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
             </div>
         );
     }
@@ -82,7 +82,7 @@ const SalesDashboard = () => {
                 <div className="flex gap-2">
                     <button
                         onClick={() => navigate('/sales/deals')}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/25"
+                        className="px-4 py-2 bg-primary-600 text-white rounded-xl font-bold text-sm hover:bg-primary-700 transition-all shadow-lg shadow-primary-600/25"
                     >
                         View Deals
                     </button>

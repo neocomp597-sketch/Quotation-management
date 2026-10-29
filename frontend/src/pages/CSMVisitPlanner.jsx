@@ -214,10 +214,10 @@ const CSMVisitPlanner = () => {
     const getStatusBadgeClass = (status) => {
         switch (status) {
             case 'Completed': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-            case 'Started': return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+            case 'Started': return 'bg-primary-50 text-primary-700 border-primary-200';
             case 'In Transit': return 'bg-amber-50 text-amber-700 border-amber-200';
             case 'Cancelled': return 'bg-rose-50 text-rose-700 border-rose-200';
-            default: return 'bg-sky-50 text-sky-700 border-sky-200';
+            default: return 'bg-primary-50 text-primary-700 border-primary-200';
         }
     };
 
@@ -617,9 +617,9 @@ const CSMVisitPlanner = () => {
                         </div>
 
                         {selectedVisit.ticketType && (
-                            <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-200 text-xs space-y-1">
-                                <span className="block text-[9px] font-black uppercase text-indigo-800">Type of Ticket</span>
-                                <p className="text-indigo-950 font-bold">{selectedVisit.ticketType}</p>
+                            <div className="p-3 bg-primary-50/60 rounded-xl border border-primary-200 text-xs space-y-1">
+                                <span className="block text-[9px] font-black uppercase text-primary-800">Type of Ticket</span>
+                                <p className="text-primary-950 font-bold">{selectedVisit.ticketType}</p>
                             </div>
                         )}
 

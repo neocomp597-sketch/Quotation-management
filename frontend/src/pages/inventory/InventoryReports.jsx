@@ -251,7 +251,7 @@ const InventoryReports = () => {
                                         <td className="px-4 py-3 font-medium">{item.productName}</td>
                                         <td className="px-4 py-3 text-xs text-slate-500">{item.categoryName}</td>
                                         <td className="px-4 py-3 text-right font-bold">{item.currentStock}</td>
-                                        <td className="px-4 py-3 text-right font-bold text-indigo-600">{item.outwardQtyInPeriod}</td>
+                                        <td className="px-4 py-3 text-right font-bold text-primary-600">{item.outwardQtyInPeriod}</td>
                                         <td className="px-4 py-3">
                                             <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
                                                 item.velocityCategory === 'Fast Moving'

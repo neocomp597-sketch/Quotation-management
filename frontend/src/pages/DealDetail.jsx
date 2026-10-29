@@ -20,7 +20,7 @@ const ACTIVITY_ICONS = {
 };
 
 const ACTIVITY_COLORS = {
-    Call: 'bg-blue-100 text-blue-700', Email: 'bg-purple-100 text-purple-700',
+    Call: 'bg-primary-100 text-primary-700', Email: 'bg-purple-100 text-purple-700',
     Meeting: 'bg-amber-100 text-amber-700', WhatsApp: 'bg-green-100 text-green-700',
     Task: 'bg-red-100 text-red-700', Note: 'bg-slate-100 text-slate-700'
 };
@@ -211,7 +211,7 @@ const DealDetail = () => {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-96">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
             </div>
         );
     }
@@ -234,7 +234,7 @@ const DealDetail = () => {
                                 <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${
                                     deal.status === 'Won' ? 'bg-emerald-100 text-emerald-700' :
                                     deal.status === 'Lost' ? 'bg-red-100 text-red-700' :
-                                    'bg-blue-100 text-blue-700'
+                                    'bg-primary-100 text-primary-700'
                                 }`}>{deal.status}</span>
                                 {currentStage && (
                                     <span className="flex items-center gap-1 text-xs text-slate-500">
@@ -282,7 +282,7 @@ const DealDetail = () => {
                             </div>
                             <div className="bg-white rounded-2xl border border-slate-100 p-4">
                                 <p className="text-xs font-bold text-slate-400 uppercase">Probability</p>
-                                <p className="text-xl font-black text-indigo-600 mt-1">{deal.probability}%</p>
+                                <p className="text-xl font-black text-primary-600 mt-1">{deal.probability}%</p>
                             </div>
                             <div className="bg-white rounded-2xl border border-slate-100 p-4">
                                 <p className="text-xs font-bold text-slate-400 uppercase">Weighted</p>
@@ -303,7 +303,7 @@ const DealDetail = () => {
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Deal Title *</label>
                                 <input type="text" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}
-                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="relative" ref={customerAnchorRef}>
@@ -325,7 +325,7 @@ const DealDetail = () => {
                                             setCustomerSearch(e.target.value);
                                         }}
                                         placeholder="Search & Select Customer..."
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-bold text-slate-900 placeholder:font-normal placeholder:text-slate-400"
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent font-bold text-slate-900 placeholder:font-normal placeholder:text-slate-400"
                                     />
                                     <PortalDropdown isOpen={customerDropdownOpen} anchorRef={customerAnchorRef}>
                                         <ul className="bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-64 overflow-y-auto divide-y divide-slate-50 overflow-hidden">
@@ -346,7 +346,7 @@ const DealDetail = () => {
                                                             setCustomerSearch(c.companyName || c.customerName);
                                                             setCustomerDropdownOpen(false);
                                                         }}
-                                                        className="px-5 py-3.5 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer text-sm font-bold text-slate-700 transition-colors"
+                                                        className="px-5 py-3.5 hover:bg-primary-50 hover:text-primary-700 cursor-pointer text-sm font-bold text-slate-700 transition-colors"
                                                     >
                                                         <div className="font-bold text-slate-900 text-sm">{c.companyName || c.customerName}</div>
                                                         {(c.companyName && c.customerName) && (
@@ -371,14 +371,14 @@ const DealDetail = () => {
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Deal Value (₹)</label>
                                     <input type="number" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Expected Close</label>
                                     <DateInput type="date" value={form.expectedCloseDate} onChange={e => setForm({ ...form, expectedCloseDate: e.target.value })}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Source</label>
@@ -394,7 +394,7 @@ const DealDetail = () => {
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Forecast Category</label>
                                     <select value={form.forecastCategory} onChange={e => setForm({ ...form, forecastCategory: e.target.value })}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent">
                                         {FORECAST_CATS.map(c => <option key={c} value={c}>{c}</option>)}
                                     </select>
                                 </div>
@@ -402,16 +402,16 @@ const DealDetail = () => {
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tags (comma-separated)</label>
                                 <input type="text" value={form.tags} onChange={e => setForm({ ...form, tags: e.target.value })}
-                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="e.g. enterprise, high-value" />
+                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="e.g. enterprise, high-value" />
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Notes</label>
                                 <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3}
-                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
                             </div>
                             <div className="flex gap-3">
                                 {id && <button onClick={() => { setEditing(false); loadDeal(); }} className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50">Cancel</button>}
-                                <button onClick={handleSave} className="px-6 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-600/25 flex items-center gap-1.5">
+                                <button onClick={handleSave} className="px-6 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-bold hover:bg-primary-700 shadow-lg shadow-primary-600/25 flex items-center gap-1.5">
                                     <MdSave size={16} /> Save
                                 </button>
                             </div>
@@ -434,7 +434,7 @@ const DealDetail = () => {
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-xs font-bold text-slate-400">Tags:</span>
                                     {deal.tags.map((tag, i) => (
-                                        <span key={i} className="px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-bold">{tag}</span>
+                                        <span key={i} className="px-2 py-0.5 rounded-lg bg-primary-50 text-primary-700 text-xs font-bold">{tag}</span>
                                     ))}
                                 </div>
                             )}
@@ -450,7 +450,7 @@ const DealDetail = () => {
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="text-sm font-black text-slate-900 uppercase">Activity Timeline</h3>
                                 {canModify && <button onClick={() => setShowActivity(!showActivity)}
-                                    className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center hover:bg-indigo-100 transition-all">
+                                    className="w-8 h-8 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center hover:bg-primary-100 transition-all">
                                     <MdAdd size={18} />
                                 </button>}
                             </div>
@@ -476,7 +476,7 @@ const DealDetail = () => {
                                         <DateInput type="datetime-local" value={activityForm.activityDate}
                                             onChange={e => setActivityForm({ ...activityForm, activityDate: e.target.value })}
                                             className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm" />
-                                        <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold">Add</button>
+                                        <button type="submit" className="px-4 py-2 bg-primary-600 text-white rounded-xl text-sm font-bold">Add</button>
                                     </div>
                                 </form>
                             )}

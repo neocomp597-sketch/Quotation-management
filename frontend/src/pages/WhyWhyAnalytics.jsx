@@ -14,7 +14,7 @@ const statusClass = (status) => ({
     Open: 'bg-rose-50 text-rose-700 border-rose-200',
     'In Progress': 'bg-amber-50 text-amber-700 border-amber-200',
     Closed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    Resolved: 'bg-sky-50 text-sky-700 border-sky-200'
+    Resolved: 'bg-primary-50 text-primary-700 border-primary-200'
 }[status] || 'bg-slate-50 text-slate-600 border-slate-200');
 
 const WhyWhyAnalytics = () => {

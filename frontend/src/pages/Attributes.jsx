@@ -175,7 +175,7 @@ const Attributes = ({ isCreatePage, isEditPage }) => {
                     <div className="flex gap-2">
                         <button
                             onClick={() => setIsImportModalOpen(true)}
-                            className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-indigo-600/20 uppercase text-xs tracking-widest active:scale-95"
+                            className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
                         >
                             <MdFileUpload size={20} />
                             <span>Upload</span>

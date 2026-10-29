@@ -76,14 +76,14 @@ const SalesReports = () => {
     };
 
     if (loading) {
-        return <div className="flex items-center justify-center h-96"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>;
+        return <div className="flex items-center justify-center h-96"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div></div>;
     }
 
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-lg">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center text-white shadow-lg">
                         <MdBarChart size={22} />
                     </div>
                     <div>
@@ -103,7 +103,7 @@ const SalesReports = () => {
                     <div className="bg-white rounded-2xl border border-slate-100 p-6">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-black text-slate-900">Pipeline Funnel</h3>
-                            <span className="text-xs font-bold px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700">
+                            <span className="text-xs font-bold px-2 py-1 rounded-lg bg-primary-50 text-primary-700">
                                 Conversion: {funnel.conversionRate}%
                             </span>
                         </div>

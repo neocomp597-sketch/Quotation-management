@@ -762,7 +762,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                             </span>
                                         )}
                                         {emp.externalEmployeeCode && (
-                                            <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 font-mono font-bold text-[10px] rounded-lg border border-indigo-100">
+                                            <span className="px-2 py-0.5 bg-primary-50 text-primary-700 font-mono font-bold text-[10px] rounded-lg border border-primary-100">
                                                 Ext: {emp.externalEmployeeCode}
                                             </span>
                                         )}
@@ -905,7 +905,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                                 </span>
                                                             )}
                                                             {emp.externalEmployeeCode && (
-                                                                <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 font-mono font-bold text-[10px] rounded-lg border border-indigo-100">
+                                                                <span className="px-2 py-0.5 bg-primary-50 text-primary-700 font-mono font-bold text-[10px] rounded-lg border border-primary-100">
                                                                     Ext: {emp.externalEmployeeCode}
                                                                 </span>
                                                             )}

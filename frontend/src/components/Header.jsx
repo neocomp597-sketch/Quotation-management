@@ -831,7 +831,7 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                             className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition-all flex items-center gap-1.5 border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
                         >
                             {isDarkMode ? (
-                                <MdNightsStay size={20} className="text-indigo-400" />
+                                <MdNightsStay size={20} className="text-primary-400" />
                             ) : (
                                 <MdWbSunny size={20} className="text-amber-500" />
                             )}
@@ -897,8 +897,8 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                                                 borderClass = 'border-amber-500 bg-amber-50/30';
                                                 textClass = 'text-amber-600';
                                             } else if (n.type === 'Release') {
-                                                borderClass = 'border-indigo-500 bg-indigo-50/30';
-                                                textClass = 'text-indigo-600';
+                                                borderClass = 'border-primary-500 bg-primary-50/30';
+                                                textClass = 'text-primary-600';
                                             } else if (n.type.startsWith('MEETING_')) {
                                                 borderClass = 'border-teal-500 bg-teal-50/30';
                                                 textClass = 'text-teal-600';

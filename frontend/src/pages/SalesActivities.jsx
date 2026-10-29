@@ -7,7 +7,7 @@ import { MdPhone, MdEmail, MdEvent, MdChat, MdAssignment, MdNote, MdFilterList }
 const TYPES = ['Call', 'Email', 'Meeting', 'WhatsApp', 'Task', 'Note'];
 const ICONS = { Call: <MdPhone />, Email: <MdEmail />, Meeting: <MdEvent />, WhatsApp: <MdChat />, Task: <MdAssignment />, Note: <MdNote /> };
 const COLORS = {
-    Call: 'bg-blue-100 text-blue-700 border-blue-200',
+    Call: 'bg-primary-100 text-primary-700 border-primary-200',
     Email: 'bg-purple-100 text-purple-700 border-purple-200',
     Meeting: 'bg-amber-100 text-amber-700 border-amber-200',
     WhatsApp: 'bg-green-100 text-green-700 border-green-200',
@@ -48,13 +48,13 @@ const SalesActivities = () => {
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                     <button onClick={() => { setFilterType(''); setPage(1); }}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${!filterType ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-300'}`}>
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${!filterType ? 'bg-primary-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-primary-300'}`}>
                         All
                     </button>
                     {TYPES.map(t => (
                         <button key={t} onClick={() => { setFilterType(t); setPage(1); }}
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
-                                filterType === t ? COLORS[t] : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-300'
+                                filterType === t ? COLORS[t] : 'bg-white border border-slate-200 text-slate-600 hover:border-primary-300'
                             }`}>
                             {ICONS[t]} {t}
                         </button>
@@ -63,7 +63,7 @@ const SalesActivities = () => {
             </div>
 
             {loading ? (
-                <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>
+                <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div></div>
             ) : (
                 <div className="bg-white rounded-2xl border border-slate-100 divide-y divide-slate-50">
                     {activities.length > 0 ? activities.map((a, i) => (

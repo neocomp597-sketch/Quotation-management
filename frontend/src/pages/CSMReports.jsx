@@ -214,11 +214,11 @@ const CSMReports = () => {
 
     const hudCards = [
         { label: 'Total Tickets', value: totalCount, icon: <MdAssignment size={24} />, color: 'text-teal-600 bg-teal-50 border-teal-100' },
-        { label: 'Open cases', value: openCount, icon: <MdHourglassEmpty size={24} />, color: 'text-blue-600 bg-blue-50 border-blue-100' },
+        { label: 'Open cases', value: openCount, icon: <MdHourglassEmpty size={24} />, color: 'text-primary-600 bg-primary-50 border-primary-100' },
         { label: 'Closed Cases', value: closedCount, icon: <MdCheckCircle size={24} />, color: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
         { label: 'SLA Breaches', value: breachedCount, icon: <MdWarning size={24} />, color: 'text-rose-600 bg-rose-50 border-rose-100' },
         { label: 'FCR Rate', value: `${overallFcrRate}%`, icon: <MdFlashOn size={24} />, color: 'text-amber-600 bg-amber-50 border-amber-100' },
-        { label: 'Avg Resolution', value: `${avgResolutionHours} hrs`, icon: <MdTimer size={24} />, color: 'text-indigo-600 bg-indigo-50 border-indigo-100' },
+        { label: 'Avg Resolution', value: `${avgResolutionHours} hrs`, icon: <MdTimer size={24} />, color: 'text-primary-600 bg-primary-50 border-primary-100' },
         { label: 'CSAT score', value: `${avgCsatRating} ★`, icon: <MdFeedback size={24} />, color: 'text-violet-600 bg-violet-50 border-violet-100' }
     ];
 

@@ -311,14 +311,14 @@ const Quotations = () => {
                                                     <div className="flex flex-wrap items-center gap-2 mt-1">
                                                         <p className="text-xs text-slate-400 font-medium">{q.customerId?.customerName}</p>
                                                         {q.territory && (
-                                                            <span className="px-1.5 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-md text-[9px] font-black uppercase tracking-wider">
+                                                            <span className="px-1.5 py-0.5 bg-primary-50 border border-primary-100 text-primary-600 rounded-md text-[9px] font-black uppercase tracking-wider">
                                                                 {q.territory.name}
                                                             </span>
                                                         )}
                                                     </div>
                                                 </div>
                                                 <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${q.status === 'ordered'
-                                                    ? 'bg-blue-50 text-blue-600 border-blue-100'
+                                                    ? 'bg-primary-50 text-primary-600 border-primary-100'
                                                     : q.status === 'final'
                                                         ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
                                                         : 'bg-amber-50 text-amber-600 border-amber-100'
@@ -361,7 +361,7 @@ const Quotations = () => {
                                                 {canModify && q.status === 'final' && (
                                                     <button
                                                         onClick={() => handleMarkAsOrdered(q._id)}
-                                                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                                        className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
                                                         title="Convert to Order"
                                                     >
                                                         <MdCheckCircle size={18} />
@@ -428,7 +428,7 @@ const Quotations = () => {
                                                             <div className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">{q.customerId?.customerName}</div>
                                                         </div>
                                                         {q.territory && (
-                                                            <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-lg text-[9px] font-black uppercase tracking-widest whitespace-nowrap">
+                                                            <span className="px-2 py-0.5 bg-primary-50 border border-primary-100 text-primary-600 rounded-lg text-[9px] font-black uppercase tracking-widest whitespace-nowrap">
                                                                 {q.territory.name}
                                                             </span>
                                                         )}
@@ -446,7 +446,7 @@ const Quotations = () => {
                                                 <td className="px-8 py-5">
                                                     <div className="flex justify-center">
                                                         <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${q.status === 'ordered'
-                                                            ? 'bg-blue-50 text-blue-600 border-blue-100'
+                                                            ? 'bg-primary-50 text-primary-600 border-primary-100'
                                                             : q.status === 'final'
                                                                 ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
                                                                 : 'bg-amber-50 text-amber-600 border-amber-100'
@@ -478,7 +478,7 @@ const Quotations = () => {
                                                         {canModify && q.status === 'final' && (
                                                             <button
                                                                 onClick={() => handleMarkAsOrdered(q._id)}
-                                                                className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                                                                className="p-2.5 text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
                                                                 title="Mark as Ordered (Invoice)"
                                                             >
                                                                 <MdCheckCircle size={18} />

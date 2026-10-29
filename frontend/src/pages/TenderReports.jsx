@@ -23,7 +23,7 @@ const REPORT_TABS = [
 
 const COLORS = ['#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 const STATUS_BADGES = {
-    'Active': 'bg-blue-50 text-blue-700 border-blue-100',
+    'Active': 'bg-primary-50 text-primary-700 border-primary-100',
     'Submitted': 'bg-amber-50 text-amber-700 border-amber-100',
     'Won': 'bg-emerald-50 text-emerald-700 border-emerald-100',
     'Lost': 'bg-rose-50 text-rose-700 border-rose-100',

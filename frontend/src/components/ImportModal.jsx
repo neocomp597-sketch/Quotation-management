@@ -345,15 +345,15 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
 
                 {/* ── Progress bar ── */}
                 {isImporting && (
-                    <div className="rounded-2xl p-4 bg-blue-50 border border-blue-100">
+                    <div className="rounded-2xl p-4 bg-primary-50 border border-primary-100">
                         <div className="flex items-center justify-between mb-2">
-                            <p className="text-sm font-bold text-blue-900">
+                            <p className="text-sm font-bold text-primary-900">
                                 {liveProgress?.stage === 'queued'
                                     ? 'Waiting for another import to finish…'
                                     : liveProgress || importStage === 'processing' ? 'Saving rows…' : 'Uploading file…'}
                             </p>
                             <div className="flex items-center gap-3">
-                                <span className="text-xs font-bold text-blue-600">{progressPct}%</span>
+                                <span className="text-xs font-bold text-primary-600">{progressPct}%</span>
                                 <button
                                     onClick={handleCancel}
                                     className="text-xs text-rose-500 hover:text-rose-700 font-bold uppercase tracking-widest flex items-center gap-1"
@@ -362,27 +362,27 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
                                 </button>
                             </div>
                         </div>
-                        <div className="w-full bg-blue-200 rounded-full h-2 overflow-hidden">
+                        <div className="w-full bg-primary-200 rounded-full h-2 overflow-hidden">
                             <div
-                                className="bg-gradient-to-r from-blue-500 to-blue-600 h-full transition-all duration-300"
+                                className="bg-gradient-to-r from-primary-500 to-primary-600 h-full transition-all duration-300"
                                 style={{ width: `${progressPct}%` }}
                             />
                         </div>
                         {serverCounting ? (
-                            <p className="text-xs text-blue-600 mt-2 font-medium">
+                            <p className="text-xs text-primary-600 mt-2 font-medium">
                                 {`${liveProgress.processed.toLocaleString()} of ${liveProgress.total.toLocaleString()} rows processed`}
                                 {` · ${liveProgress.created.toLocaleString()} created · ${liveProgress.updated.toLocaleString()} updated`}
                                 {` · ${liveProgress.skipped.toLocaleString()} skipped · ${liveProgress.failed.toLocaleString()} failed`}
                             </p>
                         ) : importProgress.total > 0 && (
-                            <p className="text-xs text-blue-600 mt-2 font-medium">
+                            <p className="text-xs text-primary-600 mt-2 font-medium">
                                 {importStage === 'uploading'
                                     ? `${Math.round(importProgress.processed / 1024)} KB / ${Math.round(importProgress.total / 1024)} KB uploaded`
                                     : `${importProgress.processed} / ${importProgress.total} entries`}
                             </p>
                         )}
                         {isImporting && (
-                            <p className="text-[11px] text-blue-500 mt-1">
+                            <p className="text-[11px] text-primary-500 mt-1">
                                 You can keep working in other tabs; large files can take a minute.
                             </p>
                         )}
@@ -578,7 +578,7 @@ const ImportModal = ({ isOpen, onClose, title, onImport, onDownloadTemplate, typ
                     {isImporting && (
                         <button
                             disabled
-                            className="bg-blue-500 text-white px-8 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest opacity-80 cursor-not-allowed flex items-center gap-2"
+                            className="bg-primary-500 text-white px-8 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest opacity-80 cursor-not-allowed flex items-center gap-2"
                         >
                             <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>

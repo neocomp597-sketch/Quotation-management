@@ -323,7 +323,7 @@ const Simulations = () => {
           </div>
 
           {/* Performance Recommendation Card - THE BEAUTY PART */}
-          <div className="relative p-1 bg-gradient-to-br from-indigo-500 via-primary-500 to-emerald-400 rounded-[3.5rem] shadow-2xl shadow-primary-500/30 overflow-hidden">
+          <div className="relative p-1 bg-gradient-to-br from-primary-500 via-primary-500 to-emerald-400 rounded-[3.5rem] shadow-2xl shadow-primary-500/30 overflow-hidden">
             <div className="bg-slate-950/95 backdrop-blur-2xl p-12 rounded-[3.4rem] text-white relative">
               {/* Animated Ambient Light */}
               <motion.div

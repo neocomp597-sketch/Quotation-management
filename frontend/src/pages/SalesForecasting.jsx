@@ -51,7 +51,7 @@ const SalesForecasting = () => {
     };
 
     if (loading) {
-        return <div className="flex items-center justify-center h-96"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>;
+        return <div className="flex items-center justify-center h-96"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div></div>;
     }
 
     return (
@@ -88,7 +88,7 @@ const SalesForecasting = () => {
                     </div>
                     <div className="bg-white rounded-2xl border border-slate-100 p-5">
                         <p className="text-xs font-bold text-slate-400 uppercase">Weighted Revenue</p>
-                        <p className="text-2xl font-black text-indigo-600 mt-1">{formatCurrency(data.weightedRevenue)}</p>
+                        <p className="text-2xl font-black text-primary-600 mt-1">{formatCurrency(data.weightedRevenue)}</p>
                         <p className="text-xs text-slate-400 mt-1">Value × Probability</p>
                     </div>
                     <div className="bg-white rounded-2xl border border-slate-100 p-5">
@@ -128,14 +128,14 @@ const SalesForecasting = () => {
                                         <td className="py-3 px-4">
                                             <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${
                                                 deal.forecastCategory === 'Commit' ? 'bg-emerald-50 text-emerald-700' :
-                                                deal.forecastCategory === 'Best Case' ? 'bg-blue-50 text-blue-700' :
+                                                deal.forecastCategory === 'Best Case' ? 'bg-primary-50 text-primary-700' :
                                                 deal.forecastCategory === 'Closed' ? 'bg-green-50 text-green-700' :
                                                 deal.forecastCategory === 'Omitted' ? 'bg-red-50 text-red-700' :
                                                 'bg-slate-50 text-slate-700'
                                             }`}>{deal.forecastCategory}</span>
                                         </td>
                                         <td className="py-3 px-4 text-right font-bold text-slate-900">{formatCurrency(deal.value)}</td>
-                                        <td className="py-3 px-4 text-right text-indigo-600 font-bold">{deal.probability}%</td>
+                                        <td className="py-3 px-4 text-right text-primary-600 font-bold">{deal.probability}%</td>
                                         <td className="py-3 px-4 text-right font-black text-emerald-600">{formatCurrency(deal.weightedValue)}</td>
                                     </tr>
                                 ))}
@@ -162,7 +162,7 @@ const SalesForecasting = () => {
                             <div key={i} className="flex items-center gap-4">
                                 <span className="text-sm font-bold text-slate-700 w-32 truncate">{u.userName || 'Unknown'}</span>
                                 <div className="flex-1 bg-slate-100 rounded-full h-3 overflow-hidden">
-                                    <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all"
+                                    <div className="h-full rounded-full bg-gradient-to-r from-primary-500 to-purple-500 transition-all"
                                         style={{ width: `${Math.min(u.accuracy, 100)}%` }} />
                                 </div>
                                 <span className="text-sm font-black text-slate-900 w-16 text-right">{u.accuracy}%</span>

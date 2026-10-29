@@ -720,7 +720,7 @@ const FieldAttendance = () => {
                         activeAttendance 
                             ? 'bg-slate-900 text-white border-teal-500/50 shadow-teal-950/40' 
                             : hasCompletedToday
-                                ? 'bg-slate-900 text-white border-indigo-500/50 shadow-indigo-950/40'
+                                ? 'bg-slate-900 text-white border-primary-500/50 shadow-primary-950/40'
                                 : 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-slate-200 dark:border-slate-800'
                     }`}>
                         {(activeAttendance || hasCompletedToday) && (
@@ -732,7 +732,7 @@ const FieldAttendance = () => {
                                     activeAttendance 
                                         ? 'bg-teal-500/20 text-teal-300 border border-teal-400/40' 
                                         : hasCompletedToday
-                                            ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-400/40'
+                                            ? 'bg-primary-500/20 text-primary-300 border border-primary-400/40'
                                             : 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
                                 }`}>
                                     {activeAttendance ? <MdCheckCircle size={32} /> : hasCompletedToday ? <MdCheckCircle size={32} /> : <MdHowToReg size={32} />}
@@ -743,7 +743,7 @@ const FieldAttendance = () => {
                                             activeAttendance 
                                                 ? 'bg-teal-500/25 text-teal-200 border-teal-400/40' 
                                                 : hasCompletedToday
-                                                    ? 'bg-indigo-500/25 text-indigo-200 border-indigo-400/40'
+                                                    ? 'bg-primary-500/25 text-primary-200 border-primary-400/40'
                                                     : 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200 border-amber-300 dark:border-amber-700'
                                         }`}>
                                             {activeAttendance 
@@ -782,7 +782,7 @@ const FieldAttendance = () => {
                                     ) : hasCompletedToday ? (
                                         <div className="text-xs text-slate-300 font-medium mt-1 flex flex-wrap items-center gap-1.5 leading-relaxed">
                                             <span>Checked-in at</span>
-                                            <span className="font-extrabold text-indigo-300 bg-indigo-950/80 px-2 py-0.5 rounded-md border border-indigo-800/80">
+                                            <span className="font-extrabold text-primary-300 bg-primary-950/80 px-2 py-0.5 rounded-md border border-primary-800/80">
                                                 {new Date(todayAttendance.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </span>
                                             <span>& Checked-out at</span>

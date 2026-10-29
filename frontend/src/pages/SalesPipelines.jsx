@@ -107,7 +107,7 @@ const SalesPipelines = () => {
     };
 
     if (loading) {
-        return <div className="flex items-center justify-center h-96"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>;
+        return <div className="flex items-center justify-center h-96"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div></div>;
     }
 
     return (
@@ -122,7 +122,7 @@ const SalesPipelines = () => {
                         <p className="text-xs text-slate-500">Configure your deal stages</p>
                     </div>
                 </div>
-                {canCreate && <button onClick={openCreate} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/25 flex items-center gap-1.5">
+                {canCreate && <button onClick={openCreate} className="px-4 py-2 bg-primary-600 text-white rounded-xl font-bold text-sm hover:bg-primary-700 transition-all shadow-lg shadow-primary-600/25 flex items-center gap-1.5">
                     <MdAdd size={18} /> New Pipeline
                 </button>}
             </div>
@@ -141,7 +141,7 @@ const SalesPipelines = () => {
                                 )}
                             </div>
                             <div className="flex items-center gap-1">
-                                {canModify && <button onClick={() => openEdit(pipeline)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-indigo-600"><MdEdit size={18} /></button>}
+                                {canModify && <button onClick={() => openEdit(pipeline)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-primary-600"><MdEdit size={18} /></button>}
                                 {canDelete && <button onClick={() => handleDelete(pipeline._id)} className="p-2 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-600"><MdDelete size={18} /></button>}
                             </div>
                         </div>
@@ -167,7 +167,7 @@ const SalesPipelines = () => {
             {pipelines.length === 0 && (
                 <div className="text-center py-20 text-slate-400">
                     <p className="text-lg font-bold mb-2">No pipelines yet</p>
-                    {canCreate && <button onClick={openCreate} className="text-indigo-600 font-bold hover:underline">Create your first pipeline</button>}
+                    {canCreate && <button onClick={openCreate} className="text-primary-600 font-bold hover:underline">Create your first pipeline</button>}
                 </div>
             )}
 
@@ -180,7 +180,7 @@ const SalesPipelines = () => {
                 footer={
                     <>
                         <button onClick={() => setShowForm(false)} className="w-full sm:w-auto px-6 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50">Cancel</button>
-                        <button onClick={handleSave} className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-1.5">
+                        <button onClick={handleSave} className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-bold hover:bg-primary-700 shadow-lg shadow-primary-600/25 flex items-center justify-center gap-1.5">
                             <MdSave size={16} /> Save Pipeline
                         </button>
                     </>
@@ -191,12 +191,12 @@ const SalesPipelines = () => {
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Name *</label>
                             <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
                         </div>
                         <div className="flex items-end">
                             <label className="flex items-center gap-2 cursor-pointer">
                                 <input type="checkbox" checked={form.isDefault} onChange={e => setForm({ ...form, isDefault: e.target.checked })}
-                                    className="rounded border-slate-300 text-indigo-600" />
+                                    className="rounded border-slate-300 text-primary-600" />
                                 <span className="text-sm font-bold text-slate-700">Set as default</span>
                             </label>
                         </div>
@@ -204,13 +204,13 @@ const SalesPipelines = () => {
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Description</label>
                         <input type="text" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
-                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
                     </div>
 
                     <div>
                         <div className="flex items-center justify-between mb-3">
                             <label className="text-xs font-bold text-slate-500 uppercase">Stages</label>
-                            <button onClick={addStage} className="text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1"><MdAdd size={14} /> Add Stage</button>
+                            <button onClick={addStage} className="text-xs font-bold text-primary-600 hover:underline flex items-center gap-1"><MdAdd size={14} /> Add Stage</button>
                         </div>
                         <div className="space-y-2">
                             {form.stages.map((stage, i) => (

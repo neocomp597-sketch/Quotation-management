@@ -510,7 +510,7 @@ const Overview = () => {
                                                 <div className="flex items-center justify-between gap-2">
                                                     <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-black uppercase ${
                                                         sub.method === 'GET' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
-                                                        sub.method === 'POST' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                                        sub.method === 'POST' ? 'bg-primary-100 text-primary-800 border border-primary-200' :
                                                         sub.method === 'PATCH' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
                                                         'bg-rose-100 text-rose-800 border border-rose-200'
                                                     }`}>

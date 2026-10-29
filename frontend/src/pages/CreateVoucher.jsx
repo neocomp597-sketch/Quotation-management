@@ -299,11 +299,11 @@ const CreateVoucher = ({ mode = 'grn', isViewOnly = false }) => {
             <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-8">
                 {/* Header Row similar to screenshot colors basically */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
-                        <label className="text-xs font-black uppercase text-blue-600 tracking-widest block mb-2">Date</label>
+                    <div className="bg-primary-50/50 p-4 rounded-xl border border-primary-100">
+                        <label className="text-xs font-black uppercase text-primary-600 tracking-widest block mb-2">Date</label>
                         <DateInput
                             type="date"
-                            className="w-full px-4 py-2.5 bg-white border border-blue-200 rounded-lg focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none text-slate-900 font-bold transition-all"
+                            className="w-full px-4 py-2.5 bg-white border border-primary-200 rounded-lg focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none text-slate-900 font-bold transition-all"
                             value={voucherData.date}
                             onChange={(e) => setVoucherData({ ...voucherData, date: e.target.value })}
                             disabled={isViewOnlyMode}

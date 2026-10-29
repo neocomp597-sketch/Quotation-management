@@ -1030,7 +1030,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                     {(canCreate || canModify) && (
                         <button
                             onClick={() => setIsAttrImportModalOpen(true)}
-                            className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-indigo-600/20 uppercase text-xs tracking-widest active:scale-95"
+                            className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
                         >
                             <MdFileUpload size={20} />
                             <span>Import Attributes</span>
@@ -1399,7 +1399,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                                                         {allProductAttributes[p.productCode] && (
                                                                             <div className="flex flex-wrap gap-1">
                                                                                 {allProductAttributes[p.productCode].map(attr => (
-                                                                                    <span key={attr._id} className="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-widest rounded border border-indigo-100" title={`${attr.attributeCode}: ${attr.attributeValue}`}>
+                                                                                    <span key={attr._id} className="px-1.5 py-0.5 bg-primary-50 text-primary-600 text-[8px] font-black uppercase tracking-widest rounded border border-primary-100" title={`${attr.attributeCode}: ${attr.attributeValue}`}>
                                                                                         {attr.attributeCode}
                                                                                     </span>
                                                                                 ))}
@@ -1421,7 +1421,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                                                                     <button
                                                                                         type="button"
                                                                                         onClick={() => handleViewPdf(p.operatingUserManualUrl)}
-                                                                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[8px] font-black uppercase tracking-widest rounded border border-indigo-200 transition-all cursor-pointer"
+                                                                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-primary-50 hover:bg-primary-100 text-primary-700 text-[8px] font-black uppercase tracking-widest rounded border border-primary-200 transition-all cursor-pointer"
                                                                                         title="View Operating User Manual PDF"
                                                                                     >
                                                                                         <MdPictureAsPdf size={10} /> Manual
@@ -1749,7 +1749,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                                             <button
                                                 type="button"
                                                 onClick={() => setIsAttrImportModalOpen(true)}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-indigo-100"
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 hover:bg-primary-100 text-primary-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-primary-100"
                                             >
                                                 <MdFileUpload size={14} />
                                                 Import Attributes

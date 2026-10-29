@@ -64,7 +64,7 @@ const StockMatrix = () => {
             case 'OUT_OF_STOCK':
                 return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">Out of Stock</span>;
             case 'OVERSTOCK':
-                return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">Overstock</span>;
+                return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-primary-100 text-primary-800 dark:bg-primary-950 dark:text-primary-300">Overstock</span>;
             default:
                 return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300">{status}</span>;
         }

@@ -120,18 +120,18 @@ const SalesTargets = () => {
                     {PERIODS.map(p => (
                         <button key={p} onClick={() => setFilterPeriod(p)}
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-all ${
-                                filterPeriod === p ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-600'
+                                filterPeriod === p ? 'bg-primary-600 text-white' : 'bg-white border border-slate-200 text-slate-600'
                             }`}>{p}</button>
                     ))}
                     {canCreate && <button onClick={openCreate}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-600/25 flex items-center gap-1.5">
+                        className="px-4 py-2 bg-primary-600 text-white rounded-xl font-bold text-sm hover:bg-primary-700 shadow-lg shadow-primary-600/25 flex items-center gap-1.5">
                         <MdAdd size={18} /> Set Target
                     </button>}
                 </div>
             </div>
 
             {loading ? (
-                <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>
+                <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div></div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {targets.map(t => {
@@ -151,7 +151,7 @@ const SalesTargets = () => {
                                 <div className="flex items-end justify-between mb-3">
                                     <div>
                                         <p className="text-xs text-slate-400">Achieved</p>
-                                        <p className="text-lg font-black text-indigo-600">{formatCurrency(t.achievedAmount)}</p>
+                                        <p className="text-lg font-black text-primary-600">{formatCurrency(t.achievedAmount)}</p>
                                     </div>
                                     <div className="text-right">
                                         <p className="text-xs text-slate-400">Target</p>
@@ -161,13 +161,13 @@ const SalesTargets = () => {
                                 <div className="bg-slate-100 rounded-full h-3 overflow-hidden">
                                     <div className={`h-full rounded-full transition-all ${
                                         pct >= 100 ? 'bg-gradient-to-r from-emerald-500 to-green-500' :
-                                        pct >= 75 ? 'bg-gradient-to-r from-blue-500 to-indigo-500' :
+                                        pct >= 75 ? 'bg-gradient-to-r from-primary-500 to-primary-500' :
                                         pct >= 50 ? 'bg-gradient-to-r from-amber-500 to-orange-500' :
                                         'bg-gradient-to-r from-red-500 to-pink-500'
                                     }`} style={{ width: `${Math.min(pct, 100)}%` }} />
                                 </div>
                                 <p className={`text-right text-sm font-black mt-1 ${
-                                    pct >= 100 ? 'text-emerald-600' : pct >= 50 ? 'text-indigo-600' : 'text-red-600'
+                                    pct >= 100 ? 'text-emerald-600' : pct >= 50 ? 'text-primary-600' : 'text-red-600'
                                 }`}>{pct}%</p>
                             </div>
                         );
@@ -178,7 +178,7 @@ const SalesTargets = () => {
             {targets.length === 0 && !loading && (
                 <div className="text-center py-20 text-slate-400">
                     <p className="text-lg font-bold mb-2">No targets set</p>
-                    {canCreate && <button onClick={openCreate} className="text-indigo-600 font-bold hover:underline">Set your first target</button>}
+                    {canCreate && <button onClick={openCreate} className="text-primary-600 font-bold hover:underline">Set your first target</button>}
                 </div>
             )}
 
@@ -191,7 +191,7 @@ const SalesTargets = () => {
                 footer={
                     <>
                         <button onClick={() => setShowForm(false)} className="w-full sm:w-auto px-6 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50">Cancel</button>
-                        <button onClick={handleSave} className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-600/25">Save</button>
+                        <button onClick={handleSave} className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-bold hover:bg-primary-700 shadow-lg shadow-primary-600/25">Save</button>
                     </>
                 }
             >

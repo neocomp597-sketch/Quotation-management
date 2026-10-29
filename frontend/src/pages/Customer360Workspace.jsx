@@ -64,13 +64,13 @@ const TABS = [
 // Helper icon mapping for the timeline
 const getTimelineIcon = (iconName) => {
     switch (iconName) {
-        case 'MdPersonAdd': return <MdPerson className="text-blue-500" size={18} />;
-        case 'MdRequestQuote': return <MdRequestQuote className="text-indigo-500" size={18} />;
+        case 'MdPersonAdd': return <MdPerson className="text-primary-500" size={18} />;
+        case 'MdRequestQuote': return <MdRequestQuote className="text-primary-500" size={18} />;
         case 'MdShoppingCart': return <MdShoppingCart className="text-emerald-500" size={18} />;
         case 'MdReceipt': return <MdReceipt className="text-amber-500" size={18} />;
         case 'MdBuildCircle': return <MdBuildCircle className="text-rose-500" size={18} />;
         case 'MdAssignment': return <MdAssignment className="text-purple-500" size={18} />;
-        case 'MdCalendarMonth': return <MdCalendarMonth className="text-sky-500" size={18} />;
+        case 'MdCalendarMonth': return <MdCalendarMonth className="text-primary-500" size={18} />;
         case 'MdPhone': return <MdPhone className="text-teal-500" size={18} />;
         case 'MdEmail': return <MdEmail className="text-violet-500" size={18} />;
         case 'MdChat': return <MdChat className="text-emerald-600" size={18} />;
@@ -166,14 +166,14 @@ const Customer360Workspace = () => {
                         <div className="flex items-center gap-2 mt-1.5 justify-end">
                             <span className={`h-3 w-3 rounded-full animate-pulse ${
                                 healthScore.color === 'green' ? 'bg-emerald-500' :
-                                healthScore.color === 'blue' ? 'bg-blue-500' :
+                                healthScore.color === 'blue' ? 'bg-primary-500' :
                                 healthScore.color === 'yellow' ? 'bg-amber-400' : 'bg-rose-500'
                             }`}></span>
                             <span className="text-xl font-black text-slate-900">{healthScore.score}/100</span>
                         </div>
                         <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${
                             healthScore.color === 'green' ? 'bg-emerald-50 text-emerald-700' :
-                            healthScore.color === 'blue' ? 'bg-blue-50 text-blue-700' :
+                            healthScore.color === 'blue' ? 'bg-primary-50 text-primary-700' :
                             healthScore.color === 'yellow' ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'
                         }`}>{healthScore.status}</span>
                     </div>
@@ -182,7 +182,7 @@ const Customer360Workspace = () => {
 
                     <div>
                         <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Lifetime Value</span>
-                        <div className="text-xl font-black text-indigo-600 mt-1">₹{(stats.clv || 0).toLocaleString()}</div>
+                        <div className="text-xl font-black text-primary-600 mt-1">₹{(stats.clv || 0).toLocaleString()}</div>
                         <span className="text-[9px] font-bold text-slate-400">Outstanding: <span className="text-rose-600">₹{(customer.outstanding || 0).toLocaleString()}</span></span>
                     </div>
                 </div>
@@ -280,7 +280,7 @@ const Customer360Workspace = () => {
                                     <div>
                                         <div className="flex justify-between items-start">
                                             <h4 className="font-black text-slate-900 text-base">{c.contactName}</h4>
-                                            {c.isPrimary && <span className="bg-indigo-50 border border-indigo-100 text-indigo-700 text-[8px] font-black uppercase px-2 py-0.5 rounded">Primary Protocol</span>}
+                                            {c.isPrimary && <span className="bg-primary-50 border border-primary-100 text-primary-700 text-[8px] font-black uppercase px-2 py-0.5 rounded">Primary Protocol</span>}
                                         </div>
                                         <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mt-1">{c.designation || 'Technical Representative'}</p>
                                     </div>
@@ -303,7 +303,7 @@ const Customer360Workspace = () => {
                 {activeTab === 'addresses' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-4">
-                            <h3 className="font-black text-slate-800 text-xs uppercase tracking-wider flex items-center gap-1.5"><MdLocationOn className="text-indigo-600" /> Billing Address Premises</h3>
+                            <h3 className="font-black text-slate-800 text-xs uppercase tracking-wider flex items-center gap-1.5"><MdLocationOn className="text-primary-600" /> Billing Address Premises</h3>
                             <div className="text-slate-600 text-xs font-bold space-y-2">
                                 <div>Line 1: {customer.billingAddress?.line1 || 'N/A'}</div>
                                 <div>Line 2: {customer.billingAddress?.line2 || 'N/A'}</div>
@@ -347,13 +347,13 @@ const Customer360Workspace = () => {
                                         // Mock or real deals matching dealId
                                         <tr key={deal._id} className="hover:bg-slate-50/50">
                                             <td className="px-6 py-4 font-black text-slate-900">{deal.dealId?.title || 'Upgrade Project'}</td>
-                                            <td className="px-6 py-4 text-right font-mono text-indigo-600">₹{(deal.dealId?.value || 25000).toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-right font-mono text-primary-600">₹{(deal.dealId?.value || 25000).toLocaleString()}</td>
                                             <td className="px-6 py-4 text-center font-mono">{deal.dealId?.probability || 60}%</td>
                                             <td className="px-6 py-4 text-slate-500">{deal.dealId?.forecastCategory || 'Commit'}</td>
                                             <td className="px-6 py-4">
                                                 <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
                                                     deal.dealId?.status === 'Won' ? 'bg-emerald-50 text-emerald-700' :
-                                                    deal.dealId?.status === 'Lost' ? 'bg-rose-50 text-rose-700' : 'bg-blue-50 text-blue-700'
+                                                    deal.dealId?.status === 'Lost' ? 'bg-rose-50 text-rose-700' : 'bg-primary-50 text-primary-700'
                                                 }`}>
                                                     {deal.dealId?.status || 'Open'}
                                                 </span>
@@ -397,7 +397,7 @@ const Customer360Workspace = () => {
                                             <td className="px-6 py-4 font-black text-slate-900">{q.quotationNumber}</td>
                                             <td className="px-6 py-4 text-right font-mono">₹{(q.subtotal || 0).toLocaleString()}</td>
                                             <td className="px-6 py-4 text-right font-mono">₹{(q.totalTax || 0).toLocaleString()}</td>
-                                            <td className="px-6 py-4 text-right font-mono text-indigo-600">₹{(q.grandTotal || 0).toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-right font-mono text-primary-600">₹{(q.grandTotal || 0).toLocaleString()}</td>
                                             <td className="px-6 py-4 text-slate-500">{q.createdBy?.name || 'Sales Rep'}</td>
                                             <td className="px-6 py-4">
                                                 <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border ${
@@ -445,7 +445,7 @@ const Customer360Workspace = () => {
                                             <td className="px-6 py-4">{c.title}</td>
                                             <td className="px-6 py-4 text-slate-500">{formatDate(c.startDate)}</td>
                                             <td className="px-6 py-4 text-slate-500">{formatDate(c.endDate)}</td>
-                                            <td className="px-6 py-4 text-right font-mono text-indigo-600">₹{(c.value || 0).toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-right font-mono text-primary-600">₹{(c.value || 0).toLocaleString()}</td>
                                             <td className="px-6 py-4">
                                                 <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
                                                     c.status === 'Active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-slate-500'
@@ -496,7 +496,7 @@ const Customer360Workspace = () => {
                                             <td className="px-6 py-4 font-mono font-black text-slate-900">{o.orderNumber}</td>
                                             <td className="px-6 py-4 text-right font-mono">₹{(o.subtotal || 0).toLocaleString()}</td>
                                             <td className="px-6 py-4 text-right font-mono">₹{(o.totalDiscount || 0).toLocaleString()}</td>
-                                            <td className="px-6 py-4 text-right font-mono text-indigo-600">₹{(o.grandTotal || 0).toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-right font-mono text-primary-600">₹{(o.grandTotal || 0).toLocaleString()}</td>
                                             <td className="px-6 py-4 text-slate-500">{o.createdBy?.name || 'Sales Rep'}</td>
                                             <td className="px-6 py-4">
                                                 <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
@@ -541,7 +541,7 @@ const Customer360Workspace = () => {
                                             <td className="px-6 py-4 font-mono font-black text-slate-900">{i.voucherNumber}</td>
                                             <td className="px-6 py-4 text-center font-mono">{i.totalQty}</td>
                                             <td className="px-6 py-4 text-right font-mono">₹{(i.totalTax || 0).toLocaleString()}</td>
-                                            <td className="px-6 py-4 text-right font-mono text-indigo-600">₹{(i.grandTotal || 0).toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-right font-mono text-primary-600">₹{(i.grandTotal || 0).toLocaleString()}</td>
                                             <td className="px-6 py-4">
                                                 <span className="text-[10px] font-black uppercase bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-100">
                                                     Paid

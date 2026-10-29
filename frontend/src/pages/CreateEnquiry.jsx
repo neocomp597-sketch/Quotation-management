@@ -1113,7 +1113,7 @@ const CreateEnquiry = () => {
                             {can('master_customers', 'create') && <button
                                 type="button"
                                 onClick={() => setIsInlineCustomerFormOpen(!isInlineCustomerFormOpen)}
-                                className="w-full py-3.5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center whitespace-nowrap gap-1 shadow-md active:scale-95 shrink-0"
+                                className="w-full py-3.5 bg-primary-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-700 transition-all flex items-center justify-center whitespace-nowrap gap-1 shadow-md active:scale-95 shrink-0"
                             >
                                 {isInlineCustomerFormOpen ? '✕ Close Form' : '+ New Customer'}
                             </button>}

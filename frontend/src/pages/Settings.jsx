@@ -916,7 +916,7 @@ const [logoUploading, setLogoUploading] = useState(false);
                     <form onSubmit={handleCompanySettingsUpdate} className="space-y-6">
                         <fieldset disabled={!canModify} className="space-y-6">
                         {/* Dual Branding Toggle */}
-                        <div className="p-5 bg-gradient-to-r from-primary-50 to-blue-50 rounded-2xl border border-primary-100">
+                        <div className="p-5 bg-gradient-to-r from-primary-50 to-primary-50 rounded-2xl border border-primary-100">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <h3 className="font-bold text-slate-800 text-sm">Show Dual Branding</h3>

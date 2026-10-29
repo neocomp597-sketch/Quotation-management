@@ -152,7 +152,7 @@ const Vouchers = ({ mode = 'grn' }) => {
                                                 <div className="font-black text-slate-900 dark:text-white tracking-tight">{v.voucherNumber}</div>
                                                 <div className="text-[10px] text-slate-400 dark:text-slate-400 font-bold uppercase mt-1 flex gap-2">
                                                     <span>{formatDate(v.date)}</span>
-                                                    <span className={`px-1 rounded ${v.voucherType === 'Invoice' ? 'bg-rose-100 dark:bg-rose-950/80 text-rose-600 dark:text-rose-300' : v.voucherType === 'Purchase' ? 'bg-blue-100 dark:bg-blue-950/80 text-blue-600 dark:text-blue-300' : 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-300'}`}>
+                                                    <span className={`px-1 rounded ${v.voucherType === 'Invoice' ? 'bg-rose-100 dark:bg-rose-950/80 text-rose-600 dark:text-rose-300' : v.voucherType === 'Purchase' ? 'bg-primary-100 dark:bg-primary-950/80 text-primary-600 dark:text-primary-300' : 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-300'}`}>
                                                         {v.voucherType}
                                                     </span>
                                                 </div>

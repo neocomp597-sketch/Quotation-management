@@ -179,7 +179,7 @@ const RecordAuditCount = () => {
                                             />
                                         </td>
                                         <td className="px-5 py-4 text-right">
-                                            <span className={`font-bold px-2.5 py-1 rounded-lg text-xs ${variance === 0 ? 'bg-emerald-50 text-emerald-700' : variance > 0 ? 'bg-blue-50 text-blue-700' : 'bg-rose-50 text-rose-700'}`}>
+                                            <span className={`font-bold px-2.5 py-1 rounded-lg text-xs ${variance === 0 ? 'bg-emerald-50 text-emerald-700' : variance > 0 ? 'bg-primary-50 text-primary-700' : 'bg-rose-50 text-rose-700'}`}>
                                                 {variance > 0 ? `+${variance}` : variance}
                                             </span>
                                         </td>

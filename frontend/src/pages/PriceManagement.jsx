@@ -508,12 +508,12 @@ const PriceManagement = ({ mode = 'price-books' }) => {
                     {/* LEFT COLUMN: PRODUCT CATALOG MASTER (width 30% / lg:col-span-4) */}
                     <div className="lg:col-span-4">
                         <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden p-6 space-y-4">
-                            <div className="flex items-center justify-between border-b-2 border-sky-500 pb-3">
+                            <div className="flex items-center justify-between border-b-2 border-primary-500 pb-3">
                                 <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
-                                    <MdCategory className="text-sky-600" size={22} />
+                                    <MdCategory className="text-primary-600" size={22} />
                                     Product Catalog
                                 </h3>
-                                <span className="text-xs font-bold bg-sky-50 text-sky-700 px-2.5 py-1 rounded-full border border-sky-200">
+                                <span className="text-xs font-bold bg-primary-50 text-primary-700 px-2.5 py-1 rounded-full border border-primary-200">
                                     {displayedCatalogs.length} Catalogs
                                 </span>
                             </div>
@@ -528,12 +528,12 @@ const PriceManagement = ({ mode = 'price-books' }) => {
                                             onClick={() => handleSelectBook(catalog)}
                                             className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between group ${
                                                 isSelected
-                                                    ? 'bg-sky-500 text-white border-sky-500 shadow-md font-bold'
-                                                    : 'bg-white text-slate-800 border-slate-200 hover:bg-sky-50 hover:border-sky-300'
+                                                    ? 'bg-primary-500 text-white border-primary-500 shadow-md font-bold'
+                                                    : 'bg-white text-slate-800 border-slate-200 hover:bg-primary-50 hover:border-primary-300'
                                             }`}
                                         >
                                             <div className="flex items-center gap-2.5 min-w-0">
-                                                <span className={`text-xs font-mono font-black ${isSelected ? 'text-sky-100' : 'text-slate-400'}`}>
+                                                <span className={`text-xs font-mono font-black ${isSelected ? 'text-primary-100' : 'text-slate-400'}`}>
                                                     {index + 1}.
                                                 </span>
                                                 <span className="text-sm font-bold truncate">
@@ -548,7 +548,7 @@ const PriceManagement = ({ mode = 'price-books' }) => {
                                                 }}
                                                 className={`p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity ${
                                                     isSelected 
-                                                        ? 'text-sky-100 hover:text-white hover:bg-sky-600' 
+                                                        ? 'text-primary-100 hover:text-white hover:bg-primary-600' 
                                                         : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
                                                 }`}
                                                 title="Delete Catalog"
@@ -562,7 +562,7 @@ const PriceManagement = ({ mode = 'price-books' }) => {
 
                             {canCreate && <button
                                 onClick={handleOpenCreateModal}
-                                className="w-full mt-4 flex items-center justify-center gap-2 py-3 px-4 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all active:scale-95"
+                                className="w-full mt-4 flex items-center justify-center gap-2 py-3 px-4 bg-primary-600 hover:bg-primary-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all active:scale-95"
                             >
                                 <MdAdd size={18} />
                                 + Add Catalog
@@ -646,7 +646,7 @@ const PriceManagement = ({ mode = 'price-books' }) => {
                                                             <div className="flex items-center justify-center gap-2">
                                                                 {canModify && <button
                                                                     onClick={() => handleOpenAddProductModal(item)}
-                                                                    className="px-3 py-1 bg-sky-500 hover:bg-sky-600 text-white rounded-md text-xs font-bold transition-all shadow-sm"
+                                                                    className="px-3 py-1 bg-primary-500 hover:bg-primary-600 text-white rounded-md text-xs font-bold transition-all shadow-sm"
                                                                 >
                                                                     Edit
                                                                 </button>}
@@ -668,7 +668,7 @@ const PriceManagement = ({ mode = 'price-books' }) => {
 
                             {canCreate && <button
                                 onClick={() => handleOpenAddProductModal()}
-                                className="mt-4 flex items-center justify-center gap-2 py-3 px-5 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all active:scale-95"
+                                className="mt-4 flex items-center justify-center gap-2 py-3 px-5 bg-primary-600 hover:bg-primary-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all active:scale-95"
                             >
                                 <MdAdd size={18} />
                                 + Add Product to Price Book
@@ -700,7 +700,7 @@ const PriceManagement = ({ mode = 'price-books' }) => {
                                         {rules.map(rule => (
                                             <tr key={rule._id} className="hover:bg-slate-50/50 transition-colors">
                                                 <td className="py-3.5 font-bold text-slate-900">{rule.name}</td>
-                                                <td className="py-3.5 text-xs text-indigo-600 uppercase font-black">{rule.ruleType}</td>
+                                                <td className="py-3.5 text-xs text-primary-600 uppercase font-black">{rule.ruleType}</td>
                                                 <td className="py-3.5 text-slate-500">{rule.productId?.productName || 'Global Rule'}</td>
                                                 <td className="py-3.5">
                                                     <span className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-lg ${rule.isActive ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-50 text-slate-400'}`}>
@@ -814,11 +814,11 @@ const PriceManagement = ({ mode = 'price-books' }) => {
                         <div className="space-y-4">
                             <div>
                                 <label className="text-xs font-bold text-slate-700 block mb-1">Catalog Name *</label>
-                                <input type="text" required placeholder="e.g. Power Transformers" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-sky-500" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+                                <input type="text" required placeholder="e.g. Power Transformers" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-primary-500" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value })} />
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-slate-700 block mb-1">Description</label>
-                                <input type="text" placeholder="Description of products in this catalog" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-sky-500" value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} />
+                                <input type="text" placeholder="Description of products in this catalog" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-primary-500" value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} />
                             </div>
                         </div>
                     )}
@@ -851,7 +851,7 @@ const PriceManagement = ({ mode = 'price-books' }) => {
 
                     <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
                         <button type="button" onClick={() => setIsCreateModalOpen(false)} className="px-5 py-2.5 text-xs font-bold text-slate-500 uppercase tracking-widest hover:bg-slate-50 rounded-xl">Cancel</button>
-                        <button type="submit" className="px-6 py-2.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-xl uppercase tracking-widest shadow-md">Save</button>
+                        <button type="submit" className="px-6 py-2.5 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-xl uppercase tracking-widest shadow-md">Save</button>
                     </div>
                 </form>
             </Modal>
@@ -864,7 +864,7 @@ const PriceManagement = ({ mode = 'price-books' }) => {
                         <select
                             required
                             disabled={!!editingItemId}
-                            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-sky-500"
+                            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-primary-500"
                             value={itemFormData.productId}
                             onChange={(e) => handleProductSelectChange(e.target.value)}
                         >
@@ -885,7 +885,7 @@ const PriceManagement = ({ mode = 'price-books' }) => {
                                 required
                                 min="0"
                                 placeholder="e.g. 250000"
-                                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-sky-500"
+                                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-primary-500"
                                 value={itemFormData.basePrice}
                                 onChange={(e) => handleBasePriceOrDiscountChange(e.target.value, itemFormData.discountPercent)}
                             />
@@ -899,7 +899,7 @@ const PriceManagement = ({ mode = 'price-books' }) => {
                                 max="100"
                                 step="0.5"
                                 placeholder="e.g. 5"
-                                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-sky-500"
+                                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-primary-500"
                                 value={itemFormData.discountPercent}
                                 onChange={(e) => handleBasePriceOrDiscountChange(itemFormData.basePrice, e.target.value)}
                             />
@@ -915,7 +915,7 @@ const PriceManagement = ({ mode = 'price-books' }) => {
                         <button type="button" onClick={() => setIsAddProductModalOpen(false)} className="px-5 py-2.5 text-xs font-bold text-slate-500 uppercase tracking-widest hover:bg-slate-50 rounded-xl">
                             Cancel
                         </button>
-                        <button type="submit" className="px-6 py-2.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-xl uppercase tracking-widest shadow-md">
+                        <button type="submit" className="px-6 py-2.5 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-xl uppercase tracking-widest shadow-md">
                             {editingItemId ? 'Update Rate' : 'Add Product'}
                         </button>
                     </div>

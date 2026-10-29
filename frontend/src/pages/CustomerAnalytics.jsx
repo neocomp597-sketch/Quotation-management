@@ -285,7 +285,7 @@ const CustomerAnalytics = () => {
                     </p>
                     {user?.role && (
                         <div className="mt-3 flex items-center gap-2">
-                            <span className="text-[10px] font-black uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-3 py-1 rounded-full">
+                            <span className="text-[10px] font-black uppercase tracking-wider bg-primary-50 dark:bg-primary-950/60 border border-primary-100 dark:border-primary-900/50 text-primary-700 dark:text-primary-300 px-3 py-1 rounded-full">
                                 Role: {user.role.toUpperCase()}
                             </span>
                             <span className="text-[10px] font-black uppercase tracking-wider bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400 px-3 py-1 rounded-full">
@@ -495,7 +495,7 @@ const CustomerAnalytics = () => {
                     {/* KPI Cards Grid */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-6">
                         <div className="bg-white dark:bg-slate-900/60 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between h-36 relative overflow-hidden">
-                            <div className="absolute -top-4 -right-4 w-16 h-16 bg-blue-50 dark:bg-blue-950/40 rounded-full flex items-center justify-center text-blue-500 font-black text-xl">#</div>
+                            <div className="absolute -top-4 -right-4 w-16 h-16 bg-primary-50 dark:bg-primary-950/40 rounded-full flex items-center justify-center text-primary-500 font-black text-xl">#</div>
                             <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider">Total Accounts</span>
                             <span className="text-3xl font-black text-slate-900 dark:text-slate-100 leading-none mt-4">{stats.totalCustomers?.toLocaleString()}</span>
                             <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 mt-2">Active database nodes</span>
@@ -522,8 +522,8 @@ const CustomerAnalytics = () => {
 
                         <div className="bg-white dark:bg-slate-900/60 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between h-36 relative overflow-hidden">
                             <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider">CLV (Cumulative)</span>
-                            <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400 leading-none mt-4">₹{Math.round(stats.totalCustomers * stats.averageRevenuePerCustomer).toLocaleString()}</span>
-                            <span className="text-[9px] font-bold text-indigo-500 dark:text-indigo-400 mt-2">Gross customer revenue</span>
+                            <span className="text-3xl font-black text-primary-600 dark:text-primary-400 leading-none mt-4">₹{Math.round(stats.totalCustomers * stats.averageRevenuePerCustomer).toLocaleString()}</span>
+                            <span className="text-[9px] font-bold text-primary-500 dark:text-primary-400 mt-2">Gross customer revenue</span>
                         </div>
 
                         <div className="bg-white dark:bg-slate-900/60 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between h-36 relative overflow-hidden bg-gradient-to-br from-rose-50 to-white dark:from-rose-950/30 dark:to-slate-900 border-rose-100 dark:border-rose-900/40">
@@ -540,7 +540,7 @@ const CustomerAnalytics = () => {
                                 <div className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">NPS Customer Index</div>
                                 <div className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1">+{stats.nps}</div>
                             </div>
-                            <div className="h-10 w-10 bg-indigo-50 dark:bg-indigo-950/50 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold text-sm">
+                            <div className="h-10 w-10 bg-primary-50 dark:bg-primary-950/50 rounded-xl flex items-center justify-center text-primary-600 dark:text-primary-400 font-bold text-sm">
                                 NPS
                             </div>
                         </div>
@@ -567,21 +567,21 @@ const CustomerAnalytics = () => {
                                 <div className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Retention Rate</div>
                                 <div className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1">{stats.customerRetentionRate}%</div>
                             </div>
-                            <div className="h-10 w-10 bg-sky-50 dark:bg-sky-950/50 rounded-xl flex items-center justify-center text-sky-600 dark:text-sky-400 font-bold text-sm">
+                            <div className="h-10 w-10 bg-primary-50 dark:bg-primary-950/50 rounded-xl flex items-center justify-center text-primary-600 dark:text-primary-400 font-bold text-sm">
                                 CRR
                             </div>
                         </div>
                     </div>
 
                     {/* AI Insights Placeholder Panel (Future Proofing) */}
-                    <div className="bg-gradient-to-r from-violet-50 via-indigo-50 to-cyan-50 dark:from-slate-900 dark:via-indigo-950/50 dark:to-slate-900 p-6 rounded-[2.5rem] border border-indigo-100/50 dark:border-indigo-900/50 shadow-sm relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-8 opacity-10"><MdAutorenew size={120} className="animate-spin-slow text-indigo-700 dark:text-indigo-400" /></div>
+                    <div className="bg-gradient-to-r from-violet-50 via-primary-50 to-primary-50 dark:from-slate-900 dark:via-primary-950/50 dark:to-slate-900 p-6 rounded-[2.5rem] border border-primary-100/50 dark:border-primary-900/50 shadow-sm relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-8 opacity-10"><MdAutorenew size={120} className="animate-spin-slow text-primary-700 dark:text-primary-400" /></div>
                         <div className="flex items-center gap-3">
                             <span className="flex h-3.5 w-3.5 relative">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-indigo-600"></span>
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-primary-600"></span>
                             </span>
-                            <h3 className="font-black text-indigo-950 dark:text-indigo-200 uppercase tracking-wider text-sm">AI CRM Intelligence Engine (Placeholder)</h3>
+                            <h3 className="font-black text-primary-950 dark:text-primary-200 uppercase tracking-wider text-sm">AI CRM Intelligence Engine (Placeholder)</h3>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
                             <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-5 rounded-2xl border border-white/55 dark:border-slate-800">
@@ -613,16 +613,16 @@ const CustomerAnalytics = () => {
                                 </div>
                             </div>
                             <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-5 rounded-2xl border border-white/55 dark:border-slate-800">
-                                <h4 className="font-black text-xs text-indigo-700 dark:text-indigo-400 uppercase tracking-wider">🧩 Cross-Sell Fitment</h4>
+                                <h4 className="font-black text-xs text-primary-700 dark:text-primary-400 uppercase tracking-wider">🧩 Cross-Sell Fitment</h4>
                                 <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">Suggests product bundles that match customer assets.</p>
                                 <div className="mt-3 flex flex-col gap-1.5">
                                     <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
                                         <span>JD Interiors</span>
-                                        <span className="text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded text-[10px] font-black">C&R PANELS</span>
+                                        <span className="text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/60 px-2 py-0.5 rounded text-[10px] font-black">C&R PANELS</span>
                                     </div>
                                     <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
                                         <span>Metro Source</span>
-                                        <span className="text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded text-[10px] font-black">AMC PACKS</span>
+                                        <span className="text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/60 px-2 py-0.5 rounded text-[10px] font-black">AMC PACKS</span>
                                     </div>
                                 </div>
                             </div>
@@ -765,13 +765,13 @@ const CustomerAnalytics = () => {
                                             </span>
                                         </td>
                                         <td className="px-6 py-5 text-right font-mono text-rose-600">₹{(c.outstanding || 0).toLocaleString()}</td>
-                                        <td className="px-6 py-5 text-right font-mono text-indigo-600">₹{(c.clv || 0).toLocaleString()}</td>
+                                        <td className="px-6 py-5 text-right font-mono text-primary-600">₹{(c.clv || 0).toLocaleString()}</td>
                                         <td className="px-6 py-5 text-center font-mono">{c.invoiceCount || 0}</td>
                                         <td className="px-6 py-5">
                                             <div className="flex items-center gap-2">
                                                 <span className={`h-2.5 w-2.5 rounded-full ${
                                                     c.health?.color === 'green' ? 'bg-emerald-500' :
-                                                    c.health?.color === 'blue' ? 'bg-blue-500' :
+                                                    c.health?.color === 'blue' ? 'bg-primary-500' :
                                                     c.health?.color === 'yellow' ? 'bg-amber-400' : 'bg-rose-500'
                                                 }`}></span>
                                                 <span className="font-bold text-xs">{c.health?.score || 70} ({c.health?.status || 'Good'})</span>
@@ -780,8 +780,8 @@ const CustomerAnalytics = () => {
                                         <td className="px-6 py-5">
                                             <span className={`text-[10px] uppercase font-black px-2.5 py-1 rounded-lg border ${
                                                 c.status === 'Active' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' :
-                                                c.status === 'New' ? 'bg-blue-50 border-blue-100 text-blue-700' :
-                                                c.status === 'VIP' ? 'bg-indigo-50 border-indigo-100 text-indigo-700' :
+                                                c.status === 'New' ? 'bg-primary-50 border-primary-100 text-primary-700' :
+                                                c.status === 'VIP' ? 'bg-primary-50 border-primary-100 text-primary-700' :
                                                 c.status === 'Lost' ? 'bg-rose-50 border-rose-100 text-rose-700' : 'bg-slate-50 border-slate-100 text-slate-600'
                                             }`}>
                                                 {c.status || 'Prospect'}
@@ -840,7 +840,7 @@ const CustomerAnalytics = () => {
                     {/* Value segment */}
                     <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
                         <h3 className="font-black text-slate-800 text-sm uppercase tracking-wider flex items-center gap-2">
-                            <MdBarChart className="text-indigo-600" size={18} />
+                            <MdBarChart className="text-primary-600" size={18} />
                             Value Segments
                         </h3>
                         <div className="h-64">
@@ -1066,7 +1066,7 @@ const CustomerAnalytics = () => {
                     {/* Operational */}
                     <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6 flex flex-col justify-between">
                         <div>
-                            <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-wider">Operational</span>
+                            <span className="text-[10px] font-black text-primary-600 bg-primary-50 px-3 py-1 rounded-full uppercase tracking-wider">Operational</span>
                             <h3 className="font-black text-slate-800 text-base mt-4">Customer Directory & Demographics</h3>
                             <p className="text-slate-400 text-xs mt-2 leading-relaxed">
                                 Complete list of active accounts, branch designations, owners, territory groupings, contact details, and locations.

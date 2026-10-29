@@ -7,7 +7,7 @@ import { MobileCard, MobileCardHead, MobileCardList, MobileEmpty, MobileField, M
 // Transfer both show it, so the same records read the same everywhere.
 
 const CATEGORY_STYLES = {
-    Lifecycle: 'bg-blue-50 text-blue-700 border-blue-200',
+    Lifecycle: 'bg-primary-50 text-primary-700 border-primary-200',
     Customer: 'bg-violet-50 text-violet-700 border-violet-200',
     Ticket: 'bg-amber-50 text-amber-700 border-amber-200',
     'Service Visit': 'bg-teal-50 text-teal-700 border-teal-200'

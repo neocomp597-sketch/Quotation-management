@@ -341,7 +341,7 @@ const Vendors = ({ isCreatePage, isEditPage }) => {
                                                     {vendor.isActive ? 'Active' : 'Inactive'}
                                                 </span>
                                                 {vendor.loginEnabled && (
-                                                    <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-blue-50 text-blue-600 border border-blue-100">
+                                                    <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-primary-50 text-primary-600 border border-primary-100">
                                                         Login Enabled
                                                     </span>
                                                 )}

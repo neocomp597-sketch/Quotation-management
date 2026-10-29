@@ -13,7 +13,7 @@ const StatCard = ({ icon, label, value, color, description }) => {
         primary: 'bg-primary-50 text-primary-600 border-primary-100',
         emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
         amber: 'bg-amber-50 text-amber-600 border-amber-100',
-        indigo: 'bg-indigo-50 text-indigo-600 border-indigo-100',
+        indigo: 'bg-primary-50 text-primary-600 border-primary-100',
     };
 
     return (

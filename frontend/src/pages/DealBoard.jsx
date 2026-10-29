@@ -44,16 +44,16 @@ const DealCard = ({ deal, onClick }) => {
             {...attributes}
             {...listeners}
             onClick={() => onClick(deal)}
-            className="bg-white rounded-xl border border-slate-100 p-4 cursor-grab active:cursor-grabbing hover:shadow-lg hover:border-indigo-200 transition-all duration-200 group"
+            className="bg-white rounded-xl border border-slate-100 p-4 cursor-grab active:cursor-grabbing hover:shadow-lg hover:border-primary-200 transition-all duration-200 group"
         >
-            <h4 className="font-bold text-slate-900 text-sm truncate group-hover:text-indigo-600 transition-colors">{deal.title}</h4>
+            <h4 className="font-bold text-slate-900 text-sm truncate group-hover:text-primary-600 transition-colors">{deal.title}</h4>
             <div className="flex items-center gap-1.5 mt-2 text-xs text-slate-500">
                 <MdBusiness size={14} className="text-slate-400" />
                 <span className="truncate">{deal.customerId?.companyName || deal.customerId?.customerName || '—'}</span>
             </div>
             <div className="flex items-center justify-between mt-3">
                 <span className="text-sm font-black text-slate-900">{formatCurrency(deal.value)}</span>
-                <span className="text-xs px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 font-bold">{deal.probability}%</span>
+                <span className="text-xs px-2 py-0.5 rounded-lg bg-primary-50 text-primary-700 font-bold">{deal.probability}%</span>
             </div>
             {deal.expectedCloseDate && (
                 <div className="flex items-center gap-1 mt-2 text-xs text-slate-400">
@@ -86,7 +86,7 @@ const StageColumn = ({ stage, onDealClick, onAddDeal }) => {
                     </div>
                     {canCreate && <button
                         onClick={() => onAddDeal(stage)}
-                        className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-300 transition-all"
+                        className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-primary-600 hover:border-primary-300 transition-all"
                     >
                         <MdAdd size={14} />
                     </button>}
@@ -106,7 +106,7 @@ const StageColumn = ({ stage, onDealClick, onAddDeal }) => {
                         <p>No deals</p>
                         {canCreate && <button
                             onClick={() => onAddDeal(stage)}
-                            className="mt-2 text-indigo-600 font-bold hover:underline"
+                            className="mt-2 text-primary-600 font-bold hover:underline"
                         >
                             + Add deal
                         </button>}
@@ -337,7 +337,7 @@ const DealBoard = () => {
             {/* Header */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-600/25">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-primary-600/25">
                         <MdViewKanban size={22} />
                     </div>
                     <div>
@@ -351,7 +351,7 @@ const DealBoard = () => {
                     <select
                         value={selectedPipeline}
                         onChange={(e) => setSelectedPipeline(e.target.value)}
-                        className="px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        className="px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     >
                         {pipelines.map(p => (
                             <option key={p._id} value={p._id}>{p.name}</option>
@@ -362,7 +362,7 @@ const DealBoard = () => {
                     <select
                         value={filterOwner}
                         onChange={(e) => setFilterOwner(e.target.value)}
-                        className="px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        className="px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     >
                         <option value="">All Owners</option>
                         {users.map(u => (
@@ -372,7 +372,7 @@ const DealBoard = () => {
 
                     {canCreate && <button
                         onClick={() => openCreateModal(null)}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/25 flex items-center gap-1.5"
+                        className="px-4 py-2 bg-primary-600 text-white rounded-xl font-bold text-sm hover:bg-primary-700 transition-all shadow-lg shadow-primary-600/25 flex items-center gap-1.5"
                     >
                         <MdAdd size={18} /> New Deal
                     </button>}
@@ -382,7 +382,7 @@ const DealBoard = () => {
             {/* Board */}
             {loading ? (
                 <div className="flex items-center justify-center h-96">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
                 </div>
             ) : boardData ? (
                 <DndContext
@@ -404,9 +404,9 @@ const DealBoard = () => {
                     </div>
                     <DragOverlay>
                         {activeDeal ? (
-                            <div className="bg-white rounded-xl border-2 border-indigo-500 p-4 shadow-2xl w-72 rotate-2">
+                            <div className="bg-white rounded-xl border-2 border-primary-500 p-4 shadow-2xl w-72 rotate-2">
                                 <h4 className="font-bold text-slate-900 text-sm">{activeDeal.title}</h4>
-                                <p className="text-sm font-black text-indigo-600 mt-2">{formatCurrency(activeDeal.value)}</p>
+                                <p className="text-sm font-black text-primary-600 mt-2">{formatCurrency(activeDeal.value)}</p>
                             </div>
                         ) : null}
                     </DragOverlay>
@@ -431,7 +431,7 @@ const DealBoard = () => {
                             type="text"
                             value={form.title}
                             onChange={e => setForm({ ...form, title: e.target.value })}
-                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                             placeholder="e.g. ABC Ltd - Enterprise License"
                             autoFocus
                         />
@@ -456,7 +456,7 @@ const DealBoard = () => {
                                     setCustomerSearch(e.target.value);
                                 }}
                                 placeholder="Search & Select Customer..."
-                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-bold text-slate-900 placeholder:font-normal placeholder:text-slate-400"
+                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent font-bold text-slate-900 placeholder:font-normal placeholder:text-slate-400"
                             />
                             <PortalDropdown isOpen={customerDropdownOpen} anchorRef={customerAnchorRef}>
                                 <ul className="bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-64 overflow-y-auto divide-y divide-slate-50 overflow-hidden">
@@ -477,7 +477,7 @@ const DealBoard = () => {
                                                     setCustomerSearch(c.companyName || c.customerName);
                                                     setCustomerDropdownOpen(false);
                                                 }}
-                                                className="px-5 py-3.5 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer text-sm font-bold text-slate-700 transition-colors"
+                                                className="px-5 py-3.5 hover:bg-primary-50 hover:text-primary-700 cursor-pointer text-sm font-bold text-slate-700 transition-colors"
                                             >
                                                 <div className="font-bold text-slate-900 text-sm">{c.companyName || c.customerName}</div>
                                                 {(c.companyName && c.customerName) && (
@@ -505,7 +505,7 @@ const DealBoard = () => {
                                 type="number"
                                 value={form.value}
                                 onChange={e => setForm({ ...form, value: e.target.value })}
-                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                                 placeholder="0"
                             />
                         </div>
@@ -517,7 +517,7 @@ const DealBoard = () => {
                                 type="date"
                                 value={form.expectedCloseDate}
                                 onChange={e => setForm({ ...form, expectedCloseDate: e.target.value })}
-                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                             />
                         </div>
                         <div>
@@ -548,7 +548,7 @@ const DealBoard = () => {
                         </button>
                         <button
                             type="submit"
-                            className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/25"
+                            className="flex-1 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-bold hover:bg-primary-700 transition-all shadow-lg shadow-primary-600/25"
                         >
                             Create Deal
                         </button>

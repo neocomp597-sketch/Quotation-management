@@ -126,7 +126,7 @@ const MgrLine = ({ record }) => {
 };
 
 const ASSET_STATUS_STYLES = {
-    SOLD: 'bg-blue-50 text-blue-600 border-blue-200',
+    SOLD: 'bg-primary-50 text-primary-600 border-primary-200',
     IN_STOCK: 'bg-emerald-50 text-emerald-600 border-emerald-200',
     RETURN: 'bg-amber-50 text-amber-600 border-amber-200',
     RETURNED: 'bg-amber-50 text-amber-600 border-amber-200'
@@ -851,8 +851,8 @@ const SerialNoMaster = () => {
                     <div><span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">In Stock</span><span className="text-2xl font-black text-emerald-600">{stats.inStock}</span></div>
                 </div>
                 <div className="p-4 sm:p-5 bg-white border border-slate-200/80 rounded-[2rem] shadow-sm hover:shadow-md transition-all flex items-center gap-3 sm:gap-4">
-                    <div className="p-3.5 bg-blue-50 text-blue-600 rounded-2xl"><MdPeople size={24} /></div>
-                    <div><span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Sold (Customer)</span><span className="text-2xl font-black text-blue-600">{stats.sold}</span></div>
+                    <div className="p-3.5 bg-primary-50 text-primary-600 rounded-2xl"><MdPeople size={24} /></div>
+                    <div><span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Sold (Customer)</span><span className="text-2xl font-black text-primary-600">{stats.sold}</span></div>
                 </div>
                 <div className="p-4 sm:p-5 bg-white border border-slate-200/80 rounded-[2rem] shadow-sm hover:shadow-md transition-all flex items-center gap-3 sm:gap-4">
                     <div className="p-3.5 bg-amber-50 text-amber-600 rounded-2xl"><MdUndo size={24} /></div>

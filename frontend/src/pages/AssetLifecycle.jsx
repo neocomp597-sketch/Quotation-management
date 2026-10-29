@@ -232,7 +232,7 @@ const AssetLifecycle = () => {
     };
 
     const statusBadge = (status) => (
-        status === 'SOLD' ? 'bg-blue-50 text-blue-600 border-blue-200'
+        status === 'SOLD' ? 'bg-primary-50 text-primary-600 border-primary-200'
             : status === 'IN_STOCK' ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
                 : status === 'RETURN' || status === 'RETURNED' ? 'bg-amber-50 text-amber-600 border-amber-200'
                     : 'bg-slate-50 text-slate-600 border-slate-200'

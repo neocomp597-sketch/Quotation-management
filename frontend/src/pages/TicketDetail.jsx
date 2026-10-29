@@ -1592,13 +1592,13 @@ const TicketDetail = () => {
                                 {/* Display Service Visits */}
                                 <div className="space-y-4">
                                     {activeVisit ? (
-                                        <div className="p-5 rounded-2xl bg-indigo-50/50 border border-indigo-100 space-y-4">
+                                        <div className="p-5 rounded-2xl bg-primary-50/50 border border-primary-100 space-y-4">
                                             <div className="flex justify-between items-center">
                                                 <div>
-                                                    <span className="text-[9px] font-black uppercase tracking-widest text-indigo-500">Active Visit No</span>
+                                                    <span className="text-[9px] font-black uppercase tracking-widest text-primary-500">Active Visit No</span>
                                                     <p className="text-sm font-black text-slate-900">{activeVisit.visitNo}</p>
                                                 </div>
-                                                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-indigo-100 text-indigo-700 border border-indigo-200">
+                                                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-primary-100 text-primary-700 border border-primary-200">
                                                     {activeVisit.status}
                                                 </span>
                                             </div>
@@ -1632,7 +1632,7 @@ const TicketDetail = () => {
                                                             setVisitTicketType(activeVisit.ticketType || '');
                                                             setShowVisitModal(true);
                                                         }}
-                                                        className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md"
+                                                        className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md"
                                                     >
                                                         Reschedule Visit
                                                     </button>

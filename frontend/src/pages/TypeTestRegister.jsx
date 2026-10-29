@@ -42,7 +42,7 @@ const badgeTone = (s) => {
     if (['Expired', 'Overdue', 'Inactive'].includes(s)) return 'bg-rose-50 text-rose-700 border-rose-100';
     if (['Upcoming', 'In Progress', 'Renewal In Progress', 'Submitted'].includes(s)) return 'bg-amber-50 text-amber-700 border-amber-100';
     if (s === 'Not Started') return 'bg-slate-50 text-slate-600 border-slate-200';
-    return 'bg-sky-50 text-sky-700 border-sky-100';
+    return 'bg-primary-50 text-primary-700 border-primary-100';
 };
 const Badge = ({ value }) => (
     <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-bold whitespace-nowrap ${badgeTone(value)}`}>{value || 'Not set'}</span>
@@ -662,7 +662,7 @@ const TypeTestRegister = () => {
     const hasExpiry = (r) => r.daysToExpiry !== null && r.daysToExpiry !== undefined;
     const dashboardCards = [
         { key: 'total', label: 'Total Test Records', hint: 'All recorded tests', icon: <MdAssignment size={20} />, color: 'from-teal-500 to-emerald-600', rows: records },
-        { key: 'valid', label: 'Valid Certificates', hint: 'Currently within validity', icon: <MdVerified size={20} />, color: 'from-sky-500 to-cyan-600', rows: activeRecords.filter(r => r.displayStatus === 'Valid') },
+        { key: 'valid', label: 'Valid Certificates', hint: 'Currently within validity', icon: <MdVerified size={20} />, color: 'from-primary-500 to-primary-600', rows: activeRecords.filter(r => r.displayStatus === 'Valid') },
         { key: 'due', label: 'Renewals Due ≤ 90 Days', hint: 'Including already overdue', icon: <MdUpdate size={20} />, color: 'from-amber-400 to-orange-500', rows: activeRecords.filter(r => hasExpiry(r) && r.daysToExpiry <= 90) },
         { key: 'expired', label: 'Expired Certificates', hint: 'Requires review', icon: <MdErrorOutline size={20} />, color: 'from-rose-500 to-red-600', rows: activeRecords.filter(r => r.displayStatus === 'Expired') },
         // Products, not test records, so it opens its own tab instead of filtering the table below.
@@ -1138,7 +1138,7 @@ const TypeTestRegister = () => {
                                             {pipeline.map(({ key, label: s, rows }) => {
                                                 const n = rows.length;
                                                 const width = activeRecords.length ? Math.min(100, (n / activeRecords.length) * 100) : 0;
-                                                const color = s === 'Valid' ? 'bg-emerald-500' : s === 'Expired' ? 'bg-rose-500' : s === 'In Progress' ? 'bg-sky-500' : s === 'Not Started' ? 'bg-slate-400' : 'bg-amber-500';
+                                                const color = s === 'Valid' ? 'bg-emerald-500' : s === 'Expired' ? 'bg-rose-500' : s === 'In Progress' ? 'bg-primary-500' : s === 'Not Started' ? 'bg-slate-400' : 'bg-amber-500';
                                                 return (
                                                     <button
                                                         key={key}

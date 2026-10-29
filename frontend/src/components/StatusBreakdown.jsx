@@ -49,28 +49,28 @@ const StatusBreakdown = ({ data, financialYear }) => {
     };
 
     return (
-        <div className="overflow-x-auto rounded-2xl border border-indigo-100 shadow-sm bg-white">
+        <div className="overflow-x-auto rounded-2xl border border-primary-100 shadow-sm bg-white">
             <table className="w-full text-left text-sm">
                 <thead>
-                    <tr className="bg-gradient-to-r from-indigo-50 to-blue-50 border-b border-indigo-100">
-                        <th className="px-4 py-3 font-black text-indigo-900 text-xs min-w-[120px] uppercase tracking-wider">Segment</th>
+                    <tr className="bg-gradient-to-r from-primary-50 to-primary-50 border-b border-primary-100">
+                        <th className="px-4 py-3 font-black text-primary-900 text-xs min-w-[120px] uppercase tracking-wider">Segment</th>
                         {statuses.map((status) => (
-                            <th key={status} className="px-4 py-3 font-black text-indigo-900 text-right text-xs min-w-[100px] uppercase tracking-wider">
+                            <th key={status} className="px-4 py-3 font-black text-primary-900 text-right text-xs min-w-[100px] uppercase tracking-wider">
                                 {status}
                             </th>
                         ))}
-                        <th className="px-4 py-3 font-black text-indigo-950 text-right text-xs min-w-[100px] bg-indigo-100/50 uppercase tracking-wider">
+                        <th className="px-4 py-3 font-black text-primary-950 text-right text-xs min-w-[100px] bg-primary-100/50 uppercase tracking-wider">
                             Total
                         </th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-indigo-50/50">
+                <tbody className="divide-y divide-primary-50/50">
                     {segments.map((segment) => {
                         const segmentData = breakdown[segment];
                         if (!segmentData) return null;
 
                         return (
-                            <tr key={segment} className="hover:bg-indigo-50/40 transition-colors">
+                            <tr key={segment} className="hover:bg-primary-50/40 transition-colors">
                                 <td className="px-4 py-3 font-bold text-slate-800 text-sm">
                                     {segment}
                                 </td>
@@ -82,7 +82,7 @@ const StatusBreakdown = ({ data, financialYear }) => {
                                         </td>
                                     );
                                 })}
-                                <td className="px-4 py-3 text-right font-black text-indigo-900 bg-indigo-50/30">
+                                <td className="px-4 py-3 text-right font-black text-primary-900 bg-primary-50/30">
                                     {formatToIndian(segmentData?.total || 0, 2)}
                                 </td>
                             </tr>

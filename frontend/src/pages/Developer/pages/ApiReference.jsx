@@ -284,7 +284,7 @@ const ApiReference = () => {
                                     <div className="flex items-center gap-2">
                                         <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-black uppercase ${
                                             ep.method === 'GET' ? 'bg-emerald-100 text-emerald-800' :
-                                            ep.method === 'POST' ? 'bg-blue-100 text-blue-800' :
+                                            ep.method === 'POST' ? 'bg-primary-100 text-primary-800' :
                                             ep.method === 'PATCH' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
                                         }`}>
                                             {ep.method}
@@ -308,7 +308,7 @@ const ApiReference = () => {
                                     <div className="flex items-center gap-2">
                                         <span className={`px-2.5 py-1 rounded-md text-xs font-mono font-black uppercase ${
                                             activeEndpoint.method === 'GET' ? 'bg-emerald-100 text-emerald-800' :
-                                            activeEndpoint.method === 'POST' ? 'bg-blue-100 text-blue-800' :
+                                            activeEndpoint.method === 'POST' ? 'bg-primary-100 text-primary-800' :
                                             activeEndpoint.method === 'PATCH' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
                                         }`}>
                                             {activeEndpoint.method}

@@ -409,7 +409,7 @@ const TerritoryMaster = ({ isCreatePage, isEditPage }) => {
 
                     {/* Right 1 Column: Mini summary of Rules */}
                     <div className="space-y-6">
-                        <div className="bg-gradient-to-br from-primary-50 to-blue-50/50 rounded-[2rem] border border-primary-100/50 p-6 space-y-4">
+                        <div className="bg-gradient-to-br from-primary-50 to-primary-50/50 rounded-[2rem] border border-primary-100/50 p-6 space-y-4">
                             <h3 className="font-black text-primary-950 uppercase tracking-widest text-xs flex items-center gap-2">
                                 <MdInfoOutline size={18} className="text-primary-600" />
                                 Hierarchy Routing Rules

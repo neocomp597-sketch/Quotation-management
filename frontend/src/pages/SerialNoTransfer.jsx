@@ -31,7 +31,7 @@ const SERIAL_STATUSES = [
 ];
 
 const STATUS_STYLES = {
-    SOLD: 'bg-blue-50 text-blue-600 border-blue-200',
+    SOLD: 'bg-primary-50 text-primary-600 border-primary-200',
     IN_STOCK: 'bg-emerald-50 text-emerald-600 border-emerald-200',
     RETURN: 'bg-amber-50 text-amber-600 border-amber-200',
     RETURNED: 'bg-amber-50 text-amber-600 border-amber-200',
@@ -74,7 +74,7 @@ const TYPE_STYLES = { Transferred: 'bg-amber-50 text-amber-600', 'Past Entry': '
 const TYPE_LABELS = { Sold: 'Original Sale' };
 
 const TypeBadge = ({ type }) => (
-    <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest whitespace-nowrap ${TYPE_STYLES[type] || 'bg-sky-50 text-sky-600'}`}>
+    <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest whitespace-nowrap ${TYPE_STYLES[type] || 'bg-primary-50 text-primary-600'}`}>
         {TYPE_LABELS[type] || type}
     </span>
 );

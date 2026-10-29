@@ -170,9 +170,9 @@ const StockTransfers = () => {
             case 'PENDING_APPROVAL':
                 return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">Pending Approval</span>;
             case 'APPROVED':
-                return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300">Approved</span>;
+                return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-primary-100 text-primary-800 dark:bg-primary-950 dark:text-primary-300">Approved</span>;
             case 'DISPATCHED':
-                return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">Dispatched</span>;
+                return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-primary-100 text-primary-800 dark:bg-primary-950 dark:text-primary-300">Dispatched</span>;
             case 'PARTIALLY_RECEIVED':
                 return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300">Partially Received</span>;
             case 'COMPLETED':
@@ -296,7 +296,7 @@ const StockTransfers = () => {
                                             {canModify && tr.status === 'APPROVED' && (
                                                 <button
                                                     onClick={() => handleOpenDispatch(tr)}
-                                                    className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1 ml-auto"
+                                                    className="px-3 py-1 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1 ml-auto"
                                                 >
                                                     <MdLocalShipping /> Dispatch Material
                                                 </button>
@@ -431,7 +431,7 @@ const StockTransfers = () => {
                             ))}
                             <div className="flex justify-end gap-3 pt-4 border-t">
                                 <button type="button" onClick={() => setShowDispatchModal(null)} className="px-4 py-2 text-sm text-slate-600">Cancel</button>
-                                <button type="submit" className="px-5 py-2 text-sm bg-indigo-600 text-white rounded-xl">Confirm Dispatch</button>
+                                <button type="submit" className="px-5 py-2 text-sm bg-primary-600 text-white rounded-xl">Confirm Dispatch</button>
                             </div>
                         </form>
                     </div>

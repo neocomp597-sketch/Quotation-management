@@ -18,14 +18,14 @@ import usePermission from '../hooks/usePermission';
 const StatusPill = ({ status }) => {
     const styles = {
         'Open': 'bg-teal-50 text-teal-700 border-teal-200',
-        'Assigned': 'bg-blue-50 text-blue-700 border-blue-200',
+        'Assigned': 'bg-primary-50 text-primary-700 border-primary-200',
         'In Progress': 'bg-amber-50 text-amber-700 border-amber-200',
         'Pending Customer': 'bg-orange-50 text-orange-700 border-orange-200',
-        'Resolved': 'bg-indigo-50 text-indigo-700 border-indigo-200',
+        'Resolved': 'bg-primary-50 text-primary-700 border-primary-200',
         'Closed': 'bg-slate-100 text-slate-700 border-slate-300',
         'Cancelled': 'bg-rose-50 text-rose-700 border-rose-200',
-        'New': 'bg-blue-50 text-blue-700 border-blue-200',
-        'Contacted': 'bg-indigo-50 text-indigo-700 border-indigo-200',
+        'New': 'bg-primary-50 text-primary-700 border-primary-200',
+        'Contacted': 'bg-primary-50 text-primary-700 border-primary-200',
         'Quotation Pending': 'bg-amber-50 text-amber-700 border-amber-200',
         'Quotation Received': 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200',
         'Negotiation': 'bg-purple-50 text-purple-700 border-purple-200',
@@ -43,9 +43,9 @@ const StatusPill = ({ status }) => {
 const ActionStatusPill = ({ status }) => {
     const colorMap = {
         'VISIT CUSTOMER': 'bg-slate-100 text-slate-700 border-slate-200',
-        'Quotation given': 'bg-sky-50 text-sky-700 border-sky-200',
+        'Quotation given': 'bg-primary-50 text-primary-700 border-primary-200',
         'Followup date time': 'bg-amber-50 text-amber-700 border-amber-200',
-        'quotation revise': 'bg-indigo-50 text-indigo-700 border-indigo-200',
+        'quotation revise': 'bg-primary-50 text-primary-700 border-primary-200',
         'quotation finalise': 'bg-purple-50 text-purple-700 border-purple-200',
         'po received': 'bg-teal-50 text-teal-700 border-teal-200',
         'enquiry won': 'bg-teal-100 text-teal-800 border-teal-300'
@@ -60,7 +60,7 @@ const ActionStatusPill = ({ status }) => {
 const VisitStatusPill = ({ status }) => {
     const styles = {
         'Scheduled': 'bg-amber-50 text-amber-800 border-amber-300',
-        'Visited': 'bg-sky-50 text-sky-800 border-sky-300',
+        'Visited': 'bg-primary-50 text-primary-800 border-primary-300',
         'Follow-up Required': 'bg-purple-50 text-purple-800 border-purple-300',
         'Completed': 'bg-teal-50 text-teal-800 border-teal-300',
         'Cancelled': 'bg-rose-50 text-rose-800 border-rose-300'
@@ -504,7 +504,7 @@ const EnquiryDetail = () => {
                 </div>
                 <div>
                     <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Assigned Executive</span>
-                    <span className="text-base font-black mt-1 block truncate text-indigo-600 dark:text-indigo-400">
+                    <span className="text-base font-black mt-1 block truncate text-primary-600 dark:text-primary-400">
                         {executiveName}
                     </span>
                 </div>

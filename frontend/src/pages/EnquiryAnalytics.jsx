@@ -39,7 +39,7 @@ const HealthScoreBadge = ({ score }) => {
 // Recommended Action Badge Component
 const ActionBadge = ({ action }) => {
     const colors = {
-        'Follow Up Now': 'bg-blue-100 text-blue-700',
+        'Follow Up Now': 'bg-primary-100 text-primary-700',
         'Re-negotiate': 'bg-purple-100 text-purple-700',
         'Request Revised Quote': 'bg-amber-100 text-amber-700',
         'Finalize Vendor': 'bg-emerald-100 text-emerald-700',
@@ -214,7 +214,7 @@ const EnquiryAnalytics = () => {
                     <StatCard title="Won" value={summary.wonCount} icon={MdCheckCircle} color="text-emerald-600" bg="bg-emerald-50" />
                     <StatCard title="Lost" value={summary.lostCount} icon={MdWarning} color="text-rose-600" bg="bg-rose-50" />
                     <StatCard title="Overdue Follow-ups" value={summary.overdueFU} icon={MdCalendarToday} color="text-orange-600" bg="bg-orange-50" />
-                    <StatCard title="Pending Quotes" value={summary.pendingQuotations} icon={MdLocalOffer} color="text-indigo-600" bg="bg-indigo-50" />
+                    <StatCard title="Pending Quotes" value={summary.pendingQuotations} icon={MdLocalOffer} color="text-primary-600" bg="bg-primary-50" />
                 </div>
             )}
 
@@ -383,20 +383,20 @@ const EnquiryAnalytics = () => {
                     {/* Upcoming Follow-ups */}
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                         <h3 className="text-sm font-black text-slate-900 mb-4 flex items-center gap-2">
-                            <span className="w-3 h-3 rounded-full bg-blue-500"></span>
+                            <span className="w-3 h-3 rounded-full bg-primary-500"></span>
                             Upcoming (7 days) ({followUps.upcoming.length})
                         </h3>
                         <div className="space-y-3">
                             {followUps.upcoming.length > 0 ? (
                                 followUps.upcoming.map(e => (
-                                    <div key={e._id} className="flex items-center justify-between p-4 bg-blue-50 border border-blue-100 rounded-lg hover:shadow-md transition-shadow">
+                                    <div key={e._id} className="flex items-center justify-between p-4 bg-primary-50 border border-primary-100 rounded-lg hover:shadow-md transition-shadow">
                                         <div className="flex-1">
                                             <p className="font-bold text-slate-900">{e.enquiryNo}</p>
                                             <p className="text-xs text-slate-600">{e.customerId?.companyName}</p>
                                         </div>
                                         <div className="text-right">
                                             <p className="text-[10px] font-bold text-slate-500">Scheduled</p>
-                                            <p className="font-bold text-blue-600">{formatDate(e.followUpDate)}</p>
+                                            <p className="font-bold text-primary-600">{formatDate(e.followUpDate)}</p>
                                         </div>
                                     </div>
                                 ))
@@ -576,7 +576,7 @@ const EnquiryAnalytics = () => {
                                     <td className="py-3 px-4 text-right text-rose-600">{u.lostCount}</td>
                                     <td className="py-3 px-4 text-right text-slate-700">{u.pendingCount}</td>
                                     <td className="py-3 px-4 text-right">
-                                        <span className="text-xs font-black px-2 py-1 rounded bg-blue-100 text-blue-700">
+                                        <span className="text-xs font-black px-2 py-1 rounded bg-primary-100 text-primary-700">
                                             {u.conversionRate}%
                                         </span>
                                     </td>

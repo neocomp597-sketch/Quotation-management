@@ -72,7 +72,7 @@ const Orders = () => {
                                         <td className="px-6 py-4 font-extrabold text-slate-900">₹ {Number(o.grandTotal).toLocaleString()}</td>
                                         <td className="px-6 py-4 text-slate-500">{formatDate(o.orderDate)}</td>
                                         <td className="px-6 py-4">
-                                            <span className={`px-2.5 py-1 text-[10px] font-black rounded-lg uppercase ${o.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                                            <span className={`px-2.5 py-1 text-[10px] font-black rounded-lg uppercase ${o.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-primary-50 text-primary-600'}`}>
                                                 {o.status}
                                             </span>
                                         </td>

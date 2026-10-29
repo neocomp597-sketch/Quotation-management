@@ -1357,7 +1357,7 @@ const OrgChart = () => {
                                     href={`mailto:${selectedEmp.email || ''}?subject=ARCRM%20Official%20Communication`}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="p-6 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl flex flex-col items-center justify-center space-y-2 font-bold shadow-lg hover:scale-105 transition-all"
+                                    className="p-6 bg-gradient-to-br from-primary-600 to-primary-700 text-white rounded-2xl flex flex-col items-center justify-center space-y-2 font-bold shadow-lg hover:scale-105 transition-all"
                                 >
                                     <MdEmail size={32} />
                                     <span>Send Email</span>

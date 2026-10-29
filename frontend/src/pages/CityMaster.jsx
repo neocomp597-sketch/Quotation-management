@@ -414,7 +414,7 @@ const CityMaster = ({ isCreatePage, isEditPage }) => {
                                                         </span>
                                                     </td>
                                                     <td className="py-4 px-6 font-bold">
-                                                        <span className="inline-block px-2.5 py-1 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 font-mono font-black text-xs uppercase tracking-wider">
+                                                        <span className="inline-block px-2.5 py-1 rounded-xl bg-primary-50 border border-primary-200 text-primary-700 font-mono font-black text-xs uppercase tracking-wider">
                                                             {item.stateCode || (item.state === 'Maharashtra' ? 'MH' : (item.state || 'IN').substring(0, 2).toUpperCase())}
                                                         </span>
                                                     </td>
@@ -547,11 +547,11 @@ const CityMaster = ({ isCreatePage, isEditPage }) => {
                                         </div>
                                     </div>
 
-                                    <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl text-xs space-y-1">
-                                        <p className="font-bold text-indigo-900 uppercase tracking-wide text-[10px]">
+                                    <div className="bg-primary-50 border border-primary-100 p-4 rounded-2xl text-xs space-y-1">
+                                        <p className="font-bold text-primary-900 uppercase tracking-wide text-[10px]">
                                             State Short Code Mapping Info:
                                         </p>
-                                        <p className="text-indigo-700">
+                                        <p className="text-primary-700">
                                             States like <span className="font-bold">MAHARASHTRA</span> will automatically map to 2-digit code <span className="font-bold">MH</span> during import.
                                         </p>
                                     </div>
@@ -652,11 +652,11 @@ const CityMaster = ({ isCreatePage, isEditPage }) => {
 
                             {/* State Short Code Preview */}
                             {formData.state && (
-                                <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl flex items-center justify-between">
-                                    <span className="text-xs font-bold text-indigo-900 uppercase tracking-wider">
+                                <div className="bg-primary-50 border border-primary-100 p-4 rounded-2xl flex items-center justify-between">
+                                    <span className="text-xs font-bold text-primary-900 uppercase tracking-wider">
                                         State Short Code (2 DIGIT Mapping):
                                     </span>
-                                    <span className="px-3 py-1 bg-indigo-600 text-white rounded-xl font-mono font-black text-sm uppercase tracking-widest">
+                                    <span className="px-3 py-1 bg-primary-600 text-white rounded-xl font-mono font-black text-sm uppercase tracking-widest">
                                         {formData.stateCode || (formData.state.toLowerCase() === 'maharashtra' ? 'MH' : formData.state.substring(0, 2).toUpperCase())}
                                     </span>
                                 </div>

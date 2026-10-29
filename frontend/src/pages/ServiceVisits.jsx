@@ -15,7 +15,7 @@ import usePermission from '../hooks/usePermission';
 
 const visitStatusClass = (status) => (
     status === 'Completed' ? 'bg-teal-50 text-teal-600 border-teal-200' :
-    status === 'Started' ? 'bg-indigo-50 text-indigo-600 border-indigo-200' :
+    status === 'Started' ? 'bg-primary-50 text-primary-600 border-primary-200' :
     status === 'Cancelled' ? 'bg-rose-50 text-rose-600 border-rose-200' :
     'bg-slate-50 text-slate-500 border-slate-200'
 );
@@ -181,12 +181,12 @@ const Mgr5SearchSelect = ({ mgr5Parts, selectedId, onSelect, isCustomDesc }) => 
 
                         {/* SECTION 2: PRODUCTS CATALOG */}
                         <div className="p-2">
-                            <div className="px-2 py-1.5 text-[10px] font-black uppercase tracking-widest text-indigo-700 bg-indigo-50/70 rounded-lg flex items-center justify-between mb-1">
+                            <div className="px-2 py-1.5 text-[10px] font-black uppercase tracking-widest text-primary-700 bg-primary-50/70 rounded-lg flex items-center justify-between mb-1">
                                 <span className="flex items-center gap-1.5">
-                                    <MdInventory2 size={13} className="text-indigo-600" />
+                                    <MdInventory2 size={13} className="text-primary-600" />
                                     Section 2: Products Catalog ({productParts.length})
                                 </span>
-                                <span className="text-[9px] font-bold text-indigo-800 bg-indigo-200/60 px-1.5 py-0.2 rounded">Catalog</span>
+                                <span className="text-[9px] font-bold text-primary-800 bg-primary-200/60 px-1.5 py-0.2 rounded">Catalog</span>
                             </div>
                             {productParts.length === 0 ? (
                                 <div className="px-3 py-1.5 text-xs text-slate-400 italic">No products found</div>
@@ -202,12 +202,12 @@ const Mgr5SearchSelect = ({ mgr5Parts, selectedId, onSelect, isCustomDesc }) => 
                                             }}
                                             className={`px-3 py-2 rounded-xl cursor-pointer text-xs transition-all flex items-center justify-between ${
                                                 isSelected 
-                                                    ? 'bg-indigo-50 text-indigo-900 font-bold border border-indigo-200' 
-                                                    : 'hover:bg-indigo-50/40 text-slate-700'
+                                                    ? 'bg-primary-50 text-primary-900 font-bold border border-primary-200' 
+                                                    : 'hover:bg-primary-50/40 text-slate-700'
                                             }`}
                                         >
                                             <div className="flex items-center gap-2 min-w-0 pr-2">
-                                                <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-800 font-black text-[9px] rounded uppercase shrink-0">
+                                                <span className="px-1.5 py-0.5 bg-primary-100 text-primary-800 font-black text-[9px] rounded uppercase shrink-0">
                                                     Product
                                                 </span>
                                                 <div className="truncate">

@@ -198,7 +198,7 @@ const AIPricingInsights = () => {
     if (loading) {
         return (
             <div className="p-20 text-center">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-600 border-t-transparent mb-4"></div>
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary-600 border-t-transparent mb-4"></div>
                 <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">AI Models Initializing...</p>
             </div>
         );
@@ -208,7 +208,7 @@ const AIPricingInsights = () => {
         <div className="space-y-6">
             <div>
                 <h1 className="text-3xl font-black text-slate-900 tracking-tight font-outfit uppercase flex items-center gap-3">
-                    <MdAutoGraph className="text-indigo-600 animate-pulse" />
+                    <MdAutoGraph className="text-primary-600 animate-pulse" />
                     AI Pricing & Win Insights
                 </h1>
                 <p className="text-slate-500 font-medium">Predict deal closures, evaluate approval risks, and optimize discounting using predictive models.</p>
@@ -218,7 +218,7 @@ const AIPricingInsights = () => {
                 {/* Column 1: Configurator Inputs */}
                 <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-6 lg:col-span-1">
                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-indigo-600"></span>
+                        <span className="h-2 w-2 rounded-full bg-primary-600"></span>
                         Simulation Parameters
                     </h3>
 
@@ -228,7 +228,7 @@ const AIPricingInsights = () => {
                             <select 
                                 value={selectedCustomer} 
                                 onChange={handleCustomerChange}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none transition-all"
                             >
                                 <option value="">Select Customer...</option>
                                 {customers.map(c => (
@@ -242,7 +242,7 @@ const AIPricingInsights = () => {
                             <select 
                                 value={selectedProduct} 
                                 onChange={(e) => setSelectedProduct(e.target.value)}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none transition-all"
                             >
                                 <option value="">Select Product...</option>
                                 {products.map(p => (
@@ -259,7 +259,7 @@ const AIPricingInsights = () => {
                                     min="1"
                                     value={quantity}
                                     onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none transition-all"
                                 />
                             </div>
                             <div className="space-y-1">
@@ -271,7 +271,7 @@ const AIPricingInsights = () => {
                                         max="100"
                                         value={proposedDiscount}
                                         onChange={(e) => setProposedDiscount(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
-                                        className="w-full pr-10 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
+                                        className="w-full pr-10 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none transition-all"
                                     />
                                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">%</span>
                                 </div>
@@ -283,7 +283,7 @@ const AIPricingInsights = () => {
                             <select 
                                 value={competitorPresence}
                                 onChange={(e) => setCompetitorPresence(e.target.value)}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none transition-all"
                             >
                                 <option value="none">No Competitors Present</option>
                                 <option value="higher">Competitor offers Higher price</option>
@@ -297,7 +297,7 @@ const AIPricingInsights = () => {
                             <select 
                                 value={region}
                                 onChange={(e) => setRegion(e.target.value)}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none transition-all"
                             >
                                 <option value="Maharashtra">Maharashtra (West)</option>
                                 <option value="Gujarat">Gujarat (West)</option>
@@ -374,7 +374,7 @@ const AIPricingInsights = () => {
 
                     {/* AI Recommendation Engine HUD */}
                     <div className="bg-slate-900 text-white p-6 rounded-[2rem] shadow-xl space-y-4 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 h-40 w-40 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                        <div className="absolute top-0 right-0 h-40 w-40 bg-primary-500/10 rounded-full blur-3xl pointer-events-none"></div>
                         <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
                             <MdLightbulb className="text-yellow-400" size={18} />
                             AI Copilot Recommendations
@@ -387,7 +387,7 @@ const AIPricingInsights = () => {
                                         {tip.type === 'error' && <MdCancel className="text-rose-500" size={16} />}
                                         {tip.type === 'warn' && <MdWarning className="text-amber-500" size={16} />}
                                         {tip.type === 'success' && <MdCheckCircle className="text-emerald-400" size={16} />}
-                                        {tip.type === 'info' && <MdInfo className="text-indigo-400" size={16} />}
+                                        {tip.type === 'info' && <MdInfo className="text-primary-400" size={16} />}
                                     </div>
                                     <p>{tip.text}</p>
                                 </div>

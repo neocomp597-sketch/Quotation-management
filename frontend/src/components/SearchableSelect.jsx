@@ -93,7 +93,7 @@ const SearchableSelect = ({
     };
 
     const selectedLabel = getSelectedLabel();
-    const defaultInputClass = "w-full flex items-center justify-between px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-700 font-bold focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-left text-sm";
+    const defaultInputClass = "w-full flex items-center justify-between px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-700 font-bold focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all text-left text-sm";
 
     return (
         <div className={`relative ${className}`} ref={containerRef}>
@@ -107,7 +107,7 @@ const SearchableSelect = ({
                 </span>
                 <MdKeyboardArrowDown 
                     size={20} 
-                    className={`text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180 text-indigo-500' : ''}`} 
+                    className={`text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180 text-primary-500' : ''}`} 
                 />
             </button>
 
@@ -127,7 +127,7 @@ const SearchableSelect = ({
                                     placeholder="Type to search..."
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
-                                    className="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-semibold text-slate-700 text-xs"
+                                    className="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition-all font-semibold text-slate-700 text-xs"
                                 />
                             </div>
 
@@ -139,7 +139,7 @@ const SearchableSelect = ({
                                     onClick={() => handleSelect('')}
                                     className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                                         !value 
-                                            ? 'bg-indigo-50 text-indigo-700' 
+                                            ? 'bg-primary-50 text-primary-700' 
                                             : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700'
                                     }`}
                                 >
@@ -150,7 +150,7 @@ const SearchableSelect = ({
                                     <button
                                         type="button"
                                         onClick={() => handleSelect({ value: search.trim(), label: search.trim() })}
-                                        className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-all mb-1 flex items-center gap-1.5"
+                                        className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-primary-600 bg-primary-50 hover:bg-primary-100 transition-all mb-1 flex items-center gap-1.5"
                                     >
                                         <MdAdd size={15} />
                                         <span>Use custom: "{search.trim()}"</span>
@@ -171,7 +171,7 @@ const SearchableSelect = ({
                                             <div 
                                                 key={idx} 
                                                 className={`group/item flex items-center justify-between rounded-xl transition-all ${
-                                                    isSelected ? 'bg-indigo-600 text-white font-bold' : 'hover:bg-slate-50'
+                                                    isSelected ? 'bg-primary-600 text-white font-bold' : 'hover:bg-slate-50'
                                                 }`}
                                             >
                                                 <button
@@ -193,8 +193,8 @@ const SearchableSelect = ({
                                                             }}
                                                             className={`p-1.5 rounded-lg transition-colors ${
                                                                 isSelected 
-                                                                    ? 'text-indigo-200 hover:text-white hover:bg-indigo-700' 
-                                                                    : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
+                                                                    ? 'text-primary-200 hover:text-white hover:bg-primary-700' 
+                                                                    : 'text-slate-400 hover:text-primary-600 hover:bg-primary-50'
                                                             }`}
                                                             title="Edit Option"
                                                         >
@@ -210,7 +210,7 @@ const SearchableSelect = ({
                                                             }}
                                                             className={`p-1.5 rounded-lg transition-colors ${
                                                                 isSelected 
-                                                                    ? 'text-indigo-200 hover:text-white hover:bg-indigo-700' 
+                                                                    ? 'text-primary-200 hover:text-white hover:bg-primary-700' 
                                                                     : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
                                                             }`}
                                                             title="Delete Option"
@@ -238,7 +238,7 @@ const SearchableSelect = ({
                                 placeholder="Enter custom option name..."
                                 value={newOptionValue}
                                 onChange={(e) => setNewOptionValue(e.target.value)}
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-semibold text-slate-700 text-xs"
+                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition-all font-semibold text-slate-700 text-xs"
                                 onKeyDown={(e) => {
                                     if (e.key === 'Escape') {
                                         setShowInlineAdd(false);
@@ -265,7 +265,7 @@ const SearchableSelect = ({
                                             setShowInlineAdd(false);
                                         }
                                     }}
-                                    className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-md shadow-indigo-600/10"
+                                    className="flex-1 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-md shadow-primary-600/10"
                                 >
                                     Save Option
                                 </button>

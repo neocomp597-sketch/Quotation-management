@@ -294,7 +294,7 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                                                 className="w-12 h-12 rounded-2xl object-cover border border-slate-200 dark:border-slate-700" 
                                             />
                                         ) : (
-                                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-500 to-indigo-600 text-white flex items-center justify-center font-black text-lg">
+                                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 text-white flex items-center justify-center font-black text-lg">
                                                 {branch.branchPrefix || branch.code?.substring(0, 3) || 'BR'}
                                             </div>
                                         )}
@@ -310,7 +310,7 @@ const BranchMaster = ({ isCreatePage, isEditPage }) => {
                                                     Prefix: {branch.branchPrefix}
                                                 </span>
                                                 {branch.stateShortCode && (
-                                                    <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-mono font-bold text-[11px] rounded-lg">
+                                                    <span className="px-2 py-0.5 bg-primary-50 dark:bg-primary-950/60 text-primary-700 dark:text-primary-300 font-mono font-bold text-[11px] rounded-lg">
                                                         State Code: {branch.stateShortCode}
                                                     </span>
                                                 )}

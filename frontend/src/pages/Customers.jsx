@@ -555,7 +555,7 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
                                                 <MdLocationOn size={14} className="text-slate-400" /> {c.billingAddress?.city}, {c.billingAddress?.state}
                                             </div>
                                             {c.territory && (
-                                                <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100/50">
+                                                <span className="text-[10px] font-bold text-primary-700 bg-primary-50 px-2 py-0.5 rounded border border-primary-100/50">
                                                     {c.territory.name}
                                                 </span>
                                             )}
@@ -673,7 +673,7 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
                                             </td>
                                             <td className="px-8 py-5">
                                                 {c.territory ? (
-                                                    <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100/50">
+                                                    <span className="text-xs font-bold text-primary-700 bg-primary-50 px-2.5 py-1 rounded-lg border border-primary-100/50">
                                                         {c.territory.name}
                                                     </span>
                                                 ) : (

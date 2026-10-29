@@ -273,7 +273,7 @@ const CustomerPricingDashboard = ({ customerId: propCustomerId, inlineMode = fal
                         {/* Margin Trend Chart */}
                         <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4 lg:col-span-2">
                             <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                                <span className="h-2 w-2 rounded-full bg-indigo-500"></span>
+                                <span className="h-2 w-2 rounded-full bg-primary-500"></span>
                                 Quotation & Margin Performance Trend
                             </h3>
                             <div className="h-64">

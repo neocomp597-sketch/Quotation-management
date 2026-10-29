@@ -488,17 +488,17 @@ const ImportWizard = ({ isOpen, onClose, module, title, onDownloadTemplate, onIm
 
             {step === 'importing' && job && (
                 <div className="space-y-5">
-                    <div className="rounded-2xl p-6 bg-blue-50 border border-blue-100">
+                    <div className="rounded-2xl p-6 bg-primary-50 border border-primary-100">
                         <div className="flex items-center justify-between mb-2">
-                            <p className="text-sm font-bold text-blue-900">
+                            <p className="text-sm font-bold text-primary-900">
                                 {connectionLost ? 'Waiting for the server…' : `Importing ${job.module.recordLabelPlural}…`}
                             </p>
-                            <span className="text-xs font-bold text-blue-700 tabular-nums">{progressPercent}%</span>
+                            <span className="text-xs font-bold text-primary-700 tabular-nums">{progressPercent}%</span>
                         </div>
-                        <div className="w-full bg-blue-200 rounded-full h-2.5 overflow-hidden">
-                            <div className="bg-gradient-to-r from-blue-500 to-blue-600 h-full transition-all duration-500" style={{ width: `${Math.max(progressPercent, 3)}%` }} />
+                        <div className="w-full bg-primary-200 rounded-full h-2.5 overflow-hidden">
+                            <div className="bg-gradient-to-r from-primary-500 to-primary-600 h-full transition-all duration-500" style={{ width: `${Math.max(progressPercent, 3)}%` }} />
                         </div>
-                        <p className="text-xs text-blue-700 mt-2 font-medium tabular-nums">
+                        <p className="text-xs text-primary-700 mt-2 font-medium tabular-nums">
                             {progress.total ? `${formatCount(progress.processed)} of ${formatCount(progress.total)} rows processed` : 'Checking the rows one last time…'}
                         </p>
                     </div>

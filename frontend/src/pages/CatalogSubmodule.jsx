@@ -318,7 +318,7 @@ const CatalogSubmodule = ({ mode = 'products' }) => {
                                         <td className="px-6 py-4 text-xs font-semibold text-slate-600">{item.uom}</td>
                                         {activeTab === 'subscriptions' && (
                                             <td className="px-6 py-4">
-                                                <span className="px-2.5 py-1 text-[10px] font-black uppercase bg-indigo-50 text-indigo-600 rounded-lg">
+                                                <span className="px-2.5 py-1 text-[10px] font-black uppercase bg-primary-50 text-primary-600 rounded-lg">
                                                     {item.subscriptionDetails?.billingCycle || 'Monthly'}
                                                 </span>
                                             </td>
@@ -428,16 +428,16 @@ const CatalogSubmodule = ({ mode = 'products' }) => {
                     </div>
 
                     {activeTab === 'subscriptions' && (
-                        <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-4">
-                            <h3 className="text-xs font-black text-indigo-900 uppercase tracking-wider">Subscription Specifications</h3>
+                        <div className="p-4 bg-primary-50/50 rounded-2xl border border-primary-100 space-y-4">
+                            <h3 className="text-xs font-black text-primary-900 uppercase tracking-wider">Subscription Specifications</h3>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
-                                    <label className="text-[10px] font-black text-indigo-700 uppercase tracking-widest block mb-2">Billing Cycle</label>
+                                    <label className="text-[10px] font-black text-primary-700 uppercase tracking-widest block mb-2">Billing Cycle</label>
                                     <select
                                         name="sub.billingCycle"
                                         value={formData.subscriptionDetails?.billingCycle}
                                         onChange={handleFormChange}
-                                        className="w-full px-4 py-2.5 bg-white border border-indigo-200 rounded-xl outline-none text-sm font-semibold"
+                                        className="w-full px-4 py-2.5 bg-white border border-primary-200 rounded-xl outline-none text-sm font-semibold"
                                     >
                                         <option value="Monthly">Monthly</option>
                                         <option value="Quarterly">Quarterly</option>
@@ -446,23 +446,23 @@ const CatalogSubmodule = ({ mode = 'products' }) => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-black text-indigo-700 uppercase tracking-widest block mb-2">Setup Fee</label>
+                                    <label className="text-[10px] font-black text-primary-700 uppercase tracking-widest block mb-2">Setup Fee</label>
                                     <input
                                         type="number"
                                         name="sub.setupFee"
                                         value={formData.subscriptionDetails?.setupFee}
                                         onChange={handleFormChange}
-                                        className="w-full px-4 py-2.5 bg-white border border-indigo-200 rounded-xl outline-none text-sm font-semibold"
+                                        className="w-full px-4 py-2.5 bg-white border border-primary-200 rounded-xl outline-none text-sm font-semibold"
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-black text-indigo-700 uppercase tracking-widest block mb-2">Renewal Rate</label>
+                                    <label className="text-[10px] font-black text-primary-700 uppercase tracking-widest block mb-2">Renewal Rate</label>
                                     <input
                                         type="number"
                                         name="sub.renewalPrice"
                                         value={formData.subscriptionDetails?.renewalPrice}
                                         onChange={handleFormChange}
-                                        className="w-full px-4 py-2.5 bg-white border border-indigo-200 rounded-xl outline-none text-sm font-semibold"
+                                        className="w-full px-4 py-2.5 bg-white border border-primary-200 rounded-xl outline-none text-sm font-semibold"
                                     />
                                 </div>
                             </div>

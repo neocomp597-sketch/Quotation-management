@@ -52,7 +52,7 @@ const StockAlertsPage = () => {
             case 'Warning':
                 return <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 flex items-center gap-1"><MdWarning /> Warning</span>;
             default:
-                return <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300">Info</span>;
+                return <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-primary-100 text-primary-800 dark:bg-primary-950 dark:text-primary-300">Info</span>;
         }
     };
 
