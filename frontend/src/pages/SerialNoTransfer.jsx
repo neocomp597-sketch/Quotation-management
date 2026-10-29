@@ -245,6 +245,25 @@ const DateRangeFilter = ({ range, field, onChange }) => {
     );
 };
 
+// Total Count of a list: every record matching its search and filters (the server's count), apart
+// from the rows on this page, as on Invoice Bulk Upload.
+const TotalCountBar = ({ pagination, shown, noun, filtered }) => {
+    const from = shown ? (pagination.page - 1) * pagination.limit + 1 : 0;
+    const to = shown ? from + shown - 1 : 0;
+    return (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-2xl border border-primary-100 bg-primary-50/60 px-4 py-3">
+            <p className="text-sm font-bold text-slate-700">
+                Total Count:{' '}
+                <span className="text-lg font-black text-primary-700">{(pagination.total || 0).toLocaleString('en-IN')}</span>{' '}
+                <span className="text-xs font-semibold text-slate-500">{noun}{filtered ? ' matching the search and filters' : ''}</span>
+            </p>
+            <p className="text-xs font-bold text-slate-500">
+                {to ? `Showing ${from.toLocaleString('en-IN')}–${to.toLocaleString('en-IN')} on this page` : 'No records on this page'}
+            </p>
+        </div>
+    );
+};
+
 const SerialListTab = ({ onOpen, onTransfer }) => {
     const { canModify } = usePermission('master_serial_transfer');
     const [search, setSearch] = useStoredState('list.search', '');
@@ -296,6 +315,12 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
             <div className="p-3 md:p-6">
                 {loading ? <Spinner /> : (
                     <>
+                        <TotalCountBar
+                            pagination={pagination}
+                            shown={rows.length}
+                            noun="serial numbers"
+                            filtered={Boolean(debouncedSearch || status || ownership || mgr4 || range.fromDate || range.toDate)}
+                        />
                         <MobileCardList>
                             {rows.map((row, index) => (
                                 <MobileCard key={row._id} onClick={() => onOpen(row._id)}>
@@ -433,6 +458,12 @@ const HistoryTab = ({ onOpen }) => {
             <div className="p-3 md:p-6">
                 {loading ? <Spinner /> : (
                     <>
+                        <TotalCountBar
+                            pagination={pagination}
+                            shown={rows.length}
+                            noun="history records"
+                            filtered={Boolean(debouncedSearch || flag || entryType || mgr4 || range.fromDate || range.toDate)}
+                        />
                         <MobileCardList>
                             {rows.map((entry) => (
                                 <MobileCard key={entry._id} onClick={() => onOpen(entry.assetId)}>
@@ -802,9 +833,9 @@ const InfoRow = ({ label, children }) => (
     </div>
 );
 
-// A card whose heading opens and closes it; the choice is kept for this browser tab.
-const CollapsibleSection = ({ storageKey, icon, title, children }) => {
-    const [open, setOpen] = useStoredState(`section.${storageKey}`, true);
+// A card whose heading opens and closes it; it starts collapsed each time the serial is opened.
+const CollapsibleSection = ({ icon, title, children }) => {
+    const [open, setOpen] = useState(false);
     return (
         <div className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
             <button
@@ -835,7 +866,7 @@ export const SerialNoDetails = ({ transfer = false }) => {
     // Open form: 'transfer' (new current customer) or 'past' (an earlier customer, inactive).
     const [formMode, setFormMode] = useState(transfer && canModify ? 'transfer' : null);
     const [refreshCount, setRefreshCount] = useState(0);
-    const [activityOpen, setActivityOpen] = useStoredState('section.activityLog', true);
+    const [activityOpen, setActivityOpen] = useState(false);
     // Back returns to wherever the page was opened from (list filters, history tab), else the list.
     const goBack = () => (location.key !== 'default' ? navigate(-1) : navigate('/serial-no-transfer'));
 
@@ -957,7 +988,7 @@ export const SerialNoDetails = ({ transfer = false }) => {
                         )}
                     </div>
 
-                    <CollapsibleSection storageKey="history" icon={<MdHistory size={16} />} title={`Serial Number Sale History (${history.length})`}>
+                    <CollapsibleSection icon={<MdHistory size={16} />} title={`Serial Number Sale History (${history.length})`}>
                         <div className="p-3 md:hidden">
                             <MobileCardList>
                                 {history.map((entry) => (
@@ -1014,7 +1045,7 @@ export const SerialNoDetails = ({ transfer = false }) => {
                     </CollapsibleSection>
 
                     {history.length > 0 && (
-                        <CollapsibleSection storageKey="activityDownload" icon={<MdFileDownload size={16} />} title={`Customer Activity Log Download — ${data.asset.serialNumber}`}>
+                        <CollapsibleSection icon={<MdFileDownload size={16} />} title={`Customer Activity Log Download — ${data.asset.serialNumber}`}>
                             {/* Remounted after a transfer so the Active/Inactive lists reload. */}
                             <ActivityTab key={`${assetId}-${refreshCount}`} assetId={assetId} />
                         </CollapsibleSection>
@@ -1305,6 +1336,7 @@ const BranchTransferList = ({ params, enabled, hasFilters, onPageChange, onOpen 
             : 'No serial numbers have been moved to another branch yet.';
     return (
         <>
+            <TotalCountBar pagination={pagination} shown={rows.length} noun="branch transfers" filtered={hasFilters} />
             <MobileCardList>
                 {rows.map((row) => (
                     <MobileCard key={row._id} onClick={() => onOpen(row)}>
