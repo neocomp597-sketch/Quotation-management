@@ -8,6 +8,7 @@ const { enforceImportRowLimit } = require('../middlewares/importRowLimit');
 const { limitImportConcurrency } = require('../middlewares/importConcurrency');
 const { keepTenantContext } = require('../middlewares/tenantContext');
 const { getImportProgress, getLatestImportProgress } = require('../utils/importProgress');
+const { refuseMgrLimited } = require('../utils/mgrAccess');
 const {
     importProducts,
     importCustomers,
@@ -99,7 +100,7 @@ router.post('/employees', protect, uploadFile, enforceImportRowLimit, limitImpor
 router.post('/contacts', protect, uploadFile, enforceImportRowLimit, limitImportConcurrency, importContacts);
 router.post('/contracts', protect, uploadFile, enforceImportRowLimit, limitImportConcurrency, importContracts);
 router.post('/tenders', protect, uploadFile, enforceImportRowLimit, limitImportConcurrency, importTenders);
-router.post('/assets', protect, uploadFile, enforceImportRowLimit, limitImportConcurrency, importAssets);
+router.post('/assets', protect, refuseMgrLimited, uploadFile, enforceImportRowLimit, limitImportConcurrency, importAssets);
 
 // Template download routes
 router.get('/template/products', getProductTemplate);

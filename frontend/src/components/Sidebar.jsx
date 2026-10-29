@@ -240,7 +240,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'sale_invoices', name: 'Invoices', icon: <MdReceipt size={18} />, path: '/invoices' },
                 { key: 'master_serials', name: 'Invoice Bulk Upload', icon: <MdTag size={18} />, path: '/serial-no-master' },
                 // Sorted as if named after Invoice Bulk Upload so it sits directly below it.
-                { key: 'master_serials', name: 'Serial No Transfer', sortName: 'Invoice Bulk Upload 2', icon: <MdSwapHoriz size={18} />, path: '/serial-no-transfer' },
+                { key: 'master_serial_transfer', name: 'Serial No Transfer', sortName: 'Invoice Bulk Upload 2', icon: <MdSwapHoriz size={18} />, path: '/serial-no-transfer' },
                 { key: 'sales_approvals', name: 'Approvals', icon: <MdLock size={18} />, path: '/sales/approvals' },
                 { key: 'sales_orders', name: 'Orders', icon: <MdShoppingCart size={18} />, path: '/sales/orders' },
             ]

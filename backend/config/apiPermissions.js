@@ -102,7 +102,7 @@ const API_PERMISSION_RULES = [
         }
     },
     {
-        prefix: '/api/serial-transfers', key: 'master_serials',
+        prefix: '/api/serial-transfers', key: 'master_serial_transfer',
         routes: { 'POST /serials/:assetId/transfer': 'modify', 'POST /serials/:assetId/past-entry': 'modify', 'POST /branch-transfers': 'modify' }
     },
     {
@@ -275,6 +275,13 @@ const API_PERMISSION_RULES = [
             // summary also feeds the ticket form and the warranty / customer screens, so
             // those keep it; Invoice Bulk Upload access alone no longer does.
             'PUT /:id': { key: 'master_serials_edit', action: 'view' },
+            // The Activity Log is also shown on a serial number's Serial No Transfer page
+            'GET /activity': {
+                anyOf: [
+                    ['csm_warranties_amc', 'view'], ['csm_tickets', 'view'], ['master_serials', 'view'],
+                    ['master_customers', 'view'], ['master_serial_transfer', 'view']
+                ]
+            },
             'GET /summary': {
                 anyOf: [
                     ['master_serials_view_details', 'view'], ['csm_tickets', 'view'],

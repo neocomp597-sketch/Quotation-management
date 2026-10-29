@@ -381,20 +381,28 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
                 return;
             }
 
+            // Same columns, in the same order, as the import template
+            // (importController.getCustomerTemplate); Territory is not imported and comes last.
             const exportData = exportCustomers.map((c) => ({
-                'Company Trade Name': c.companyName || '',
                 'Customer Code': c.externalCode || '',
+                'Company Name': c.companyName || '',
                 'Contact Person': contactPersonOf(c),
+                'GSTIN': c.gstin || '',
                 'Mobile': c.mobile || '',
                 'Email': c.email || '',
-                'GSTIN': c.gstin || '',
-                'Billing Address': c.billingAddress?.line1 || '',
+                'Billing Address Line 1': c.billingAddress?.line1 || '',
+                'Billing Address Line 2': c.billingAddress?.line2 || '',
                 'City': c.billingAddress?.city || '',
                 'State': c.billingAddress?.state || '',
                 'Pincode': c.billingAddress?.pincode || '',
-                'Default Discount (%)': c.defaultDiscount || 0,
-                'Territory': c.territory?.name || 'Unassigned',
-                'Notes': c.notes || ''
+                'Shipping Address Line 1': c.shippingAddress?.line1 || '',
+                'Shipping Address Line 2': c.shippingAddress?.line2 || '',
+                'Shipping City': c.shippingAddress?.city || '',
+                'Shipping State': c.shippingAddress?.state || '',
+                'Shipping Pincode': c.shippingAddress?.pincode || '',
+                'Default Discount': c.defaultDiscount || 0,
+                'Logo URL': c.logoUrl || '',
+                'Territory': c.territory?.name || 'Unassigned'
             }));
 
             const ws = XLSX.utils.json_to_sheet(exportData);

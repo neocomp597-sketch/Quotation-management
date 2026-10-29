@@ -6,11 +6,12 @@ import {
     MdShield, MdExpandMore, MdExpandLess, MdAdd, MdDelete, MdSave, MdEdit, MdClose,
     MdBusiness, MdStorefront, MdKey, MdCheckCircle, MdTune, MdVpnKey, MdSearch
 } from 'react-icons/md';
-import { authorizationService, userService, superAdminService, vendorService } from '../services/api';
+import { authorizationService, userService, superAdminService, vendorService, mgrService } from '../services/api';
 import { ROLE_LABELS as BUILTIN_ROLE_LABELS, MENU_PERMISSION_GROUPS } from '../constants/menuPermissions';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
 import PermissionGroupMatrix from '../components/PermissionGroupMatrix';
+import UserMgrAccess from '../components/UserMgrAccess';
 import { childKeysFor, mergeUserPermissions, samePermissions } from '../utils/permissions';
 
 const MODULE_KEYS = Array.from(new Set(MENU_PERMISSION_GROUPS.flatMap(childKeysFor)));
@@ -103,6 +104,28 @@ const Authorization = () => {
         }
     };
 
+    // MGR 1-5 values offered in each user's MGR Access
+    const [mgrOptions, setMgrOptions] = useState([]);
+    const fetchMgrOptions = async (companyId = selectedCompanyId) => {
+        try {
+            const res = await mgrService.getAll(null, companyId ? { companyId } : {});
+            const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
+            setMgrOptions([...list].sort((a, b) => String(a.mgrType).localeCompare(String(b.mgrType)) || String(a.code).localeCompare(String(b.code))));
+        } catch (err) {
+            console.warn('Error fetching MGR values:', err);
+            setMgrOptions([]);
+        }
+    };
+    const mgrById = useMemo(() => Object.fromEntries(mgrOptions.map((mgr) => [String(mgr._id), mgr])), [mgrOptions]);
+    // "MGR 1: IND, IT · MGR 2: OTH" of a user's MGR access, for the badge in the user list.
+    const mgrAccessSummary = (ids = []) => ['MGR1', 'MGR2', 'MGR3', 'MGR4', 'MGR5']
+        .map((type) => {
+            const codes = ids.map((id) => mgrById[String(id)]).filter((mgr) => mgr?.mgrType === type).map((mgr) => mgr.code);
+            return codes.length ? `MGR ${type.slice(3)}: ${codes.join(', ')}` : '';
+        })
+        .filter(Boolean)
+        .join(' · ');
+
     const fetchVendors = async () => {
         setVendorsLoading(true);
         try {
@@ -147,7 +170,8 @@ const Authorization = () => {
             await Promise.all([
                 fetchMatrix(selectedCompanyId), 
                 fetchUsers(selectedCompanyId),
-                fetchVendors()
+                fetchVendors(),
+                fetchMgrOptions(selectedCompanyId)
             ]);
             setLoading(false);
         })();
@@ -888,6 +912,9 @@ const Authorization = () => {
                                         const isUserDirty = dirtyUserIds.includes(user._id);
                                         const userEnabledCount = enabledCount(effectivePerms);
                                         const hasCustomOverrides = Object.keys(user.customPermissions || {}).length > 0;
+                                        const mgrAccessText = String(user.role || '').toLowerCase() === 'admin'
+                                            ? ''
+                                            : mgrAccessSummary(user.mgrAccess);
 
                                         if (isEditing) {
                                             return (
@@ -961,6 +988,11 @@ const Authorization = () => {
                                                                 {hasCustomOverrides && (
                                                                     <span className="text-[10px] font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-full flex items-center gap-1" title="User has custom permission overrides">
                                                                         <MdTune size={12} /> Custom Perms
+                                                                    </span>
+                                                                )}
+                                                                {mgrAccessText && (
+                                                                    <span className="text-[10px] font-bold bg-primary-50 dark:bg-primary-950/60 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800 px-2 py-0.5 rounded-full" title="Invoice Bulk Upload is limited to these MGR values">
+                                                                        {mgrAccessText}
                                                                     </span>
                                                                 )}
                                                             </div>
@@ -1088,6 +1120,14 @@ const Authorization = () => {
                                                                 />
                                                             ))}
                                                         </div>
+
+                                                        <UserMgrAccess
+                                                            user={user}
+                                                            options={mgrOptions}
+                                                            params={companyParams()}
+                                                            disabled={isMe || isUpdating}
+                                                            onSaved={(ids) => setUsers((prev) => prev.map((u) => (u._id === user._id ? { ...u, mgrAccess: ids } : u)))}
+                                                        />
 
                                                         {isUserDirty && (
                                                             <div className="sticky bottom-4 z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 pl-4 bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 rounded-2xl shadow-lg">

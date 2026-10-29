@@ -295,9 +295,9 @@ function App() {
             <Route path="/city-master/edit/:id" element={<PermissionRoute permissionKey="city_master" action="modify"><Layout><CityMaster isEditPage={true} /></Layout></PermissionRoute>} />
             <Route path="/masters/city" element={<PermissionRoute permissionKey="city_master"><Layout><CityMaster /></Layout></PermissionRoute>} />
             <Route path="/serial-no-master" element={<PermissionRoute permissionKey="master_serials"><Layout><SerialNoMaster /></Layout></PermissionRoute>} />
-            <Route path="/serial-no-transfer" element={<PermissionRoute permissionKey="master_serials"><Layout><SerialNoTransfer /></Layout></PermissionRoute>} />
-            <Route path="/serial-no-transfer/:assetId" element={<PermissionRoute permissionKey="master_serials"><Layout><SerialNoDetails /></Layout></PermissionRoute>} />
-            <Route path="/serial-no-transfer/:assetId/transfer" element={<PermissionRoute permissionKey="master_serials"><Layout><SerialNoDetails transfer /></Layout></PermissionRoute>} />
+            <Route path="/serial-no-transfer" element={<PermissionRoute permissionKey="master_serial_transfer"><Layout><SerialNoTransfer /></Layout></PermissionRoute>} />
+            <Route path="/serial-no-transfer/:assetId" element={<PermissionRoute permissionKey="master_serial_transfer"><Layout><SerialNoDetails /></Layout></PermissionRoute>} />
+            <Route path="/serial-no-transfer/:assetId/transfer" element={<PermissionRoute permissionKey="master_serial_transfer"><Layout><SerialNoDetails transfer /></Layout></PermissionRoute>} />
             <Route path="/serial-no-master/view/:serialNumber" element={<PermissionRoute permissionKey="master_serials_view_details"><Layout><AssetLifecycle /></Layout></PermissionRoute>} />
             <Route path="/flowcharts" element={<PermissionRoute permissionKey="flowchart_view"><Layout><Flowcharts /></Layout></PermissionRoute>} />
             <Route path="/settings" element={<PermissionRoute permissionKey="settings_profile"><Layout><Settings /></Layout></PermissionRoute>} />

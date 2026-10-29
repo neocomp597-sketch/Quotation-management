@@ -32,6 +32,7 @@ const MENU_GROUPS = [
             { key: 'master_serials', label: 'Invoice Bulk Upload', description: 'Invoice bulk upload and serial asset management' },
             { key: 'master_serials_view_details', label: 'Invoice Bulk Upload: View Details', description: 'Open the lifecycle details of an Invoice Bulk Upload entry' },
             { key: 'master_serials_edit', label: 'Invoice Bulk Upload: Edit Entry', description: 'Change a saved Invoice Bulk Upload entry' },
+            { key: 'master_serial_transfer', label: 'Serial No Transfer', description: 'Serial number ownership history; Modify allows transfers and past entries' },
             { key: 'state_master_create', label: 'State Master', description: 'State master management' },
             { key: 'city_master', label: 'City Master', description: 'City master management' },
             { key: 'csm_masters', label: 'Engineers Master', description: 'Field service engineers master' },
@@ -310,6 +311,7 @@ const MODULE_ACTIONS = {
     master_serials: ['view', 'create', 'modify'],
     master_serials_view_details: ['view'],
     master_serials_edit: ['view'],
+    master_serial_transfer: ['view', 'modify'],
     inventory_dashboard: ['view'],
     inventory_items: ['view'],
     inventory_stock_in: ['view'],
@@ -364,6 +366,27 @@ const getPermissionActionMap = () => MODULE_KEYS.reduce((map, key) => {
 
 const getLockedViewKeys = (role) => ROLE_LOCKED_VIEW_KEYS[role] || [];
 
+// Screens given a switch of their own after roles and users were saved with the switch that
+// used to cover them. Until a role or user is saved again, the screen takes every value saved
+// for the old switch (View and each action), so nobody gains or loses access.
+const SPLIT_PERMISSION_SOURCES = {
+    master_serial_transfer: 'master_serials'
+};
+
+/** `saved` with the old switch's values copied to each split-out screen that has none of its own. */
+const withSplitPermissions = (saved = {}) => {
+    const next = { ...saved };
+    Object.entries(SPLIT_PERMISSION_SOURCES).forEach(([key, source]) => {
+        if (typeof next[key] === 'boolean' || typeof next[source] !== 'boolean') return;
+        next[key] = next[source];
+        getModuleActions(key).forEach((action) => {
+            const value = next[actionKey(source, action)];
+            if (action !== 'view' && typeof value === 'boolean') next[actionKey(key, action)] = value;
+        });
+    });
+    return next;
+};
+
 /**
  * Adds the Create/Modify/Delete flags of every screen to `permissions`, which
  * already holds the View values. A flag that was never saved follows the screen's
@@ -414,7 +437,8 @@ const DEFAULT_ROLE_PERMISSIONS = {
  * grants all children in that section so existing saved roles keep working.
  * Every action flag comes out explicit.
  */
-const sanitizePermissions = (input = {}) => {
+const sanitizePermissions = (rawInput = {}) => {
+    const input = withSplitPermissions(rawInput);
     const permissions = MENU_GROUPS.reduce((permissions, group) => {
         const childKeys = (group.children || []).map((child) => child.key);
         const hasExplicitChildren = childKeys.some((key) => typeof input[key] === 'boolean');
@@ -448,7 +472,8 @@ const sanitizePermissions = (input = {}) => {
  * Admin is always fully locked - no stored overrides apply.
  * For other roles, stored child permissions are respected.
  */
-const resolvePermissions = (role, storedPermissions = {}) => {
+const resolvePermissions = (role, savedPermissions = {}) => {
+    const storedPermissions = withSplitPermissions(savedPermissions);
     const defaults = DEFAULT_ROLE_PERMISSIONS[role] || DEFAULT_ROLE_PERMISSIONS.admin;
     const lockedKeys = new Set(getLockedViewKeys(role));
 
@@ -495,7 +520,7 @@ const resolvePermissions = (role, storedPermissions = {}) => {
  * existed holds only View; its actions then follow that View value, as they did.
  */
 const mergeUserPermissions = (role, rolePermissions = {}, customPermissions = {}) => {
-    const custom = customPermissions || {};
+    const custom = withSplitPermissions(customPermissions || {});
     const lockedKeys = new Set(getLockedViewKeys(role));
     const merged = {};
 
@@ -535,9 +560,15 @@ const diffUserPermissions = (role, rolePermissions = {}, desired = {}) => {
     const locked = Object.fromEntries(getLockedViewKeys(role).map((key) => [key, true]));
     const wanted = sanitizePermissions({ ...desired, ...locked });
 
+    const flagsOf = (key) => getModuleActions(key).map((action) => actionKey(key, action));
+    const source = (key) => SPLIT_PERMISSION_SOURCES[key];
+
     return MODULE_KEYS.reduce((diff, key) => {
-        const flags = getModuleActions(key).map((action) => actionKey(key, action));
-        const viewChanged = wanted[key] !== target[key];
+        const flags = flagsOf(key);
+        // A split-out screen left as the role has it is saved too when its old switch is
+        // overridden; otherwise it would take that override (withSplitPermissions).
+        const viewChanged = wanted[key] !== target[key]
+            || Boolean(source(key) && flagsOf(source(key)).some((flag) => wanted[flag] !== target[flag]));
         flags.forEach((flag) => {
             if (viewChanged || wanted[flag] !== target[flag]) diff[flag] = wanted[flag];
         });

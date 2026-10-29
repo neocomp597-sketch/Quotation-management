@@ -29,6 +29,8 @@ const UserSchema = new mongoose.Schema({
     assignedBranches: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Branch' }],
     // Branch the user is currently working in; drives server-side branch scoping (see authMiddleware).
     activeBranchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
+    // MGR values the user's Invoice Bulk Upload data is limited to; none = all (utils/mgrAccess.js).
+    mgrAccess: [{ type: mongoose.Schema.Types.ObjectId, ref: 'MGR' }],
     status: { type: Boolean, default: true },
     isActive: { type: Boolean, default: true },
     personalNote: { type: String, default: '' },

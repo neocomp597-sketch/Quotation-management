@@ -37,6 +37,26 @@ export const permissionAllows = (permissions = {}, key, action = 'view', permiss
     return typeof flag === 'boolean' ? flag : true;
 };
 
+// Screens given a switch of their own after users were saved with the switch that used to cover
+// them; until the user is saved again they take that switch's values (as on the server).
+const SPLIT_PERMISSION_SOURCES = {
+    master_serial_transfer: 'master_serials',
+};
+
+/** `saved` with the old switch's values copied to each split-out screen that has none of its own. */
+const withSplitPermissions = (saved = {}, permissionActions) => {
+    const next = { ...saved };
+    Object.entries(SPLIT_PERMISSION_SOURCES).forEach(([key, source]) => {
+        if (typeof next[key] === 'boolean' || typeof next[source] !== 'boolean') return;
+        next[key] = next[source];
+        actionsFor(key, permissionActions).forEach((action) => {
+            const value = next[actionKey(source, action)];
+            if (action !== 'view' && typeof value === 'boolean') next[actionKey(key, action)] = value;
+        });
+    });
+    return next;
+};
+
 /** Every module key the server knows, plus any key used by the given menu groups. */
 const moduleKeysOf = (groups, permissionActions) => Array.from(new Set([
     ...Object.keys(permissionActions || {}),
@@ -48,7 +68,8 @@ const moduleKeysOf = (groups, permissionActions) => Array.from(new Set([
  * on top (same rules as the server). An override holding only View, saved before
  * action-level permissions, carries its View value to the actions.
  */
-export const mergeUserPermissions = (groups, rolePermissions = {}, custom = {}, permissionActions, lockedViewKeys = []) => {
+export const mergeUserPermissions = (groups, rolePermissions = {}, savedCustom = {}, permissionActions, lockedViewKeys = []) => {
+    const custom = withSplitPermissions(savedCustom || {}, permissionActions);
     const locked = new Set(lockedViewKeys);
     const merged = {};
 

@@ -1,4 +1,6 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
+const MGR = require('../models/MGR');
 const AuditLog = require('../models/AuditLog');
 const bcrypt = require('bcryptjs');
 const { ROLE_OPTIONS, mergeUserPermissions, diffUserPermissions } = require('../config/authorization');
@@ -60,7 +62,7 @@ exports.getAllUsers = async (req, res) => {
         }
 
         const users = await User.find(query)
-            .select('_id name email role reportsTo branchId assignedBranches status companyId customPermissions vendorId createdAt')
+            .select('_id name email role reportsTo branchId assignedBranches status companyId customPermissions mgrAccess vendorId createdAt')
             .populate('reportsTo', 'name email')
             .populate('branchId', 'name code branchPrefix')
             .populate('assignedBranches', 'name code branchPrefix')
@@ -419,6 +421,55 @@ exports.updateUserPermissions = async (req, res) => {
     } catch (error) {
         console.error('[updateUserPermissions] Error:', error.message);
         res.status(500).json({ message: 'Failed to update user permissions', error: error.message });
+    }
+};
+
+/**
+ * Saves the MGR values one user's Invoice Bulk Upload data is limited to (`mgrAccess`: MGR ids,
+ * [] = no limit). Admins are never limited, whatever is saved (utils/mgrAccess.js).
+ */
+exports.updateUserMgrAccess = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { mgrAccess } = req.body || {};
+        if (!Array.isArray(mgrAccess) || mgrAccess.some((value) => !mongoose.Types.ObjectId.isValid(value))) {
+            return res.status(400).json({ message: 'MGR access must be a list of MGR values' });
+        }
+
+        const user = await User.findOne({ _id: id, companyId: req.user.companyId });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const ids = [...new Set(mgrAccess.map(String))];
+        const mgrs = await MGR.find({ _id: { $in: ids }, companyId: req.user.companyId }).select('mgrType code').lean();
+        if (mgrs.length !== ids.length) {
+            return res.status(400).json({ message: 'Some of the MGR values no longer exist. Reload the page and try again.' });
+        }
+
+        const previous = (user.mgrAccess || []).map(String);
+        await User.updateOne({ _id: user._id }, { $set: { mgrAccess: ids } });
+
+        try {
+            await AuditLog.create({
+                action: 'USER_MGR_ACCESS_UPDATED',
+                entityType: 'User',
+                entityId: user._id,
+                userId: req.user.id,
+                userName: req.user.name,
+                oldValue: { mgrAccess: previous },
+                newValue: { mgrAccess: mgrs.map((mgr) => `${mgr.mgrType} ${mgr.code}`) },
+                reason: `MGR access of ${user.name}`,
+                companyId: user.companyId
+            });
+        } catch (auditError) {
+            console.warn('[updateUserMgrAccess] Audit log failed:', auditError.message);
+        }
+
+        res.json({ _id: user._id, mgrAccess: ids, message: 'MGR access updated successfully' });
+    } catch (error) {
+        console.error('[updateUserMgrAccess] Error:', error.message);
+        res.status(500).json({ message: 'Failed to update MGR access', error: error.message });
     }
 };
 

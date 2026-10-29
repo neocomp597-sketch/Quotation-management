@@ -9,6 +9,7 @@ const { loadProductIndex } = require('../../../utils/productUniqueness');
 const { loadDivisionSegmentLookup, resolveDivisionSegment } = require('../../../utils/divisionSegment');
 const { chunk, insertRows, writeRows, describeWriteError } = require('../../../utils/importBatch');
 const { invalidateCustomerCaches, invalidateProductCaches, invalidateAssetCaches } = require('../../../utils/cacheInvalidation');
+const { allowedProductIdSet } = require('../../../utils/mgrAccess');
 const { ImportJobError } = require('../errors');
 
 /*
@@ -211,6 +212,29 @@ const resolveProduct = (index, legacy, data) => {
     return { product, rename, productCode, productName: name };
 };
 
+/**
+ * The issue of a row whose product is outside the importing user's MGR access (`allowed`: product
+ * ids, or null when the user is not limited; utils/mgrAccess.js). A new product has no MGR yet.
+ */
+const mgrAccessIssue = (allowed, resolution) => {
+    if (!allowed) return null;
+    if (resolution.create) {
+        return {
+            field: 'productCode',
+            code: 'MGR_ACCESS',
+            message: `Product code ${resolution.productCode} is new, and your MGR access does not allow new products.`,
+            hint: 'Ask an administrator to add the product with its MGR first, or skip this row.'
+        };
+    }
+    if (allowed.has(String(resolution.product._id))) return null;
+    return {
+        field: 'productCode',
+        code: 'MGR_ACCESS',
+        message: `Product ${resolution.productCode} is outside your MGR access.`,
+        hint: 'Ask an administrator to give you access to its MGR, or skip this row.'
+    };
+};
+
 /** Applies a resolution to the index (and legacy cache): later rows see the new or renamed product. */
 const applyProduct = (index, legacy, resolution, newProduct) => {
     if (resolution.create) {
@@ -270,7 +294,7 @@ const findCustomersByName = async (companyId, branchId, values) => {
 
 // ── Serials ─────────────────────────────────────────────────────────────────
 
-const ASSET_SELECT = '_id serialNumber serialNumberKey status branchId productCode customerId saleDate';
+const ASSET_SELECT = '_id serialNumber serialNumberKey status branchId productId productCode customerId saleDate';
 
 /** Saved serials of the company (every branch), grouped by key. */
 const findAssetsBySerial = async (companyId, keys) => {
@@ -715,6 +739,7 @@ module.exports = {
             products,
             legacy,
             divisions: await loadDivisionSegmentLookup(companyId),
+            mgrAllowed: await allowedProductIdSet(user),
             seenSerials: new Set()
         };
     },
@@ -777,6 +802,14 @@ module.exports = {
                 hint: 'A serial number belongs to one branch only. Import this row from that branch, or skip it.'
             });
         }
+        if (saved && context.mgrAllowed && !context.mgrAllowed.has(String(saved.productId || ''))) {
+            issues.push({
+                field: 'serialNumber',
+                code: 'MGR_ACCESS',
+                message: `Serial number ${data.serialNumber} is already saved under a product outside your MGR access.`,
+                hint: 'Ask an administrator to import this row, or skip it.'
+            });
+        }
 
         if (!data.productCode && !data.productName) {
             issues.push({
@@ -787,7 +820,9 @@ module.exports = {
             });
         } else {
             const resolution = resolveProduct(context.products, context.legacy, data);
+            const mgrIssue = resolution.issue ? null : mgrAccessIssue(context.mgrAllowed, resolution);
             if (resolution.issue) issues.push(resolution.issue);
+            else if (mgrIssue) issues.push(mgrIssue);
             else if (!earlier.length && !issues.length && !(serialKey && context.seenSerials.has(serialKey))) {
                 // Only a row that will be imported adds or renames a product.
                 applyProduct(context.products, context.legacy, resolution, resolution.create

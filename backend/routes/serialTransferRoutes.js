@@ -5,10 +5,11 @@ const { protect } = require('../middlewares/authMiddleware');
 const { requirePermission } = require('../middlewares/permissionMiddleware');
 const { acrossBranches } = require('../utils/serialBranchAccess');
 
-// Serial No Transfer sits with Invoice Bulk Upload and uses the same permission.
-const canManageSerials = requirePermission('master_serials');
+// Serial No Transfer has its own switch in Authorization; transfers and past entries need its
+// Modify (config/apiPermissions.js).
+const canViewSerialTransfers = requirePermission('master_serial_transfer');
 
-router.use(protect, canManageSerials);
+router.use(protect, canViewSerialTransfers);
 
 router.get('/serials', serialTransferController.listSerials);
 router.get('/serials/:assetId', serialTransferController.getSerial);

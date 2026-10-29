@@ -365,6 +365,7 @@ export const userService = {
   delete: (id, params) => api.delete(`/users/${id}`, { params }),
   // payload: { permissions } (the full set the user should have) or { customPermissions: {} } (back to role defaults)
   updatePermissions: (id, payload, params) => api.put(`/users/${id}/permissions`, payload, { params }),
+  updateMgrAccess: (id, mgrAccess, params) => api.put(`/users/${id}/mgr-access`, { mgrAccess }, { params }),
 };
 
 export const branchService = {

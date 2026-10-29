@@ -25,6 +25,7 @@ export const MENU_PERMISSION_GROUPS = [
             { key: 'master_serials', label: 'Invoice Bulk Upload', description: 'Serial number and asset master records', defaultRoute: '/serial-no-master' },
             { key: 'master_serials_view_details', label: 'Invoice Bulk Upload: View Details', description: 'Open the lifecycle details of an Invoice Bulk Upload entry', defaultRoute: '/serial-no-master' },
             { key: 'master_serials_edit', label: 'Invoice Bulk Upload: Edit Entry', description: 'Change a saved Invoice Bulk Upload entry', defaultRoute: '/serial-no-master' },
+            { key: 'master_serial_transfer', label: 'Serial No Transfer', description: 'Serial number ownership history; Modify allows transfers and past entries', defaultRoute: '/serial-no-transfer' },
             { key: 'payroll_org_chart_full', label: 'Org Chart (Full Company)', description: 'Full company org chart access', defaultRoute: '/payroll/org-chart' },
             { key: 'payroll_org_chart', label: 'Org Chart (My Team)', description: 'Direct reporting org chart access', defaultRoute: '/payroll/org-chart' },
             { key: 'master_bom', label: 'Product BOM Master', description: 'Create, edit and view serial-number-wise BOMs', defaultRoute: '/bom-master' },

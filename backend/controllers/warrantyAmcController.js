@@ -13,6 +13,7 @@ require('../models/MGR');
 const { productMgrPopulate, applyProductMgrs, applyProductMgrsToAll, stripMgrFields } = require('../utils/productMgr');
 const { customerPostalCodeOf, applyCustomerPostalCode } = require('../utils/customerPostalCode');
 const { loadDivisionSegmentLookup, resolveDivisionSegment } = require('../utils/divisionSegment');
+const { getMgrAccess, describeMgrAccess, accessCondition, mgrAccessCondition, accessAllowsProduct, canSeeProduct, MGR_ACCESS_DENIED } = require('../utils/mgrAccess');
 
 // Division / Segment of an Invoice Bulk Upload record, shown as code + description.
 const DIVISION_POPULATE = { path: 'divisionId', select: 'code description status' };
@@ -352,6 +353,9 @@ exports.createAsset = async (req, res) => {
                 return res.status(400).json({ message: `Duplicate entry: Serial Number (${cleanSN}) already exists in the system. Serial Numbers must be unique.` });
             }
         }
+        if (!(await canSeeProduct(req, req.body.productId))) {
+            return res.status(403).json({ message: MGR_ACCESS_DENIED });
+        }
         const branchId = req.body.branchId || await resolveEntitlementBranch(req.body.customerId, req);
         const doc = await Asset.create({ ...stripMgrFields(req.body), branchId, companyId: req.user?.companyId });
         res.status(201).json(doc);
@@ -366,7 +370,20 @@ const entryValidationError = (message) => Object.assign(new Error(message), { st
 // company, then in any company; else created. The code and name must name one Product Master
 // record, as in Excel bulk upload: a known code with another name, or a new code with the name
 // of an existing product, is refused instead of being saved under a product it does not name.
-const resolveEntryProduct = async (companyId, cleanProductCode, productName) => {
+// `mgrAccess` (utils/mgrAccess.js) refuses a product outside the user's MGR access, and a new
+// one, which has no MGR yet.
+const resolveEntryProduct = async (companyId, cleanProductCode, productName, mgrAccess = null) => {
+    const product = await findOrCreateEntryProduct(companyId, cleanProductCode, productName, !mgrAccess);
+    if (!(await accessAllowsProduct(mgrAccess, product))) {
+        throw Object.assign(new Error(product
+            ? `Product ${product.productCode} is outside your MGR access. Ask an administrator to give you access to its MGR, or use a product of your MGR.`
+            : `Product Code "${cleanProductCode}" is not in the Product Master. Ask an administrator to add it with its MGR first: your MGR access does not allow new products.`
+        ), { statusCode: 403 });
+    }
+    return product;
+};
+
+const findOrCreateEntryProduct = async (companyId, cleanProductCode, productName, canCreate) => {
     const cleanName = String(productName || '').trim();
     let product = await Product.findOne({
         companyId,
@@ -398,7 +415,7 @@ const resolveEntryProduct = async (companyId, cleanProductCode, productName) => 
         if (sameName) product = await Product.findById(sameName._id);
     }
 
-    if (!product) {
+    if (!product && canCreate) {
         try {
             product = await Product.create({
                 companyId,
@@ -560,7 +577,8 @@ exports.createSingleAsset = async (req, res) => {
         const cleanProductCode = String(productCode).trim();
         const cleanIndicator = String(indicatorField || '').trim().slice(0, 20);
 
-        const product = await resolveEntryProduct(companyId, cleanProductCode, productName);
+        const mgrAccess = await getMgrAccess(req);
+        const product = await resolveEntryProduct(companyId, cleanProductCode, productName, mgrAccess);
         // MGR 1-5 are not stored on the asset: every read derives them from the Product Master.
 
         const resolvedCustomer = await resolveEntryCustomer(req, { companyId, customerCode, customerInput, mobile: cleanMobile });
@@ -590,6 +608,13 @@ exports.createSingleAsset = async (req, res) => {
 
         // 2. Search for returned asset match (to re-activate)
         const matchedReturnedAsset = existingAssets.find(a => a.status === 'RETURN' || a.status === 'RETURNED');
+
+        // A returned serial of a product outside the user's MGR access stays with that MGR.
+        if (matchedReturnedAsset && !(await accessAllowsProduct(mgrAccess, matchedReturnedAsset.productId))) {
+            return res.status(403).json({
+                message: `Serial Number (${cleanSN}) is a returned serial of a product outside your MGR access. Ask an administrator to re-sell it.`
+            });
+        }
 
         if (matchedReturnedAsset) {
             const updatePayload = {
@@ -720,7 +745,8 @@ exports.updateAsset = async (req, res) => {
         const asset = await Asset.findOne({ _id: id, companyId })
             .populate({ path: 'productId', select: 'productCode productName', options: { bypassTenant: true } })
             .populate({ path: 'customerId', options: { bypassTenant: true } });
-        if (!asset) {
+        const mgrAccess = await getMgrAccess(req);
+        if (!asset || !(await accessAllowsProduct(mgrAccess, asset.productId))) {
             return res.status(404).json({ message: 'Invoice Bulk Upload entry not found' });
         }
 
@@ -793,7 +819,7 @@ exports.updateAsset = async (req, res) => {
         const cleanProductCode = String(productCode).trim();
         const currentProductCode = asset.productId?.productCode || asset.productCode;
         if (!sameText(cleanProductCode, currentProductCode)) {
-            const product = await resolveEntryProduct(companyId, cleanProductCode, productName);
+            const product = await resolveEntryProduct(companyId, cleanProductCode, productName, mgrAccess);
             asset.set({
                 productId: product._id,
                 productCode: product.productCode || cleanProductCode,
@@ -883,7 +909,7 @@ exports.returnAsset = async (req, res) => {
         const asset = await Asset.findOne({ _id: id, companyId })
             .populate('productId')
             .populate({ path: 'customerId', options: { bypassTenant: true } });
-        if (!asset) {
+        if (!asset || !(await canSeeProduct(req, asset.productId))) {
             return res.status(404).json({ message: 'Asset entry not found' });
         }
 
@@ -930,8 +956,10 @@ exports.returnAsset = async (req, res) => {
 exports.getReturnHistory = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
+        const accessFilter = await mgrAccessCondition(req);
         const historyDocs = await AssetHistory.find({
             companyId,
+            ...(accessFilter || {}),
             $or: [
                 { transactionType: 'RETURN' },
                 { status: 'RETURN' },
@@ -964,7 +992,14 @@ exports.getAssets = async (req, res) => {
         const limit = isExport
             ? Math.min(50000, Math.max(1, Number.parseInt(req.query.limit, 10) || 50000))
             : Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 15));
-        const filter = { companyId, branchId };
+        // A user limited to some MGR values sees only those serials, in the cards as well
+        // (utils/mgrAccess.js). The screen gets the values to offer only them in its MGR filters.
+        const mgrAccess = await getMgrAccess(req);
+        const accessFilter = await accessCondition(mgrAccess);
+        const scope = accessFilter ? { companyId, branchId, $and: [accessFilter] } : { companyId, branchId };
+        const accessValues = await describeMgrAccess(mgrAccess);
+
+        const filter = { ...scope };
         if (req.query.customerId) filter.customerId = req.query.customerId;
         if (req.query.productId) filter.productId = req.query.productId;
         if (req.query.status && req.query.status !== 'ALL') filter.status = req.query.status;
@@ -973,7 +1008,7 @@ exports.getAssets = async (req, res) => {
             .filter((field) => req.query[field] && mongoose.Types.ObjectId.isValid(req.query[field]));
         if (mgrFilters.length) {
             const productIds = await Product.find({ companyId, $and: mgrFilters.map((field) => ({ [field]: req.query[field] })) }).distinct('_id');
-            if (!productIds.length) return res.json({ data: [], pagination: { page, limit, total: 0, pages: 1 }, summary: { total: 0, inStock: 0, sold: 0, returned: 0 } });
+            if (!productIds.length) return res.json({ data: [], pagination: { page, limit, total: 0, pages: 1 }, summary: { total: 0, inStock: 0, sold: 0, returned: 0 }, mgrAccess: accessValues });
             filter.productId = { $in: productIds };
         }
 
@@ -995,16 +1030,17 @@ exports.getAssets = async (req, res) => {
                 .sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit)
                 .allowDiskUse(true).maxTimeMS(12000).lean(),
             Asset.countDocuments(filter),
-            Asset.countDocuments({ companyId, branchId }),
-            Asset.countDocuments({ companyId, branchId, status: 'IN_STOCK' }),
-            Asset.countDocuments({ companyId, branchId, status: 'SOLD' }),
-            Asset.countDocuments({ companyId, branchId, status: { $in: ['RETURN', 'RETURNED'] } })
+            Asset.countDocuments(scope),
+            Asset.countDocuments({ ...scope, status: 'IN_STOCK' }),
+            Asset.countDocuments({ ...scope, status: 'SOLD' }),
+            Asset.countDocuments({ ...scope, status: { $in: ['RETURN', 'RETURNED'] } })
         ]);
 
         res.json({
             data: applyProductMgrsToAll(docs).map(applyCustomerPostalCode),
             pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
-            summary: { total: allAssets, inStock, sold, returned }
+            summary: { total: allAssets, inStock, sold, returned },
+            mgrAccess: accessValues
         });
     } catch (error) {
         console.error('getAssets error:', error);
@@ -1021,6 +1057,8 @@ exports.exportAssets = async (req, res) => {
 
         const filter = { companyId };
         if (branchId) filter.branchId = branchId;
+        const accessFilter = await mgrAccessCondition(req);
+        if (accessFilter) filter.$and = [accessFilter];
         if (req.query.customerId) filter.customerId = req.query.customerId;
         if (req.query.productId) filter.productId = req.query.productId;
         if (req.query.status && req.query.status !== 'ALL') filter.status = req.query.status;
@@ -1171,10 +1209,12 @@ exports.getAssetSummary = async (req, res) => {
 
         const Ticket = require('../models/Ticket');
         const ServiceVisit = require('../models/ServiceVisit');
+        // A serial outside the user's MGR access is "not found" (utils/mgrAccess.js).
+        const access = (await mgrAccessCondition(req)) || {};
 
         let asset = null;
         if (assetId && isValidObjectId(assetId)) {
-            asset = await Asset.findOne({ _id: assetId, companyId })
+            asset = await Asset.findOne({ _id: assetId, companyId, ...access })
                 .populate({ path: 'customerId', select: 'customerName companyName gstin billingAddress mobile email', options: { bypassTenant: true } })
                 .populate(productMgrPopulate('basePrice mrp catalogType'))
                 .populate('invoiceId', 'voucherNumber date')
@@ -1184,7 +1224,7 @@ exports.getAssetSummary = async (req, res) => {
         } else if (serialNumber) {
             const cleanSN = String(serialNumber).trim();
             const escapedSN = cleanSN.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-            const assetQuery = { serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") } };
+            const assetQuery = { serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") }, ...access };
             if (companyId) assetQuery.companyId = companyId;
 
             let matches = await Asset.find(assetQuery)
@@ -1197,7 +1237,7 @@ exports.getAssetSummary = async (req, res) => {
 
             // Fallback search across tenant boundary if no matches found
             if (matches.length === 0 && companyId) {
-                matches = await Asset.find({ serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") } })
+                matches = await Asset.find({ serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") }, ...access })
                 .setOptions({ bypassTenant: true })
                 .populate({ path: 'customerId', select: 'customerName companyName gstin billingAddress mobile email', options: { bypassTenant: true } })
                 .populate(productMgrPopulate('basePrice mrp catalogType'))
@@ -1239,7 +1279,7 @@ exports.getAssetSummary = async (req, res) => {
                 }
             } else {
                 // FALLBACK: Search AssetHistory (Transaction Data) if not found in Asset Master
-                const historyQuery = { serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") } };
+                const historyQuery = { serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") }, ...access };
                 if (companyId) historyQuery.companyId = companyId;
 
                 let historyDoc = await AssetHistory.findOne(historyQuery)
@@ -1249,7 +1289,7 @@ exports.getAssetSummary = async (req, res) => {
                 .lean();
 
                 if (!historyDoc && companyId) {
-                    historyDoc = await AssetHistory.findOne({ serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") } })
+                    historyDoc = await AssetHistory.findOne({ serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") }, ...access })
                     .setOptions({ bypassTenant: true })
                     .sort({ createdAt: -1 })
                     .populate('customerId', 'customerName companyName gstin billingAddress mobile email')
@@ -1365,7 +1405,8 @@ exports.getAssetSummary = async (req, res) => {
         // Fetch transaction history
         const history = await AssetHistory.find({
             companyId,
-            serialNumber: buildExactRegex(asset.serialNumber)
+            serialNumber: buildExactRegex(asset.serialNumber),
+            ...access
         }).sort({ createdAt: -1 }).lean();
 
         // MGR 1-5 always reflect the current Product Master assignment, and the
@@ -1485,18 +1526,24 @@ exports.getAssetActivity = async (req, res) => {
         require('../models/Engineer');
         require('../models/Branch');
         const CROSS_BRANCH = { bypassBranch: true };
+        const accessFilter = await mgrAccessCondition(req);
+        const access = accessFilter || {};
 
         const [assets, history] = await Promise.all([
-            Asset.find({ companyId, serialNumber: snRegex })
+            Asset.find({ companyId, serialNumber: snRegex, ...access })
                 .select('_id serialNumber status customerId customerCode customerNameStr invoiceNumber saleDate invoiceDate createdAt')
                 .populate({ path: 'customerId', select: 'companyName customerName externalCode', options: { bypassTenant: true } })
                 .setOptions(CROSS_BRANCH)
                 .lean(),
-            AssetHistory.find({ companyId, serialNumber: snRegex })
+            AssetHistory.find({ companyId, serialNumber: snRegex, ...access })
                 .populate({ path: 'createdBy', select: 'name email', options: CROSS_BRANCH })
                 .setOptions(CROSS_BRANCH)
                 .lean()
         ]);
+        // Nothing of this serial within the user's MGR access: it is not shown at all.
+        if (accessFilter && !assets.length && !history.length) {
+            return res.status(404).json({ message: 'Serial number not found' });
+        }
         const assetIds = assets.map(a => a._id);
 
         const tickets = await Ticket.find({
@@ -1588,10 +1635,13 @@ exports.searchSerialNumbers = async (req, res) => {
         const queryStr = String(q).trim();
         const escapedQuery = queryStr.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
 
-        // Search ALL registered assets in Invoice Bulk Upload for this company
+        // Search ALL registered assets in Invoice Bulk Upload for this company (within the
+        // user's MGR access, utils/mgrAccess.js)
+        const access = (await mgrAccessCondition(req)) || {};
         const assets = await Asset.find({
             companyId,
-            serialNumber: { $regex: escapedQuery, $options: 'i' }
+            serialNumber: { $regex: escapedQuery, $options: 'i' },
+            ...access
         })
         .sort({ createdAt: -1, serialNumber: 1 })
         .limit(100)
@@ -1603,7 +1653,8 @@ exports.searchSerialNumbers = async (req, res) => {
         // Also search transaction history for historical serials registered in Invoice Bulk Upload
         const historyDocs = await AssetHistory.find({
             companyId,
-            serialNumber: { $regex: escapedQuery, $options: 'i' }
+            serialNumber: { $regex: escapedQuery, $options: 'i' },
+            ...access
         })
         .sort({ createdAt: -1 })
         .limit(100)

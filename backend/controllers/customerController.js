@@ -245,7 +245,8 @@ const getAllCustomers = async (req, res) => {
         const { page, limit, skip } = getPagination(req.query);
         const [customers, total] = await Promise.all([
             Customer.find(query)
-                .select('externalCode customerName companyName contactPerson gstin billingAddress mobile email logoUrl defaultDiscount territory createdAt')
+                // shippingAddress is for the Customer Master export, which reads these pages
+                .select('externalCode customerName companyName contactPerson gstin billingAddress shippingAddress mobile email logoUrl defaultDiscount territory createdAt')
                 .populate('territory', 'name type')
                 .sort({ createdAt: -1 })
                 .skip(skip)

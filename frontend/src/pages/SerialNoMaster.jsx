@@ -6,7 +6,7 @@ import * as XLSX from 'xlsx';
 import {
     MdSearch, MdTag, MdInfoOutline, MdSync,
     MdLocalOffer, MdPeople, MdReceipt, MdAssignmentTurnedIn,
-    MdFileUpload, MdFileDownload, MdAdd, MdUndo, MdHistory, MdEdit
+    MdFileUpload, MdFileDownload, MdAdd, MdUndo, MdHistory, MdEdit, MdFilterAlt
 } from 'react-icons/md';
 import Modal from '../components/Modal';
 import ImportWizard from '../components/import/ImportWizard';
@@ -171,6 +171,10 @@ const SerialNoMaster = () => {
     const [selectedStatus, setSelectedStatus] = useState('ALL');
     // MGR 1-5 filters ('ALL' or the MGR's display value, as shown on the rows).
     const [mgrFilters, setMgrFilters] = useState({ mgr1: 'ALL', mgr2: 'ALL', mgr3: 'ALL', mgr4: 'ALL', mgr5: 'ALL' });
+    // MGR values this user is limited to (Authorization > MGR Access), sent with the list as
+    // { mgr1: [{ _id, code, description }] }; null = all. The server limits the data; the screen
+    // only says so and trims the filter options.
+    const [mgrAccess, setMgrAccess] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
@@ -437,6 +441,7 @@ const SerialNoMaster = () => {
             setAssets(payload.data || []);
             setAssetPagination(payload.pagination || { page: currentPage, limit: PAGE_SIZE, total: 0, pages: 1 });
             setAssetSummary(payload.summary || { total: 0, inStock: 0, sold: 0, returned: 0 });
+            setMgrAccess(payload.mgrAccess || null);
         } catch (err) {
             if (!isLatest()) return;
             const status = err?.response?.status;
@@ -703,11 +708,23 @@ const SerialNoMaster = () => {
     // Asset filtering is performed by the paginated backend endpoint.
     const filteredAssets = assets;
 
-    // Options of each MGR filter: the values assigned to the products of the loaded entries.
-    const mgrOptions = useMemo(() => Object.fromEntries(MGR_FIELDS.map(({ key }) => [
-        key,
-        [...new Set(products.map((product) => formatMgrVal(product[key])).filter(Boolean))].sort((a, b) => a.localeCompare(b))
-    ])), [products]);
+    // Options of each MGR filter: the values assigned to the products of the loaded entries, of
+    // the products the user's MGR access allows.
+    const mgrOptions = useMemo(() => {
+        const allowed = mgrAccess
+            ? products.filter((product) => Object.entries(mgrAccess).every(([key, values]) => values.some((mgr) => mgr._id === idOf(product[key]))))
+            : products;
+        return Object.fromEntries(MGR_FIELDS.map(({ key }) => [
+            key,
+            [...new Set(allowed.map((product) => formatMgrVal(product[key])).filter(Boolean))].sort((a, b) => a.localeCompare(b))
+        ]));
+    }, [products, mgrAccess]);
+
+    // "MGR 1: IND - INDUSTRY" per level of the user's MGR access, for the notice above the list.
+    const mgrAccessLines = useMemo(() => (mgrAccess
+        ? MGR_FIELDS.filter(({ key }) => mgrAccess[key]?.length)
+            .map(({ key, label }) => `${label}: ${mgrAccess[key].map(formatMgrVal).join(', ')}`)
+        : []), [mgrAccess]);
 
     const filteredReturns = useMemo(() => {
         return returnHistory.filter(item => {
@@ -1121,6 +1138,23 @@ const SerialNoMaster = () => {
                     <div><span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Returned</span><span className="text-2xl font-black text-amber-600">{stats.returned}</span></div>
                 </div>
             </div>
+
+            {/* MGR access of this user (Authorization > Team Users): the list, cards, filters and export only hold these. */}
+            {mgrAccess && (
+                <div className="p-4 bg-primary-50 border border-primary-200 rounded-2xl flex items-start gap-3">
+                    <div className="p-2 bg-primary-100 rounded-xl text-primary-700 shrink-0"><MdFilterAlt size={18} /></div>
+                    <div className="min-w-0">
+                        <p className="text-sm font-black text-primary-800">
+                            {mgrAccessLines.length ? 'You see only the serial numbers of your MGR access' : 'Your MGR access has no values'}
+                        </p>
+                        <p className="text-[11px] font-semibold text-primary-700 mt-0.5 break-words">
+                            {mgrAccessLines.length
+                                ? mgrAccessLines.join(' · ')
+                                : 'The MGR values you were given have been removed from the Product MGR Master. Ask an administrator to set your MGR access again.'}
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* Error Banner — visible when asset data failed to load */}
             {fetchError && (
