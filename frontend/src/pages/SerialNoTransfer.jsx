@@ -43,11 +43,15 @@ const StatusBadge = ({ status }) => (
     </span>
 );
 
-// A new customer of a sold serial is a transfer; of any other serial an assignment, which leaves
-// the status as it is. Scrapped serials keep their history but take no new customer.
+// A new customer for a serial: Transfer sells it to them (a sold serial stays sold, an allocated or
+// in-stock one becomes sold); Assign records them as Assigned and leaves the status as it is
+// (allocated, in-stock and returned serials). Scrapped serials keep their history but take no new
+// customer; a returned serial is re-sold with Add Single Entry in Invoice Bulk Upload.
 const isSold = (status) => status === 'SOLD';
 const canTakeCustomer = (status) => status !== 'SCRAPPED';
-const assignLabel = (status) => (isSold(status) ? 'Transfer' : 'Assign');
+const canSell = (status) => ['ALLOCATED', 'IN_STOCK'].includes(status || 'IN_STOCK');
+const canTransfer = (status) => isSold(status) || canSell(status);
+const canAssign = (status) => canTakeCustomer(status) && !isSold(status);
 const statusText = (status) => SERIAL_STATUSES.find((option) => option.value === (status === 'RETURNED' ? 'RETURN' : status || 'IN_STOCK'))?.label || status;
 
 const StatusFilter = ({ value, onChange }) => (
@@ -346,9 +350,14 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                                         <button type="button" onClick={() => setDownloadFor(row)} aria-label={`Download customer activity log of ${row.serialNumber}`} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 bg-white text-emerald-600 font-black uppercase text-[10px] tracking-widest">
                                             <MdFileDownload size={16} /> Log
                                         </button>
-                                        {canModify && canTakeCustomer(row.status) && (
-                                            <button type="button" onClick={() => onTransfer(row._id)} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 font-black uppercase text-[10px] tracking-widest">
-                                                <MdSwapHoriz size={16} /> {assignLabel(row.status)}
+                                        {canModify && canAssign(row.status) && (
+                                            <button type="button" onClick={() => onTransfer(row._id, 'assign')} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 font-black uppercase text-[10px] tracking-widest">
+                                                <MdPersonAdd size={16} /> Assign
+                                            </button>
+                                        )}
+                                        {canModify && canTransfer(row.status) && (
+                                            <button type="button" onClick={() => onTransfer(row._id, 'transfer')} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 font-black uppercase text-[10px] tracking-widest">
+                                                <MdSwapHoriz size={16} /> Transfer
                                             </button>
                                         )}
                                     </MobileCardActions>
@@ -391,9 +400,14 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                                                 <button type="button" title="Download Customer Activity Log" aria-label={`Download customer activity log of ${row.serialNumber}`} onClick={(e) => { e.stopPropagation(); setDownloadFor(row); }} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all">
                                                     <MdFileDownload size={18} />
                                                 </button>
-                                                {canModify && canTakeCustomer(row.status) && (
-                                                    <button type="button" title={isSold(row.status) ? 'Transfer to another customer' : 'Assign a customer (status stays the same)'} onClick={(e) => { e.stopPropagation(); onTransfer(row._id); }} className="ml-1 inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all">
-                                                        <MdSwapHoriz size={16} /> {assignLabel(row.status)}
+                                                {canModify && canAssign(row.status) && (
+                                                    <button type="button" title="Assign a customer (status stays the same)" onClick={(e) => { e.stopPropagation(); onTransfer(row._id, 'assign'); }} className="ml-1 inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all">
+                                                        <MdPersonAdd size={16} /> Assign
+                                                    </button>
+                                                )}
+                                                {canModify && canTransfer(row.status) && (
+                                                    <button type="button" title={isSold(row.status) ? 'Transfer to another customer' : 'Sell to another customer (status becomes Sold)'} onClick={(e) => { e.stopPropagation(); onTransfer(row._id, 'transfer'); }} className="ml-1 inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all">
+                                                        <MdSwapHoriz size={16} /> Transfer
                                                     </button>
                                                 )}
                                             </td>
@@ -854,17 +868,20 @@ const CollapsibleSection = ({ icon, title, children }) => {
     );
 };
 
-// One serial number as a page (/serial-no-transfer/:assetId, or .../transfer to open the form):
-// the current customer, the transfer form in place, the date-wise sale history and the customer
-// activity log. After a save the page stays put and both tables reload.
+// One serial number as a page (/serial-no-transfer/:assetId, or .../transfer to open the Transfer
+// form, .../transfer?mode=assign the Assign form): the current customer, the form in place, the
+// date-wise sale history and the customer activity log. After a save the page stays put and both
+// tables reload.
 export const SerialNoDetails = ({ transfer = false }) => {
     const { assetId } = useParams();
+    const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const location = useLocation();
     const { canModify } = usePermission('master_serial_transfer');
     const [result, setResult] = useState({ id: null, data: null, error: '' });
-    // Open form: 'transfer' (new current customer) or 'past' (an earlier customer, inactive).
-    const [formMode, setFormMode] = useState(transfer && canModify ? 'transfer' : null);
+    // Open form: 'transfer' (new current customer, sold), 'assign' (new current customer, status
+    // stays) or 'past' (an earlier customer, inactive).
+    const [formMode, setFormMode] = useState(transfer && canModify ? (searchParams.get('mode') === 'assign' ? 'assign' : 'transfer') : null);
     const [refreshCount, setRefreshCount] = useState(0);
     const [activityOpen, setActivityOpen] = useState(false);
     // Back returns to wherever the page was opened from (list filters, history tab), else the list.
@@ -906,8 +923,15 @@ export const SerialNoDetails = ({ transfer = false }) => {
     const current = history.find((entry) => entry.isActive);
     const returnedBy = !current && history[0]?.entryType === 'Returned' ? history[0] : null;
     const status = data?.asset?.status;
-    // A scrapped serial opened at its transfer address shows its details; only a past entry can be added.
-    const openForm = formMode === 'transfer' && data && !canTakeCustomer(status) ? null : formMode;
+    // A form the serial's status does not allow opens the one it does (a returned serial opened at
+    // its transfer address gets Assign); a scrapped serial shows its details, and only a past entry
+    // can be added.
+    const formFor = (mode) => {
+        if (!data || !mode || mode === 'past') return mode;
+        if (mode === 'transfer') return canTransfer(status) ? 'transfer' : canAssign(status) ? 'assign' : null;
+        return canAssign(status) ? 'assign' : canTransfer(status) ? 'transfer' : null;
+    };
+    const openForm = formFor(formMode);
 
     return (
         <div className="space-y-6">
@@ -930,13 +954,22 @@ export const SerialNoDetails = ({ transfer = false }) => {
                         >
                             <MdHistory size={18} /> Add Past Entry
                         </button>
-                        {canTakeCustomer(status) && (
+                        {canAssign(status) && (
+                            <button
+                                type="button"
+                                onClick={() => setFormMode('assign')}
+                                className="flex flex-1 sm:flex-none items-center justify-center gap-2 px-5 py-3 rounded-2xl border border-primary-200 bg-primary-50 text-primary-700 font-black uppercase text-xs tracking-widest hover:bg-primary-100 transition-all"
+                            >
+                                <MdPersonAdd size={18} /> Assign Customer
+                            </button>
+                        )}
+                        {canTransfer(status) && (
                             <button
                                 type="button"
                                 onClick={() => setFormMode('transfer')}
                                 className="flex flex-1 sm:flex-none items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl font-black transition-all shadow-xl shadow-primary-600/20 uppercase text-xs tracking-widest active:scale-95"
                             >
-                                <MdSwapHoriz size={18} /> {isSold(status) ? 'Transfer Serial No' : 'Assign Customer'}
+                                <MdSwapHoriz size={18} /> Transfer Serial No
                             </button>
                         )}
                     </div>
@@ -1069,8 +1102,9 @@ const newRequestId = () => (globalThis.crypto?.randomUUID
     ? globalThis.crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
-// mode "transfer": the new current customer. mode "past": an earlier customer, saved as inactive
-// history and dated on or before the current customer's date.
+// mode "transfer": the new current customer, sold to them. mode "assign": the new current customer,
+// recorded as Assigned with the status left as it is. mode "past": an earlier customer, saved as
+// inactive history and dated on or before the current customer's date.
 const toDateInput = (value) => {
     const date = new Date(value);
     return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -1078,6 +1112,7 @@ const toDateInput = (value) => {
 
 const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved }) => {
     const past = mode === 'past';
+    const assign = mode === 'assign';
     const { can } = useAuth();
     const canAddCustomer = can('master_customers', 'create');
     const latestPastDate = currentSince ? toDateInput(currentSince) : todayInput();
@@ -1109,7 +1144,7 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
     const currentId = data.asset.customerId;
     // The invoice the API carries over to the new customer: the current record's, else the serial's.
     const invoice = data.history.find((entry) => entry.isActive) || data.asset;
-    // Not sold: the customer is an assignment and the status stays as it is.
+    // Transfer of a serial not sold yet sells it; Assign leaves its status as it is.
     const sold = isSold(data.asset.status);
     const pendingReturn = data.history.find((entry) => entry.pending && entry.entryType === 'Returned');
 
@@ -1124,10 +1159,10 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
         try {
             const res = past
                 ? await serialTransferService.addPastEntry(data.asset._id, { customerId: customer._id, entryDate: transferDate, remarks: remarks.trim(), requestId })
-                : await serialTransferService.transfer(data.asset._id, { customerId: customer._id, transferDate, remarks: remarks.trim(), requestId });
+                : await serialTransferService.transfer(data.asset._id, { customerId: customer._id, transferDate, remarks: remarks.trim(), requestId, sale: !assign });
             toast.success(past
                 ? `Past entry for ${customerTitle(customer)} added to ${data.asset.serialNumber}`
-                : `${data.asset.serialNumber} assigned to ${customerTitle(customer)}`);
+                : `${data.asset.serialNumber} ${assign ? 'assigned' : 'transferred'} to ${customerTitle(customer)}`);
             onSaved(res.data);
         } catch (err) {
             // Kept on the form so the reason stays visible.
@@ -1256,7 +1291,7 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div>
-                    <label className={label} htmlFor="transferDate">{past ? 'Date With This Customer' : sold ? 'Transfer Date' : 'Assignment Date'} <span className="text-rose-500">*</span></label>
+                    <label className={label} htmlFor="transferDate">{past ? 'Date With This Customer' : assign ? 'Assignment Date' : 'Transfer Date'} <span className="text-rose-500">*</span></label>
                     <DateInput id="transferDate" type="date" required max={past ? latestPastDate : todayInput()} value={transferDate} onChange={(e) => setTransferDate(e.target.value)} className={inputClass} />
                 </div>
                 <div className="md:col-span-2">
@@ -1270,7 +1305,7 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
                     ? (currentSince
                         ? `A past entry records an earlier customer as Inactive history, dated on or before ${formatDate(currentSince)} (when the current customer received it). The current customer stays Active.`
                         : 'A past entry records an earlier customer as Inactive history.')
-                    : `${pendingReturn ? `The return by ${pendingReturn.companyName || pendingReturn.customerName || 'the previous customer'} is saved first. ` : ''}${sold ? '' : `The serial stays ${statusText(data.asset.status)}: the customer is recorded as Assigned, not as a sale. `}Saving keeps every earlier customer in the history as Inactive and makes the new customer the only Active one.`}
+                    : `${pendingReturn ? `The return by ${pendingReturn.companyName || pendingReturn.customerName || 'the previous customer'} is saved first. ` : ''}${assign ? `The serial stays ${statusText(data.asset.status)}: the customer is recorded as Assigned, not as a sale. ` : sold ? '' : `The serial becomes Sold to the new customer (recorded as Transferred). `}Saving keeps every earlier customer in the history as Inactive and makes the new customer the only Active one.`}
             </p>
 
             {saveError && (
@@ -1282,7 +1317,7 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
                     Cancel
                 </button>
                 <button type="submit" disabled={saving || !customer} className="flex-1 sm:flex-none px-6 py-3 rounded-2xl bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-xs tracking-widest transition-all disabled:opacity-60">
-                    {saving ? 'Saving…' : past ? 'Save Past Entry' : sold ? 'Save Transfer' : 'Save Assignment'}
+                    {saving ? 'Saving…' : past ? 'Save Past Entry' : assign ? 'Save Assignment' : 'Save Transfer'}
                 </button>
             </div>
         </form>
@@ -1918,7 +1953,7 @@ const SerialNoTransfer = () => {
                     ))}
                 </div>
                 {tab === 'serials' && (
-                    <SerialListTab onOpen={openSerial} onTransfer={(assetId) => navigate(`/serial-no-transfer/${assetId}/transfer`)} />
+                    <SerialListTab onOpen={openSerial} onTransfer={(assetId, mode) => navigate(`/serial-no-transfer/${assetId}/transfer${mode === 'assign' ? '?mode=assign' : ''}`)} />
                 )}
                 {tab === 'history' && <HistoryTab onOpen={openSerial} />}
                 {tab === 'activity' && <ActivityTab onOpen={openSerial} />}

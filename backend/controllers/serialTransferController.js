@@ -179,8 +179,11 @@ const hasSaleCustomer = (asset) => asset.status === 'SOLD' || Boolean(asset.cust
 const isReturned = (asset) => asset.status === 'RETURN' || asset.status === 'RETURNED';
 // The invoice row's customer of an allocated or in-stock serial is an allocation, not a sale.
 const originType = (asset) => (['ALLOCATED', 'IN_STOCK'].includes(statusOf(asset)) ? 'Allocated' : 'Sold');
-// A new customer recorded here: a transfer of a sold serial, else an assignment.
-const changeType = (asset) => (asset.status === 'SOLD' ? 'Transferred' : 'Assigned');
+// A new customer recorded here: a transfer of a sold serial (or of one sold by this change), else
+// an assignment.
+const changeType = (asset, sells = false) => (sells || asset.status === 'SOLD' ? 'Transferred' : 'Assigned');
+// Statuses whose serial can be sold to the new customer by a transfer (Transfer, not Assign).
+const SELLABLE_STATUSES = ['ALLOCATED', 'IN_STOCK'];
 // The entries that give a serial to a new customer (counted as its transfers).
 const CHANGE_TYPES = ['Transferred', 'Assigned'];
 const ENTRY_TYPES = SerialTransfer.schema.path('entryType').enumValues;
@@ -452,7 +455,11 @@ const startOfDay = (value) => new Date(new Date(value).setHours(0, 0, 0, 0));
  * saved as the first record if this is the first change, a returned serial's return is saved, the
  * current record becomes inactive, a new active record is added for the new customer and the
  * asset moves to that customer. Either all of it is saved or none of it. Nothing earlier is
- * changed or removed, and the serial's status stays as it is. Scrapped serials are refused.
+ * changed or removed. Scrapped serials are refused.
+ *
+ * The serial's status stays as it is (Assign), unless `sale: true` is sent for an allocated or
+ * in-stock serial (Transfer): it is then sold to the new customer, its status becomes SOLD and the
+ * record is a Transferred one. A returned serial is re-sold with Add Single Entry instead.
  *
  * The form sends a requestId with each save; repeating a request returns the record it already
  * created instead of adding a second one.
@@ -476,6 +483,10 @@ exports.transferSerial = async (req, res) => {
         const asset = await loadTransferSerial(assetId);
         if (asset.status === 'SCRAPPED') {
             throw httpError(400, `${asset.serialNumber} is scrapped. Its customer history is kept, but a scrapped serial number cannot be assigned or transferred to a customer.`);
+        }
+        const sells = req.body.sale === true && asset.status !== 'SOLD';
+        if (sells && !SELLABLE_STATUSES.includes(statusOf(asset))) {
+            throw httpError(400, `${asset.serialNumber} is ${statusOf(asset)}. Only an allocated or in-stock serial number can be sold by a transfer; use Assign, or re-sell a returned serial with Add Single Entry in Invoice Bulk Upload.`);
         }
         const customer = await Customer.findById(customerId).select(CUSTOMER_SELECT).lean();
         if (!customer) throw httpError(404, 'Customer not found in Customer Master.');
@@ -523,7 +534,7 @@ exports.transferSerial = async (req, res) => {
                 previousCustomerId: previous?.customerId || null,
                 previousCustomerCode: previous?.customerCode || '',
                 previousCustomerName: previous?.companyName || previous?.customerName || '',
-                entryType: changeType(asset),
+                entryType: changeType(asset, sells),
                 transferDate,
                 isActive: true,
                 invoiceNumber: invoice.invoiceNumber || '',
@@ -540,7 +551,9 @@ exports.transferSerial = async (req, res) => {
                     customerCode: snapshot.customerCode,
                     customerNameStr: snapshot.companyName,
                     customerMobile: snapshot.customerMobile,
-                    customerPostalCode: snapshot.customerPincode
+                    customerPostalCode: snapshot.customerPincode,
+                    // Sold by this transfer; a serial with no invoice date was sold on the transfer date.
+                    ...(sells ? { status: 'SOLD', ...(invoiceDateOf(asset) ? {} : { saleDate: transferDate }) } : {})
                 }
             }, { session });
         });
