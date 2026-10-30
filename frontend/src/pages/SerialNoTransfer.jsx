@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { MdSearch, MdSwapHoriz, MdVisibility, MdArrowBack, MdPersonAdd, MdHistory, MdCheckCircle, MdFileDownload, MdAdd, MdClose, MdArrowForward, MdStore, MdExpandMore } from 'react-icons/md';
+import { MdSearch, MdSwapHoriz, MdVisibility, MdArrowBack, MdPersonAdd, MdHistory, MdCheckCircle, MdFileDownload, MdAdd, MdClose, MdArrowForward, MdStore, MdExpandMore, MdFilterAlt } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { serialTransferService, customerService, csmService, mgrService } from '../services/api';
 import AssetActivityLog from '../components/AssetActivityLog';
@@ -126,17 +126,25 @@ const InvoiceCell = ({ entry }) => (
 const EMPTY_PAGINATION = { page: 1, limit: PAGE_SIZE, total: 0, pages: 1 };
 
 // Debounced list loader shared by the tabs: rows are "loading" until they belong to the current
-// request. Nothing is requested while `enabled` is false (e.g. an invalid date range).
+// request. Nothing is requested while `enabled` is false (e.g. an invalid date range). `mgrAccess`
+// is what the user's MGR access limits them to, when the list says (Serial No List).
 const useList = (load, params, enabled = true) => {
     const requestKey = JSON.stringify(params);
-    const [state, setState] = useState({ key: null, rows: [], pagination: EMPTY_PAGINATION });
+    const [state, setState] = useState({ key: null, rows: [], pagination: EMPTY_PAGINATION, mgrAccess: null });
 
     useEffect(() => {
         if (!enabled) return undefined;
         let cancelled = false;
         load(JSON.parse(requestKey))
             .then((res) => {
-                if (!cancelled) setState({ key: requestKey, rows: res.data?.data || [], pagination: res.data?.pagination || state.pagination });
+                if (!cancelled) {
+                    setState({
+                        key: requestKey,
+                        rows: res.data?.data || [],
+                        pagination: res.data?.pagination || state.pagination,
+                        mgrAccess: res.data?.mgrAccess || null
+                    });
+                }
             })
             .catch((err) => {
                 if (cancelled) return;
@@ -147,8 +155,34 @@ const useList = (load, params, enabled = true) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [requestKey, enabled]);
 
-    if (!enabled) return { rows: [], pagination: EMPTY_PAGINATION, loading: false };
+    if (!enabled) return { rows: [], pagination: EMPTY_PAGINATION, mgrAccess: state.mgrAccess, loading: false };
     return { ...state, loading: state.key !== requestKey };
+};
+
+const MGR_ACCESS_LEVELS = [['mgr1', 'MGR 1'], ['mgr2', 'MGR 2'], ['mgr3', 'MGR 3'], ['mgr4', 'MGR 4'], ['mgr5', 'MGR 5']];
+
+// The user's MGR access (Authorization > MGR Access, shared with Invoice Bulk Upload), shown above
+// the list when it limits what they see: { mgr1: [{ code, description }] }, or null.
+const MgrAccessNotice = ({ mgrAccess }) => {
+    if (!mgrAccess) return null;
+    const lines = MGR_ACCESS_LEVELS
+        .filter(([key]) => mgrAccess[key]?.length)
+        .map(([key, label]) => `${label}: ${mgrAccess[key].map(mgrLabel).join(', ')}`);
+    return (
+        <div className="mb-4 flex items-start gap-3 rounded-2xl border border-primary-200 bg-primary-50 p-4">
+            <div className="shrink-0 rounded-xl bg-primary-100 p-2 text-primary-700"><MdFilterAlt size={18} /></div>
+            <div className="min-w-0">
+                <p className="text-sm font-black text-primary-800">
+                    {lines.length ? 'You see only the serial numbers of your MGR access' : 'Your MGR access has no values'}
+                </p>
+                <p className="mt-0.5 break-words text-[11px] font-semibold text-primary-700">
+                    {lines.length
+                        ? lines.join(' · ')
+                        : 'The MGR values you were given have been removed from the Product MGR Master. Ask an administrator to set your MGR access again.'}
+                </p>
+            </div>
+        </div>
+    );
 };
 
 // Search and filters survive opening a serial and coming back (per browser tab only).
@@ -279,7 +313,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
     const range = useDateRange('list');
     const debouncedSearch = useDebounced(search.trim());
 
-    const { rows, pagination, loading } = useList(serialTransferService.listSerials, {
+    const { rows, pagination, loading, mgrAccess } = useList(serialTransferService.listSerials, {
         page, limit: PAGE_SIZE, search: debouncedSearch || undefined, field: field || undefined, status: status || undefined,
         ownership: ownership || undefined, mgr4: mgr4 || undefined, ...range.params,
     }, !range.invalid);
@@ -317,6 +351,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                 <DateRangeFilter range={range} field="Invoice Date" onChange={() => setPage(1)} />
             </div>
             <div className="p-3 md:p-6">
+                <MgrAccessNotice mgrAccess={mgrAccess} />
                 {loading ? <Spinner /> : (
                     <>
                         <TotalCountBar

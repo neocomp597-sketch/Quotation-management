@@ -991,7 +991,7 @@ const Authorization = () => {
                                                                     </span>
                                                                 )}
                                                                 {mgrAccessText && (
-                                                                    <span className="text-[10px] font-bold bg-primary-50 dark:bg-primary-950/60 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800 px-2 py-0.5 rounded-full" title="Invoice Bulk Upload is limited to these MGR values">
+                                                                    <span className="text-[10px] font-bold bg-primary-50 dark:bg-primary-950/60 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800 px-2 py-0.5 rounded-full" title="Invoice Bulk Upload and Serial No Transfer are limited to these MGR values">
                                                                         {mgrAccessText}
                                                                     </span>
                                                                 )}

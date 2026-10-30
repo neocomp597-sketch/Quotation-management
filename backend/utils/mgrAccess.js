@@ -5,7 +5,8 @@ const User = require('../models/User');
 const { isSuperAdminRole } = require('../middlewares/authMiddleware');
 
 /**
- * MGR access of Invoice Bulk Upload, set per user in Authorization > Team Users ("MGR Access").
+ * MGR access of Invoice Bulk Upload and Serial No Transfer, set per user in Authorization > Team
+ * Users ("MGR Access"); one setting for both screens.
  *
  * A user given MGR values sees only the serial numbers whose product carries them: any of the
  * values of one level, and every level that has values (MGR 1 = IND sees IND products only;
@@ -13,7 +14,9 @@ const { isSuperAdminRole } = require('../middlewares/authMiddleware');
  * admins see everything. Read from the user on each request, so a change applies at once.
  *
  * Applied to every Invoice Bulk Upload read and write: list, cards, search, MGR filters, export,
- * return history, details / activity log, serial search, add, edit, return and Excel import.
+ * return history, details / activity log, serial search, add, edit, return and Excel import; and to
+ * every Serial No Transfer tab: Serial No List, details, transfer / assign / past entry, Transfer
+ * History, Customer Activity Log and its export, and Branch Transfer (controllers/serialTransferController.js).
  */
 
 const MGR_FIELDS = { MGR1: 'mgr1', MGR2: 'mgr2', MGR3: 'mgr3', MGR4: 'mgr4', MGR5: 'mgr5' };
