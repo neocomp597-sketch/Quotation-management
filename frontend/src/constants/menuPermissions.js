@@ -22,10 +22,6 @@ export const MENU_PERMISSION_GROUPS = [
             { key: 'payroll_employees', label: 'Employees & Master', description: 'Employee directory and profile management', defaultRoute: '/payroll/employees' },
             { key: 'csm_masters', label: 'Engineers Master', description: 'Field service engineers master', defaultRoute: '/csm/masters?tab=engineers' },
             { key: 'flowchart_view', label: 'Flowchart Builder', description: 'Visual process flowchart builder', defaultRoute: '/flowcharts' },
-            { key: 'master_serials', label: 'Invoice Bulk Upload', description: 'Serial number and asset master records', defaultRoute: '/serial-no-master' },
-            { key: 'master_serials_view_details', label: 'Invoice Bulk Upload: View Details', description: 'Open the lifecycle details of an Invoice Bulk Upload entry', defaultRoute: '/serial-no-master' },
-            { key: 'master_serials_edit', label: 'Invoice Bulk Upload: Edit Entry', description: 'Change a saved Invoice Bulk Upload entry', defaultRoute: '/serial-no-master' },
-            { key: 'master_serial_transfer', label: 'Serial No Transfer', description: 'Serial number ownership history; Modify allows transfers and past entries', defaultRoute: '/serial-no-transfer' },
             { key: 'payroll_org_chart_full', label: 'Org Chart (Full Company)', description: 'Full company org chart access', defaultRoute: '/payroll/org-chart' },
             { key: 'payroll_org_chart', label: 'Org Chart (My Team)', description: 'Direct reporting org chart access', defaultRoute: '/payroll/org-chart' },
             { key: 'master_bom', label: 'Product BOM Master', description: 'Create, edit and view serial-number-wise BOMs', defaultRoute: '/bom-master' },
@@ -88,13 +84,18 @@ export const MENU_PERMISSION_GROUPS = [
     {
         key: 'quotation',
         label: 'Quotations',
-        description: 'Quotation registers, CPQ tools, invoices, approvals, and orders',
+        description: 'Quotation registers, CPQ tools, invoices, invoice bulk upload, serial transfers, approvals, and orders',
         defaultRoute: '/quotations',
         children: [
             { key: 'quotation_list', label: 'Quotation Register', description: 'View, create, and manage trade quotations', defaultRoute: '/quotations' },
             { key: 'reports_main', label: 'Quote Conversion Report', description: 'Quotation conversion analytics', defaultRoute: '/quotations/conversion-report' },
             { key: 'sales_cpq', label: 'Guided Selling & Configurator', description: 'Interactive product configurator and quote simulator', defaultRoute: '/sales/cpq/guided-selling' },
             { key: 'sale_invoices', label: 'Invoices', description: 'Billing invoices and payment schedules', defaultRoute: '/invoices' },
+            // master_ keys are kept from when these screens were under Master (see backend config/authorization.js)
+            { key: 'master_serials', label: 'Invoice Bulk Upload', description: 'Invoice bulk upload and serial asset management', defaultRoute: '/serial-no-master' },
+            { key: 'master_serials_view_details', label: 'Invoice Bulk Upload: View Details', description: 'Open the lifecycle details of an Invoice Bulk Upload entry', defaultRoute: '/serial-no-master' },
+            { key: 'master_serials_edit', label: 'Invoice Bulk Upload: Edit Entry', description: 'Change a saved Invoice Bulk Upload entry', defaultRoute: '/serial-no-master' },
+            { key: 'master_serial_transfer', label: 'Serial No Transfer', description: 'Serial number ownership history; Modify allows transfers and past entries', defaultRoute: '/serial-no-transfer' },
             { key: 'sales_approvals', label: 'Approvals Queue', description: 'Manage discount and high-value quotation approvals', defaultRoute: '/sales/approvals' },
             { key: 'sales_orders', label: 'Sales Orders', description: 'Sales order processing and status tracking', defaultRoute: '/sales/orders' }
         ]

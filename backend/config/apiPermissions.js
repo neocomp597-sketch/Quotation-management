@@ -102,10 +102,6 @@ const API_PERMISSION_RULES = [
         }
     },
     {
-        prefix: '/api/serial-transfers', key: 'master_serial_transfer',
-        routes: { 'POST /serials/:assetId/transfer': 'modify', 'POST /serials/:assetId/past-entry': 'modify', 'POST /branch-transfers': 'modify' }
-    },
-    {
         prefix: '/api/payroll/employees', key: 'payroll_employees', openRead: true,
         routes: {
             'POST /sync-users': 'modify',
@@ -201,6 +197,11 @@ const API_PERMISSION_RULES = [
         viewKeys: ['sale_invoices', 'purchase_grn', 'csm_tickets', 'csm_warranties_amc']
     },
     { prefix: '/api/orders', key: 'sales_orders', routes: { 'POST /:id/invoice': 'modify' } },
+    // Invoice Bulk Upload entries are the assets under /api/csm/assets and /api/import/assets
+    {
+        prefix: '/api/serial-transfers', key: 'master_serial_transfer',
+        routes: { 'POST /serials/:assetId/transfer': 'modify', 'POST /serials/:assetId/past-entry': 'modify', 'POST /branch-transfers': 'modify' }
+    },
 
     // ── Contracts ─────────────────────────────────────────────────────────
     { prefix: '/api/clm', key: 'sales_contracts', routes: { 'POST /generate': 'create' } },

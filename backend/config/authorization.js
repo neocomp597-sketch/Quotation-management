@@ -29,10 +29,6 @@ const MENU_GROUPS = [
             { key: 'master_terms', label: 'Terms & Conditions', description: 'Terms and conditions master' },
             { key: 'master_territories', label: 'Territory Master', description: 'Territory master management' },
             { key: 'master_branches', label: 'Branch Master', description: 'Branch master management' },
-            { key: 'master_serials', label: 'Invoice Bulk Upload', description: 'Invoice bulk upload and serial asset management' },
-            { key: 'master_serials_view_details', label: 'Invoice Bulk Upload: View Details', description: 'Open the lifecycle details of an Invoice Bulk Upload entry' },
-            { key: 'master_serials_edit', label: 'Invoice Bulk Upload: Edit Entry', description: 'Change a saved Invoice Bulk Upload entry' },
-            { key: 'master_serial_transfer', label: 'Serial No Transfer', description: 'Serial number ownership history; Modify allows transfers and past entries' },
             { key: 'state_master_create', label: 'State Master', description: 'State master management' },
             { key: 'city_master', label: 'City Master', description: 'City master management' },
             { key: 'csm_masters', label: 'Engineers Master', description: 'Field service engineers master' },
@@ -93,12 +89,18 @@ const MENU_GROUPS = [
     {
         key: 'quotation',
         label: 'Quotations',
-        description: 'Quotation registers, CPQ tools, invoices, approvals, and orders',
+        description: 'Quotation registers, CPQ tools, invoices, invoice bulk upload, serial transfers, approvals, and orders',
         children: [
             { key: 'quotation_list', label: 'Quotation Register', description: 'View, create, and manage trade quotations' },
             { key: 'reports_main', label: 'Quote Conversion Report', description: 'Quotation conversion analytics' },
             { key: 'sales_cpq', label: 'Guided Selling & Configurator', description: 'Interactive product configurator and quote simulator' },
             { key: 'sale_invoices', label: 'Invoices', description: 'Billing invoices and payment schedules' },
+            // Keys keep their master_ prefix from when these screens were under Master: roles,
+            // user overrides and API rules are saved against them.
+            { key: 'master_serials', label: 'Invoice Bulk Upload', description: 'Invoice bulk upload and serial asset management' },
+            { key: 'master_serials_view_details', label: 'Invoice Bulk Upload: View Details', description: 'Open the lifecycle details of an Invoice Bulk Upload entry' },
+            { key: 'master_serials_edit', label: 'Invoice Bulk Upload: Edit Entry', description: 'Change a saved Invoice Bulk Upload entry' },
+            { key: 'master_serial_transfer', label: 'Serial No Transfer', description: 'Serial number ownership history; Modify allows transfers and past entries' },
             { key: 'sales_approvals', label: 'Approvals Queue', description: 'Manage discount and high-value quotation approvals' },
             { key: 'sales_orders', label: 'Sales Orders', description: 'Sales order processing and status tracking' }
         ]
@@ -276,14 +278,50 @@ const LEGACY_PERMISSION_FALLBACKS = {
 // is the admin role, whatever its other defaults are; an admin grants them to others.
 const ADMIN_DEFAULT_ONLY_KEYS = new Set(['master_serials_edit']);
 
-const withoutAdminOnlyKeys = (permissions) => {
-    ADMIN_DEFAULT_ONLY_KEYS.forEach((key) => { permissions[key] = false; });
+// Sales has the Quotations module but not Invoice Bulk Upload or Serial No Transfer, which
+// it never had while they were under Master.
+const SALES_WITHHELD_KEYS = ['master_serials', 'master_serials_view_details', 'master_serials_edit', 'master_serial_transfer'];
+
+const withKeysOff = (permissions, keys) => {
+    keys.forEach((key) => { permissions[key] = false; });
     return permissions;
 };
+
+const withoutAdminOnlyKeys = (permissions) => withKeysOff(permissions, ADMIN_DEFAULT_ONLY_KEYS);
 
 const getLegacyFallback = (input, key) => {
     const fallbackKey = LEGACY_PERMISSION_FALLBACKS[key];
     return fallbackKey && typeof input[fallbackKey] === 'boolean' ? input[fallbackKey] : undefined;
+};
+
+// Screens moved to another module after roles were saved, with the module they came from.
+// A role saved with module switches only (before screens had switches of their own) gives
+// each screen its module's switch. A moved screen keeps taking its old module's switch and
+// does not count as a saved screen of its new module, so the move changes nobody's access.
+const MOVED_SCREEN_ORIGINS = {
+    master_serials: 'master',
+    master_serials_view_details: 'master',
+    master_serials_edit: 'master',
+    master_serial_transfer: 'master'
+};
+
+// Each module's screens as they were before those moves.
+const ORIGINAL_MODULE_SCREENS = MENU_GROUPS.reduce((modules, group) => {
+    modules[group.key] = (group.children || []).map((child) => child.key).filter((key) => !MOVED_SCREEN_ORIGINS[key]);
+    return modules;
+}, {});
+Object.entries(MOVED_SCREEN_ORIGINS).forEach(([key, moduleKey]) => ORIGINAL_MODULE_SCREENS[moduleKey].push(key));
+
+/**
+ * The module switch that a role saved with module switches only gives `key`, a screen of
+ * `group`; undefined when no switch was saved for that module or it has screen values.
+ */
+const getModuleOnlyValue = (saved, group, key) => {
+    const moduleKey = MOVED_SCREEN_ORIGINS[key] || group.key;
+    if (typeof saved[moduleKey] !== 'boolean') return undefined;
+    return ORIGINAL_MODULE_SCREENS[moduleKey].some((screen) => typeof saved[screen] === 'boolean')
+        ? undefined
+        : saved[moduleKey];
 };
 
 // ─── Action-level permissions ───────────────────────────────────────────────
@@ -428,7 +466,7 @@ const hasPermission = (permissions = {}, key, action = 'view') => {
 const DEFAULT_ROLE_PERMISSIONS = {
     admin: buildPermissions(FULL_ACCESS_KEYS),
     manager: withoutAdminOnlyKeys(buildPermissions(['dashboard', 'master', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'sale', 'purchase', 'inventory', 'planning', 'reports', 'settings', 'csm', 'tender', 'payroll_org_chart'])),
-    sales: withoutAdminOnlyKeys(buildPermissions(['dashboard', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'inventory_items', 'inventory_stock_in', 'inventory_stock_out', 'inventory_transfers', 'csm_tickets', 'csm_attendance', 'csm_kb', 'tender_dashboard', 'tender_register', 'payroll_org_chart'])),
+    sales: withoutAdminOnlyKeys(withKeysOff(buildPermissions(['dashboard', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'inventory_items', 'inventory_stock_in', 'inventory_stock_out', 'inventory_transfers', 'csm_tickets', 'csm_attendance', 'csm_kb', 'tender_dashboard', 'tender_register', 'payroll_org_chart']), SALES_WITHHELD_KEYS)),
     employee: withoutAdminOnlyKeys(buildPermissions(['dashboard', 'payroll_org_chart', 'csm_tickets', 'csm_attendance', 'csm_kb', 'settings_profile']))
 };
 
@@ -441,8 +479,6 @@ const sanitizePermissions = (rawInput = {}) => {
     const input = withSplitPermissions(rawInput);
     const permissions = MENU_GROUPS.reduce((permissions, group) => {
         const childKeys = (group.children || []).map((child) => child.key);
-        const hasExplicitChildren = childKeys.some((key) => typeof input[key] === 'boolean');
-        const legacyParentEnabled = input[group.key] === true && !hasExplicitChildren;
         let enabledChildren = 0;
 
         childKeys.forEach((key) => {
@@ -451,7 +487,7 @@ const sanitizePermissions = (rawInput = {}) => {
                 ? input[key]
                 : typeof legacyFallback === 'boolean'
                     ? legacyFallback
-                    : legacyParentEnabled;
+                    : getModuleOnlyValue(input, group, key) === true;
 
             permissions[key] = childEnabled;
             if (childEnabled) enabledChildren += 1;
@@ -488,14 +524,15 @@ const resolvePermissions = (role, savedPermissions = {}) => {
             const stored = storedPermissions[key];
             const hasStoredValue = typeof stored === 'boolean';
             const legacyFallback = getLegacyFallback(storedPermissions, key);
+            const moduleOnlyValue = getModuleOnlyValue(storedPermissions, group, key);
             const childEnabled = lockedKeys.has(key) || (hasStoredValue
                 ? stored
                 : typeof legacyFallback === 'boolean'
                     ? legacyFallback
                     : ADMIN_DEFAULT_ONLY_KEYS.has(key)
                     ? String(role || '').toLowerCase() === 'admin'
-                    : hasStoredParent && !hasStoredChildren
-                    ? storedParent
+                    : typeof moduleOnlyValue === 'boolean'
+                    ? moduleOnlyValue
                     : Boolean(defaults[key]));
 
             permissions[key] = childEnabled;
