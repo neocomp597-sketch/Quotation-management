@@ -14,6 +14,7 @@ const SearchableSelect = ({
     onAddOption, // Callback: async (name) => { ... }
     onEditOption, // Callback: async (option) => { ... }
     onDeleteOption, // Callback: async (option) => { ... }
+    onSearchChange, // Optional: (text) => void, to load matching options from the server as the user types
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState('');
@@ -126,7 +127,7 @@ const SearchableSelect = ({
                                     type="text"
                                     placeholder="Type to search..."
                                     value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
+                                    onChange={(e) => { setSearch(e.target.value); onSearchChange?.(e.target.value); }}
                                     className="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition-all font-semibold text-slate-700 text-xs"
                                 />
                             </div>

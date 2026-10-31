@@ -960,6 +960,8 @@ export const salesService = {
 export const csmService = {
   getStats: (params = {}) => api.get("/csm/dashboard", { params }),
   getTicketCustomers: () => api.get("/csm/tickets/customers"),
+  // Customers of the active branch for the Raise Ticket form: { search, limit } (at most 50 a call).
+  getTicketCustomerOptions: (params = {}) => api.get("/csm/tickets/customer-options", { params, cache: false }),
   getTickets: (params = {}) => api.get("/csm/tickets", { params }),
   getTicketById: (id) => api.get(`/csm/tickets/${id}`),
   createTicket: (data) => api.post("/csm/tickets", data),

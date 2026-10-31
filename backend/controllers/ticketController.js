@@ -1390,6 +1390,42 @@ exports.updateRca = async (req, res) => {
     }
 };
 
+const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const TICKET_CUSTOMER_FIELDS = 'externalCode customerName companyName contactPerson gstin billingAddress mobile email';
+
+/**
+ * Customers the Raise Ticket form offers (?search, up to ?limit=50): the Customer Master customers
+ * of the branch being worked in, by name. Anyone who may use tickets sees all of them: Customer
+ * Master's own list also limits Employee and Sales users to the customers of their territories,
+ * which left employees without territories (e.g. Ularia's) with an empty Customer field.
+ */
+exports.getTicketCustomerOptions = async (req, res) => {
+    try {
+        const query = {};
+        // Same branch rule as Customer Master: the customers of the selected branch.
+        if (req.user?.activeBranchId) query.branchId = req.user.activeBranchId;
+        const search = String(req.query.search || '').trim();
+        if (search) {
+            const pattern = new RegExp(escapeRegex(search), 'i');
+            query.$or = [
+                { companyName: pattern }, { customerName: pattern }, { externalCode: pattern },
+                { mobile: pattern }, { gstin: pattern }, { email: pattern }
+            ];
+        }
+        const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 50));
+        const customers = await Customer.find(query)
+            .select(TICKET_CUSTOMER_FIELDS)
+            .collation({ locale: 'en', strength: 2 })
+            .sort({ companyName: 1, customerName: 1, _id: 1 })
+            .limit(limit)
+            .lean();
+        res.json(customers);
+    } catch (error) {
+        console.error('Get ticket customer options error:', error);
+        res.status(500).json({ message: error.message || 'Error fetching customers' });
+    }
+};
+
 exports.getTicketCustomers = async (req, res) => {
     try {
         const companyId = req.user?.companyId;

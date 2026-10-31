@@ -118,6 +118,28 @@ const CSMTickets = () => {
 
     // Masters lists for creation
     const [customers, setCustomers] = useState([]);
+    // The Customer fields load the branch's first 50 customers with the form and search the
+    // server as the user types; found customers are added to the list, so a chosen one stays in it.
+    const customerSearchTimerRef = useRef(null);
+    const searchTicketCustomers = (text) => {
+        clearTimeout(customerSearchTimerRef.current);
+        const term = String(text || '').trim();
+        if (!term) return;
+        customerSearchTimerRef.current = setTimeout(async () => {
+            try {
+                const res = await csmService.getTicketCustomerOptions({ search: term });
+                const found = Array.isArray(res.data) ? res.data : [];
+                setCustomers((prev) => {
+                    const known = new Set(prev.map((c) => String(c._id)));
+                    const added = found.filter((c) => !known.has(String(c._id)));
+                    return added.length ? [...prev, ...added] : prev;
+                });
+            } catch (error) {
+                console.error('Customer search failed:', error);
+            }
+        }, 300);
+    };
+    useEffect(() => () => clearTimeout(customerSearchTimerRef.current), []);
     const [priorities, setPriorities] = useState([]);
     const [categories, setCategories] = useState([]);
     const [types, setTypes] = useState([]);
@@ -574,7 +596,7 @@ const CSMTickets = () => {
     const loadCreationData = async () => {
         try {
             const [custRes, priRes, catRes, typRes, prodRes, srcRes, desRes, assetRes, branchRes, probRes] = await Promise.allSettled([
-                customerService.getAll({ limit: 500 }),
+                csmService.getTicketCustomerOptions(),
                 csmService.getPriorities(),
                 csmService.getCategories(),
                 csmService.getTypes(),
@@ -2697,7 +2719,9 @@ const CSMTickets = () => {
                                 }))}
                                 value={formData.customerId}
                                 onChange={handleCustomerChange}
+                                onSearchChange={searchTicketCustomers}
                                 placeholder="Search & Select Customer..."
+                                noResultsText="No customer of this branch matches yet. Keep typing the name, code, mobile or GSTIN."
                             />
                             {(() => {
                                 const selectedCust = customers.find(c => c._id === formData.customerId);
@@ -3829,7 +3853,9 @@ const CSMTickets = () => {
                                     }))}
                                     value={manualFormData.customerId}
                                     onChange={handleManualCustomerChange}
+                                    onSearchChange={searchTicketCustomers}
                                     placeholder="Search & Select Customer..."
+                                    noResultsText="No customer of this branch matches yet. Keep typing the name, code, mobile or GSTIN."
                                 />
                             )}
                         </div>
