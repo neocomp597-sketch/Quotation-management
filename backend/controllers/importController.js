@@ -1952,7 +1952,7 @@ const importTickets = async (req, res) => {
                     ticketNo = await generateTicketNumberForImport(companyId);
                 } else {
                     // Check if ticket number is unique for this company
-                    const existingTicket = await Ticket.findOne({ companyId, ticketNo: buildExactRegex(ticketNo) });
+                    const existingTicket = await Ticket.findOne({ companyId, ticketNo: buildExactRegex(ticketNo) }).setOptions({ bypassBranch: true });
                     if (existingTicket) {
                         throw new Error(`Ticket No "${ticketNo}" already exists`);
                     }

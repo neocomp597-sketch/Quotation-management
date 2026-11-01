@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { notificationService, systemUpdateService, enquiryService } from '../services/api';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
+import { rememberAnalyticsBranch } from '../hooks/useCSMDashboardFilters';
 import { useTheme } from '../context/ThemeContext';
 import { useSocket } from '../context/SocketContext';
 import SystemUpdatesModal from './SystemUpdatesModal';
@@ -790,6 +791,8 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                                                             setIsBranchDropdownOpen(false);
                                                             if (isActive) return;
                                                             try {
+                                                                // Analytics, if open, remounts below on the branch picked here.
+                                                                rememberAnalyticsBranch(user, bId);
                                                                 // Persisted server-side first; the page content then
                                                                 // remounts in the new branch context (see Layout).
                                                                 await setActiveBranch(b);

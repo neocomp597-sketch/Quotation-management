@@ -13,6 +13,7 @@ router.use(protect, canViewSerialTransfers);
 
 router.get('/serials', serialTransferController.listSerials);
 router.get('/serials/:assetId', serialTransferController.getSerial);
+router.put('/serials/:assetId/asset-no', serialTransferController.updateAssetNo);
 router.post('/serials/:assetId/transfer', serialTransferController.transferSerial);
 router.post('/serials/:assetId/past-entry', serialTransferController.addPastEntry);
 router.get('/history', serialTransferController.listHistory);

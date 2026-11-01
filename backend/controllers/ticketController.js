@@ -6,10 +6,10 @@ const Customer = require('../models/Customer');
 const User = require('../models/User');
 const CustomerContact = require('../models/CustomerContact');
 const { broadcastCrmUpdate } = require('../config/socket');
-const { mgrAccessCondition } = require('../utils/mgrAccess');
+const { mgrAccessCondition, mgr1FilterCondition } = require('../utils/mgrAccess');
 
-// Tickets are visible from every branch (see models/Ticket.js), so the customer, contact and
-// serial a ticket points to must resolve even when they belong to another branch.
+// A ticket is shown only in its own branch (see models/Ticket.js), but the customer, contact and
+// serial it points to may belong to another branch and must still resolve.
 const CROSS_BRANCH = { bypassBranch: true };
 
 const generateTicketNumber = async (companyId) => {
@@ -67,8 +67,9 @@ exports.createTicket = async (req, res) => {
             } else if (targetSerialNo) {
                 const cleanSN = targetSerialNo.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
                 linkedAsset = await Asset.findOne({
+                    companyId,
                     serialNumber: { $regex: new RegExp("^" + cleanSN + "$", "i") }
-                }).setOptions({ bypassTenant: true });
+                }).setOptions(CROSS_BRANCH);
             }
 
             if (linkedAsset) {
@@ -104,11 +105,12 @@ exports.createTicket = async (req, res) => {
             }
 
             if (queryConditions.length > 0) {
+                // One active ticket per serial in the whole company, whichever branch raised it.
                 const activeTicket = await Ticket.findOne({
                     companyId,
                     $or: queryConditions,
                     status: { $nin: ['Closed', 'Cancelled'] }
-                }).lean();
+                }).setOptions(CROSS_BRANCH).lean();
 
                 if (activeTicket) {
                     const displaySerial = targetSerialNo || 'selected Product Serial No.';
@@ -152,7 +154,7 @@ exports.createTicket = async (req, res) => {
         }
 
         // Branch: the one picked on the form (checked against the user's branch access), else
-        // the active branch. "All Branches" is stored as no branch.
+        // the active branch. Every new ticket belongs to one branch.
         const requestedBranch = parseTicketBranch(ticketBody.branchId);
         let ticketBranchId = req.user?.activeBranchId || req.user?.branchId || null;
         if (requestedBranch.given) {
@@ -160,11 +162,7 @@ exports.createTicket = async (req, res) => {
                 return res.status(400).json({ message: 'Invalid branch selected' });
             }
             if (!(await canUseTicketBranch(req.user, requestedBranch.branchId))) {
-                return res.status(403).json({
-                    message: requestedBranch.branchId
-                        ? 'You do not have access to the selected branch.'
-                        : 'Only users with access to every branch can raise a ticket for All Branches.'
-                });
+                return res.status(403).json({ message: 'You do not have access to the selected branch.' });
             }
             ticketBranchId = requestedBranch.branchId;
         }
@@ -227,7 +225,7 @@ const isAdminOrManagerUser = (user) => {
     return role === 'admin' || role === 'manager' || role === 'super_admin' || role === 'superadmin';
 };
 
-const { canUseBranch, getSelectableBranchIds, listSelectableBranches } = require('../utils/branchScope');
+const { canUseBranch, listSelectableBranches } = require('../utils/branchScope');
 
 const isTicketCreator = (user, ticket) => {
     const creatorId = ticket?.createdBy?._id?.toString() || ticket?.createdBy?.toString();
@@ -235,24 +233,16 @@ const isTicketCreator = (user, ticket) => {
 };
 
 /**
- * "All Branches" (no branch on the ticket) is only for users who may work in every
- * branch. Tickets are a company-wide register anyway, so it never widens access.
+ * Whether the user may work with tickets of `branchId`. An older ticket with no branch yet may be
+ * given one by anyone who can edit it.
  */
-const canUseAllBranches = (user) => getSelectableBranchIds(user) === null;
+const canUseTicketBranch = async (user, branchId) => (
+    branchId ? canUseBranch(user, String(branchId), user?.companyId?.toString()) : true
+);
 
-/** Whether the user may file a ticket under `branchId` (null = All Branches). */
-const canUseTicketBranch = async (user, branchId) => {
-    if (!branchId) return canUseAllBranches(user);
-    return canUseBranch(user, String(branchId), user?.companyId?.toString());
-};
-
-/**
- * Reads the requested branch from a ticket payload: undefined/'' = not given,
- * null/'all' = All Branches, otherwise a branch id.
- */
+/** Reads the requested branch from a ticket payload: empty = not given, otherwise a branch id. */
 const parseTicketBranch = (raw) => {
-    if (raw === undefined || raw === '') return { given: false };
-    if (raw === null || String(raw).toLowerCase() === 'all') return { given: true, branchId: null };
+    if (raw === undefined || raw === null || raw === '') return { given: false };
     const id = String(raw._id || raw);
     if (!mongoose.Types.ObjectId.isValid(id)) return { given: true, invalid: true };
     return { given: true, branchId: id };
@@ -313,11 +303,11 @@ const canEditTicket = async (user, ticket) => {
     return primaryEngIdStr === engIdStr || assignedEngIdsStr.includes(engIdStr);
 };
 
-/** Branches the user may raise a ticket under, and whether "All Branches" is offered. */
+/** Branches the user may raise a ticket under. */
 exports.getTicketBranchOptions = async (req, res) => {
     try {
         const branches = await listSelectableBranches(req.user, req.user?.companyId?.toString());
-        res.json({ branches, allowAllBranches: canUseAllBranches(req.user) });
+        res.json({ branches });
     } catch (error) {
         console.error('Ticket branch options error:', error);
         res.status(500).json({ message: error.message || 'Error loading branches' });
@@ -535,19 +525,14 @@ exports.getTickets = async (req, res) => {
             }
         }
 
-        // Support Tickets are a company-wide register: a ticket raised in any branch is
-        // listed from every branch. Visibility is still limited by the my/team/all
-        // hierarchy rules below; ?branchId= narrows the register on request, and ?myBranches=true
-        // (a dashboard card on "All My Branches") to every branch the user is authorized for.
-        if (req.query.branchId && mongoose.Types.ObjectId.isValid(req.query.branchId)) {
-            filter.branchId = req.query.branchId;
-        } else if (req.query.myBranches === 'true' && req.user?.allowedBranchIds) {
-            filter.branchId = { $in: req.user.allowedBranchIds };
-        }
-
+        // The register lists the tickets of the branch selected in the header (models/Ticket.js), or
+        // of the Analytics card that opened it (routes: withBranchView), further limited by the
+        // my/team/all hierarchy rules below.
         const andConditions = [];
         const mgrCondition = await exports.getTicketMgrCondition(req);
         if (mgrCondition) andConditions.push(mgrCondition);
+        const mgr1Condition = await mgr1FilterCondition(req.query.mgr1);
+        if (mgr1Condition) andConditions.push(mgr1Condition);
 
         // Cascading Reporting Hierarchy & Ticket Visibility Filter
         const tab = (req.query.tab || '').toLowerCase().trim();
@@ -751,7 +736,18 @@ exports.getTicketById = async (req, res) => {
             .lean();
 
         if (!ticket) {
-            return res.status(404).json({ message: 'Ticket not found' });
+            // A ticket of another branch the user works in: say where it is (e.g. from a notification).
+            const elsewhere = await Ticket.findOne({ _id: req.params.id, companyId: req.user?.companyId, ...mgrCondition })
+                .select('branchId')
+                .populate({ path: 'branchId', select: 'name', options: { bypassTenant: true } })
+                .setOptions(CROSS_BRANCH)
+                .lean();
+            const usable = elsewhere?.branchId && await canUseTicketBranch(req.user, elsewhere.branchId._id);
+            return res.status(404).json({
+                message: usable
+                    ? `This ticket belongs to ${elsewhere.branchId.name}. Switch to that branch at the top of the screen to open it.`
+                    : 'Ticket not found'
+            });
         }
 
         if (!(await canViewTicketDetails(req.user, ticket))) {
@@ -811,15 +807,13 @@ exports.updateTicket = async (req, res) => {
                     code: 'TICKET_BRANCH_CHANGE_DENIED',
                     message: !mayLeave
                         ? 'You do not have permission to move this ticket out of its current branch.'
-                        : (requestedBranch.branchId
-                            ? 'You do not have access to the selected branch.'
-                            : 'Only users with access to every branch can set a ticket to All Branches.')
+                        : 'You do not have access to the selected branch.'
                 });
             }
             const Branch = require('../models/Branch');
             const branchDocs = await Branch.find({ _id: { $in: [previousBranchId, requestedBranch.branchId].filter(Boolean) } })
                 .select('name').setOptions({ bypassTenant: true }).lean();
-            const branchName = (id) => (id ? (branchDocs.find(b => b._id.toString() === id)?.name || id) : 'All Branches');
+            const branchName = (id) => (id ? (branchDocs.find(b => b._id.toString() === id)?.name || id) : 'No Branch');
             ticketBody.branchId = requestedBranch.branchId;
             timelineEntries.push({
                 activityType: 'BranchChanged',
@@ -1456,7 +1450,9 @@ exports.getTicketCustomers = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
         const mgrCondition = await exports.getTicketMgrCondition(req);
-        const uniqueCustomerIds = await Ticket.find({ companyId, ...mgrCondition }).distinct('customerId');
+        // Not .distinct(): it skips tenantPlugin, and this list must stay within the selected branch.
+        const branchTickets = await Ticket.find({ companyId, ...mgrCondition }).select('customerId').lean();
+        const uniqueCustomerIds = [...new Set(branchTickets.map((ticket) => String(ticket.customerId || '')).filter(Boolean))];
         
         const customers = await Customer.find({ 
             _id: { $in: uniqueCustomerIds },

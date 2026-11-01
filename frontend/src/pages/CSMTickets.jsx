@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { csmService, customerService, productService, voucherService, userService, importService, uploadService, branchService, invalidateApiCache } from '../services/api';
+import { csmService, customerService, productService, voucherService, userService, importService, uploadService, invalidateApiCache } from '../services/api';
 import { formatDate } from '../utils/helpers';
 import { toast } from 'react-toastify';
 import { MdAdd, MdSearch, MdFilterList, MdArrowForward, MdEdit, MdDelete, MdPublish, MdFileDownload, MdInfoOutline, MdPhotoCamera, MdCloudUpload, MdPeople, MdAccountTree, MdCorporateFare } from 'react-icons/md';
@@ -68,17 +68,16 @@ const getManualImagesForTicket = (ticket) => {
 
 const CSMTickets = () => {
     const navigate = useNavigate();
-    const { user, isAdmin, isSuperAdmin, activeBranchId, can } = useAuth();
+    const { user, isAdmin, isSuperAdmin, activeBranch, activeBranchId, setActiveBranch, can } = useAuth();
     const { canCreate } = usePermission('csm_tickets');
-    // Branch the new ticket is raised under ('all' = All Branches). Options and whether
-    // "All Branches" is offered come from the server's branch-access rules.
-    const [ticketBranchOptions, setTicketBranchOptions] = useState({ branches: [], allowAllBranches: false });
+    // Branch the new ticket is raised under: the one selected in the header unless changed here.
+    // The options are the branches the user works in, from the server's branch-access rules.
+    const [ticketBranchOptions, setTicketBranchOptions] = useState({ branches: [] });
     const [ticketBranch, setTicketBranch] = useState('');
     useEffect(() => {
         csmService.getTicketBranchOptions()
             .then(res => setTicketBranchOptions({
                 branches: Array.isArray(res.data?.branches) ? res.data.branches : [],
-                allowAllBranches: Boolean(res.data?.allowAllBranches),
             }))
             .catch(err => console.error('Error loading ticket branches:', err));
     }, []);
@@ -111,11 +110,19 @@ const CSMTickets = () => {
     const [filterPriority, setFilterPriority] = useState('');
     const [filterInvoiceType, setFilterInvoiceType] = useState('');
     const [filterCustomer, setFilterCustomer] = useState('');
-    // A dashboard card opens the register on the branches it counted: ?branchId=, or ?myBranches=true
-    const [filterBranch, setFilterBranch] = useState(searchParams.get('branchId') || '');
+    // A Customer Service Analytics card opens the register on the tickets it counted: its branches and MGR 1.
+    const branchView = searchParams.get('branchView') || '';
+    const viewMgr1 = searchParams.get('mgr1') || '';
+    const viewMgr1Name = searchParams.get('mgr1Name') || '';
+    const viewParams = { ...(branchView ? { branchView } : {}), ...(viewMgr1 ? { mgr1: viewMgr1 } : {}) };
+    const inOtherBranchView = Boolean(branchView) && branchView !== String(activeBranchId);
+    const clearView = () => setSearchParams((previous) => {
+        const next = new URLSearchParams(previous);
+        ['branchView', 'mgr1', 'mgr1Name'].forEach((key) => next.delete(key));
+        return next;
+    });
     const [isFilterCollapsed, setIsFilterCollapsed] = useState(false);
     const [ticketCustomers, setTicketCustomers] = useState([]);
-    const [branches, setBranches] = useState([]);
 
     // Masters lists for creation
     const [customers, setCustomers] = useState([]);
@@ -490,6 +497,7 @@ const CSMTickets = () => {
         setLoading(true);
         try {
             const queryParams = {
+                ...viewParams,
                 page,
                 limit: 10,
                 search,
@@ -499,11 +507,6 @@ const CSMTickets = () => {
             };
             if (filterCustomer) {
                 queryParams.customerId = filterCustomer;
-            }
-            if (filterBranch) {
-                queryParams.branchId = filterBranch;
-            } else if (searchParams.get('myBranches') === 'true') {
-                queryParams.myBranches = 'true';
             }
             if (searchParams.get('unassigned') === 'true') {
                 queryParams.unassigned = 'true';
@@ -589,7 +592,7 @@ const CSMTickets = () => {
 
     const fetchTicketCustomers = async () => {
         try {
-            const res = await csmService.getTicketCustomers();
+            const res = await csmService.getTicketCustomers(branchView ? { branchView } : {});
             setTicketCustomers(res.data || []);
         } catch (error) {
             console.error('Failed to load ticket customers:', error);
@@ -598,7 +601,7 @@ const CSMTickets = () => {
 
     const loadCreationData = async () => {
         try {
-            const [custRes, priRes, catRes, typRes, prodRes, srcRes, desRes, assetRes, branchRes, probRes] = await Promise.allSettled([
+            const [custRes, priRes, catRes, typRes, prodRes, srcRes, desRes, assetRes, probRes] = await Promise.allSettled([
                 csmService.getTicketCustomerOptions(),
                 csmService.getPriorities(),
                 csmService.getCategories(),
@@ -607,7 +610,6 @@ const CSMTickets = () => {
                 csmService.getSources(),
                 csmService.getDesignations(),
                 csmService.getAssets(),
-                branchService.getAll(),
                 csmService.getProblems({ mgr4Category: formData.mgr4Category || '' })
             ]);
 
@@ -618,7 +620,6 @@ const CSMTickets = () => {
             const typesRes = valueOf(typRes);
             const productsRes = valueOf(prodRes);
             const sourcesRes = valueOf(srcRes);
-            const branchesRes = valueOf(branchRes);
             const designationsRes = valueOf(desRes);
             const assetsRes = valueOf(assetRes);
             const problemsRes = valueOf(probRes);
@@ -640,7 +641,6 @@ const CSMTickets = () => {
             setDesignations(extractArray(designationsRes));
             setAssets(extractArray(assetsRes));
             setProblems(extractArray(problemsRes));
-            if (branchesRes) setBranches(extractArray(branchesRes));
 
             const failed = [custRes, priRes, catRes, typRes, prodRes, srcRes, desRes, assetRes].some(result => result.status === 'rejected');
             if (failed) {
@@ -669,7 +669,7 @@ const CSMTickets = () => {
 
     useEffect(() => {
         fetchTickets();
-    }, [page, filterStatus, filterPriority, filterInvoiceType, filterCustomer, filterBranch, activeTab]);
+    }, [page, filterStatus, filterPriority, filterInvoiceType, filterCustomer, activeTab, branchView, viewMgr1]);
 
     useEffect(() => {
         const handleRealtimeUpdate = (e) => {
@@ -680,18 +680,26 @@ const CSMTickets = () => {
         };
         window.addEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
         return () => window.removeEventListener('onCrmSocketUpdate', handleRealtimeUpdate);
-    }, [page, filterStatus, filterPriority, filterInvoiceType, filterCustomer, filterBranch, activeTab]);
+    }, [page, filterStatus, filterPriority, filterInvoiceType, filterCustomer, activeTab, branchView, viewMgr1]);
 
     useEffect(() => {
         fetchTicketCustomers();
-        // Options of the register's Branch filter
-        branchService.getAll()
-            .then((res) => {
-                const list = res.data?.data || res.data || [];
-                setBranches(Array.isArray(list) ? list : []);
-            })
-            .catch((error) => console.error('Failed to load branches:', error));
-    }, []);
+    }, [branchView]);
+
+    // A ticket opens only in its own branch: from the Analytics view of other branches, switch to it first.
+    const openTicket = async (ticket) => {
+        const branch = ticket?.branchId;
+        if (branch?._id && String(branch._id) !== String(activeBranchId)) {
+            try {
+                await setActiveBranch(branch);
+                toast.info(`Switched active branch to ${branch.name}`);
+            } catch (error) {
+                toast.error(error.response?.data?.message || `Could not switch to ${branch.name}`);
+                return;
+            }
+        }
+        navigate(`/csm/tickets/${ticket._id}`);
+    };
 
     useEffect(() => {
         if (showModal || showManualModal || pageView === 'standard' || pageView === 'manual') {
@@ -1180,6 +1188,11 @@ const CSMTickets = () => {
             }
 
             toast.success('Support ticket generated successfully!');
+            // A ticket raised for another branch is shown only in that branch.
+            if (ticketBranch && String(ticketBranch) !== String(activeBranchId)) {
+                const raisedIn = ticketBranchOptions.branches.find(b => String(b._id) === String(ticketBranch));
+                toast.info(`It was raised under ${raisedIn?.name || 'another branch'}. Switch to that branch at the top of the screen to see it.`);
+            }
             setManualImages({ front: null, back: null, left: null, right: null, invoice: null });
             setShowModal(false);
             setPageView('list');
@@ -1660,6 +1673,7 @@ const CSMTickets = () => {
         setLoading(true);
         try {
             const res = await csmService.getTickets({
+                ...viewParams,
                 limit: 10000,
                 search,
                 status: filterStatus,
@@ -2313,6 +2327,25 @@ const CSMTickets = () => {
                 </div>
             </div>
 
+            {(inOtherBranchView || viewMgr1) && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary-200 bg-primary-50 px-4 py-3">
+                    <p className="min-w-0 text-xs font-bold text-primary-800">
+                        From Customer Service Analytics: showing {branchView === 'all'
+                            ? 'all your branches'
+                            : (inOtherBranchView ? ticketBranchOptions.branches.find((branch) => String(branch._id) === branchView)?.name || 'the selected branch' : activeBranch?.name || 'this branch')}
+                        {viewMgr1 ? `, MGR 1: ${viewMgr1Name || 'selected'}` : ''}.
+                        {inOtherBranchView ? ' Opening a ticket of another branch switches to that branch.' : ''}
+                    </p>
+                    <button
+                        type="button"
+                        onClick={clearView}
+                        className="shrink-0 rounded-xl border border-primary-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-primary-700 hover:bg-primary-100 transition-all"
+                    >
+                        Show {activeBranch?.name || 'current branch'} only
+                    </button>
+                </div>
+            )}
+
             {/* Ticket Register Hierarchy Tabs */}
             <div className="flex items-center gap-3 border-b border-slate-200/80 pb-3 relative z-20">
                 <button
@@ -2395,24 +2428,6 @@ const CSMTickets = () => {
                                 menuClass="w-64"
                             />
                         </div>
-
-                        {/* Branch Filter */}
-                        {branches.length > 0 && (
-                            <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-1.5">
-                                <MdFilterList className="text-slate-400" />
-                                <span className="text-xs font-black uppercase tracking-wider text-slate-400">Branch</span>
-                                <select
-                                    value={filterBranch}
-                                    onChange={(e) => { setFilterBranch(e.target.value); setPage(1); }}
-                                    className="bg-transparent border-none focus:outline-none text-xs font-bold text-slate-700 cursor-pointer"
-                                >
-                                    <option value="">{searchParams.get('myBranches') === 'true' ? 'All My Branches' : 'All Branches'}</option>
-                                    {branches.map(b => (
-                                        <option key={b._id} value={b._id}>{b.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
 
                         {/* Invoice Type Filter */}
                         <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-1.5">
@@ -2510,7 +2525,7 @@ const CSMTickets = () => {
                                                             {isManual ? 'Manual' : 'System'}
                                                         </span>
                                                         <span className="inline-block whitespace-nowrap text-[9px] px-1.5 py-0.5 rounded-full font-black tracking-wide bg-purple-50 text-purple-700 border border-purple-200">
-                                                            📍 {t.branchId?.name || 'All Branches'}
+                                                            📍 {t.branchId?.name || 'No Branch'}
                                                         </span>
                                                     </div>
                                                 </td>
@@ -2566,7 +2581,7 @@ const CSMTickets = () => {
                                                 <td className="w-[6.25rem] min-w-[6.25rem] px-2 py-3 text-center whitespace-nowrap sticky right-0 bg-white">
                                                     <div className="flex justify-center items-center gap-2">
                                                         <button
-                                                            onClick={() => navigate(`/csm/tickets/${t._id}`)}
+                                                            onClick={() => openTicket(t)}
                                                             className="flex items-center gap-1 px-2 py-1.5 hover:bg-primary-50 text-primary-600 rounded-xl transition-all hover:scale-105 active:scale-95"
                                                         >
                                                             Details
@@ -2936,7 +2951,6 @@ const CSMTickets = () => {
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Branch *</label>
                             <SearchableSelect
                                 options={[
-                                    ...(ticketBranchOptions.allowAllBranches ? [{ value: 'all', label: 'All Branches' }] : []),
                                     ...ticketBranchOptions.branches.map(b => ({ value: String(b._id), label: b.code ? `${b.name} (${b.code})` : b.name })),
                                 ]}
                                 value={ticketBranch}
@@ -4267,7 +4281,7 @@ const CSMTickets = () => {
                             onClick={() => {
                                 setShowManualViewModal(false);
                                 if (selectedManualTicket) {
-                                    navigate(`/csm/tickets/${selectedManualTicket._id}`);
+                                    openTicket(selectedManualTicket);
                                 }
                             }}
                             className="px-6 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95"

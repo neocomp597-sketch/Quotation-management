@@ -24,11 +24,18 @@
  * Usage:
  *   node scripts/backfillBranchIds.js            # apply
  *   node scripts/backfillBranchIds.js --dry-run  # report only
+ *
+ * Add --customer-service to touch only Customer Service records: tickets, customer contacts,
+ * warranties, AMCs, service visits, RCA reports and field attendance. It also reports how many
+ * tickets are left without a branch (their customer has none): those stay visible from every
+ * branch until someone edits them and picks one.
  */
 require('dotenv').config();
 const mongoose = require('mongoose');
 
 const DRY_RUN = process.argv.includes('--dry-run');
+const CUSTOMER_SERVICE_ONLY = process.argv.includes('--customer-service');
+const CUSTOMER_SERVICE_MODELS = new Set(['Ticket', 'CustomerContact', 'Warranty', 'AMC']);
 const BATCH_SIZE = 500;
 
 const Customer = require('../models/Customer');
@@ -130,6 +137,7 @@ const backfillFromSources = async (model, field, sources, sourceKey = '_id') => 
         console.log(`\nCustomers with a branch: ${customers.length}`);
         let total = 0;
         for (const { model, field } of BY_CUSTOMER) {
+            if (CUSTOMER_SERVICE_ONLY && !CUSTOMER_SERVICE_MODELS.has(model.modelName)) continue;
             total += await backfillFromSources(model, field, customers);
         }
 
@@ -142,13 +150,15 @@ const backfillFromSources = async (model, field, sources, sourceKey = '_id') => 
             total += await backfillFromSources(model, field, tickets, sourceKey);
         }
 
-        const assets = await Asset.find({ branchId: { $ne: null } })
-            .select('_id branchId')
-            .setOptions({ bypassTenant: true })
-            .lean();
-        console.log(`\nAssets with a branch: ${assets.length}`);
-        for (const { model, field } of BY_ASSET) {
-            total += await backfillFromSources(model, field, assets);
+        if (!CUSTOMER_SERVICE_ONLY) {
+            const assets = await Asset.find({ branchId: { $ne: null } })
+                .select('_id branchId')
+                .setOptions({ bypassTenant: true })
+                .lean();
+            console.log(`\nAssets with a branch: ${assets.length}`);
+            for (const { model, field } of BY_ASSET) {
+                total += await backfillFromSources(model, field, assets);
+            }
         }
 
         const usersWithBranch = await User.find({ branchId: { $ne: null } })
@@ -159,16 +169,22 @@ const backfillFromSources = async (model, field, sources, sourceKey = '_id') => 
             total += await backfillFromSources(model, field, usersWithBranch);
         }
 
-        const warehouses = await Warehouse.find({ branchId: { $ne: null } })
-            .select('_id branchId')
-            .setOptions({ bypassTenant: true })
-            .lean();
-        console.log(`\nWarehouses with a branch: ${warehouses.length}`);
-        for (const { model, field } of BY_WAREHOUSE) {
-            total += await backfillFromSources(model, field, warehouses);
+        if (!CUSTOMER_SERVICE_ONLY) {
+            const warehouses = await Warehouse.find({ branchId: { $ne: null } })
+                .select('_id branchId')
+                .setOptions({ bypassTenant: true })
+                .lean();
+            console.log(`\nWarehouses with a branch: ${warehouses.length}`);
+            for (const { model, field } of BY_WAREHOUSE) {
+                total += await backfillFromSources(model, field, warehouses);
+            }
         }
 
         console.log(`\nDone. ${DRY_RUN ? 'Would update' : 'Updated'} ${total} record(s) in total.`);
+        if (CUSTOMER_SERVICE_ONLY) {
+            const left = await Ticket.countDocuments(NO_BRANCH).setOptions({ bypassTenant: true });
+            console.log(`Tickets with no branch ${DRY_RUN ? 'right now (before applying)' : 'left'}: ${left}`);
+        }
     } finally {
         await mongoose.disconnect();
     }

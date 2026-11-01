@@ -10,6 +10,8 @@ const {
     getAssignedBranchIds,
     getSelectableBranchIds,
     isBranchAdminRole,
+    requiresBranch,
+    NO_BRANCH_ASSIGNED,
 } = require('../utils/branchScope');
 
 const AUTH_USER_CACHE_TTL_SECONDS = Number(process.env.AUTH_USER_CACHE_TTL_SECONDS || 300);
@@ -146,6 +148,10 @@ exports.protect = async (req, res, next) => {
             // user is the fallback for clients that send no header (exports, API
             // tools), so both always describe the same context.
             const assignedBranchIds = getAssignedBranchIds(req.user);
+            // Also ends a session opened before this user's branches were removed.
+            if (requiresBranch(req.user) && assignedBranchIds.length === 0) {
+                return res.status(403).json(NO_BRANCH_ASSIGNED);
+            }
             const headerBranchId = normalizeBranchId(
                 req.headers['x-active-branch'] || req.headers['x-branch-id'] || req.query?.activeBranchId
             );
@@ -165,7 +171,7 @@ exports.protect = async (req, res, next) => {
             }
 
             req.user.activeBranchId = activeBranchId;
-            // null = every branch of the company (admins, and users without an assignment)
+            // null = every branch of the company (admins, and vendor logins without an assignment)
             req.user.allowedBranchIds = getSelectableBranchIds(req.user);
             req.activeBranchId = activeBranchId;
 

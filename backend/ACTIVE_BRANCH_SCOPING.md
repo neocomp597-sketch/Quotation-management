@@ -33,6 +33,10 @@ query to. This applies to every role, super admin included.
   `update`, `delete` **and `aggregate`** on models that carry `branchId` /
   `assignedBranches`. Controllers do not need to filter by branch themselves, and a
   caller cannot widen the scope by passing their own `branchId`.
+- Staff with **no branch assigned** cannot log in: login, session refresh and every API call
+  answer 403 `NO_BRANCH_ASSIGNED`, and the login page shows the message. Admins, super admins
+  and vendor logins are exempt. An admin assigns branches in Authorization > Team Users >
+  Individual Permissions > Branch Access, or in Employee Master (each updates the other).
 - Records with **no branch** stay visible from every branch: they are not owned by a
   branch. Use `scripts/backfillBranchIds.js` to give legacy records the branch of
   their customer / warehouse.
@@ -56,6 +60,19 @@ attendance check-ins, knowledge base articles and notifications take the active
 branch of the request that created them (notifications raised by background jobs
 carry no branch and reach the user in every branch). Product is a company-wide
 catalog and is not branch scoped.
+
+Customer Service is branch-wise: tickets, visits, RCA reports, warranties, AMCs, attendance and
+the CSM Detail Dashboard show only the branch selected in the header. The one exception is
+Customer Service Analytics: its Branch filter can show all of the user's branches or another of
+them, and the Tickets Register opened from its cards lists the same tickets
+(`middlewares/branchView.js`, `?branchView=all|<id>`, never beyond the user's branches). A ticket
+itself still opens only in its own branch, so the register switches branch to open one.
+Every new ticket gets one branch. Checks that must see the whole company pass `bypassBranch`:
+one active ticket per serial, ticket numbers on import, masters in use.
+The engineer list follows the branches of the engineer's employee record, because those are
+the only branches whose tickets they can see (Territory Master asks for all of them).
+Older tickets with no branch stay visible from every branch until they are given one, by
+editing the ticket or with `scripts/backfillBranchIds.js` (their customer's branch).
 
 ## Endpoints
 

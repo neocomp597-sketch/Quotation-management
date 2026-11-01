@@ -135,9 +135,8 @@ const applyDefaultBranch = (doc, schema) => {
 /**
  * Options:
  *   required     - companyId is mandatory (default true)
- *   branchScoped - false for company-wide registers (Support Tickets): the record still
- *                  carries the branch it was created in, but reads are never filtered by
- *                  the active branch, so a ticket raised in NASHIK is visible from USGOAN.
+ *   branchScoped - false for a company-wide register: the record still carries the branch it
+ *                  was created in, but reads are never filtered by the active branch.
  */
 module.exports = function tenantPlugin(schema, options = {}) {
     const required = options.required !== false;

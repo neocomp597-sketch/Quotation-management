@@ -6,12 +6,14 @@ import {
     MdShield, MdExpandMore, MdExpandLess, MdAdd, MdDelete, MdSave, MdEdit, MdClose,
     MdBusiness, MdStorefront, MdKey, MdCheckCircle, MdTune, MdVpnKey, MdSearch
 } from 'react-icons/md';
-import { authorizationService, userService, superAdminService, vendorService, mgrService } from '../services/api';
+import { authorizationService, userService, superAdminService, vendorService, mgrService, branchService } from '../services/api';
 import { ROLE_LABELS as BUILTIN_ROLE_LABELS, MENU_PERMISSION_GROUPS } from '../constants/menuPermissions';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
 import PermissionGroupMatrix from '../components/PermissionGroupMatrix';
 import UserMgrAccess from '../components/UserMgrAccess';
+import UserBranchAccess from '../components/UserBranchAccess';
+import { isBranchUnrestrictedRole, userBranchIds } from '../utils/userBranches';
 import { childKeysFor, mergeUserPermissions, samePermissions } from '../utils/permissions';
 
 const MODULE_KEYS = Array.from(new Set(MENU_PERMISSION_GROUPS.flatMap(childKeysFor)));
@@ -117,6 +119,18 @@ const Authorization = () => {
         }
     };
     const mgrById = useMemo(() => Object.fromEntries(mgrOptions.map((mgr) => [String(mgr._id), mgr])), [mgrOptions]);
+
+    // Branches offered in each user's Branch Access
+    const [branchOptions, setBranchOptions] = useState([]);
+    const fetchBranchOptions = async (companyId = selectedCompanyId) => {
+        try {
+            const res = await branchService.getAll(companyId ? { companyId } : {});
+            setBranchOptions(Array.isArray(res.data) ? res.data : res.data?.data || []);
+        } catch (err) {
+            console.warn('Error fetching branches:', err);
+            setBranchOptions([]);
+        }
+    };
     // "MGR 1: IND, IT · MGR 2: OTH" of a user's MGR access, for the badge in the user list.
     const mgrAccessSummary = (ids = []) => ['MGR1', 'MGR2', 'MGR3', 'MGR4', 'MGR5']
         .map((type) => {
@@ -171,7 +185,8 @@ const Authorization = () => {
                 fetchMatrix(selectedCompanyId), 
                 fetchUsers(selectedCompanyId),
                 fetchVendors(),
-                fetchMgrOptions(selectedCompanyId)
+                fetchMgrOptions(selectedCompanyId),
+                fetchBranchOptions(selectedCompanyId)
             ]);
             setLoading(false);
         })();
@@ -995,6 +1010,11 @@ const Authorization = () => {
                                                                         {mgrAccessText}
                                                                     </span>
                                                                 )}
+                                                                {!isBranchUnrestrictedRole(user.role) && userBranchIds(user).length === 0 && (
+                                                                    <span className="text-[10px] font-bold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 px-2 py-0.5 rounded-full" title="This user cannot log in until a branch is assigned. Open Individual Permissions to assign one.">
+                                                                        No branch · cannot log in
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                             <p className="text-xs text-slate-500 dark:text-slate-400">{user.email}</p>
                                                         </div>
@@ -1099,6 +1119,16 @@ const Authorization = () => {
                                                             <div className="flex items-center gap-2 text-xs font-semibold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2">
                                                                 <MdLock size={16} /> You cannot change your own permissions. Another administrator can change them for you.
                                                             </div>
+                                                        )}
+
+                                                        {!isBranchUnrestrictedRole(user.role) && (
+                                                            <UserBranchAccess
+                                                                user={user}
+                                                                options={branchOptions}
+                                                                params={companyParams()}
+                                                                disabled={isUpdating}
+                                                                onSaved={(saved) => setUsers((prev) => prev.map((u) => (u._id === user._id ? { ...u, branchId: saved.branchId, assignedBranches: saved.assignedBranches } : u)))}
+                                                            />
                                                         )}
 
                                                         {/* Permission Groups Accordion for this Individual User */}

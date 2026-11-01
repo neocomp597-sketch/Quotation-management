@@ -64,7 +64,7 @@ const parseDescriptionAndImages = (rawDesc = '') => {
 const TicketDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { can } = useAuth();
+    const { can, activeBranchId } = useAuth();
     const { canModify } = usePermission('csm_tickets');
     const [loading, setLoading] = useState(true);
     const [ticket, setTicket] = useState(null);
@@ -110,7 +110,7 @@ const TicketDetail = () => {
     const [showEditModal, setShowEditModal] = useState(false);
     const [editForm, setEditForm] = useState({ issueTitle: '', description: '', contactId: '', pincode: '', branchId: '' });
     const [editContacts, setEditContacts] = useState([]);
-    const [editBranchOptions, setEditBranchOptions] = useState({ branches: [], allowAllBranches: false });
+    const [editBranchOptions, setEditBranchOptions] = useState({ branches: [] });
     const [savingEdit, setSavingEdit] = useState(false);
     const [reassignEngineer, setReassignEngineer] = useState('');
     const [reassignReason, setReassignReason] = useState('Leave');
@@ -320,7 +320,7 @@ const TicketDetail = () => {
             description: ticket.description || '',
             contactId: ticket.contactId?._id || ticket.contactId || '',
             pincode: ticket.pincode || '',
-            branchId: ticket.branchId?._id || (ticket.branchId ? String(ticket.branchId) : 'all'),
+            branchId: ticket.branchId?._id || (ticket.branchId ? String(ticket.branchId) : ''),
         });
         setShowEditModal(true);
         try {
@@ -334,7 +334,6 @@ const TicketDetail = () => {
             if (branchRes.data) {
                 setEditBranchOptions({
                     branches: Array.isArray(branchRes.data.branches) ? branchRes.data.branches : [],
-                    allowAllBranches: Boolean(branchRes.data.allowAllBranches),
                 });
             }
         } catch (error) {
@@ -370,6 +369,13 @@ const TicketDetail = () => {
             await csmService.updateTicket(id, payload);
             toast.success('Ticket updated successfully!');
             setShowEditModal(false);
+            // A ticket moved to another branch is no longer shown in this one.
+            if (payload.branchId && String(payload.branchId) !== String(activeBranchId)) {
+                const movedTo = editBranchOptions.branches.find(b => String(b._id) === String(payload.branchId));
+                toast.info(`The ticket is now in ${movedTo?.name || 'another branch'}. Switch to that branch at the top of the screen to see it.`);
+                navigate('/csm/tickets');
+                return;
+            }
             fetchTicketDetails();
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to update ticket');
@@ -656,7 +662,7 @@ const TicketDetail = () => {
             const active = allVisits.find(v => ['Scheduled', 'In Transit', 'Started'].includes(v.status));
             setActiveVisit(active || null);
         } catch (error) {
-            toast.error('Failed to load ticket details');
+            toast.error(error.response?.data?.message || 'Failed to load ticket details');
             navigate('/csm/tickets');
         } finally {
             setLoading(false);
@@ -865,7 +871,7 @@ const TicketDetail = () => {
                             <div className="grid grid-cols-2 gap-2 pt-2">
                                 <div>
                                     <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Branch</span>
-                                    <span className="truncate block">{ticket.branchId?.name || 'All Branches'}</span>
+                                    <span className="truncate block">{ticket.branchId?.name || 'No Branch'}</span>
                                 </div>
                                 <div>
                                     <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Raised By</span>
@@ -1915,7 +1921,6 @@ const TicketDetail = () => {
                         {ticket.permissions?.canChangeBranch ? (
                             <SearchableSelect
                                 options={[
-                                    ...(editBranchOptions.allowAllBranches ? [{ value: 'all', label: 'All Branches' }] : []),
                                     ...editBranchOptions.branches.map(b => ({ value: String(b._id), label: b.code ? `${b.name} (${b.code})` : b.name })),
                                     // Keep the current branch selectable/visible even if it is outside the list.
                                     ...(ticket.branchId?._id && !editBranchOptions.branches.some(b => String(b._id) === String(ticket.branchId._id))
@@ -1931,7 +1936,7 @@ const TicketDetail = () => {
                                 <input
                                     type="text"
                                     disabled
-                                    value={ticket.branchId?.name || 'All Branches'}
+                                    value={ticket.branchId?.name || 'No Branch'}
                                     className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-bold bg-slate-100 text-slate-600"
                                 />
                                 <p className="text-[10px] font-bold text-amber-600 mt-1">You do not have permission to change this ticket's branch.</p>

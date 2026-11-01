@@ -109,6 +109,23 @@ const clearStoredActiveBranch = () => {
   }
 };
 
+// Why the session ended, shown on the login page it lands on.
+const LOGIN_NOTICE_KEY = "arcrm:loginNotice";
+export const readLoginNotice = () => {
+  try {
+    return sessionStorage.getItem(LOGIN_NOTICE_KEY) || "";
+  } catch {
+    return "";
+  }
+};
+export const clearLoginNotice = () => {
+  try {
+    sessionStorage.removeItem(LOGIN_NOTICE_KEY);
+  } catch {
+    // Ignore storage failures.
+  }
+};
+
 export const refreshAccessToken = async () => {
   if (!refreshPromise) {
     refreshPromise = api
@@ -144,6 +161,26 @@ api.interceptors.response.use(
     const isExpiredAuthError =
       error.response?.status === 401 &&
       /token expired|jwt expired|token failed|token invalid|no token|refresh token missing|refresh token invalid/i.test(message);
+
+    if (
+      error.response?.status === 403 &&
+      error.response?.data?.code === "NO_BRANCH_ASSIGNED"
+    ) {
+      // Staff cannot work without a branch. The login page shows this itself when it is
+      // the one asking; a session already open ends there with the same message.
+      setAccessToken(null);
+      localStorage.removeItem("user");
+      clearStoredActiveBranch();
+      if (window.location.pathname !== "/login") {
+        try {
+          sessionStorage.setItem(LOGIN_NOTICE_KEY, message);
+        } catch {
+          // Ignore storage failures: the login page still opens, only without the reason.
+        }
+        window.location.assign("/login");
+      }
+      return Promise.reject(error);
+    }
 
     if (
       error.response?.status === 403 &&
@@ -360,6 +397,7 @@ export const userService = {
   // payload: { permissions } (the full set the user should have) or { customPermissions: {} } (back to role defaults)
   updatePermissions: (id, payload, params) => api.put(`/users/${id}/permissions`, payload, { params }),
   updateMgrAccess: (id, mgrAccess, params) => api.put(`/users/${id}/mgr-access`, { mgrAccess }, { params }),
+  updateBranches: (id, assignedBranches, params) => api.put(`/users/${id}/branches`, { assignedBranches }, { params }),
 };
 
 export const branchService = {
@@ -473,6 +511,7 @@ export const bomService = {
 export const serialTransferService = {
   listSerials: (params = {}) => api.get("/serial-transfers/serials", { params }),
   getSerial: (assetId) => api.get(`/serial-transfers/serials/${assetId}`),
+  updateAssetNo: (assetId, assetNo) => api.put(`/serial-transfers/serials/${assetId}/asset-no`, { assetNo }),
   transfer: (assetId, data) => api.post(`/serial-transfers/serials/${assetId}/transfer`, data),
   // An earlier customer recorded afterwards; stays inactive.
   addPastEntry: (assetId, data) => api.post(`/serial-transfers/serials/${assetId}/past-entry`, data),
@@ -953,7 +992,9 @@ export const salesService = {
 
 export const csmService = {
   getStats: (params = {}) => api.get("/csm/dashboard", { params }),
-  getTicketCustomers: () => api.get("/csm/tickets/customers"),
+  getDashboardFilters: () => api.get("/csm/dashboard/filters"),
+  getDashboardBranchSummary: (params = {}) => api.get("/csm/dashboard/branch-summary", { params }),
+  getTicketCustomers: (params = {}) => api.get("/csm/tickets/customers", { params }),
   // Customers of the active branch for the Raise Ticket form: { search, limit } (at most 50 a call).
   getTicketCustomerOptions: (params = {}) => api.get("/csm/tickets/customer-options", { params, cache: false }),
   getTickets: (params = {}) => api.get("/csm/tickets", { params }),
@@ -1064,7 +1105,8 @@ export const csmService = {
   updateTeam: (id, data) => api.put(`/csm/masters/teams/${id}`, data),
   deleteTeam: (id) => api.delete(`/csm/masters/teams/${id}`),
 
-  getEngineers: () => api.get("/csm/masters/engineers"),
+  // The engineers of the branch selected in the header; { allBranches: 'true' } lists everyone.
+  getEngineers: (params) => api.get("/csm/masters/engineers", { params }),
   createEngineer: (data) => api.post("/csm/masters/engineers", data),
   updateEngineer: (id, data) => api.put(`/csm/masters/engineers/${id}`, data),
   deleteEngineer: (id) => api.delete(`/csm/masters/engineers/${id}`),

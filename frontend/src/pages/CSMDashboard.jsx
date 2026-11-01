@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { csmService } from '../services/api';
 import { MdFlashOn, MdFormatListBulleted, MdGridView, MdChevronRight } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import CSMDashboardFilter, { CSMDashboardHeader } from '../components/csm/CSMDashboardFilter';
+import * as XLSX from 'xlsx';
+import CSMDashboardFilter, { CSMDashboardHeader, describeDateFilter } from '../components/csm/CSMDashboardFilter';
 import MgrAccessNotice from '../components/MgrAccessNotice';
 import { useCSMDashboardFilters } from '../hooks/useCSMDashboardFilters';
+import { formatDateTime } from '../utils/helpers';
 
 // Charts, SLA compliance, field service log and engineer performance live on the
 // CSM Detail Dashboard (/csm/detail-dashboard); this page only shows the ticket counts.
@@ -18,8 +20,9 @@ const VIEW_OPTIONS = [
 
 const CSMDashboard = () => {
     const navigate = useNavigate();
-    const filters = useCSMDashboardFilters();
+    const filters = useCSMDashboardFilters({ branchAndMgr: true });
     const [loading, setLoading] = useState(true);
+    const [exporting, setExporting] = useState(false);
     const [metrics, setMetrics] = useState(null);
     const [mgrAccess, setMgrAccess] = useState(null);
     const latestRequest = useRef(0);
@@ -67,21 +70,57 @@ const CSMDashboard = () => {
         };
     }, [loadStats]);
 
+    // One row per branch, adding up to the numbers on the screen, with the filters they were taken under.
+    const exportToExcel = async () => {
+        setExporting(true);
+        try {
+            const res = await csmService.getDashboardBranchSummary(filters.params);
+            const { rows = [], total = {} } = res.data || {};
+            const toRow = (branch, counts) => [
+                branch, counts.open, counts.unassigned, counts.pending,
+                counts.createdYesterday, counts.resolvedYesterday, counts.createdToday, counts.resolvedToday
+            ];
+            const sheet = XLSX.utils.aoa_to_sheet([
+                ['Customer Service Analytics'],
+                ['Branch', filters.branchName],
+                ['MGR 1', filters.mgr1Name || 'All MGR 1'],
+                ['Period', describeDateFilter(filters)],
+                ['Exported On', formatDateTime(new Date())],
+                [],
+                ['Branch', 'Open', 'Unassigned', 'Pending', 'Created Yesterday', 'Resolved Yesterday', 'Created Today', 'Resolved Today'],
+                ...rows.map((row) => toRow(row.branch, row)),
+                ...(rows.length > 1 ? [toRow('Total', total)] : [])
+            ]);
+            sheet['!cols'] = [{ wch: 24 }, ...Array(7).fill({ wch: 18 })];
+            const book = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(book, sheet, 'Analytics');
+            XLSX.writeFile(book, `Customer_Service_Analytics_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        } catch (error) {
+            console.error('Export dashboard error:', error);
+            toast.error(error.response?.data?.message || 'Failed to export');
+        } finally {
+            setExporting(false);
+        }
+    };
+
     const m = metrics || {};
 
-    // Each card opens the Tickets Register filtered to the tickets it counts, in the same branches
-    const branchQuery = filters.selectedBranch ? `branchId=${filters.selectedBranch}` : 'myBranches=true';
+    // Each card opens the Tickets Register on the tickets it counts: same branches, same MGR 1
+    const view = [
+        filters.branchOptions.length === 1 ? '' : `branchView=${filters.params.branchView}`,
+        filters.selectedMgr1 ? `mgr1=${filters.selectedMgr1}&mgr1Name=${encodeURIComponent(filters.mgr1Name)}` : ''
+    ].filter(Boolean).map((part) => `&${part}`).join('');
     const cardRows = [
         [
-            { label: 'Open', value: m.open, color: 'from-teal-500 to-emerald-600', link: `/csm/tickets?status=open_tickets&tab=all&${branchQuery}` },
-            { label: 'Unassigned', value: m.unassigned, color: 'from-purple-500 to-primary-600', link: `/csm/tickets?unassigned=true&tab=all&${branchQuery}` },
-            { label: 'Pending', value: m.pending, color: 'from-amber-400 to-orange-500', link: `/csm/tickets?status=Pending Customer&tab=all&${branchQuery}` }
+            { label: 'Open', value: m.open, color: 'from-teal-500 to-emerald-600', link: `/csm/tickets?status=open_tickets&tab=all${view}` },
+            { label: 'Unassigned', value: m.unassigned, color: 'from-purple-500 to-primary-600', link: `/csm/tickets?unassigned=true&tab=all${view}` },
+            { label: 'Pending', value: m.pending, color: 'from-amber-400 to-orange-500', link: `/csm/tickets?status=Pending Customer&tab=all${view}` }
         ],
         [
-            { label: 'Created Yesterday', value: m.createdYesterday, color: 'from-primary-400 to-primary-600', link: `/csm/tickets?createdOn=yesterday&tab=all&${branchQuery}` },
-            { label: 'Resolved Yesterday', value: m.resolvedYesterday, color: 'from-emerald-500 to-green-600', link: `/csm/tickets?resolvedOn=yesterday&tab=all&${branchQuery}` },
-            { label: 'Created Today', value: m.createdToday, color: 'from-primary-500 to-primary-700', link: `/csm/tickets?createdOn=today&tab=all&${branchQuery}` },
-            { label: 'Resolved Today', value: m.resolvedToday, color: 'from-primary-500 to-primary-600', link: `/csm/tickets?resolvedOn=today&tab=all&${branchQuery}` }
+            { label: 'Created Yesterday', value: m.createdYesterday, color: 'from-primary-400 to-primary-600', link: `/csm/tickets?createdOn=yesterday&tab=all${view}` },
+            { label: 'Resolved Yesterday', value: m.resolvedYesterday, color: 'from-emerald-500 to-green-600', link: `/csm/tickets?resolvedOn=yesterday&tab=all${view}` },
+            { label: 'Created Today', value: m.createdToday, color: 'from-primary-500 to-primary-700', link: `/csm/tickets?createdOn=today&tab=all${view}` },
+            { label: 'Resolved Today', value: m.resolvedToday, color: 'from-primary-500 to-primary-600', link: `/csm/tickets?resolvedOn=today&tab=all${view}` }
         ]
     ];
 
@@ -135,6 +174,8 @@ const CSMDashboard = () => {
                 icon={<MdFlashOn className="text-teal-600 animate-pulse" />}
                 onRefresh={loadStats}
                 refreshing={loading}
+                onExport={exportToExcel}
+                exporting={exporting}
             />
 
             <CSMDashboardFilter filters={filters} />

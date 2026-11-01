@@ -4,10 +4,10 @@
  *
  * Vocabulary:
  *  - assigned branches: Branch ids on the user (assignedBranches, else branchId)
- *  - selectable branches: what the user may pick as active branch. Non-admin users
- *    with an assignment pick from it; admins / super admins (whatever branch their
- *    own record carries) and users without any assignment pick from every branch
- *    of the company.
+ *  - selectable branches: what the user may pick as active branch. Staff pick from
+ *    their assignment and cannot use the system without one. Admins / super admins
+ *    (whatever branch their own record carries) and vendor logins without an
+ *    assignment pick from every branch of the company.
  *  - active branch: the single branch the user is working in right now. It is sent
  *    by the UI on every request (x-active-branch) and persisted on the user so API
  *    clients without the header, exports and background work share the context.
@@ -21,6 +21,17 @@ const BRANCH_ADMIN_ROLES = ['admin', 'company_admin', 'super_admin', 'superadmin
 const BRANCH_SUMMARY_FIELDS = '_id name code branchPrefix address city state status';
 
 const isBranchAdminRole = (role) => BRANCH_ADMIN_ROLES.includes(String(role || '').toLowerCase());
+
+/** Admins and vendor logins (who belong to a vendor, not a branch) work without one; staff cannot. */
+const requiresBranch = (user) => !isBranchAdminRole(user?.role)
+    && String(user?.role || '').toLowerCase() !== 'vendor'
+    && !user?.vendorId;
+
+/** The answer to staff without a branch: at login, on session refresh and on every API call. */
+const NO_BRANCH_ASSIGNED = {
+    code: 'NO_BRANCH_ASSIGNED',
+    message: 'No branch is assigned to your account. Please contact your administrator.',
+};
 
 const idOf = (value) => {
     if (value === undefined || value === null) return null;
@@ -55,14 +66,16 @@ const getAssignedBranchIds = (user) => {
 };
 
 /**
- * Branch ids the user may select; null means every branch of the company.
+ * Branch ids the user may select; null means every branch of the company, an empty
+ * list means none (staff without an assignment).
  * Admins and super admins always get every branch: the branch on their own record
  * is only their home branch (attendance, HR), never a limit on what they may see.
  */
 const getSelectableBranchIds = (user) => {
     if (isBranchAdminRole(user?.role)) return null;
     const assigned = getAssignedBranchIds(user);
-    return assigned.length > 0 ? assigned : null;
+    if (assigned.length > 0) return assigned;
+    return requiresBranch(user) ? [] : null;
 };
 
 // Existence checks run on every request for admins without an assignment, so
@@ -89,8 +102,8 @@ const forgetBranchLookups = () => branchLookupCache.clear();
 
 /**
  * Whether `branchId` may be the active branch of `user`.
- * Non-admin users with assigned branches must stay inside them; admins and users
- * without an assignment may use any branch of the company they are working in.
+ * Users with assigned branches must stay inside them; admins, and vendor logins
+ * without an assignment, may use any branch of the company they are working in.
  */
 const canUseBranch = async (user, branchId, companyId) => {
     const normalized = normalizeBranchId(branchId);
@@ -139,6 +152,8 @@ module.exports = {
     BRANCH_SUMMARY_FIELDS,
     scopedBranchCondition,
     isBranchAdminRole,
+    requiresBranch,
+    NO_BRANCH_ASSIGNED,
     idOf,
     isObjectIdString,
     normalizeBranchId,

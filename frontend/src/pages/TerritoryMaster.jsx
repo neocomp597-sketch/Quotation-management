@@ -60,7 +60,7 @@ const TerritoryMaster = ({ isCreatePage, isEditPage }) => {
                 mgrService.getAll('MGR3'),
                 mgrService.getAll('MGR4'),
                 mgrService.getAll('MGR5'),
-                csmService.getEngineers()
+                csmService.getEngineers({ allBranches: 'true' })
             ]);
 
             if (terrResult.status === 'fulfilled') {

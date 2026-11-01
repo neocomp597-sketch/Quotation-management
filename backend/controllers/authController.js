@@ -12,6 +12,8 @@ const {
     normalizeBranchId,
     canUseBranch,
     listSelectableBranches,
+    requiresBranch,
+    NO_BRANCH_ASSIGNED,
 } = require('../utils/branchScope');
 
 const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || '20m';
@@ -89,16 +91,23 @@ const BRANCH_POPULATE = [
     { path: 'activeBranchId', select: BRANCH_SUMMARY_FIELDS, options: { bypassTenant: true } },
 ];
 
+/** Why this user may not have a session (the body of the 403), or null when they may. */
 const ensureLoginAllowed = async (user) => {
     if (user.status === false || user.isActive === false) {
-        return 'Account deactivated';
+        return { message: 'Account deactivated' };
     }
 
     if (!isSuperAdminRole(user.role) && user.companyId) {
         const company = await Company.findById(user.companyId).select('isActive status').lean();
         if (!company || company.isActive === false || ['SUSPENDED', 'DISABLED'].includes(company.status)) {
-            return 'Company account is suspended';
+            return { message: 'Company account is suspended' };
         }
+    }
+
+    // Counts the branches that still exist, so an assignment to deleted ones is no assignment.
+    if (requiresBranch(user)) {
+        const branches = await listSelectableBranches(user, await resolveSessionCompanyId(user));
+        if (branches.length === 0) return NO_BRANCH_ASSIGNED;
     }
 
     return null;
@@ -362,7 +371,7 @@ exports.login = async (req, res) => {
 
         const blockedReason = await ensureLoginAllowed(user);
         if (blockedReason) {
-            return res.status(403).json({ message: blockedReason });
+            return res.status(403).json(blockedReason);
         }
 
         const session = await issueSession(user, res, req);
@@ -412,7 +421,7 @@ exports.refresh = async (req, res) => {
         const blockedReason = await ensureLoginAllowed(user);
         if (blockedReason) {
             clearRefreshCookie(res, req);
-            return res.status(403).json({ message: blockedReason });
+            return res.status(403).json(blockedReason);
         }
 
         // Keep refresh idempotent. A page reload can trigger overlapping refresh

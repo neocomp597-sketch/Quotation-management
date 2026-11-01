@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect, admin } = require('../middlewares/authMiddleware');
+const { withBranchView } = require('../middlewares/branchView');
 
 const csmDashboardController = require('../controllers/csmDashboardController');
 const ticketController = require('../controllers/ticketController');
@@ -13,15 +14,17 @@ const customerContactController = require('../controllers/customerContactControl
 const rcaReportController = require('../controllers/rcaReportController');
 
 // ─── CSM DASHBOARD ──────────────────────────────────────────────────────────
-router.get('/dashboard', protect, csmDashboardController.getStats);
+router.get('/dashboard/filters', protect, csmDashboardController.getFilterOptions);
+router.get('/dashboard/branch-summary', protect, withBranchView, csmDashboardController.getBranchSummary);
+router.get('/dashboard', protect, withBranchView, csmDashboardController.getStats);
 router.get('/reports', protect, csmDashboardController.getReportData);
 
 // ─── TICKET MANAGEMENT ──────────────────────────────────────────────────────
 router.post('/tickets', protect, ticketController.createTicket);
-router.get('/tickets/customers', protect, ticketController.getTicketCustomers);
+router.get('/tickets/customers', protect, withBranchView, ticketController.getTicketCustomers);
 router.get('/tickets/customer-options', protect, ticketController.getTicketCustomerOptions);
 router.get('/tickets/branch-options', protect, ticketController.getTicketBranchOptions);
-router.get('/tickets', protect, ticketController.getTickets);
+router.get('/tickets', protect, withBranchView, ticketController.getTickets);
 router.get('/tickets/:id', protect, ticketController.getTicketById);
 router.put('/tickets/:id', protect, ticketController.updateTicket);
 router.patch('/tickets/:id/assign', protect, ticketController.assignTicket);

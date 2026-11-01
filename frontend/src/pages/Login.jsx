@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
-import { authService } from "../services/api";
+import { authService, readLoginNotice, clearLoginNotice } from "../services/api";
 import { Eye, EyeOff, CheckCircle } from "lucide-react";
 import { getFallbackRoute } from "../constants/menuPermissions";
 import SiteLogo from "../components/SiteLogo";
@@ -13,9 +13,11 @@ const Login = () => {
     email: "",
     password: "",
   });
-  const [error, setError] = useState("");
+  const [error, setError] = useState(readLoginNotice);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => clearLoginNotice(), []);
 
   const navigate = useNavigate();
   const location = useLocation();

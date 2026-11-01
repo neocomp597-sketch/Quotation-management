@@ -13,6 +13,8 @@ const AssetSchema = new mongoose.Schema({
     serialNumber: { type: String, required: true },
     // Trimmed, case-insensitive key used to enforce one current record per serial/company.
     serialNumberKey: { type: String, default: '' },
+    // The client's own asset number, typed on Serial No Transfer: free text, nothing checks it.
+    assetNo: { type: String, default: '' },
     status: {
         type: String,
         enum: ['IN_STOCK', 'ALLOCATED', 'SOLD', 'RETURNED', 'RETURN', 'SCRAPPED'],

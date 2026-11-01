@@ -1,19 +1,114 @@
+const Branch = require('../models/Branch');
+const MGR = require('../models/MGR');
 const Ticket = require('../models/Ticket');
 const User = require('../models/User');
 const { buildAccessScopeQuery } = require('../utils/accessControl');
-const { getMgrAccess, describeMgrAccess } = require('../utils/mgrAccess');
+const { listSelectableBranches } = require('../utils/branchScope');
+const { getScopedBranches } = require('../middlewares/tenantContext');
+const { getMgrAccess, describeMgrAccess, mgr1FilterCondition, allowedMgr1Ids } = require('../utils/mgrAccess');
 const { getVisibleTicketsFilter, getTicketMgrCondition } = require('./ticketController');
 
 /**
- * The tickets the dashboards count, the same ones their cards open in the register: the chosen
- * branch (?branchId, which the screen defaults to the branch selected in the header), else every
- * branch the user is authorized for; the date range; the tickets the user may see in the register;
- * and the user's MGR access.
+ * The tickets the dashboards count, the same ones their cards open in the register: those of the
+ * branch selected in the header, or of Analytics' Branch filter (tenantPlugin applies either, see
+ * middlewares/branchView.js and models/Ticket.js, so a ?branchId is ignored), in the date range,
+ * that the user may see in the register, within their MGR access and the MGR 1 filter. Always the
+ * user's own company (protect resolves a super admin's), so a ?companyId cannot reach another.
  */
 const dashboardTicketScope = async (req) => {
-    const scope = await buildAccessScopeQuery(req, { branchField: 'branchId', userField: null, engineerField: null });
-    const conditions = [await getVisibleTicketsFilter(req.user), await getTicketMgrCondition(req)].filter(Boolean);
+    const { branchId: _branchId, ...scope } = await buildAccessScopeQuery(req, {
+        branchField: 'branchId',
+        userField: null,
+        engineerField: null,
+        customCompanyId: req.user.companyId
+    });
+    const conditions = [
+        await getVisibleTicketsFilter(req.user),
+        await getTicketMgrCondition(req),
+        await mgr1FilterCondition(req.query.mgr1)
+    ].filter(Boolean);
     return conditions.length ? { ...scope, $and: conditions } : scope;
+};
+
+const STILL_OPEN = { $nin: ['Resolved', 'Closed', 'Cancelled'] };
+const RESOLVED = { $in: ['Resolved', 'Closed'] };
+
+/** The counts of the Analytics cards for `scope`. */
+const cardCounts = async (scope) => {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const startOfYesterday = new Date(startOfToday);
+    startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+    const today = { $gte: startOfToday };
+    const yesterday = { $gte: startOfYesterday, $lt: startOfToday };
+
+    const [open, unassigned, pending, createdToday, createdYesterday, resolvedToday, resolvedYesterday] = await Promise.all([
+        // Open = every ticket still in process, the same set as the register's "Open Tickets" filter.
+        Ticket.countDocuments({ ...scope, status: STILL_OPEN }),
+        // Nobody assigned; `null` also matches a missing field, and leaves scope's own $or (user hierarchy) intact.
+        Ticket.countDocuments({ ...scope, status: STILL_OPEN, assignedEngineerId: null }),
+        Ticket.countDocuments({ ...scope, status: 'Pending Customer' }),
+        // Raised on the day, any status.
+        Ticket.countDocuments({ ...scope, createdAt: today }),
+        Ticket.countDocuments({ ...scope, createdAt: yesterday }),
+        // Resolved on the day, including tickets that have since been closed.
+        Ticket.countDocuments({ ...scope, status: RESOLVED, resolvedAt: today }),
+        Ticket.countDocuments({ ...scope, status: RESOLVED, resolvedAt: yesterday })
+    ]);
+    return { open, unassigned, pending, createdToday, createdYesterday, resolvedToday, resolvedYesterday };
+};
+
+/** What Analytics' Branch and MGR 1 filters offer: only the branches and MGR values the user was given. */
+exports.getFilterOptions = async (req, res) => {
+    try {
+        const branches = await listSelectableBranches(req.user, req.user.companyId);
+        const allowedMgr1 = await allowedMgr1Ids(await getMgrAccess(req));
+        const mgr1 = await MGR.find({
+            mgrType: 'MGR1',
+            companyId: req.user.companyId,
+            ...(allowedMgr1 ? { _id: { $in: allowedMgr1 } } : {})
+        }).select('code description').sort({ code: 1 }).lean();
+        res.json({ branches: branches.map(({ _id, name, code }) => ({ _id, name, code })), mgr1 });
+    } catch (error) {
+        console.error('CSM Dashboard filter options error:', error);
+        res.status(500).json({ message: error.message || 'Error loading the filters' });
+    }
+};
+
+/**
+ * Analytics' Excel export: the card counts of each branch in view, including branches with nothing
+ * to count and a "No Branch" row for older tickets not yet given one. The rows add up to the cards.
+ */
+exports.getBranchSummary = async (req, res) => {
+    try {
+        const scope = await dashboardTicketScope(req);
+        const inView = getScopedBranches(); // null: every branch of the company
+        const selectable = await listSelectableBranches(req.user, req.user.companyId);
+        const listedIds = selectable.map((branch) => String(branch._id)).filter((id) => !inView || inView.includes(id));
+        const ticketBranches = await Ticket.aggregate([{ $match: scope }, { $group: { _id: '$branchId' } }]);
+        const ids = [...new Set([...listedIds, ...ticketBranches.map((row) => (row._id ? String(row._id) : null))])];
+
+        const branches = await Branch.find({ _id: { $in: ids.filter(Boolean) } })
+            .select('name')
+            .setOptions({ bypassTenant: true })
+            .lean();
+        const nameOf = (id) => (id ? branches.find((branch) => String(branch._id) === id)?.name || 'Deleted Branch' : 'No Branch');
+
+        const rows = [];
+        for (const id of ids) {
+            rows.push({ branch: nameOf(id), noBranch: !id, ...(await cardCounts({ ...scope, branchId: id })) });
+        }
+        rows.sort((a, b) => Number(a.noBranch) - Number(b.noBranch) || a.branch.localeCompare(b.branch));
+
+        const total = {};
+        rows.forEach(({ branch: _branch, noBranch: _noBranch, ...counts }) => {
+            Object.entries(counts).forEach(([key, value]) => { total[key] = (total[key] || 0) + value; });
+        });
+        res.json({ rows: rows.map(({ noBranch: _noBranch, ...row }) => row), total });
+    } catch (error) {
+        console.error('CSM Dashboard branch summary error:', error);
+        res.status(500).json({ message: error.message || 'Error loading the export' });
+    }
 };
 
 exports.getStats = async (req, res) => {
@@ -22,51 +117,7 @@ exports.getStats = async (req, res) => {
 
         const baseScope = await dashboardTicketScope(req);
 
-        // 1. Unassigned Tickets count (Requirement 3)
-        // Tickets that are not resolved/closed/cancelled and have no engineer assigned.
-        // `null` also matches a missing field, and leaves baseScope's own $or (user hierarchy) intact.
-        const unassignedQuery = {
-            ...baseScope,
-            status: { $nin: ['Resolved', 'Closed', 'Cancelled'] },
-            assignedEngineerId: null
-        };
-        const unassignedCount = await Ticket.countDocuments(unassignedQuery);
-
-        // Core metric counters
-        // Open = every ticket still in process, the same set as the register's "Open Tickets" filter.
-        const openCount = await Ticket.countDocuments({ ...baseScope, status: { $nin: ['Resolved', 'Closed', 'Cancelled'] } });
-        const pendingCount = await Ticket.countDocuments({ ...baseScope, status: 'Pending Customer' });
-
-        const startOfToday = new Date();
-        startOfToday.setHours(0, 0, 0, 0);
-        const startOfYesterday = new Date(startOfToday);
-        startOfYesterday.setDate(startOfYesterday.getDate() - 1);
-
-        // Tickets raised today (any status), same day boundary as the Resolved cards.
-        const createdTodayCount = await Ticket.countDocuments({
-            ...baseScope,
-            createdAt: { $gte: startOfToday }
-        });
-
-        // Tickets raised yesterday (any status).
-        const createdYesterdayCount = await Ticket.countDocuments({
-            ...baseScope,
-            createdAt: { $gte: startOfYesterday, $lt: startOfToday }
-        });
-
-        // Resolved today, including tickets that have since been closed (same rule as yesterday).
-        const resolvedTodayCount = await Ticket.countDocuments({
-            ...baseScope,
-            status: { $in: ['Resolved', 'Closed'] },
-            resolvedAt: { $gte: startOfToday }
-        });
-
-        // Resolved yesterday, including tickets that have since been closed.
-        const resolvedYesterdayCount = await Ticket.countDocuments({
-            ...baseScope,
-            status: { $in: ['Resolved', 'Closed'] },
-            resolvedAt: { $gte: startOfYesterday, $lt: startOfToday }
-        });
+        const counts = await cardCounts(baseScope);
 
         // Overdue tickets (any unresolved ticket past resolution due time)
         const overdueCount = await Ticket.countDocuments({
@@ -181,14 +232,8 @@ exports.getStats = async (req, res) => {
 
         res.json({
             metrics: {
-                open: openCount,
-                unassigned: unassignedCount,
-                createdToday: createdTodayCount,
-                createdYesterday: createdYesterdayCount,
-                pending: pendingCount,
+                ...counts,
                 overdue: overdueCount,
-                resolvedToday: resolvedTodayCount,
-                resolvedYesterday: resolvedYesterdayCount,
                 fcrRate
             },
             statusBreakdown: statusBreakdown.map(item => ({ name: item._id, value: item.count })),

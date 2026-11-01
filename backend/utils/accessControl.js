@@ -71,7 +71,9 @@ const buildAccessScopeQuery = async (req, {
     const user = req.user;
     if (!user) return {};
 
-    const rawCompanyId = customCompanyId || req.query?.companyId || req.headers?.['x-company-id'] || user.companyId;
+    // protect has already resolved req.user.companyId: a super admin's chosen company, everyone else's own.
+    // Never read ?companyId or x-company-id here: that lets an admin of one company read another's data.
+    const rawCompanyId = customCompanyId || user.companyId;
     const companyId = toObjectId(rawCompanyId);
     const query = {};
 

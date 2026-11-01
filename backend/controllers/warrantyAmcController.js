@@ -1224,26 +1224,18 @@ exports.getAssetSummary = async (req, res) => {
         } else if (serialNumber) {
             const cleanSN = String(serialNumber).trim();
             const escapedSN = cleanSN.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            // Only the serials of the selected branch (tenantPlugin): one of another branch or
+            // company is "not found", and the ticket form continues with manual entry.
             const assetQuery = { serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") }, ...access };
             if (companyId) assetQuery.companyId = companyId;
 
-            let matches = await Asset.find(assetQuery)
+            const matches = await Asset.find(assetQuery)
             .populate({ path: 'customerId', select: 'customerName companyName gstin billingAddress mobile email', options: { bypassTenant: true } })
             .populate(productMgrPopulate('basePrice mrp catalogType'))
             .populate('invoiceId', 'voucherNumber date')
             .populate(DIVISION_POPULATE)
             .populate(SEGMENT_POPULATE)
             .lean();
-
-            // Fallback search across tenant boundary if no matches found
-            if (matches.length === 0 && companyId) {
-                matches = await Asset.find({ serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") }, ...access })
-                .setOptions({ bypassTenant: true })
-                .populate({ path: 'customerId', select: 'customerName companyName gstin billingAddress mobile email', options: { bypassTenant: true } })
-                .populate(productMgrPopulate('basePrice mrp catalogType'))
-                .populate('invoiceId', 'voucherNumber date')
-                .lean();
-            }
 
             if (matches.length > 0) {
                 const statusPriority = { 'SOLD': 1, 'ALLOCATED': 2, 'RETURNED': 3, 'RETURN': 3, 'IN_STOCK': 4, 'SCRAPPED': 5 };
@@ -1282,20 +1274,11 @@ exports.getAssetSummary = async (req, res) => {
                 const historyQuery = { serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") }, ...access };
                 if (companyId) historyQuery.companyId = companyId;
 
-                let historyDoc = await AssetHistory.findOne(historyQuery)
+                const historyDoc = await AssetHistory.findOne(historyQuery)
                 .sort({ createdAt: -1 })
                 .populate('customerId', 'customerName companyName gstin billingAddress mobile email')
                 .populate(productMgrPopulate('basePrice mrp catalogType'))
                 .lean();
-
-                if (!historyDoc && companyId) {
-                    historyDoc = await AssetHistory.findOne({ serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") }, ...access })
-                    .setOptions({ bypassTenant: true })
-                    .sort({ createdAt: -1 })
-                    .populate('customerId', 'customerName companyName gstin billingAddress mobile email')
-                    .populate(productMgrPopulate('basePrice mrp catalogType'))
-                    .lean();
-                }
 
                 if (historyDoc) {
                     asset = {
@@ -1508,8 +1491,8 @@ const customerActivity = async (assetDocs, serialNumber) => {
 /**
  * Activity log of one serial number, newest first: its Invoice Bulk Upload lifecycle
  * (import, single entry, edits, returns, re-sales), the support tickets raised for it
- * and the service visits of those tickets. Tickets are company-wide, so the ticket and
- * visit lookups are not limited to the active branch.
+ * and the service visits of those tickets, all of the branch selected in the header. A serial
+ * moved to another branch takes its records with it, so nothing of it is left behind here.
  */
 exports.getAssetActivity = async (req, res) => {
     try {
@@ -1533,11 +1516,9 @@ exports.getAssetActivity = async (req, res) => {
             Asset.find({ companyId, serialNumber: snRegex, ...access })
                 .select('_id serialNumber status customerId customerCode customerNameStr invoiceNumber saleDate invoiceDate createdAt')
                 .populate({ path: 'customerId', select: 'companyName customerName externalCode', options: { bypassTenant: true } })
-                .setOptions(CROSS_BRANCH)
                 .lean(),
             AssetHistory.find({ companyId, serialNumber: snRegex, ...access })
                 .populate({ path: 'createdBy', select: 'name email', options: CROSS_BRANCH })
-                .setOptions(CROSS_BRANCH)
                 .lean()
         ]);
         // Nothing of this serial within the user's MGR access: it is not shown at all.
@@ -1560,7 +1541,6 @@ exports.getAssetActivity = async (req, res) => {
             ? await ServiceVisit.find({ companyId, ticketId: { $in: tickets.map(t => t._id) } })
                 .select('visitNo ticketId scheduledDate status engineerId')
                 .populate('engineerId', 'name')
-                .setOptions(CROSS_BRANCH)
                 .lean()
             : [];
         const ticketNoById = new Map(tickets.map(t => [String(t._id), t.ticketNo]));

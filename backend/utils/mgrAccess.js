@@ -93,6 +93,24 @@ const accessCondition = async (access) => (
 /** accessCondition of the request user. */
 const mgrAccessCondition = async (req) => accessCondition(await getMgrAccess(req));
 
+/**
+ * The condition for a screen's MGR 1 filter (`mgr1Id`, e.g. from ?mgr1=): records of the products
+ * carrying that value. On top of the user's MGR access, never instead of it. null when none is picked.
+ */
+const mgr1FilterCondition = async (mgr1Id) => {
+    if (!mgr1Id) return null;
+    const id = String(mgr1Id);
+    if (!mongoose.Types.ObjectId.isValid(id)) return { _id: null };
+    return accessCondition({ mgr1: [new mongoose.Types.ObjectId(id)] });
+};
+
+/** The MGR 1 values on the products `access` allows, for that filter's options; null when not limited. */
+const allowedMgr1Ids = async (access) => {
+    if (!access) return null;
+    const ids = await Product.distinct('mgr1', { _id: { $in: await allowedProductIds(access) } });
+    return ids.filter(Boolean);
+};
+
 /** True when `access` (from getMgrAccess) allows the product (an id or a populated product). */
 const accessAllowsProduct = async (access, productId) => {
     if (!access) return true;
@@ -138,6 +156,8 @@ module.exports = {
     describeMgrAccess,
     accessCondition,
     mgrAccessCondition,
+    mgr1FilterCondition,
+    allowedMgr1Ids,
     accessAllowsProduct,
     canSeeProduct,
     allowedProductIdSet,

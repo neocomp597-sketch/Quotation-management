@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const MGR = require('../models/MGR');
+const Branch = require('../models/Branch');
 const AuditLog = require('../models/AuditLog');
 const bcrypt = require('bcryptjs');
 const { ROLE_OPTIONS, mergeUserPermissions, diffUserPermissions } = require('../config/authorization');
@@ -493,6 +494,73 @@ exports.updateUserMgrAccess = async (req, res) => {
     } catch (error) {
         console.error('[updateUserMgrAccess] Error:', error.message);
         res.status(500).json({ message: 'Failed to update MGR access', error: error.message });
+    }
+};
+
+/**
+ * The branches one user may switch between (Authorization > Team Users). Staff without a branch
+ * cannot log in, so this is also how an admin lets them back in. A login that follows an employee
+ * is saved on Employee Master too; the next sync would undo it otherwise.
+ */
+exports.updateUserBranches = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { assignedBranches } = req.body || {};
+        if (!Array.isArray(assignedBranches) || assignedBranches.length === 0
+            || assignedBranches.some((value) => !mongoose.Types.ObjectId.isValid(value))) {
+            return res.status(400).json({ message: 'Select at least one branch' });
+        }
+
+        const user = await User.findOne({ _id: id, companyId: req.user.companyId });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        if (isBranchAdminRole(user.role)) {
+            return res.status(400).json({ message: 'Admins can work in every branch; no branch needs to be assigned.' });
+        }
+
+        const ids = [...new Set(assignedBranches.map(String))];
+        const branches = await Branch.find({ _id: { $in: ids }, companyId: req.user.companyId })
+            .select('name code branchPrefix')
+            .sort({ name: 1 })
+            .setOptions({ bypassTenant: true })
+            .lean();
+        if (branches.length !== ids.length) {
+            return res.status(400).json({ message: 'Some of these branches no longer exist. Reload the page and try again.' });
+        }
+
+        const previous = (user.assignedBranches || []).map(String);
+        const branchId = ids.includes(String(user.branchId)) ? String(user.branchId) : ids[0];
+        await User.updateOne({ _id: user._id }, { $set: { assignedBranches: ids, branchId } });
+        await invalidateAuthUserCache(user._id.toString());
+
+        if (user.employeeProfileId) {
+            await EmployeeProfile.updateOne(
+                { _id: user.employeeProfileId },
+                { $set: { assignedBranches: ids, branchId } }
+            ).setOptions({ bypassBranch: true });
+        }
+
+        try {
+            await AuditLog.create({
+                action: 'USER_BRANCHES_UPDATED',
+                entityType: 'User',
+                entityId: user._id,
+                userId: req.user.id,
+                userName: req.user.name,
+                oldValue: { assignedBranches: previous },
+                newValue: { assignedBranches: branches.map((branch) => branch.name) },
+                reason: `Branch access of ${user.name}`,
+                companyId: user.companyId
+            });
+        } catch (auditError) {
+            console.warn('[updateUserBranches] Audit log failed:', auditError.message);
+        }
+
+        res.json({ _id: user._id, branchId, assignedBranches: branches, message: 'Branch access updated successfully' });
+    } catch (error) {
+        console.error('[updateUserBranches] Error:', error.message);
+        res.status(500).json({ message: 'Failed to update branch access', error: error.message });
     }
 };
 

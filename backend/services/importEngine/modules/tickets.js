@@ -151,7 +151,8 @@ const nextTicketNumbers = async (companyId, count, taken) => {
         const wanted = count - numbers.length;
         const first = await reserveSequence(filter, wanted);
         const candidates = Array.from({ length: wanted }, (_, i) => `${TICKET_PREFIX}-${year}-${String(first + i).padStart(4, '0')}`);
-        const used = await Ticket.find({ ticketNo: { $in: candidates } }).select('ticketNo').lean();
+        // Ticket numbers are unique in the whole company, whichever branch holds the ticket.
+        const used = await Ticket.find({ ticketNo: { $in: candidates } }).select('ticketNo').setOptions({ bypassBranch: true }).lean();
         const usedKeys = new Set(used.map((ticket) => shared.keyOf(ticket.ticketNo)));
         candidates.forEach((candidate) => {
             const key = shared.keyOf(candidate);
@@ -185,8 +186,8 @@ module.exports = {
             shared.loadCustomers(shared.distinctValues(rows, 'customer')),
             shared.loadProducts(shared.distinctValues(rows, 'product')),
             shared.loadAssets(rows.map((row) => row.serialNumber)),
-            // Tickets are one company-wide register (not branch-scoped).
-            ticketNos.length ? shared.findByValues(Ticket, ['ticketNo'], ticketNos, { select: 'ticketNo' }) : []
+            // Ticket numbers are unique in the whole company, whichever branch holds the ticket.
+            ticketNos.length ? shared.findByValues(Ticket, ['ticketNo'], ticketNos, { select: 'ticketNo', options: { bypassBranch: true } }) : []
         ]);
         return {
             customers,

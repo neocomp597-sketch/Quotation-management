@@ -174,40 +174,11 @@ exports.getAll = async (req, res) => {
         }
         if (req.query.activeOnly !== 'false') filter.status = true;
 
-        let contacts = await CustomerContact.find(filter)
+        // Only the contacts of the selected branch (tenantPlugin).
+        const contacts = await CustomerContact.find(filter)
             .populate('designationId', 'name')
             .sort({ isPrimary: -1, contactName: 1 })
             .lean();
-
-        if (contacts.length === 0 && rawCustId) {
-            contacts = await CustomerContact.find({ customerId: rawCustId, ...(req.query.activeOnly !== 'false' ? { status: true } : {}) })
-                .setOptions({ bypassTenant: true })
-                .populate('designationId', 'name')
-                .sort({ isPrimary: -1, contactName: 1 })
-                .lean();
-        }
-
-        // If still no contacts found, attempt resolving Customer by name or code
-        if (contacts.length === 0 && rawCustId && typeof rawCustId === 'string') {
-            const escaped = String(rawCustId).trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-            if (escaped) {
-                const resolvedCustomer = await Customer.findOne({
-                    $or: [
-                        { externalCode: new RegExp(`^${escaped}$`, 'i') },
-                        { companyName: new RegExp(`^${escaped}$`, 'i') },
-                        { customerName: new RegExp(`^${escaped}$`, 'i') }
-                    ]
-                }).setOptions({ bypassTenant: true }).select('_id').lean();
-
-                if (resolvedCustomer) {
-                    contacts = await CustomerContact.find({ customerId: resolvedCustomer._id, ...(req.query.activeOnly !== 'false' ? { status: true } : {}) })
-                        .setOptions({ bypassTenant: true })
-                        .populate('designationId', 'name')
-                        .sort({ isPrimary: -1, contactName: 1 })
-                        .lean();
-                }
-            }
-        }
 
         res.json(contacts);
     } catch (error) {

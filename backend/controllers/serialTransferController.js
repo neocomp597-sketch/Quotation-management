@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const ExcelJS = require('exceljs');
 const Asset = require('../models/Asset');
 const AssetHistory = require('../models/AssetHistory');
+const AuditLog = require('../models/AuditLog');
 const Branch = require('../models/Branch');
 const Counter = require('../models/Counter');
 const Customer = require('../models/Customer');
@@ -425,6 +426,7 @@ const loadSerial = async (assetId, access = null) => {
         asset: {
             _id: asset._id,
             serialNumber: asset.serialNumber,
+            assetNo: asset.assetNo || '',
             productCode: asset.productCode,
             productName: asset.productName,
             status: statusOf(asset),
@@ -465,6 +467,45 @@ exports.getSerial = async (req, res) => {
         return res.json(result);
     } catch (error) {
         return res.status(500).json({ message: 'Failed to load the serial number', error: error.message });
+    }
+};
+
+const ASSET_NO_MAX_LENGTH = 100;
+
+/** Saves the serial's Asset No: free text, not checked for format or duplicates; blank clears it. */
+exports.updateAssetNo = async (req, res) => {
+    try {
+        const { assetId } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(assetId)) {
+            return res.status(400).json({ message: 'Invalid serial record' });
+        }
+        const access = await mgrAccessCondition(req);
+        const assetNo = cleanText(req.body.assetNo).slice(0, ASSET_NO_MAX_LENGTH);
+        const previous = await Asset.findOneAndUpdate(addActiveBranchFilter({ _id: assetId, ...access }), { $set: { assetNo } })
+            .select('assetNo serialNumber companyId')
+            .lean();
+        if (!previous) return res.status(404).json({ message: 'Serial number not found' });
+
+        if ((previous.assetNo || '') !== assetNo) {
+            try {
+                await AuditLog.create({
+                    action: 'ASSET_NO_UPDATED',
+                    entityType: 'Asset',
+                    entityId: previous._id,
+                    userId: req.user.id,
+                    userName: req.user.name,
+                    oldValue: { assetNo: previous.assetNo || '' },
+                    newValue: { assetNo },
+                    reason: `Asset No of serial ${previous.serialNumber}`,
+                    companyId: previous.companyId
+                });
+            } catch (auditError) {
+                console.error('Asset No audit log error:', auditError);
+            }
+        }
+        return res.json(await loadSerial(assetId, access));
+    } catch (error) {
+        return res.status(500).json({ message: 'Failed to save the Asset No', error: error.message });
     }
 };
 

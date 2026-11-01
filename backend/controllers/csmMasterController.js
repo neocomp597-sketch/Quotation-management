@@ -772,13 +772,14 @@ exports.sources = {
             const sourceDoc = await TicketSource.findOne({ _id: req.params.id, companyId });
             if (!sourceDoc) return res.status(404).json({ message: 'Ticket Source not found' });
 
+            // The source is shared by every branch, so its tickets are counted in all of them.
             const usageCount = await Ticket.countDocuments({
                 companyId,
                 $or: [
                     { source: sourceDoc.name },
                     { sourceId: sourceDoc._id }
                 ]
-            });
+            }).setOptions({ bypassBranch: true });
 
             if (usageCount > 0) {
                 return res.status(400).json({
@@ -1007,8 +1008,19 @@ exports.engineers = {
                 await syncAllEngineers(companyId, { returnEngineers: false });
             }
 
-            const docs = await Engineer.find({ companyId })
-                .populate('employeeId', ENGINEER_EMPLOYEE_FIELDS)
+            // Customer Service works branch-wise: an engineer is listed in the branches of their
+            // employee record, since those are the only branches whose tickets they can see. An
+            // engineer with no employee record stays listed everywhere. Territory Master, which
+            // is not branch-wise, asks for everyone with ?allBranches=true.
+            const query = { companyId };
+            if (req.query.allBranches !== 'true') {
+                const EmployeeProfile = require('../models/EmployeeProfile');
+                const branchEmployees = await EmployeeProfile.find({ companyId }).select('_id').lean();
+                query.$or = [{ employeeId: { $in: branchEmployees.map(e => e._id) } }, { employeeId: null }];
+            }
+
+            const docs = await Engineer.find(query)
+                .populate({ path: 'employeeId', select: ENGINEER_EMPLOYEE_FIELDS, options: { bypassBranch: true } })
                 .populate('territoryId', 'name rules')
                 .sort({ createdAt: -1 })
                 .lean();
