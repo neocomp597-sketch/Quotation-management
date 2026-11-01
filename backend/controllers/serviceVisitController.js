@@ -4,7 +4,7 @@ const { formatDateTime } = require('../utils/dateFormat');
 const Ticket = require('../models/Ticket');
 const Counter = require('../models/Counter');
 const AMC = require('../models/AMC');
-const { getVisibleTicketsFilter } = require('./ticketController');
+const { getVisibleTicketsFilter, getTicketMgrCondition } = require('./ticketController');
 const { getScopedBranches } = require('../middlewares/tenantContext');
 
 // A ticket's customer and serial can belong to another branch than the visit list's.
@@ -111,11 +111,22 @@ exports.getVisits = async (req, res) => {
         if (req.query.ticketId) filter.ticketId = req.query.ticketId;
         if (req.query.engineerId) filter.engineerId = req.query.engineerId;
         if (req.query.status) filter.status = req.query.status;
-        if (req.query.branchId && mongoose.Types.ObjectId.isValid(req.query.branchId)) filter.branchId = req.query.branchId;
+        if (req.query.branchId && mongoose.Types.ObjectId.isValid(req.query.branchId)) {
+            filter.branchId = req.query.branchId;
+        } else if (req.query.myBranches === 'true' && req.user?.allowedBranchIds) {
+            filter.branchId = { $in: req.user.allowedBranchIds };
+        }
 
         if (req.query.customerId) {
             const customerTickets = await Ticket.find({ customerId: req.query.customerId, companyId }).select('_id').lean();
             filter.ticketId = { $in: customerTickets.map(t => t._id) };
+        }
+
+        // A user limited by MGR access sees the visits of the tickets they may see.
+        const mgrCondition = await getTicketMgrCondition(req);
+        if (mgrCondition) {
+            const allowedTicketIds = await Ticket.find({ companyId, ...mgrCondition }).distinct('_id');
+            filter.$and = [{ ticketId: { $in: allowedTicketIds } }];
         }
 
         // Support Tickets are one company-wide register and a visit lives in its ticket's

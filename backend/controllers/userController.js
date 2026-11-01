@@ -9,6 +9,25 @@ const { getTenantId } = require('../middlewares/tenantContext');
 const { getRolePermissions, toPlainObject } = require('../middlewares/permissionMiddleware');
 const { invalidateAuthUserCache, isSuperAdminRole } = require('../middlewares/authMiddleware');
 const { broadcastCrmUpdate } = require('../config/socket');
+const EmployeeProfile = require('../models/EmployeeProfile');
+const { isBranchAdminRole } = require('../utils/branchScope');
+
+/**
+ * An employee's login follows Employee Master (services/employeeUserService.js), so a name or email
+ * changed on the login itself is saved on the employee too; the next sync would undo it otherwise.
+ * Admin accounts keep their own name and login, so their employee is left as it is.
+ */
+const saveIdentityToEmployee = async (user) => {
+    if (!user.employeeProfileId || isBranchAdminRole(user.role)) return;
+    try {
+        await EmployeeProfile.updateOne(
+            { _id: user.employeeProfileId },
+            { $set: { name: user.name, email: String(user.email || '').trim().toLowerCase() } }
+        ).setOptions({ bypassBranch: true });
+    } catch (error) {
+        console.warn('[saveIdentityToEmployee] Failed:', error.message);
+    }
+};
 
 const normalizeReportsTo = (reportsTo) => (reportsTo ? reportsTo : null);
 
@@ -165,6 +184,7 @@ exports.updateUserProfile = async (req, res) => {
         const user = await User.findById(req.user.id);
 
         if (user) {
+            const previousIdentity = `${user.name}|${user.email}`;
             user.name = req.body.name || user.name;
             user.email = req.body.email || user.email;
 
@@ -174,6 +194,7 @@ exports.updateUserProfile = async (req, res) => {
             }
 
             const updatedUser = await user.save();
+            if (`${updatedUser.name}|${updatedUser.email}` !== previousIdentity) await saveIdentityToEmployee(updatedUser);
 
             res.json({
                 _id: updatedUser._id,
@@ -253,6 +274,7 @@ exports.updateUser = async (req, res) => {
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
+        const previousIdentity = `${user.name}|${user.email}`;
 
         if (email && email !== user.email) {
             const normalizedEmail = String(email).trim().toLowerCase();
@@ -317,6 +339,7 @@ exports.updateUser = async (req, res) => {
         }
 
         const updatedUser = await user.save();
+        if (`${updatedUser.name}|${updatedUser.email}` !== previousIdentity) await saveIdentityToEmployee(updatedUser);
         res.json({
             _id: updatedUser._id,
             name: updatedUser.name,

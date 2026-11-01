@@ -11,6 +11,7 @@ import {
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import CSMDashboardFilter, { CSMDashboardHeader } from '../components/csm/CSMDashboardFilter';
+import MgrAccessNotice from '../components/MgrAccessNotice';
 import { useCSMDashboardFilters } from '../hooks/useCSMDashboardFilters';
 
 const COLORS = ['#0d9488', '#5eead4', '#8b5cf6', '#f59e0b', '#f43f5e', '#64748b'];
@@ -132,6 +133,8 @@ const CSMDetailDashboard = () => {
             />
 
             <CSMDashboardFilter filters={filters} />
+
+            <MgrAccessNotice mgrAccess={stats?.mgrAccess} noun="tickets" />
 
             {loading && !stats ? (
                 <div className="flex flex-col items-center justify-center py-32 space-y-4">

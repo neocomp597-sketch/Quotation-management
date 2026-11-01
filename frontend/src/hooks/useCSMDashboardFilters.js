@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { branchService } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 /**
  * Branch and date filter state shared by the CSM dashboards. `params` is what the
  * /csm/dashboard and /csm/visits endpoints take, and only changes when a filter does.
+ * The branch starts on the one selected in the header (switching it remounts the page, see
+ * Layout); '' is "All My Branches", every branch the user is authorized for.
  */
 export const useCSMDashboardFilters = () => {
+    const { activeBranchId, activeBranch } = useAuth();
+    const defaultBranch = activeBranchId || '';
     const [branches, setBranches] = useState([]);
-    const [selectedBranch, setSelectedBranch] = useState('');
+    const [selectedBranch, setSelectedBranch] = useState(defaultBranch);
     const [quickRange, setQuickRange] = useState('');
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -27,6 +32,7 @@ export const useCSMDashboardFilters = () => {
     const params = useMemo(() => {
         const next = {};
         if (selectedBranch) next.branchId = selectedBranch;
+        else next.myBranches = 'true';
 
         if (quickRange) {
             next.quickRange = quickRange;
@@ -40,7 +46,7 @@ export const useCSMDashboardFilters = () => {
     }, [selectedBranch, quickRange, customMode, selectedMonth, selectedYear, startDay, endDay]);
 
     const reset = () => {
-        setSelectedBranch('');
+        setSelectedBranch(defaultBranch);
         setQuickRange('');
         setCustomMode(false);
         setStartDay('');
@@ -51,6 +57,8 @@ export const useCSMDashboardFilters = () => {
 
     return {
         branches,
+        defaultBranch,
+        activeBranchName: activeBranch?.name || '',
         selectedBranch, setSelectedBranch,
         quickRange, setQuickRange,
         selectedMonth, setSelectedMonth,

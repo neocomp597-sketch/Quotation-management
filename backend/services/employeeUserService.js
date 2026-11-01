@@ -3,9 +3,30 @@ const User = require('../models/User');
 const EmployeeProfile = require('../models/EmployeeProfile');
 const bcrypt = require('bcryptjs');
 const { insertRows, writeRows } = require('../utils/importBatch');
+const { isBranchAdminRole } = require('../utils/branchScope');
+const { invalidateAuthUserCache } = require('../middlewares/authMiddleware');
+
+const emailOf = (value) => (value ? String(value).trim().toLowerCase() : '');
+const exactEmail = (email) => new RegExp(`^${email.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i');
 
 /**
- * Ensures a User account exists for a given employee.
+ * What an employee's login must change to follow Employee Master: its name, and its login ID (the
+ * employee's email) unless another account holds that email (`emailTaken`). Without this an employee
+ * renamed or given a new email keeps a login under the old details, which looks like no login at all.
+ * Admin accounts keep their own name and login.
+ */
+const identityChanges = (user, employee, emailTaken) => {
+    if (isBranchAdminRole(user.role)) return {};
+    const changes = {};
+    const name = String(employee.name || '').trim();
+    if (name && name !== user.name) changes.name = name;
+    const email = emailOf(employee.email);
+    if (email && email !== emailOf(user.email) && !emailTaken(email)) changes.email = email;
+    return changes;
+};
+
+/**
+ * Ensures a User account exists for a given employee and follows it.
  * - Login ID: Employee email address (trimmed, lowercase)
  * - Default Password: 123456
  * - First-login prompt: mustChangePassword = true
@@ -27,14 +48,14 @@ const syncUserForEmployee = async (employeeOrId) => {
         // Try to find user account linked by employeeProfileId or email
         let existingUser = await User.findOne({ companyId, employeeProfileId: employee._id });
 
-        let emailStr = employee.email ? String(employee.email).trim().toLowerCase() : '';
+        let emailStr = emailOf(employee.email);
         if (!existingUser && emailStr) {
-            const escapedEmail = emailStr.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-            existingUser = await User.findOne({
-                companyId,
-                email: { $regex: new RegExp("^" + escapedEmail + "$", "i") },
-                employeeProfileId: null
-            });
+            // An account with this email that has no employee, or whose employee was since
+            // deleted (the employee was added again), is this employee's account.
+            const holder = await User.findOne({ companyId, email: exactEmail(emailStr) });
+            const holderHasEmployee = holder?.employeeProfileId
+                && await EmployeeProfile.exists({ _id: holder.employeeProfileId }).setOptions({ bypassBranch: true });
+            if (holder && !holderHasEmployee) existingUser = holder;
         }
 
         // Safely extract ObjectId reference for branchId & assignedBranches
@@ -53,10 +74,15 @@ const syncUserForEmployee = async (employeeOrId) => {
         }
 
         if (existingUser) {
+            const emailHolder = emailStr && emailStr !== emailOf(existingUser.email)
+                ? await User.findOne({ _id: { $ne: existingUser._id }, email: exactEmail(emailStr) }).select('_id').lean()
+                : null;
+            existingUser.set(identityChanges(existingUser, employee, () => Boolean(emailHolder)));
             existingUser.branchId = finalBranchId;
             existingUser.assignedBranches = rawAssignedBranches;
             existingUser.employeeProfileId = employee._id;
             await existingUser.save();
+            await invalidateAuthUserCache(existingUser._id.toString());
             return existingUser;
         }
 
@@ -140,18 +166,20 @@ const syncUsersForExistingEmployees = async (companyId = null) => {
         const companyIds = [...new Set(employees.map((emp) => idOrNull(emp.companyId)))];
         const [companyUsers, allEmails] = await Promise.all([
             User.find({ companyId: { $in: companyIds.map((id) => id || null) } })
-                .select('_id companyId email employeeProfileId branchId assignedBranches')
+                .select('_id companyId name email role employeeProfileId branchId assignedBranches')
                 .lean(),
             User.find({}).select('email').lean()
         ]);
 
-        // Lookups as syncUserForEmployee makes them: by employee link, else an unlinked user
-        // with the same email (ignoring case), first in collection order.
+        // Lookups as syncUserForEmployee makes them: by employee link, else a user with the same
+        // email (ignoring case) who has no employee or whose employee was since deleted, first
+        // in collection order.
+        const employeeIds = new Set(employees.map((employee) => String(employee._id)));
         const linked = new Map();
         const unlinkedByEmail = new Map();
         companyUsers.forEach((user) => {
             const scope = idOrNull(user.companyId);
-            if (user.employeeProfileId) {
+            if (user.employeeProfileId && employeeIds.has(String(user.employeeProfileId))) {
                 const key = `${scope}|${user.employeeProfileId}`;
                 if (!linked.has(key)) linked.set(key, user);
             } else if (user.email) {
@@ -178,10 +206,19 @@ const syncUsersForExistingEmployees = async (companyId = null) => {
 
             const fields = branchFieldsOf(employee);
             if (existingUser) {
-                const changed = idOrNull(existingUser.branchId) !== idOrNull(fields.branchId)
+                const identity = identityChanges(existingUser, employee, (email) => claimedEmails.has(email));
+                if (identity.email) {
+                    claimedEmails.delete(emailOf(existingUser.email));
+                    claimedEmails.add(identity.email);
+                }
+                if (Object.keys(identity).length > 0) {
+                    console.log(`[Auto User Sync] Login follows Employee Master: "${existingUser.name}" <${existingUser.email}> is now "${identity.name || existingUser.name}" <${identity.email || existingUser.email}>`);
+                }
+                const changed = Object.keys(identity).length > 0
+                    || idOrNull(existingUser.branchId) !== idOrNull(fields.branchId)
                     || !sameIds(existingUser.assignedBranches, fields.assignedBranches)
                     || idOrNull(existingUser.employeeProfileId) !== idOrNull(employee._id);
-                Object.assign(existingUser, fields, { employeeProfileId: employee._id });
+                Object.assign(existingUser, fields, identity, { employeeProfileId: employee._id });
                 linked.set(`${scope}|${employee._id}`, existingUser);
                 if (changed) updates.set(String(existingUser._id), existingUser);
                 existingCount++;
@@ -227,12 +264,14 @@ const syncUsersForExistingEmployees = async (companyId = null) => {
         const updateFailures = await writeRows(User, changedUsers.map((user) => ({
             updateOne: {
                 filter: { _id: user._id },
-                update: { $set: { branchId: user.branchId, assignedBranches: user.assignedBranches, employeeProfileId: user.employeeProfileId } }
+                update: { $set: { name: user.name, email: user.email, branchId: user.branchId, assignedBranches: user.assignedBranches, employeeProfileId: user.employeeProfileId } }
             }
         })));
         updateFailures.forEach((error, index) => {
             console.error(`[Auto User Sync Error] Failed to update user ${changedUsers[index].email}:`, error.message || error.errmsg);
         });
+        // protect caches the user between requests
+        await Promise.all(changedUsers.map((user) => invalidateAuthUserCache(String(user._id)).catch(() => null)));
         const createFailures = await insertRows(User, newUsers);
         createFailures.forEach((error, index) => {
             console.error(`[Auto User Sync Error] Failed to create user ${newUsers[index].email}:`, error.message || error.errmsg);

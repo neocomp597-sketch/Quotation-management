@@ -26,6 +26,19 @@ const branchIdOf = (branch) => {
     return String(branch);
 };
 
+/**
+ * The branch a session starts in: the one last worked in, else the home branch, else the first in
+ * the list. The user changes it from the header whenever they need to.
+ */
+const defaultBranchFor = (sessionUser, branches) => {
+    const preferredIds = [sessionUser?.activeBranchId, sessionUser?.branchId].map(branchIdOf).filter(Boolean).map(String);
+    for (const id of preferredIds) {
+        const match = branches.find((branch) => String(branchIdOf(branch)) === id);
+        if (match) return match;
+    }
+    return branches[0] || null;
+};
+
 const readStoredUser = () => {
     try {
         const raw = localStorage.getItem("user");
@@ -92,6 +105,8 @@ export const AuthProvider = ({ children }) => {
     const [activeBranchId, setActiveBranchIdState] = useState(() => localStorage.getItem("activeBranchId") || null);
     const [activeBranch, setActiveBranchState] = useState(() => readStoredActiveBranch());
     const autoSelectingBranch = useRef(false);
+    // Branches the server refused to start this session in, so they are not tried again.
+    const [refusedBranchIds, setRefusedBranchIds] = useState([]);
 
     /**
      * Local half of the active branch: state + storage. The storage value is what
@@ -193,10 +208,21 @@ export const AuthProvider = ({ children }) => {
             }
         } catch (err) {
             // An unusable stored branch answers 403; the API client then clears it and
-            // returns to the selection screen. Anything else keeps the stored list.
+            // announces it (onActiveBranchInvalid below). Anything else keeps the stored list.
             console.warn("Could not refresh branch options:", err);
         }
     }, [storeActiveBranch]);
+
+    // The server refused the branch this session works in (it is no longer available to the user).
+    // Drop it and re-read the user's branches; the session then moves to a branch they can use.
+    useEffect(() => {
+        const onBranchInvalid = () => {
+            storeActiveBranch(null);
+            syncBranchOptions();
+        };
+        window.addEventListener("onActiveBranchInvalid", onBranchInvalid);
+        return () => window.removeEventListener("onActiveBranchInvalid", onBranchInvalid);
+    }, [storeActiveBranch, syncBranchOptions]);
 
     const clearSession = useCallback(() => {
         clearApiCache(); // never let the next user see this session's cached data
@@ -291,9 +317,10 @@ export const AuthProvider = ({ children }) => {
         const normalizedUser = normalizeUser(session?.user);
 
         // A branch left behind by a previous session belongs to that session. Every
-        // login starts without one; the login flow then selects (or asks for) it.
+        // login starts without one and then opens in the user's default branch (below).
         clearApiCache();
         storeActiveBranch(null);
+        setRefusedBranchIds([]);
 
         setAccessToken(session?.accessToken);
         localStorage.setItem("user", JSON.stringify(normalizedUser));
@@ -493,26 +520,41 @@ export const AuthProvider = ({ children }) => {
         return [];
     }, [user]);
 
-    /**
-     * True while a logged-in user who has branches to choose from has not picked one
-     * (or holds a branch that is no longer in their list). ProtectedRoute sends them
-     * to the selection screen before any branch-dependent page renders.
-     */
-    const needsBranchSelection = useMemo(() => {
-        if (!user || assignedBranches.length === 0) return false;
-        if (!activeBranchId) return true;
-        const allowedIds = assignedBranches.map(branchIdOf).filter(Boolean).map(String);
-        return allowedIds.length > 0 && !allowedIds.includes(String(activeBranchId));
-    }, [user, assignedBranches, activeBranchId]);
+    // The branches this session can still start in.
+    const usableBranches = useMemo(
+        () => assignedBranches.filter((branch) => !refusedBranchIds.includes(String(branchIdOf(branch)))),
+        [assignedBranches, refusedBranchIds]
+    );
 
-    // A user with exactly one branch has nothing to choose: apply it without a screen.
+    /**
+     * True while a logged-in user who has branches has no active branch (or holds one that is no
+     * longer in their list). ProtectedRoute waits for it before any branch-dependent page renders.
+     */
+    const needsActiveBranch = useMemo(() => {
+        if (!user || usableBranches.length === 0) return false;
+        if (!activeBranchId) return true;
+        return !usableBranches.some((branch) => String(branchIdOf(branch)) === String(activeBranchId));
+    }, [user, usableBranches, activeBranchId]);
+
+    // A session opens in the user's default branch without asking; they switch from the header.
     useEffect(() => {
-        if (loading || !needsBranchSelection || assignedBranches.length !== 1 || autoSelectingBranch.current) return;
+        if (loading || !needsActiveBranch || autoSelectingBranch.current) return;
+        const branch = defaultBranchFor(user, usableBranches);
+        if (!branch) return;
         autoSelectingBranch.current = true;
-        setActiveBranch(assignedBranches[0])
-            .catch((err) => console.warn("Could not apply the user's only branch:", err))
+        setActiveBranch(branch)
+            .catch((err) => {
+                if (err.response?.data?.code === "ACTIVE_BRANCH_INVALID") {
+                    setRefusedBranchIds((prev) => [...prev, String(branchIdOf(branch))]);
+                    return null;
+                }
+                // Not saved on the server (e.g. the network dropped): work in it anyway. The
+                // branch travels with every request and the server checks it each time.
+                console.warn("Could not save the default branch:", err);
+                return setActiveBranch(branch, { persist: false });
+            })
             .finally(() => { autoSelectingBranch.current = false; });
-    }, [loading, needsBranchSelection, assignedBranches, setActiveBranch]);
+    }, [loading, needsActiveBranch, user, usableBranches, setActiveBranch]);
 
     return (
         <AuthContext.Provider
@@ -532,7 +574,7 @@ export const AuthProvider = ({ children }) => {
                 activeBranchId,
                 setActiveBranch,
                 assignedBranches,
-                needsBranchSelection,
+                needsActiveBranch,
                 isAdmin: user?.role === "admin" || user?.role === "Admin",
                 isSuperAdmin: user?.role === "SUPER_ADMIN" || user?.role === "super_admin",
             }}

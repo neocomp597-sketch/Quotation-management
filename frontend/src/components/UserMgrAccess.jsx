@@ -21,8 +21,8 @@ const sameIds = (a, b) => a.length === b.length && a.every((id) => b.includes(id
 const isMgrUnrestrictedRole = (role) => ['admin', 'super_admin', 'superadmin'].includes(String(role || '').toLowerCase());
 
 /**
- * MGR Access of one user (Authorization > Team Users): the MGR values their Invoice Bulk Upload
- * and Serial No Transfer data is limited to (one setting for both), on any of MGR 1-5. None
+ * MGR Access of one user (Authorization > Team Users): the MGR values their Invoice Bulk Upload,
+ * Serial No Transfer and Customer Service data is limited to (one setting for all), on any of MGR 1-5. None
  * ticked = every value. Within one MGR any ticked
  * value is enough; ticks on two MGRs must both match. Admins always see everything; the server
  * applies the limit (backend/utils/mgrAccess.js), so it holds for exports and direct API calls too.
@@ -85,7 +85,7 @@ const UserMgrAccess = ({ user, options, params, disabled, onSaved }) => {
     const hint = isAdminUser
         ? 'Admins see every MGR value; MGR access does not apply to them.'
         : selected.length
-            ? `Sees and changes only the serial numbers whose product has ${summary}, in Invoice Bulk Upload and Serial No Transfer (lists, search, filters, exports, history, details, transfers). Within one MGR any ticked value counts; ticks on two MGRs must both match.`
+            ? `Sees and changes only the serial numbers whose product has ${summary}, in Invoice Bulk Upload and Serial No Transfer (lists, search, filters, exports, history, details, transfers), and the service tickets of those products plus their own in Customer Service. Within one MGR any ticked value counts; ticks on two MGRs must both match.`
             : 'Nothing ticked: sees every MGR value. Tick values to limit what this user sees.';
 
     return (
@@ -95,7 +95,7 @@ const UserMgrAccess = ({ user, options, params, disabled, onSaved }) => {
                     <div className="flex items-center gap-2">
                         <MdFilterAlt className="text-primary-600 dark:text-primary-400" size={16} />
                         <h5 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
-                            MGR Access · Invoice Bulk Upload & Serial No Transfer
+                            MGR Access · Invoice Bulk Upload, Serial No Transfer & Customer Service
                         </h5>
                     </div>
                     <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">{hint}</p>
@@ -131,7 +131,7 @@ const UserMgrAccess = ({ user, options, params, disabled, onSaved }) => {
                         {removedCount === 1 ? '1 MGR value' : `${removedCount} MGR values`} of this user {removedCount === 1 ? 'was' : 'were'} deleted from the Product MGR Master.
                         {saved.length
                             ? ' Save to drop it from the access.'
-                            : ' Until you save, this user sees no Invoice Bulk Upload or Serial No Transfer data. Tick values and save, or save with nothing ticked to give access to every value.'}
+                            : ' Until you save, this user sees no Invoice Bulk Upload or Serial No Transfer data, and only their own service tickets. Tick values and save, or save with nothing ticked to give access to every value.'}
                     </span>
                 </div>
             )}

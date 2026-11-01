@@ -44,18 +44,21 @@ export const CSMDashboardHeader = ({ title, icon, onRefresh, refreshing }) => (
 const CSMDashboardFilter = ({ filters }) => {
     const [isCollapsed, setIsCollapsed] = useState(true);
     const {
-        branches, selectedBranch, setSelectedBranch, quickRange, setQuickRange,
+        branches, defaultBranch, activeBranchName, selectedBranch, setSelectedBranch, quickRange, setQuickRange,
         selectedMonth, setSelectedMonth, selectedYear, setSelectedYear,
         startDay, setStartDay, endDay, setEndDay, customMode, setCustomMode, reset
     } = filters;
 
     const daysInSelectedMonth = new Date(selectedYear, selectedMonth, 0).getDate();
     const dayOptions = Array.from({ length: daysInSelectedMonth }, (_, idx) => idx + 1);
+    // The branch starts on the one selected in the header, which is not a filter the user has set.
+    const branchChanged = selectedBranch !== defaultBranch;
 
     const selectedBranchName = (() => {
-        if (!selectedBranch) return 'All Branches';
+        if (!selectedBranch) return 'All My Branches';
         const found = branches.find(b => b._id === selectedBranch);
-        return found ? (found.name || found.code) : 'Branch';
+        if (found) return found.name || found.code;
+        return (selectedBranch === defaultBranch && activeBranchName) || 'Branch';
     })();
 
     const activeDateSummary = (() => {
@@ -85,7 +88,7 @@ const CSMDashboardFilter = ({ filters }) => {
                             <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-200">
                                 Filter View
                             </h3>
-                            {(selectedBranch || quickRange || customMode) && (
+                            {(branchChanged || quickRange || customMode) && (
                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300">
                                     Active
                                 </span>
@@ -160,7 +163,7 @@ const CSMDashboardFilter = ({ filters }) => {
                                         onChange={(e) => setSelectedBranch(e.target.value)}
                                         className="bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-bold text-xs rounded-xl px-3 py-1.5 outline-none focus:ring-2 focus:ring-teal-500 shadow-sm"
                                     >
-                                        <option value="">All Branches</option>
+                                        <option value="">All My Branches</option>
                                         {branches.map((b) => (
                                             <option key={b._id} value={b._id}>
                                                 {b.name || b.code}
@@ -170,7 +173,7 @@ const CSMDashboardFilter = ({ filters }) => {
                                 </div>
                             )}
 
-                            {(selectedBranch || quickRange || customMode || startDay || endDay) && (
+                            {(branchChanged || quickRange || customMode || startDay || endDay) && (
                                 <button
                                     onClick={reset}
                                     className="flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 px-2.5 py-1.5 rounded-xl transition-colors"

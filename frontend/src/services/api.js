@@ -150,15 +150,10 @@ api.interceptors.response.use(
       error.response?.data?.code === "ACTIVE_BRANCH_INVALID"
     ) {
       // The branch this session was working in is no longer available to the
-      // user. Drop it and make them pick again, so the header never claims a
-      // branch the server refuses to work in.
+      // user. Drop it, so the header never claims a branch the server refuses to
+      // work in; AuthContext moves the session to a branch they can use.
       clearStoredActiveBranch();
-      if (
-        !originalRequest?.skipBranchRedirect &&
-        !["/select-branch", "/login"].includes(window.location.pathname)
-      ) {
-        window.location.assign("/select-branch");
-      }
+      window.dispatchEvent(new Event("onActiveBranchInvalid"));
       return Promise.reject(error);
     }
 
@@ -350,7 +345,6 @@ export const authService = {
   setActiveBranch: (branchId) =>
     api.put("/auth/active-branch", { branchId }, {
       headers: { "x-active-branch": branchId },
-      skipBranchRedirect: true,
     }),
 };
 

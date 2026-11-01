@@ -111,7 +111,8 @@ const CSMTickets = () => {
     const [filterPriority, setFilterPriority] = useState('');
     const [filterInvoiceType, setFilterInvoiceType] = useState('');
     const [filterCustomer, setFilterCustomer] = useState('');
-    const [filterBranch, setFilterBranch] = useState('');
+    // A dashboard card opens the register on the branches it counted: ?branchId=, or ?myBranches=true
+    const [filterBranch, setFilterBranch] = useState(searchParams.get('branchId') || '');
     const [isFilterCollapsed, setIsFilterCollapsed] = useState(false);
     const [ticketCustomers, setTicketCustomers] = useState([]);
     const [branches, setBranches] = useState([]);
@@ -501,6 +502,8 @@ const CSMTickets = () => {
             }
             if (filterBranch) {
                 queryParams.branchId = filterBranch;
+            } else if (searchParams.get('myBranches') === 'true') {
+                queryParams.myBranches = 'true';
             }
             if (searchParams.get('unassigned') === 'true') {
                 queryParams.unassigned = 'true';
@@ -681,6 +684,13 @@ const CSMTickets = () => {
 
     useEffect(() => {
         fetchTicketCustomers();
+        // Options of the register's Branch filter
+        branchService.getAll()
+            .then((res) => {
+                const list = res.data?.data || res.data || [];
+                setBranches(Array.isArray(list) ? list : []);
+            })
+            .catch((error) => console.error('Failed to load branches:', error));
     }, []);
 
     useEffect(() => {
@@ -2396,7 +2406,7 @@ const CSMTickets = () => {
                                     onChange={(e) => { setFilterBranch(e.target.value); setPage(1); }}
                                     className="bg-transparent border-none focus:outline-none text-xs font-bold text-slate-700 cursor-pointer"
                                 >
-                                    <option value="">All Branches</option>
+                                    <option value="">{searchParams.get('myBranches') === 'true' ? 'All My Branches' : 'All Branches'}</option>
                                     {branches.map(b => (
                                         <option key={b._id} value={b._id}>{b.name}</option>
                                     ))}

@@ -10,12 +10,11 @@ query to. This applies to every role, super admin included.
    company branch for admins / super admins, whatever branch their own record
    carries, since that is only their home branch; the assignment for everyone else),
    `user.activeBranchId` and `user.activeBranch`.
-2. A user with more than one branch to choose from (every admin of a multi-branch
-   company) is sent to **Select Active Branch**, preselected to the branch they last
-   worked in, else their home branch. A single-branch user gets their branch applied
-   automatically. A session that is already open re-reads `GET /api/auth/branches`
-   at startup, so branches added later (or a changed role) show up in the header
-   switcher without logging in again.
+2. Login goes straight into the app, in the branch the user last worked in, else their
+   home branch, else the first of their branches (`AuthContext`). There is no selection
+   screen: the user switches from the header when they need to. A session that is
+   already open re-reads `GET /api/auth/branches` at startup, so branches added later
+   (or a changed role) show up in the header switcher without logging in again.
 3. `PUT /api/auth/active-branch { branchId }` validates the branch against the user's
    selectable branches and persists it on the user (`User.activeBranchId`).
 4. The frontend sends `x-active-branch: <branchId>` on every request. Switching the
@@ -25,8 +24,8 @@ query to. This applies to every role, super admin included.
 ## Server-side enforcement (`middlewares/authMiddleware.js`)
 
 - The header branch is validated on every request. An unusable branch gets
-  `403 { code: "ACTIVE_BRANCH_INVALID" }`; the frontend then clears its branch and
-  returns to the selection screen.
+  `403 { code: "ACTIVE_BRANCH_INVALID" }`; the frontend then clears its branch, re-reads
+  the user's branches and moves the session to one they can use.
 - Without a header the branch persisted on the user is used (exports opened in a new
   tab, API tools). `?activeBranchId=` is accepted as well.
 - The resolved branch is put in the request context (`AsyncLocalStorage`) and

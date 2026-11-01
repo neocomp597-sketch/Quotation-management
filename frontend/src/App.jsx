@@ -133,7 +133,6 @@ const CustomerAnalytics = lazy(() => import('./pages/CustomerAnalytics'));
 const Customer360Workspace = lazy(() => import('./pages/Customer360Workspace'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
-const SelectBranch = lazy(() => import('./pages/SelectBranch'));
 
 
 
@@ -213,7 +212,6 @@ function App() {
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
-            <Route path="/select-branch" element={<SelectBranch />} />
             <Route path="/dashboard" element={<PermissionRoute permissionKey="dashboard_overview"><Layout><Dashboard /></Layout></PermissionRoute>} />
             <Route path="/salespersons" element={<PermissionRoute permissionKey="admin_salespersons"><Layout><Salespersons /></Layout></PermissionRoute>} />
             <Route path="/salespersons/new" element={<PermissionRoute permissionKey="admin_salespersons" action="create"><Layout><Salespersons isCreatePage={true} /></Layout></PermissionRoute>} />

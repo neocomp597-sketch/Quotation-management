@@ -4,6 +4,7 @@ import { csmService } from '../services/api';
 import { MdFlashOn, MdFormatListBulleted, MdGridView, MdChevronRight } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import CSMDashboardFilter, { CSMDashboardHeader } from '../components/csm/CSMDashboardFilter';
+import MgrAccessNotice from '../components/MgrAccessNotice';
 import { useCSMDashboardFilters } from '../hooks/useCSMDashboardFilters';
 
 // Charts, SLA compliance, field service log and engineer performance live on the
@@ -20,6 +21,7 @@ const CSMDashboard = () => {
     const filters = useCSMDashboardFilters();
     const [loading, setLoading] = useState(true);
     const [metrics, setMetrics] = useState(null);
+    const [mgrAccess, setMgrAccess] = useState(null);
     const latestRequest = useRef(0);
     // The chosen view is remembered on this device
     const [viewMode, setViewMode] = useState(() => {
@@ -45,7 +47,10 @@ const CSMDashboard = () => {
         setLoading(true);
         try {
             const res = await csmService.getStats(filters.params);
-            if (requestId === latestRequest.current) setMetrics(res.data?.metrics || {});
+            if (requestId === latestRequest.current) {
+                setMetrics(res.data?.metrics || {});
+                setMgrAccess(res.data?.mgrAccess || null);
+            }
         } catch (error) {
             console.error('Fetch dashboard stats error:', error);
             if (requestId === latestRequest.current) toast.error('Failed to load dashboard statistics');
@@ -64,18 +69,19 @@ const CSMDashboard = () => {
 
     const m = metrics || {};
 
-    // Each card opens the Tickets Register filtered to the tickets it counts
+    // Each card opens the Tickets Register filtered to the tickets it counts, in the same branches
+    const branchQuery = filters.selectedBranch ? `branchId=${filters.selectedBranch}` : 'myBranches=true';
     const cardRows = [
         [
-            { label: 'Open', value: m.open, color: 'from-teal-500 to-emerald-600', link: '/csm/tickets?status=open_tickets&tab=all' },
-            { label: 'Unassigned', value: m.unassigned, color: 'from-purple-500 to-primary-600', link: '/csm/tickets?unassigned=true&tab=all' },
-            { label: 'Pending', value: m.pending, color: 'from-amber-400 to-orange-500', link: '/csm/tickets?status=Pending Customer&tab=all' }
+            { label: 'Open', value: m.open, color: 'from-teal-500 to-emerald-600', link: `/csm/tickets?status=open_tickets&tab=all&${branchQuery}` },
+            { label: 'Unassigned', value: m.unassigned, color: 'from-purple-500 to-primary-600', link: `/csm/tickets?unassigned=true&tab=all&${branchQuery}` },
+            { label: 'Pending', value: m.pending, color: 'from-amber-400 to-orange-500', link: `/csm/tickets?status=Pending Customer&tab=all&${branchQuery}` }
         ],
         [
-            { label: 'Created Yesterday', value: m.createdYesterday, color: 'from-primary-400 to-primary-600', link: '/csm/tickets?createdOn=yesterday&tab=all' },
-            { label: 'Resolved Yesterday', value: m.resolvedYesterday, color: 'from-emerald-500 to-green-600', link: '/csm/tickets?resolvedOn=yesterday&tab=all' },
-            { label: 'Created Today', value: m.createdToday, color: 'from-primary-500 to-primary-700', link: '/csm/tickets?createdOn=today&tab=all' },
-            { label: 'Resolved Today', value: m.resolvedToday, color: 'from-primary-500 to-primary-600', link: '/csm/tickets?resolvedOn=today&tab=all' }
+            { label: 'Created Yesterday', value: m.createdYesterday, color: 'from-primary-400 to-primary-600', link: `/csm/tickets?createdOn=yesterday&tab=all&${branchQuery}` },
+            { label: 'Resolved Yesterday', value: m.resolvedYesterday, color: 'from-emerald-500 to-green-600', link: `/csm/tickets?resolvedOn=yesterday&tab=all&${branchQuery}` },
+            { label: 'Created Today', value: m.createdToday, color: 'from-primary-500 to-primary-700', link: `/csm/tickets?createdOn=today&tab=all&${branchQuery}` },
+            { label: 'Resolved Today', value: m.resolvedToday, color: 'from-primary-500 to-primary-600', link: `/csm/tickets?resolvedOn=today&tab=all&${branchQuery}` }
         ]
     ];
 
@@ -132,6 +138,8 @@ const CSMDashboard = () => {
             />
 
             <CSMDashboardFilter filters={filters} />
+
+            <MgrAccessNotice mgrAccess={mgrAccess} noun="tickets" />
 
             <div className="space-y-3">
                 {/* List / Card View Toggle */}

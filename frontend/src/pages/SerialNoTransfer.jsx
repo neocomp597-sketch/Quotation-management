@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { MdSearch, MdSwapHoriz, MdVisibility, MdArrowBack, MdPersonAdd, MdHistory, MdCheckCircle, MdFileDownload, MdAdd, MdClose, MdArrowForward, MdStore, MdExpandMore, MdFilterAlt } from 'react-icons/md';
+import { MdSearch, MdSwapHoriz, MdVisibility, MdArrowBack, MdPersonAdd, MdHistory, MdCheckCircle, MdFileDownload, MdAdd, MdClose, MdArrowForward, MdStore, MdExpandMore } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { serialTransferService, customerService, csmService, mgrService } from '../services/api';
 import AssetActivityLog from '../components/AssetActivityLog';
+import MgrAccessNotice from '../components/MgrAccessNotice';
 import PaginationControls from '../components/PaginationControls';
 import Modal from '../components/Modal';
 import Customers from './Customers';
@@ -157,32 +158,6 @@ const useList = (load, params, enabled = true) => {
 
     if (!enabled) return { rows: [], pagination: EMPTY_PAGINATION, mgrAccess: state.mgrAccess, loading: false };
     return { ...state, loading: state.key !== requestKey };
-};
-
-const MGR_ACCESS_LEVELS = [['mgr1', 'MGR 1'], ['mgr2', 'MGR 2'], ['mgr3', 'MGR 3'], ['mgr4', 'MGR 4'], ['mgr5', 'MGR 5']];
-
-// The user's MGR access (Authorization > MGR Access, shared with Invoice Bulk Upload), shown above
-// the list when it limits what they see: { mgr1: [{ code, description }] }, or null.
-const MgrAccessNotice = ({ mgrAccess }) => {
-    if (!mgrAccess) return null;
-    const lines = MGR_ACCESS_LEVELS
-        .filter(([key]) => mgrAccess[key]?.length)
-        .map(([key, label]) => `${label}: ${mgrAccess[key].map(mgrLabel).join(', ')}`);
-    return (
-        <div className="mb-4 flex items-start gap-3 rounded-2xl border border-primary-200 bg-primary-50 p-4">
-            <div className="shrink-0 rounded-xl bg-primary-100 p-2 text-primary-700"><MdFilterAlt size={18} /></div>
-            <div className="min-w-0">
-                <p className="text-sm font-black text-primary-800">
-                    {lines.length ? 'You see only the serial numbers of your MGR access' : 'Your MGR access has no values'}
-                </p>
-                <p className="mt-0.5 break-words text-[11px] font-semibold text-primary-700">
-                    {lines.length
-                        ? lines.join(' · ')
-                        : 'The MGR values you were given have been removed from the Product MGR Master. Ask an administrator to set your MGR access again.'}
-                </p>
-            </div>
-        </div>
-    );
 };
 
 // Search and filters survive opening a serial and coming back (per browser tab only).
@@ -351,7 +326,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                 <DateRangeFilter range={range} field="Invoice Date" onChange={() => setPage(1)} />
             </div>
             <div className="p-3 md:p-6">
-                <MgrAccessNotice mgrAccess={mgrAccess} />
+                <MgrAccessNotice mgrAccess={mgrAccess} noun="serial numbers" />
                 {loading ? <Spinner /> : (
                     <>
                         <TotalCountBar
@@ -366,7 +341,6 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                                     <MobileCardHead
                                         title={<><span className="text-slate-400 font-bold">{offset + index + 1}.</span> {row.serialNumber}</>}
                                         subtitle={[row.productCode, row.productName].filter(Boolean).join(' · ')}
-                                        aside={<StatusBadge status={row.status} />}
                                     />
                                     <MobileFields>
                                         <MobileField label="Branch">{row.branchName || '-'}</MobileField>
@@ -404,7 +378,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                             <table className="serial-list-compact w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50">
-                                        {['Sr No', 'Serial No', 'Product', 'Branch', 'Current Customer', 'Invoice Number', 'Invoice Date', 'Transfers', 'Status'].map((label) => (
+                                        {['Sr No', 'Serial No', 'Product', 'Branch', 'Current Customer', 'Invoice Number', 'Invoice Date', 'Transfers'].map((label) => (
                                             <th key={label} className={thClass}>{label}</th>
                                         ))}
                                         <th className={`${thClass} text-right`}>Action</th>
@@ -427,7 +401,6 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                                             <td className="p-4 text-slate-600 whitespace-nowrap">{row.invoiceNumber || '-'}</td>
                                             <td className="p-4 text-slate-500 whitespace-nowrap">{formatDate(row.saleDate)}</td>
                                             <td className="p-4 font-bold text-slate-700">{row.transfers}</td>
-                                            <td className="p-4"><StatusBadge status={row.status} /></td>
                                             <td className="p-4 text-right whitespace-nowrap">
                                                 <button type="button" title="View history" onClick={(e) => { e.stopPropagation(); onOpen(row._id); }} className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all">
                                                     <MdVisibility size={18} />
@@ -436,20 +409,20 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                                                     <MdFileDownload size={18} />
                                                 </button>
                                                 {canModify && canAssign(row.status) && (
-                                                    <button type="button" title="Assign a customer (status stays the same)" onClick={(e) => { e.stopPropagation(); onTransfer(row._id, 'assign'); }} className="ml-1 inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all">
-                                                        <MdPersonAdd size={16} /> Assign
+                                                    <button type="button" title="Assign a customer (status stays the same)" aria-label={`Assign a customer to ${row.serialNumber}`} onClick={(e) => { e.stopPropagation(); onTransfer(row._id, 'assign'); }} className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all">
+                                                        <MdPersonAdd size={18} />
                                                     </button>
                                                 )}
                                                 {canModify && canTransfer(row.status) && (
-                                                    <button type="button" title={isSold(row.status) ? 'Transfer to another customer' : 'Sell to another customer (status becomes Sold)'} onClick={(e) => { e.stopPropagation(); onTransfer(row._id, 'transfer'); }} className="ml-1 inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all">
-                                                        <MdSwapHoriz size={16} /> Transfer
+                                                    <button type="button" title={isSold(row.status) ? 'Transfer to another customer' : 'Transfer to another customer (status becomes Sold)'} aria-label={`Transfer ${row.serialNumber}`} onClick={(e) => { e.stopPropagation(); onTransfer(row._id, 'transfer'); }} className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all">
+                                                        <MdSwapHoriz size={18} />
                                                     </button>
                                                 )}
                                             </td>
                                         </tr>
                                     ))}
                                     {!rows.length && (
-                                        <tr><td colSpan={10} className="p-8 text-center text-slate-400 text-sm font-medium">{range.invalid ? 'Correct the date range to see results.' : 'No serial numbers match.'}</td></tr>
+                                        <tr><td colSpan={9} className="p-8 text-center text-slate-400 text-sm font-medium">{range.invalid ? 'Correct the date range to see results.' : 'No serial numbers match.'}</td></tr>
                                     )}
                                 </tbody>
                             </table>
@@ -1971,7 +1944,7 @@ const SerialNoTransfer = () => {
         <div className="space-y-6">
             <div>
                 <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Serial No Transfer</h1>
-                <p className="text-sm sm:text-base text-slate-500 font-medium">Every Invoice Bulk Upload serial number with its branch and status. Move any serial to another customer or to another branch.</p>
+                <p className="text-sm sm:text-base text-slate-500 font-medium">Every Invoice Bulk Upload serial number with its branch and customer. Move any serial to another customer or to another branch.</p>
             </div>
 
             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">

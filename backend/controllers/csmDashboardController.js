@@ -1,17 +1,26 @@
 const Ticket = require('../models/Ticket');
 const User = require('../models/User');
 const { buildAccessScopeQuery } = require('../utils/accessControl');
+const { getMgrAccess, describeMgrAccess } = require('../utils/mgrAccess');
+const { getVisibleTicketsFilter, getTicketMgrCondition } = require('./ticketController');
+
+/**
+ * The tickets the dashboards count, the same ones their cards open in the register: the chosen
+ * branch (?branchId, which the screen defaults to the branch selected in the header), else every
+ * branch the user is authorized for; the date range; the tickets the user may see in the register;
+ * and the user's MGR access.
+ */
+const dashboardTicketScope = async (req) => {
+    const scope = await buildAccessScopeQuery(req, { branchField: 'branchId', userField: null, engineerField: null });
+    const conditions = [await getVisibleTicketsFilter(req.user), await getTicketMgrCondition(req)].filter(Boolean);
+    return conditions.length ? { ...scope, $and: conditions } : scope;
+};
 
 exports.getStats = async (req, res) => {
     try {
         const now = new Date();
 
-        // Build base scope query for user, role/org chart, branch, and date range
-        const baseScope = await buildAccessScopeQuery(req, {
-            branchField: 'branchId',
-            userField: 'createdBy',
-            engineerField: 'assignedEngineerId'
-        });
+        const baseScope = await dashboardTicketScope(req);
 
         // 1. Unassigned Tickets count (Requirement 3)
         // Tickets that are not resolved/closed/cancelled and have no engineer assigned.
@@ -190,7 +199,9 @@ exports.getStats = async (req, res) => {
                 { name: 'Breached', value: slaBreachedRes }
             ],
             avgResolutionHours,
-            engineerPerformance
+            engineerPerformance,
+            // What the user's MGR access limits them to, for the screen's notice; null when not limited.
+            mgrAccess: await describeMgrAccess(await getMgrAccess(req))
         });
     } catch (error) {
         console.error('CSM Dashboard stats error:', error);

@@ -6,6 +6,7 @@ const Customer = require('../models/Customer');
 const User = require('../models/User');
 const CustomerContact = require('../models/CustomerContact');
 const { broadcastCrmUpdate } = require('../config/socket');
+const { mgrAccessCondition } = require('../utils/mgrAccess');
 
 // Tickets are visible from every branch (see models/Ticket.js), so the customer, contact and
 // serial a ticket points to must resolve even when they belong to another branch.
@@ -464,6 +465,25 @@ exports.getVisibleTicketsFilter = async (user) => (
     isAdminOrManagerUser(user) ? null : hierarchyTicketCondition(await getHierarchyUserAndStaffIds(user))
 );
 
+/**
+ * MGR access (Authorization > MGR Access) on the Customer Service dashboards, register, ticket
+ * details and visits: a user limited to some MGR values sees the tickets of those products, plus
+ * the tickets they raised or are assigned to themselves whatever the product (their own work never
+ * disappears). null when the user is not limited.
+ */
+exports.getTicketMgrCondition = async (req) => {
+    const access = await mgrAccessCondition(req);
+    if (!access) return null;
+    const { selfUserIds, selfEngineerIds, selfSalespersonIds } = await getHierarchyUserAndStaffIds(req.user);
+    const visibilityOr = [access, { createdBy: { $in: selfUserIds.map(id => new mongoose.Types.ObjectId(id)) } }];
+    if (selfEngineerIds.length > 0) {
+        visibilityOr.push({ assignedEngineerId: { $in: selfEngineerIds } });
+        visibilityOr.push({ assignedEngineerIds: { $in: selfEngineerIds } });
+    }
+    if (selfSalespersonIds.length > 0) visibilityOr.push({ assignedSalespersonId: { $in: selfSalespersonIds } });
+    return { $or: visibilityOr };
+};
+
 exports.getTickets = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
@@ -517,13 +537,18 @@ exports.getTickets = async (req, res) => {
 
         // Support Tickets are a company-wide register: a ticket raised in any branch is
         // listed from every branch. Visibility is still limited by the my/team/all
-        // hierarchy rules below; ?branchId= narrows the register on request.
+        // hierarchy rules below; ?branchId= narrows the register on request, and ?myBranches=true
+        // (a dashboard card on "All My Branches") to every branch the user is authorized for.
         if (req.query.branchId && mongoose.Types.ObjectId.isValid(req.query.branchId)) {
             filter.branchId = req.query.branchId;
+        } else if (req.query.myBranches === 'true' && req.user?.allowedBranchIds) {
+            filter.branchId = { $in: req.user.allowedBranchIds };
         }
 
         const andConditions = [];
-        
+        const mgrCondition = await exports.getTicketMgrCondition(req);
+        if (mgrCondition) andConditions.push(mgrCondition);
+
         // Cascading Reporting Hierarchy & Ticket Visibility Filter
         const tab = (req.query.tab || '').toLowerCase().trim();
         const hierarchyInfo = await getHierarchyUserAndStaffIds(req.user);
@@ -706,7 +731,8 @@ exports.getTicketById = async (req, res) => {
         if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
             return res.status(400).json({ message: 'Invalid ticket ID format' });
         }
-        const ticket = await Ticket.findOne({ _id: req.params.id, companyId: req.user?.companyId })
+        const mgrCondition = await exports.getTicketMgrCondition(req);
+        const ticket = await Ticket.findOne({ _id: req.params.id, companyId: req.user?.companyId, ...mgrCondition })
             .populate({ path: 'customerId', options: CROSS_BRANCH })
             .populate({ path: 'contactId', options: CROSS_BRANCH })
             .populate('contactDesignationId')
@@ -1429,7 +1455,8 @@ exports.getTicketCustomerOptions = async (req, res) => {
 exports.getTicketCustomers = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
-        const uniqueCustomerIds = await Ticket.find({ companyId }).distinct('customerId');
+        const mgrCondition = await exports.getTicketMgrCondition(req);
+        const uniqueCustomerIds = await Ticket.find({ companyId, ...mgrCondition }).distinct('customerId');
         
         const customers = await Customer.find({ 
             _id: { $in: uniqueCustomerIds },
