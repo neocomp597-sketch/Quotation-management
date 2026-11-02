@@ -14,6 +14,7 @@ const { getCachedJson, makeCacheKey, setCachedJson } = require('../utils/apiCach
 const { createCompanyNotifications } = require('../utils/notificationHelper');
 const { broadcastCrmUpdate } = require('../config/socket');
 const { buildAccessScopeQuery } = require('../utils/accessControl');
+const { territoryLimit } = require('../utils/territoryScope');
 
 const DRAFT_TTL_SECONDS = 24 * 60 * 60;
 const DASHBOARD_TTL_SECONDS = 60;
@@ -936,22 +937,8 @@ module.exports = {
     getAllQuotations: async (req, res) => {
         try {
             let query = {};
-            if (req.user && req.user.role !== 'admin' && req.user.role !== 'manager') {
-                const Territory = require('../models/Territory');
-                const userTerritories = await Territory.find({
-                    $or: [
-                        { manager: req.user.id },
-                        { salesReps: req.user.id }
-                    ]
-                }).select('_id').lean();
-                
-                const territoryIds = userTerritories.map(t => t._id);
-                
-                query.$or = [
-                    { territory: { $in: territoryIds } },
-                    { createdBy: req.user.id }
-                ];
-            }
+            const limit = await territoryLimit(req, 'quotation_list');
+            if (limit) query.$or = limit;
 
             if (req.query.territory) {
                 query.territory = req.query.territory;
@@ -1177,20 +1164,8 @@ module.exports = {
     getConversionReport: async (req, res) => {
         try {
             let query = {};
-            if (req.user && req.user.role !== 'admin' && req.user.role !== 'manager') {
-                const Territory = require('../models/Territory');
-                const userTerritories = await Territory.find({
-                    $or: [
-                        { manager: req.user.id },
-                        { salesReps: req.user.id }
-                    ]
-                }).select('_id').lean();
-                const territoryIds = userTerritories.map(t => t._id);
-                query.$or = [
-                    { territory: { $in: territoryIds } },
-                    { createdBy: req.user.id }
-                ];
-            }
+            const limit = await territoryLimit(req, 'reports_main');
+            if (limit) query.$or = limit;
 
             const quotations = await Quotation.find(query)
                 .select('quotationNo customerName salespersonName grandTotal status createdAt convertedAt')

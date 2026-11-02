@@ -617,7 +617,7 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                             <MdMenu size={24} />
                         </button>
 
-                        <form ref={searchRef} onSubmit={(e) => e.preventDefault()} className="relative w-full max-w-lg hidden sm:block group">
+                        <form ref={searchRef} onSubmit={(e) => e.preventDefault()} className={`relative w-full max-w-lg hidden group ${sidebarOpen ? 'lg:block' : 'sm:block'}`}>
                             <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary-600 transition-colors" size={20} />
                             <input
                                 type="text"
@@ -765,7 +765,7 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                                     className="w-full flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 rounded-2xl bg-primary-50/80 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/60 transition-all font-bold text-xs shadow-sm"
                                 >
                                     <span className="hidden sm:block w-2 h-2 shrink-0 rounded-full bg-emerald-500 animate-pulse"></span>
-                                    <span className="hidden sm:inline font-extrabold uppercase tracking-wide text-[11px]">Branch:</span>
+                                    <span className="hidden lg:inline font-extrabold uppercase tracking-wide text-[11px]">Branch:</span>
                                     <span className="font-black truncate max-w-[120px]">
                                         {activeBranch?.name || assignedBranches.find(b => (b._id || b.id) === activeBranchId)?.name || 'Select Branch'}
                                     </span>
@@ -820,9 +820,9 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
 
                         {/* Socket Reconnecting Badge */}
                         {isReconnecting && (
-                            <div title="Reconnecting..." className="shrink-0 inline-flex items-center gap-1.5 px-2 sm:px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold rounded-full animate-pulse">
+                            <div title="Reconnecting..." className="shrink-0 inline-flex items-center gap-1.5 px-2 lg:px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold rounded-full animate-pulse">
                                 <MdSync className="animate-spin" size={14} />
-                                <span className="hidden sm:inline">Reconnecting...</span>
+                                <span className="hidden lg:inline">Reconnecting...</span>
                             </div>
                         )}
 
@@ -831,7 +831,7 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                             type="button"
                             onClick={toggleTheme}
                             title={isDarkMode ? 'Dark Mode Active (Click for Light Mode)' : 'Light Mode Active (Click for Dark Mode)'}
-                            className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition-all hidden sm:flex items-center gap-1.5 border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
+                            className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition-all hidden lg:flex items-center gap-1.5 border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
                         >
                             {isDarkMode ? (
                                 <MdNightsStay size={20} className="text-primary-400" />
@@ -855,7 +855,7 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                             type="button"
                             onClick={() => navigate('/system-updates')}
                             title="Daily CRM Changes Update"
-                            className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-white dark:hover:bg-slate-700 transition-all hidden sm:flex items-center justify-center border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
+                            className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-white dark:hover:bg-slate-700 transition-all hidden lg:flex items-center justify-center border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
                         >
                             <MdInfoOutline size={22} />
                         </button>
@@ -924,12 +924,12 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                             )}
                         </div>
 
-                        <div className="h-10 w-px bg-slate-100 dark:bg-slate-800 mx-1 hidden sm:block"></div>
+                        <div className="h-10 w-px bg-slate-100 dark:bg-slate-800 mx-1 hidden lg:block"></div>
 
                         {/* Profile Dropdown */}
                         <div className="relative" ref={dropdownRef}>
                             <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex items-center gap-3 pl-1 sm:pl-2 pr-1 py-1 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all border border-transparent hover:border-slate-100 dark:hover:border-slate-800 outline-none">
-                                <div className="text-right hidden md:block">
+                                <div className="text-right hidden lg:block">
                                     <p className="text-sm font-black text-slate-900 dark:text-slate-100 leading-none">{user?.name || 'User'}</p>
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{user?.role || 'User'}</p>
                                 </div>
@@ -949,11 +949,11 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                                         <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate mt-1">{user?.email}</p>
                                     </div>
                                     <div className="p-1">
-                                        {/* In the header from 640px up; a phone has no room for them there. */}
-                                        <button type="button" onClick={toggleTheme} className="sm:hidden w-full flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-primary-600 dark:hover:text-primary-400 rounded-xl transition-all">
+                                        {/* In the header from 1024px up; phones and tablets have no room for them there. */}
+                                        <button type="button" onClick={toggleTheme} className="lg:hidden w-full flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-primary-600 dark:hover:text-primary-400 rounded-xl transition-all">
                                             {isDarkMode ? <MdWbSunny size={18} /> : <MdNightsStay size={18} />} {isDarkMode ? 'Light Mode' : 'Dark Mode'}
                                         </button>
-                                        <Link to="/system-updates" onClick={() => setIsProfileOpen(false)} className="sm:hidden flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-primary-600 dark:hover:text-primary-400 rounded-xl transition-all">
+                                        <Link to="/system-updates" onClick={() => setIsProfileOpen(false)} className="lg:hidden flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-primary-600 dark:hover:text-primary-400 rounded-xl transition-all">
                                             <MdInfoOutline size={18} /> Daily CRM Changes Update
                                         </Link>
                                         <Link to="/settings" onClick={() => setIsProfileOpen(false)} className="flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-primary-600 dark:hover:text-primary-400 rounded-xl transition-all">

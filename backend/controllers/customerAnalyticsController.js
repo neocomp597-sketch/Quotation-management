@@ -8,6 +8,7 @@ const Deal = require('../models/Deal');
 const DealActivity = require('../models/DealActivity');
 const User = require('../models/User');
 const Contract = require('../models/Contract');
+const { territoryLimit } = require('../utils/territoryScope');
 
 // Simple In-Memory / Redis Caching Helper
 const localMemoryCache = new Map();
@@ -57,23 +58,8 @@ const setCachedData = async (cacheKey, data, ttlSeconds = 60) => {
 
 // Helper to get role-based filters
 const getRoleBasedFilter = async (req) => {
-    const filter = {};
-    if (req.user && req.user.role !== 'admin' && req.user.role !== 'manager') {
-        const Territory = require('../models/Territory');
-        const userTerritories = await Territory.find({
-            $or: [
-                { manager: req.user.id },
-                { salesReps: req.user.id }
-            ]
-        }).select('_id').lean();
-        const territoryIds = userTerritories.map(t => t._id);
-        filter.$or = [
-            { territory: { $in: territoryIds } },
-            { createdBy: req.user.id },
-            { owner: req.user.id }
-        ];
-    }
-    return filter;
+    const limit = await territoryLimit(req, 'master_customers', { includeUnassigned: true, ownFields: ['createdBy', 'owner'] });
+    return limit ? { $or: limit } : {};
 };
 
 // 7-Dimension Weighted Health Score Function

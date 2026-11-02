@@ -2,14 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { MdClose, MdMinimize, MdPushPin } from 'react-icons/md';
 import NotepadWidget from './NotepadWidget';
 
+// A first visit opens it, except on a phone, where it would cover most of the screen.
+const opensByDefault = () => window.innerWidth >= 640;
+
 const FloatingNotepad = () => {
     // Default open & pinned so it remains accessible permanently across all pages
     const [isOpen, setIsOpen] = useState(() => {
         try {
             const saved = localStorage.getItem('floating_notepad_open');
-            return saved === null ? true : saved !== 'false';
+            return saved === null ? opensByDefault() : saved !== 'false';
         } catch {
-            return true;
+            return opensByDefault();
         }
     });
 
