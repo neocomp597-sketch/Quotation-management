@@ -305,8 +305,7 @@ const ownershipFilter = async (ownership) => {
 /**
  * Serial No List: every Invoice Bulk Upload serial, of every status, with its current branch and
  * current customer (?status filters by status). The list follows the same branch rule as Invoice
- * Bulk Upload. `transfers` counts the new customers recorded for the serial (transfers and
- * assignments); `transferred` says whether it has any.
+ * Bulk Upload.
  */
 exports.listSerials = async (req, res) => {
     try {
@@ -346,7 +345,7 @@ exports.listSerials = async (req, res) => {
 
         const [assets, total] = await Promise.all([
             Asset.find(scopedQuery)
-                .select('serialNumber productId productCode productName status branchId customerId customerCode customerNameStr saleDate invoiceDate invoiceNumber createdAt')
+                .select('serialNumber assetNo productId productCode productName status branchId customerId customerCode customerNameStr saleDate invoiceDate invoiceNumber createdAt')
                 .populate(customerPopulate)
                 .populate(branchPopulate)
                 .sort({ saleDate: -1, createdAt: -1 })
@@ -356,42 +355,22 @@ exports.listSerials = async (req, res) => {
             Asset.countDocuments(scopedQuery)
         ]);
 
-        const counts = assets.length
-            ? await SerialTransfer.aggregate([
-                { $match: addActiveBranchFilter({ assetId: { $in: assets.map((asset) => asset._id) } }) },
-                {
-                    $group: {
-                        _id: '$assetId',
-                        transfers: { $sum: { $cond: [{ $in: ['$entryType', CHANGE_TYPES] }, 1, 0] } },
-                        lastTransferDate: { $max: '$transferDate' }
-                    }
-                }
-            ])
-            : [];
-        const countById = new Map(counts.map((row) => [String(row._id), row]));
-
-        const data = assets.map((asset) => {
-            const transfer = countById.get(String(asset._id));
-            const transfers = transfer?.transfers || 0;
-            return {
-                _id: asset._id,
-                serialNumber: asset.serialNumber,
-                productCode: asset.productCode,
-                productName: asset.productName,
-                customerId: asset.customerId?._id || null,
-                customerCode: cleanText(asset.customerId?.externalCode) || asset.customerCode,
-                customerName: customerLabel(asset.customerId, asset.customerNameStr),
-                // A serial that is not sold has a sale date only if its invoice gave one.
-                saleDate: asset.status === 'SOLD' ? saleDateOf(asset) : asset.saleDate || asset.invoiceDate || null,
-                invoiceNumber: asset.invoiceNumber,
-                transfers,
-                lastTransferDate: transfers ? transfer.lastTransferDate : null,
-                transferred: transfers > 0,
-                status: statusOf(asset),
-                branchId: idOf(asset.branchId),
-                branchName: branchLabel(asset.branchId)
-            };
-        });
+        const data = assets.map((asset) => ({
+            _id: asset._id,
+            serialNumber: asset.serialNumber,
+            assetNo: asset.assetNo || '',
+            productCode: asset.productCode,
+            productName: asset.productName,
+            customerId: asset.customerId?._id || null,
+            customerCode: cleanText(asset.customerId?.externalCode) || asset.customerCode,
+            customerName: customerLabel(asset.customerId, asset.customerNameStr),
+            // A serial that is not sold has a sale date only if its invoice gave one.
+            saleDate: asset.status === 'SOLD' ? saleDateOf(asset) : asset.saleDate || asset.invoiceDate || null,
+            invoiceNumber: asset.invoiceNumber,
+            status: statusOf(asset),
+            branchId: idOf(asset.branchId),
+            branchName: branchLabel(asset.branchId)
+        }));
 
         return res.json({
             data,
