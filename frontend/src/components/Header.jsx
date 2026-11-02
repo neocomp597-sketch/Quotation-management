@@ -607,7 +607,7 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
     return (
         <>
             <header className={`fixed top-0 right-0 h-20 bg-white/80 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-100 dark:border-slate-800 z-40 transition-all duration-300 left-0 no-print ${sidebarOpen ? 'md:left-64' : 'md:left-20'}`}>
-                <div className="h-full px-6 flex items-center justify-between gap-4">
+                <div className="h-full px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4">
                     <div className="flex items-center gap-4 flex-1">
                         <button
                             onClick={toggleSidebar}
@@ -754,28 +754,28 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                         </form>
                     </div>
 
-                    <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="min-w-0 flex items-center gap-1.5 sm:gap-3">
                         {/* Active Branch Switcher */}
                         {assignedBranches && assignedBranches.length > 0 && (
-                            <div className="relative" ref={branchDropdownRef}>
+                            <div className="min-w-0 sm:relative" ref={branchDropdownRef}>
                                 <button
                                     type="button"
                                     onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
                                     title="Active Branch Scope"
-                                    className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-primary-50/80 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/60 transition-all font-bold text-xs shadow-sm"
+                                    className="w-full flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 rounded-2xl bg-primary-50/80 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/60 transition-all font-bold text-xs shadow-sm"
                                 >
-                                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    <span className="hidden sm:block w-2 h-2 shrink-0 rounded-full bg-emerald-500 animate-pulse"></span>
                                     <span className="hidden sm:inline font-extrabold uppercase tracking-wide text-[11px]">Branch:</span>
                                     <span className="font-black truncate max-w-[120px]">
                                         {activeBranch?.name || assignedBranches.find(b => (b._id || b.id) === activeBranchId)?.name || 'Select Branch'}
                                     </span>
                                     {assignedBranches.length > 1 && (
-                                        <MdExpandMore size={16} className={`transition-transform duration-200 ${isBranchDropdownOpen ? 'rotate-180' : ''}`} />
+                                        <MdExpandMore size={16} className={`shrink-0 transition-transform duration-200 ${isBranchDropdownOpen ? 'rotate-180' : ''}`} />
                                     )}
                                 </button>
 
                                 {isBranchDropdownOpen && assignedBranches.length > 1 && (
-                                    <div className="absolute top-full right-0 mt-3 w-64 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-2xl rounded-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                                    <div className="absolute top-full left-3 right-3 mt-1 sm:left-auto sm:right-0 sm:mt-3 sm:w-64 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-2xl rounded-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                                         <div className="px-4 py-2 border-b border-slate-50 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-400">
                                             Switch Active Working Branch
                                         </div>
@@ -820,9 +820,9 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
 
                         {/* Socket Reconnecting Badge */}
                         {isReconnecting && (
-                            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold rounded-full animate-pulse">
+                            <div title="Reconnecting..." className="shrink-0 inline-flex items-center gap-1.5 px-2 sm:px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold rounded-full animate-pulse">
                                 <MdSync className="animate-spin" size={14} />
-                                <span>Reconnecting...</span>
+                                <span className="hidden sm:inline">Reconnecting...</span>
                             </div>
                         )}
 
@@ -831,7 +831,7 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                             type="button"
                             onClick={toggleTheme}
                             title={isDarkMode ? 'Dark Mode Active (Click for Light Mode)' : 'Light Mode Active (Click for Dark Mode)'}
-                            className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition-all flex items-center gap-1.5 border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
+                            className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition-all hidden sm:flex items-center gap-1.5 border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
                         >
                             {isDarkMode ? (
                                 <MdNightsStay size={20} className="text-primary-400" />
@@ -845,7 +845,7 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                             type="button"
                             onClick={() => window.dispatchEvent(new CustomEvent('toggle-floating-notepad'))}
                             title="Quick Notepad"
-                            className="p-2.5 rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-amber-600 text-white hover:scale-105 shadow-md shadow-orange-500/20 transition-all flex items-center justify-center border border-amber-400/30"
+                            className="p-2 sm:p-2.5 rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-amber-600 text-white hover:scale-105 shadow-md shadow-orange-500/20 transition-all flex items-center justify-center border border-amber-400/30"
                         >
                             <MdStickyNote2 size={20} />
                         </button>
@@ -855,13 +855,13 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                             type="button"
                             onClick={() => navigate('/system-updates')}
                             title="Daily CRM Changes Update"
-                            className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-white dark:hover:bg-slate-700 transition-all flex items-center justify-center border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
+                            className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-white dark:hover:bg-slate-700 transition-all hidden sm:flex items-center justify-center border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
                         >
                             <MdInfoOutline size={22} />
                         </button>
 
                         {/* Notifications Bell */}
-                        <div className="relative" ref={notifRef}>
+                        <div className="sm:relative" ref={notifRef}>
                             <button 
                                 onClick={() => {
                                     const nextState = !isNotifOpen;
@@ -870,7 +870,7 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                                         void fetchNotifications();
                                     }
                                 }}
-                                className="relative p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:text-primary-600 hover:bg-white dark:hover:bg-slate-700 transition-all flex"
+                                className="relative p-2 sm:p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:text-primary-600 hover:bg-white dark:hover:bg-slate-700 transition-all flex"
                             >
                                 <MdNotifications size={22} />
                                 {displayNotifications.length > 0 && (
@@ -879,7 +879,7 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                             </button>
                             
                             {isNotifOpen && (
-                                <div className="absolute top-full right-0 mt-3 w-80 max-h-96 overflow-y-auto bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 py-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                                <div className="absolute top-full left-3 right-3 mt-1 sm:left-auto sm:right-0 sm:mt-3 sm:w-80 max-h-96 overflow-y-auto bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 py-3 animate-in fade-in slide-in-from-top-2 duration-200">
                                     <div className="px-4 pb-2 border-b border-slate-50 dark:border-slate-800 mb-2 flex justify-between items-center">
                                         <h4 className="font-black text-slate-900 dark:text-slate-100">Notifications</h4>
                                         <span className="text-[10px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">{displayNotifications.length} Unread</span>
@@ -928,7 +928,7 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
 
                         {/* Profile Dropdown */}
                         <div className="relative" ref={dropdownRef}>
-                            <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex items-center gap-3 pl-2 pr-1 py-1 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all border border-transparent hover:border-slate-100 dark:hover:border-slate-800 outline-none">
+                            <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex items-center gap-3 pl-1 sm:pl-2 pr-1 py-1 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all border border-transparent hover:border-slate-100 dark:hover:border-slate-800 outline-none">
                                 <div className="text-right hidden md:block">
                                     <p className="text-sm font-black text-slate-900 dark:text-slate-100 leading-none">{user?.name || 'User'}</p>
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{user?.role || 'User'}</p>
@@ -949,6 +949,13 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
                                         <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate mt-1">{user?.email}</p>
                                     </div>
                                     <div className="p-1">
+                                        {/* In the header from 640px up; a phone has no room for them there. */}
+                                        <button type="button" onClick={toggleTheme} className="sm:hidden w-full flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-primary-600 dark:hover:text-primary-400 rounded-xl transition-all">
+                                            {isDarkMode ? <MdWbSunny size={18} /> : <MdNightsStay size={18} />} {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+                                        </button>
+                                        <Link to="/system-updates" onClick={() => setIsProfileOpen(false)} className="sm:hidden flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-primary-600 dark:hover:text-primary-400 rounded-xl transition-all">
+                                            <MdInfoOutline size={18} /> Daily CRM Changes Update
+                                        </Link>
                                         <Link to="/settings" onClick={() => setIsProfileOpen(false)} className="flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-primary-600 dark:hover:text-primary-400 rounded-xl transition-all">
                                             <MdSettings size={18} /> Settings
                                         </Link>
