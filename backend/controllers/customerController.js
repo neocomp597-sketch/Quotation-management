@@ -1,6 +1,8 @@
 const Customer = require('../models/Customer');
 const { invalidateCustomerCaches } = require('../utils/cacheInvalidation');
 const { getCachedJson, makeCacheKey, setCachedJson } = require('../utils/apiCache');
+const { getEffectivePermissions } = require('../middlewares/permissionMiddleware');
+const { hasPermission } = require('../config/authorization');
 
 const CUSTOMERS_LIST_CACHE_TTL_SECONDS = Number(process.env.CUSTOMERS_LIST_CACHE_TTL_SECONDS || 300);
 const CUSTOMERS_DETAIL_CACHE_TTL_SECONDS = Number(process.env.CUSTOMERS_DETAIL_CACHE_TTL_SECONDS || 300);
@@ -67,10 +69,17 @@ const buildCustomerQuery = async (req) => {
         
         const territoryIds = userTerritories.map(t => t._id);
         
-        query.$or = [
-            { territory: { $in: territoryIds } },
-            { createdBy: req.user.id }
-        ];
+        // Territories limit the people they name. Someone given Customer Master in Authorization who
+        // is in no territory sees the whole branch. Reads here are open (other screens use this as a
+        // lookup list), so without that permission the limit stays.
+        const seesWholeBranch = !territoryIds.length
+            && hasPermission(await getEffectivePermissions(req), 'master_customers', 'view');
+        if (!seesWholeBranch) {
+            query.$or = [
+                { territory: { $in: territoryIds } },
+                { createdBy: req.user.id }
+            ];
+        }
     }
 
     if (req.query.territory) {
