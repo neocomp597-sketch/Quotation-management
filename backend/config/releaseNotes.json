@@ -601,7 +601,8 @@
       "Sign-In: no Select Branch screen, and staff with no branch assigned cannot log in; admins set this in the new Branch Access panel",
       "Serial No Transfer: Asset No box and column, and an MGR 1 filter",
       "Customers and Quotations: employees with no territory see the whole selected branch",
-      "Phones and Tablets: the top bar no longer pushes controls off the screen"
+      "Phones and Tablets: the top bar no longer pushes controls off the screen",
+      "Also fixed: Serial No Transfer search by customer and product, older products in Product Master that could not be saved, product names on Invoice Bulk Upload rows, and Contact Person in the customer import"
     ],
     "detailedChanges": [
       {
@@ -663,6 +664,30 @@
         "module": "Quotations",
         "submodule": "Invoice Bulk Upload: Customer Search",
         "changes": "The search box now finds a serial by the customer name shown on its row. Before this, some customers could not be found by name even though the row showed them, because the search looked only at a copy of the name saved with the serial, which can be blank or out of date. The search now also looks in Customer Master by name and code, in Product Master by name and code, and in the customer code saved with the serial, and it ignores double spaces in names. Export follows the same search. You still see only the serials of your branch and MGR access."
+      },
+      {
+        "date": "03.11.2026",
+        "module": "Quotations",
+        "submodule": "Serial No Transfer: Customer and Product Search",
+        "changes": "Search on Serial No List, Transfer History, Customer Activity Log and the Branch Transfer serial list now finds a serial by the customer's current name and code in Customer Master, including a customer of another branch, and by the product's name and code in Product Master. It also ignores double spaces in names. Serial No List and the Branch Transfer serial list show these names when the serial itself holds none. Each list stays on its branch and your MGR access still applies."
+      },
+      {
+        "date": "03.11.2026",
+        "module": "Quotations",
+        "submodule": "Invoice Bulk Upload: Product on the Row",
+        "changes": "A row now shows the product name and code saved with the serial when the product cannot be read from Product Master, instead of N/A. A serial with no product recorded anywhere still shows N/A."
+      },
+      {
+        "date": "03.11.2026",
+        "module": "Master Management",
+        "submodule": "Product Master: Saving Older Products",
+        "changes": "An older product that shares its name with another can now be edited and saved as long as its name and code stay the same. Before this, the save was refused with a duplicate message even though the name had not been changed. Changing a name or code to one already in use is still refused, and so is adding a new product with one."
+      },
+      {
+        "date": "03.11.2026",
+        "module": "Master Management",
+        "submodule": "Customer Import: Contact Person",
+        "changes": "The Contact Person column of the customer import now goes into the customer's Contact Person box. Before this it was saved as the Customer Name and the box stayed empty. The Customer Name now follows the company name unless the file has its own Customer Name column, and a file with no name or company column still takes the name from Contact Person. A blank cell keeps the contact already saved. Customers imported before this fix are corrected by importing the same file again. The Company Trade Name column mentioned in the template is now read as well."
       }
     ],
     "deployedBy": "Super Admin",
