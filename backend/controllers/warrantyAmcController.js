@@ -14,6 +14,7 @@ const { productMgrPopulate, applyProductMgrs, applyProductMgrsToAll, stripMgrFie
 const { customerPostalCodeOf, applyCustomerPostalCode } = require('../utils/customerPostalCode');
 const { loadDivisionSegmentLookup, resolveDivisionSegment } = require('../utils/divisionSegment');
 const { getMgrAccess, describeMgrAccess, accessCondition, mgrAccessCondition, accessAllowsProduct, canSeeProduct, MGR_ACCESS_DENIED } = require('../utils/mgrAccess');
+const { assetSearchConditions } = require('../utils/assetSearch');
 
 // Division / Segment of an Invoice Bulk Upload record, shown as code + description.
 const DIVISION_POPULATE = { path: 'divisionId', select: 'code description status' };
@@ -977,35 +978,6 @@ exports.getReturnHistory = async (req, res) => {
         console.error('getReturnHistory error:', error);
         res.status(500).json({ message: error.message || 'Error fetching return history' });
     }
-};
-
-/**
- * What the Invoice Bulk Upload search box looks in. A row shows its customer and product from their
- * masters, while the serial only keeps a copy of those names: blank on serials saved by invoices and
- * the warranty and ticket imports, and old after a rename. So the masters are searched as well, in
- * the whole company as the row's own lookup is, because a serial's customer can be of another branch.
- * The rest of the list's filter still limits the rows to the user's branch and MGR access.
- */
-const assetSearchConditions = async (companyId, text) => {
-    const source = String(text).trim()
-        .replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')
-        // A space matches any run of spaces: the screen shows double and non-breaking spaces as one.
-        .replace(/\s+/g, '[\\s\\xA0]+');
-    const pattern = new RegExp(source, 'i');
-    const [customerIds, productIds] = await Promise.all([
-        Customer.find({ companyId, $or: [{ companyName: pattern }, { customerName: pattern }, { externalCode: pattern }] }).distinct('_id'),
-        Product.find({ companyId, $or: [{ productName: pattern }, { productCode: pattern }] }).distinct('_id')
-    ]);
-    return [
-        { serialNumber: pattern },
-        { productCode: pattern },
-        { productName: pattern },
-        { invoiceNumber: pattern },
-        { customerNameStr: pattern },
-        { customerCode: pattern },
-        { customerId: { $in: customerIds } },
-        { productId: { $in: productIds } }
-    ];
 };
 
 // List Assets with Customer Name search support (Requirement #10)

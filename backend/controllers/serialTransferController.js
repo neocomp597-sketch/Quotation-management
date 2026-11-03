@@ -15,6 +15,7 @@ const { formatDate } = require('../utils/dateFormat');
 const { getActiveBranchId } = require('../middlewares/tenantContext');
 const { limitedBranchIds, canMoveFrom, visibleTransfersCondition } = require('../utils/serialBranchAccess');
 const { getMgrAccess, accessCondition, describeMgrAccess, mgrAccessCondition } = require('../utils/mgrAccess');
+const { searchPattern, matchingMasterIds, assetSearchConditions } = require('../utils/assetSearch');
 
 /**
  * Serial No Transfer: the serial numbers of Invoice Bulk Upload (Asset), read straight from
@@ -164,6 +165,7 @@ const getPagination = (query) => {
 
 const CUSTOMER_SELECT = 'customerName companyName externalCode mobile gstin billingAddress';
 const customerPopulate = { path: 'customerId', select: CUSTOMER_SELECT, options: { bypassTenant: true } };
+const productPopulate = { path: 'productId', select: 'productCode productName', options: { bypassTenant: true } };
 
 const customerLabel = (customer, fallback = '') => cleanText(customer?.companyName) || cleanText(customer?.customerName) || fallback;
 
@@ -318,18 +320,13 @@ exports.listSerials = async (req, res) => {
 
         const search = cleanText(req.query.search);
         if (search) {
-            const pattern = new RegExp(escapeRegex(search), 'i');
+            const pattern = searchPattern(search);
+            const { customerIds, productIds } = await matchingMasterIds(req.user.companyId, pattern);
             const byField = {
                 serial: [{ serialNumber: pattern }],
-                product: [{ productCode: pattern }, { productName: pattern }],
-                customer: [{ customerNameStr: pattern }, { customerCode: pattern }]
+                product: [{ productCode: pattern }, { productName: pattern }, { productId: { $in: productIds } }],
+                customer: [{ customerNameStr: pattern }, { customerCode: pattern }, { customerId: { $in: customerIds } }]
             };
-            if (req.query.field === 'customer') {
-                // The customer master name can differ from the name stored on the invoice row.
-                const customers = await Customer.find({ $or: [{ companyName: pattern }, { customerName: pattern }, { externalCode: pattern }] })
-                    .select('_id').limit(500).lean();
-                byField.customer.push({ customerId: { $in: customers.map((c) => c._id) } });
-            }
             and.push({ $or: byField[req.query.field] || [...byField.serial, ...byField.product, ...byField.customer] });
         }
 
@@ -347,6 +344,7 @@ exports.listSerials = async (req, res) => {
             Asset.find(scopedQuery)
                 .select('serialNumber assetNo productId productCode productName status branchId customerId customerCode customerNameStr saleDate invoiceDate invoiceNumber createdAt')
                 .populate(customerPopulate)
+                .populate(productPopulate)
                 .populate(branchPopulate)
                 .sort({ saleDate: -1, createdAt: -1 })
                 .skip(skip)
@@ -359,8 +357,8 @@ exports.listSerials = async (req, res) => {
             _id: asset._id,
             serialNumber: asset.serialNumber,
             assetNo: asset.assetNo || '',
-            productCode: asset.productCode,
-            productName: asset.productName,
+            productCode: asset.productId?.productCode || asset.productCode,
+            productName: asset.productId?.productName || asset.productName,
             customerId: asset.customerId?._id || null,
             customerCode: cleanText(asset.customerId?.externalCode) || asset.customerCode,
             customerName: customerLabel(asset.customerId, asset.customerNameStr),
@@ -699,10 +697,11 @@ exports.listHistory = async (req, res) => {
         const query = activeBranchFilter() || {};
         const search = cleanText(req.query.search);
         if (search) {
-            const pattern = new RegExp(escapeRegex(search), 'i');
+            const pattern = searchPattern(search);
+            const { customerIds, productIds } = await matchingMasterIds(req.user.companyId, pattern);
             query.$or = [
-                { serialNumber: pattern }, { productCode: pattern }, { productName: pattern },
-                { companyName: pattern }, { customerName: pattern }, { customerCode: pattern }
+                { serialNumber: pattern }, { productCode: pattern }, { productName: pattern }, { productId: { $in: productIds } },
+                { companyName: pattern }, { customerName: pattern }, { customerCode: pattern }, { customerId: { $in: customerIds } }
             ];
         }
         if (req.query.flag === 'Active') query.isActive = true;
@@ -744,7 +743,7 @@ exports.listHistory = async (req, res) => {
  */
 const OWNERSHIPS = ['Active', 'Inactive'];
 
-const activeOwners = async ({ search, range, assetId, products, skip, limit }) => {
+const activeOwners = async ({ companyId, search, range, assetId, products, skip, limit }) => {
     // Serials with an active history record have a current owner whatever their status.
     const owned = await SerialTransfer.find({ isActive: true }).select('assetId').lean();
     const match = { $and: [{ $or: [{ status: 'SOLD' }, { _id: { $in: owned.map((record) => record.assetId) } }] }] };
@@ -754,11 +753,12 @@ const activeOwners = async ({ search, range, assetId, products, skip, limit }) =
     if (assetId) match._id = new mongoose.Types.ObjectId(String(assetId));
     if (products) match.productId = products;
     if (search) {
-        const pattern = new RegExp(escapeRegex(search), 'i');
+        const pattern = searchPattern(search);
+        const { customerIds, productIds } = await matchingMasterIds(companyId, pattern);
         match.$and.push({
             $or: [
-                { serialNumber: pattern }, { productCode: pattern }, { productName: pattern },
-                { customerNameStr: pattern }, { customerCode: pattern }
+                { serialNumber: pattern }, { productCode: pattern }, { productName: pattern }, { productId: { $in: productIds } },
+                { customerNameStr: pattern }, { customerCode: pattern }, { customerId: { $in: customerIds } }
             ]
         });
     }
@@ -810,17 +810,18 @@ const activeOwners = async ({ search, range, assetId, products, skip, limit }) =
     return { rows, total: result?.total?.[0]?.count || 0 };
 };
 
-const inactiveOwners = async ({ search, range, assetId, products, skip, limit }) => {
+const inactiveOwners = async ({ companyId, search, range, assetId, products, skip, limit }) => {
     const query = { isActive: false };
     const branchFilter = activeBranchFilter();
     if (branchFilter) Object.assign(query, branchFilter);
     if (assetId) query.assetId = assetId;
     if (products) query.productId = products;
     if (search) {
-        const pattern = new RegExp(escapeRegex(search), 'i');
+        const pattern = searchPattern(search);
+        const { customerIds, productIds } = await matchingMasterIds(companyId, pattern);
         query.$or = [
-            { serialNumber: pattern }, { productCode: pattern }, { productName: pattern },
-            { companyName: pattern }, { customerName: pattern }, { customerCode: pattern }
+            { serialNumber: pattern }, { productCode: pattern }, { productName: pattern }, { productId: { $in: productIds } },
+            { companyName: pattern }, { customerName: pattern }, { customerCode: pattern }, { customerId: { $in: customerIds } }
         ];
     }
     if (range) query.transferDate = range;
@@ -915,6 +916,7 @@ const loadActivity = async (req, paging = {}) => {
     const { products, access } = await productScope(req);
     const serial = await activitySerial(query.assetId, access);
     const options = {
+        companyId: req.user.companyId,
         search: cleanText(query.search),
         range: dateRange(query),
         assetId: serial?._id,
@@ -1101,14 +1103,13 @@ exports.searchBranchSerials = async (req, res) => {
         const status = assetStatusCondition(req.query.status);
         if (status) query.status = status;
         const search = cleanText(req.query.search);
-        if (search) {
-            const pattern = new RegExp(escapeRegex(search), 'i');
-            query.$or = [{ serialNumber: pattern }, { productCode: pattern }, { productName: pattern }, { invoiceNumber: pattern }, { customerNameStr: pattern }];
-        }
+        if (search) query.$or = await assetSearchConditions(req.user.companyId, search);
         const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
         const [assets, total] = await Promise.all([
             Asset.find(query)
-                .select('serialNumber productCode productName status customerNameStr invoiceNumber')
+                .select('serialNumber productId productCode productName status customerId customerNameStr invoiceNumber')
+                .populate(productPopulate)
+                .populate(customerPopulate)
                 .sort({ createdAt: -1, _id: -1 })
                 .limit(limit)
                 .lean(),
@@ -1118,10 +1119,10 @@ exports.searchBranchSerials = async (req, res) => {
             data: assets.map((asset) => ({
                 _id: asset._id,
                 serialNumber: asset.serialNumber,
-                productCode: asset.productCode,
-                productName: asset.productName,
+                productCode: asset.productId?.productCode || asset.productCode,
+                productName: asset.productId?.productName || asset.productName,
                 status: statusOf(asset),
-                customerName: asset.customerNameStr || '',
+                customerName: customerLabel(asset.customerId, asset.customerNameStr),
                 invoiceNumber: asset.invoiceNumber || '',
                 branchId: branch._id,
                 branchName: branchLabel(branch)
