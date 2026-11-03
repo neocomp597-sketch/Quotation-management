@@ -1371,7 +1371,7 @@ const SerialNoMaster = () => {
                                         <MobileCard key={asset._id}>
                                             <MobileCardHead
                                                 title={<span className="font-mono tracking-wide">{asset.serialNumber}</span>}
-                                                subtitle={[asset.productId?.productName, asset.productId?.productCode].filter(Boolean).join(' · ') || 'N/A'}
+                                                subtitle={[asset.productId?.productName || asset.productName, asset.productId?.productCode || asset.productCode].filter(Boolean).join(' · ') || 'N/A'}
                                                 aside={<AssetStatusBadge status={asset.status} />}
                                             />
                                             {asset.indicatorField && (
@@ -1451,8 +1451,8 @@ const SerialNoMaster = () => {
                                                         )}
                                                     </td>
                                                     <td className="p-4">
-                                                        <span className="block text-sm font-bold text-slate-800">{asset.productId?.productName || 'N/A'}</span>
-                                                        <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{asset.productId?.productCode || 'N/A'}</span>
+                                                        <span className="block text-sm font-bold text-slate-800">{asset.productId?.productName || asset.productName || 'N/A'}</span>
+                                                        <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{asset.productId?.productCode || asset.productCode || 'N/A'}</span>
                                                         <MgrLine record={asset} />
                                                     </td>
                                                     <td className="p-4">
