@@ -979,6 +979,35 @@ exports.getReturnHistory = async (req, res) => {
     }
 };
 
+/**
+ * What the Invoice Bulk Upload search box looks in. A row shows its customer and product from their
+ * masters, while the serial only keeps a copy of those names: blank on serials saved by invoices and
+ * the warranty and ticket imports, and old after a rename. So the masters are searched as well, in
+ * the whole company as the row's own lookup is, because a serial's customer can be of another branch.
+ * The rest of the list's filter still limits the rows to the user's branch and MGR access.
+ */
+const assetSearchConditions = async (companyId, text) => {
+    const source = String(text).trim()
+        .replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')
+        // A space matches any run of spaces: the screen shows double and non-breaking spaces as one.
+        .replace(/\s+/g, '[\\s\\xA0]+');
+    const pattern = new RegExp(source, 'i');
+    const [customerIds, productIds] = await Promise.all([
+        Customer.find({ companyId, $or: [{ companyName: pattern }, { customerName: pattern }, { externalCode: pattern }] }).distinct('_id'),
+        Product.find({ companyId, $or: [{ productName: pattern }, { productCode: pattern }] }).distinct('_id')
+    ]);
+    return [
+        { serialNumber: pattern },
+        { productCode: pattern },
+        { productName: pattern },
+        { invoiceNumber: pattern },
+        { customerNameStr: pattern },
+        { customerCode: pattern },
+        { customerId: { $in: customerIds } },
+        { productId: { $in: productIds } }
+    ];
+};
+
 // List Assets with Customer Name search support (Requirement #10)
 exports.getAssets = async (req, res) => {
     try {
@@ -1013,14 +1042,7 @@ exports.getAssets = async (req, res) => {
         }
 
         if (req.query.q && String(req.query.q).trim()) {
-            const escaped = String(req.query.q).trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-            filter.$or = [
-                { serialNumber: { $regex: escaped, $options: 'i' } },
-                { productCode: { $regex: escaped, $options: 'i' } },
-                { productName: { $regex: escaped, $options: 'i' } },
-                { invoiceNumber: { $regex: escaped, $options: 'i' } },
-                { customerNameStr: { $regex: escaped, $options: 'i' } }
-            ];
+            filter.$or = await assetSearchConditions(companyId, req.query.q);
         }
 
         const [docs, total, allAssets, inStock, sold, returned] = await Promise.all([
@@ -1105,14 +1127,7 @@ exports.exportAssets = async (req, res) => {
         }
 
         if (req.query.q && String(req.query.q).trim()) {
-            const escaped = String(req.query.q).trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-            filter.$or = [
-                { serialNumber: { $regex: escaped, $options: 'i' } },
-                { productCode: { $regex: escaped, $options: 'i' } },
-                { productName: { $regex: escaped, $options: 'i' } },
-                { invoiceNumber: { $regex: escaped, $options: 'i' } },
-                { customerNameStr: { $regex: escaped, $options: 'i' } }
-            ];
+            filter.$or = await assetSearchConditions(companyId, req.query.q);
         }
 
         const docs = await Asset.find(filter)
