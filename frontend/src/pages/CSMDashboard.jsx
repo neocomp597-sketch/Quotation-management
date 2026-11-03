@@ -129,7 +129,7 @@ const CSMDashboard = () => {
             key={card.label}
             type="button"
             onClick={() => navigate(card.link)}
-            className="relative overflow-hidden text-left bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl px-5 py-4 shadow-sm cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all active:scale-[0.98] group focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+            className="relative overflow-hidden text-left bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl px-4 sm:px-5 py-3 shadow-sm cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all active:scale-[0.98] group focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
         >
             <span className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${card.color}`} />
             <span className="block text-[11px] leading-tight font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
@@ -168,7 +168,7 @@ const CSMDashboard = () => {
     );
 
     return (
-        <div className="p-6 space-y-6 max-w-7xl mx-auto animate-fade-in-up">
+        <div className="pb-6 space-y-4 max-w-7xl mx-auto animate-fade-in-up">
             <CSMDashboardHeader
                 title="Customer Service Analytics"
                 icon={<MdFlashOn className="text-teal-600 animate-pulse" />}
@@ -176,51 +176,47 @@ const CSMDashboard = () => {
                 refreshing={loading}
                 onExport={exportToExcel}
                 exporting={exporting}
-            />
+            >
+                {/* List / Card View Toggle */}
+                <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700 shrink-0">
+                    {VIEW_OPTIONS.map(({ value, label, icon: Icon }) => (
+                        <button
+                            key={value}
+                            type="button"
+                            onClick={() => changeViewMode(value)}
+                            aria-pressed={viewMode === value}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                viewMode === value
+                                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                            }`}
+                            title={`${label} View`}
+                        >
+                            <Icon size={16} />
+                            <span>{label}</span>
+                        </button>
+                    ))}
+                </div>
+            </CSMDashboardHeader>
 
             <CSMDashboardFilter filters={filters} />
 
             <MgrAccessNotice mgrAccess={mgrAccess} noun="tickets" />
 
-            <div className="space-y-3">
-                {/* List / Card View Toggle */}
-                <div className="flex justify-end">
-                    <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700 shrink-0">
-                        {VIEW_OPTIONS.map(({ value, label, icon: Icon }) => (
-                            <button
-                                key={value}
-                                type="button"
-                                onClick={() => changeViewMode(value)}
-                                aria-pressed={viewMode === value}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                                    viewMode === value
-                                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                                }`}
-                                title={`${label} View`}
-                            >
-                                <Icon size={16} />
-                                <span>{label}</span>
-                            </button>
-                        ))}
+            {viewMode === 'list' ? (
+                <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
+                    {cardRows.flat().map(renderListRow)}
+                </div>
+            ) : (
+                <div className="space-y-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 [&>:first-child]:col-span-2 sm:[&>:first-child]:col-span-1">
+                        {cardRows[0].map(renderCard)}
+                    </div>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        {cardRows[1].map(renderCard)}
                     </div>
                 </div>
-
-                {viewMode === 'list' ? (
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
-                        {cardRows.flat().map(renderListRow)}
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            {cardRows[0].map(renderCard)}
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {cardRows[1].map(renderCard)}
-                        </div>
-                    </div>
-                )}
-            </div>
+            )}
         </div>
     );
 };

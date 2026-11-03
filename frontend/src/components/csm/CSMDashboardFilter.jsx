@@ -16,7 +16,7 @@ const QUICK_RANGES = [
     { value: 'lastMonth', label: 'Previous Month' }
 ];
 
-const presetButtonClass = (active) => `px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all ${
+const presetButtonClass = (active) => `px-2.5 py-1.5 whitespace-nowrap text-xs font-bold rounded-xl transition-all ${
     active
         ? 'bg-teal-600 text-white shadow-md shadow-teal-600/20'
         : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
@@ -24,7 +24,10 @@ const presetButtonClass = (active) => `px-3.5 py-1.5 text-xs font-bold rounded-x
 
 const selectClass = 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-xl py-1.5 font-bold outline-none focus:ring-2 focus:ring-teal-500 shadow-sm';
 
-const headerButtonClass = 'p-3 text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-2xl shadow-sm hover:bg-slate-50 transition-all flex items-center gap-1 font-bold text-xs';
+// Branch and MGR 1 share the date buttons' row: a long name is cut off in the closed list, not the row's width.
+const rowSelectClass = `${selectClass} truncate min-w-0 grow basis-36 px-3 sm:grow-0 sm:basis-auto`;
+
+const headerButtonClass = 'px-3 py-2 text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-2xl shadow-sm hover:bg-slate-50 transition-all flex items-center gap-1 font-bold text-xs';
 
 /** The date filter in words, e.g. "This Month" or "Jan 2026 (1-15)". */
 export const describeDateFilter = ({ quickRange, customMode, selectedMonth, selectedYear, startDay, endDay }) => {
@@ -39,13 +42,14 @@ export const describeDateFilter = ({ quickRange, customMode, selectedMonth, sele
     return 'All Time';
 };
 
-/** Page title row with the Refresh button and, when `onExport` is given, Export to Excel. */
-export const CSMDashboardHeader = ({ title, icon, onRefresh, refreshing, onExport, exporting }) => (
-    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
-        <h1 className="text-3xl font-black tracking-tight text-slate-900 font-outfit uppercase flex items-center gap-2">
+/** Page title row with the Refresh button, Export to Excel when `onExport` is given, and `children` first (the page's own controls). */
+export const CSMDashboardHeader = ({ title, icon, onRefresh, refreshing, onExport, exporting, children }) => (
+    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+        <h1 className="text-2xl font-black tracking-tight text-slate-900 font-outfit uppercase flex items-center gap-2">
             {icon} {title}
         </h1>
-        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+        <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto">
+            {children}
             {onExport && (
                 <button type="button" onClick={onExport} disabled={exporting} className={`${headerButtonClass} disabled:opacity-60`} title="Export to Excel">
                     <MdFileDownload size={18} /> {exporting ? 'Exporting...' : 'Export to Excel'}
@@ -74,19 +78,20 @@ const CSMDashboardFilter = ({ filters }) => {
     const dayOptions = Array.from({ length: daysInSelectedMonth }, (_, idx) => idx + 1);
 
     const activeDateSummary = describeDateFilter(filters);
+    const canReset = selectedBranch || selectedMgr1 || quickRange || customMode || startDay || endDay;
 
     return (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
             {/* Filter Header / Collapse Toggle Bar */}
             <div
                 onClick={() => setIsCollapsed(!isCollapsed)}
-                className="p-4 flex items-center justify-between gap-4 cursor-pointer select-none hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                className="px-4 py-2.5 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
             >
-                <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 rounded-2xl border border-teal-100 dark:border-teal-900/50">
-                        <MdFilterList size={20} />
+                <div className="flex min-w-0 items-center gap-3">
+                    <div className="shrink-0 p-2 bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 rounded-2xl border border-teal-100 dark:border-teal-900/50">
+                        <MdFilterList size={18} />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                         <div className="flex items-center gap-2">
                             <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-200">
                                 Filter View
@@ -103,7 +108,7 @@ const CSMDashboardFilter = ({ filters }) => {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex shrink-0 items-center gap-2">
                     {/* Quick Branch & Date Badges when collapsed */}
                     {isCollapsed && (
                         <div className="hidden sm:flex items-center gap-2">
@@ -121,6 +126,18 @@ const CSMDashboardFilter = ({ filters }) => {
                         </div>
                     )}
 
+                    {!isCollapsed && canReset && (
+                        <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); reset(); }}
+                            title="Reset filters"
+                            aria-label="Reset filters"
+                            className="flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 px-2.5 py-1.5 rounded-xl transition-colors"
+                        >
+                            <MdRestartAlt size={16} /> <span className="hidden sm:inline">Reset</span>
+                        </button>
+                    )}
+
                     <button
                         type="button"
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all"
@@ -134,45 +151,41 @@ const CSMDashboardFilter = ({ filters }) => {
 
             {/* Expanded Filter Panel */}
             {!isCollapsed && (
-                <div className="p-4 pt-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
-                    {branchAndMgr && (
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
-                            {branchOptions.length > 1 && (
-                                <label className="flex min-w-0 items-center gap-2">
-                                    <span className="shrink-0 font-bold text-slate-500 dark:text-slate-400 uppercase text-[10px] tracking-wider">Branch:</span>
-                                    <select
-                                        value={selectedBranch}
-                                        onChange={(e) => setSelectedBranch(e.target.value)}
-                                        className={`${selectClass} min-w-0 max-w-full px-3`}
-                                    >
-                                        <option value="">All My Branches</option>
-                                        {branchOptions.map((branch) => (
-                                            <option key={branch._id} value={branch._id}>{branch.name}</option>
-                                        ))}
-                                    </select>
-                                </label>
-                            )}
-                            <label className="flex min-w-0 items-center gap-2">
-                                <span className="shrink-0 font-bold text-slate-500 dark:text-slate-400 uppercase text-[10px] tracking-wider">MGR 1:</span>
-                                <select
-                                    value={selectedMgr1}
-                                    onChange={(e) => setSelectedMgr1(e.target.value)}
-                                    className={`${selectClass} min-w-0 max-w-full px-3`}
-                                >
-                                    <option value="">All MGR 1</option>
-                                    {mgr1Options.map((mgr) => (
-                                        <option key={mgr._id} value={mgr._id}>
-                                            {mgr.description && mgr.description !== mgr.code ? `${mgr.code} - ${mgr.description}` : mgr.code}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-                        </div>
-                    )}
+                <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <div className="flex flex-wrap xl:flex-nowrap items-center gap-2 text-xs">
+                        {branchAndMgr && branchOptions.length > 1 && (
+                            <select
+                                value={selectedBranch}
+                                onChange={(e) => setSelectedBranch(e.target.value)}
+                                aria-label="Branch"
+                                title={branchName}
+                                className={`${rowSelectClass} sm:max-w-[10rem]`}
+                            >
+                                <option value="">All My Branches</option>
+                                {branchOptions.map((branch) => (
+                                    <option key={branch._id} value={branch._id}>{branch.name}</option>
+                                ))}
+                            </select>
+                        )}
+                        {branchAndMgr && (
+                            <select
+                                value={selectedMgr1}
+                                onChange={(e) => setSelectedMgr1(e.target.value)}
+                                aria-label="MGR 1"
+                                title={mgr1Name || 'All MGR 1'}
+                                className={`${rowSelectClass} sm:max-w-[11rem]`}
+                            >
+                                <option value="">All MGR 1</option>
+                                {mgr1Options.map((mgr) => (
+                                    <option key={mgr._id} value={mgr._id}>
+                                        {mgr.description && mgr.description !== mgr.code ? `${mgr.code} - ${mgr.description}` : mgr.code}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
 
-                    <div className="flex flex-wrap items-center justify-between gap-3">
                         {/* Preset Buttons */}
-                        <div className="flex flex-wrap items-center gap-1.5">
+                        <div className="flex flex-wrap xl:shrink-0 items-center gap-1">
                             <button
                                 onClick={() => { setQuickRange(''); setCustomMode(false); }}
                                 className={presetButtonClass(!quickRange && !customMode)}
@@ -194,18 +207,6 @@ const CSMDashboardFilter = ({ filters }) => {
                             >
                                 <MdCalendarToday size={14} /> Month / Day Range
                             </button>
-                        </div>
-
-                        {/* Reset */}
-                        <div className="flex items-center gap-3">
-                            {(selectedBranch || selectedMgr1 || quickRange || customMode || startDay || endDay) && (
-                                <button
-                                    onClick={reset}
-                                    className="flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 px-2.5 py-1.5 rounded-xl transition-colors"
-                                >
-                                    <MdRestartAlt size={16} /> Reset
-                                </button>
-                            )}
                         </div>
                     </div>
 
