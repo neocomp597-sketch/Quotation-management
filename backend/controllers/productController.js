@@ -547,37 +547,6 @@ const updateProduct = async (req, res) => {
             repairTroubleshootingUrl
         } = req.body;
 
-        const cleanProductCode = productCode !== undefined ? String(productCode).trim() : null;
-        const cleanProductName = productName !== undefined ? String(productName).trim() : null;
-
-        const companyFilter = req.user?.companyId ? { companyId: req.user.companyId } : {};
-
-        if (cleanProductCode) {
-            const existingCode = await Product.findOne({
-                _id: { $ne: req.params.id },
-                ...companyFilter,
-                productCode: new RegExp(`^${cleanProductCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
-            });
-            if (existingCode) {
-                return res.status(400).json({
-                    message: `Product Code "${cleanProductCode}" already exists. Duplicate products are not allowed.`
-                });
-            }
-        }
-
-        if (cleanProductName) {
-            const existingName = await Product.findOne({
-                _id: { $ne: req.params.id },
-                ...companyFilter,
-                productName: new RegExp(`^${cleanProductName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
-            });
-            if (existingName) {
-                return res.status(400).json({
-                    message: `Product Name "${cleanProductName}" already exists. Duplicate products are not allowed.`
-                });
-            }
-        }
-
         const updateData = {
             productCode,
             productName,
@@ -640,6 +609,7 @@ const updateProduct = async (req, res) => {
         }
         if (typeof productCode === 'string') updateData.productCode = productCode.trim();
         if (typeof productName === 'string') updateData.productName = productName.trim();
+        // Only what the edit changes is checked: older products may already share a name.
         await assertProductUnique({
             productCode: updateData.productCode,
             productName: updateData.productName,

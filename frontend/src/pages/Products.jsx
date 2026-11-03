@@ -612,9 +612,11 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
 
         const cleanProductCode = formData.productCode?.trim().toLowerCase();
         const cleanProductName = formData.productName?.trim().toLowerCase();
+        // Older products may already share a name, so an edit is checked only for what it changes.
+        const isChanged = (field, value) => !editingProduct || String(editingProduct[field] || '').trim().toLowerCase() !== value;
 
         // Check for duplicate product code
-        const duplicateCode = (Array.isArray(products) ? products : []).find(p =>
+        const duplicateCode = isChanged('productCode', cleanProductCode) && (Array.isArray(products) ? products : []).find(p =>
             String(p._id) !== String(editingProduct?._id) &&
             String(p.productCode || '').trim().toLowerCase() === cleanProductCode
         );
@@ -624,7 +626,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
         }
 
         // Check for duplicate product name
-        const duplicateName = (Array.isArray(products) ? products : []).find(p =>
+        const duplicateName = isChanged('productName', cleanProductName) && (Array.isArray(products) ? products : []).find(p =>
             String(p._id) !== String(editingProduct?._id) &&
             String(p.productName || '').trim().toLowerCase() === cleanProductName
         );
