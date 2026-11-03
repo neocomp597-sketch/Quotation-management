@@ -16,15 +16,21 @@ const FIELDS = [
     },
     {
         key: 'customerName', label: 'Customer Name', required: true, fallbackFrom: 'companyName',
-        aliases: ['Customer Name', 'customerName', 'Name', 'Contact Person', 'BP Name', 'Company Name', 'companyName', 'Company'],
+        // A Contact Person column gives the name only when the row has no name or company.
+        aliases: ['Customer Name', 'customerName', 'Name', 'BP Name', 'Company Name', 'companyName', 'Company Trade Name', 'Company', 'Contact Person'],
         requiredMessage: 'Customer name is missing.',
         requiredHint: 'Fill in the customer name or the company name (one is enough).'
     },
     {
         key: 'companyName', label: 'Company Name', required: true, fallbackFrom: 'customerName',
-        aliases: ['Company Name', 'companyName', 'Company', 'BP Name', 'Customer Name', 'customerName', 'Name'],
+        aliases: ['Company Name', 'companyName', 'Company Trade Name', 'Company', 'BP Name', 'Customer Name', 'customerName', 'Name'],
         requiredMessage: 'Company name is missing.',
         requiredHint: 'Fill in the company name or the customer name (one is enough).'
+    },
+    {
+        key: 'contactPerson', label: 'Contact Person',
+        aliases: ['Contact Person', 'contactPerson'],
+        description: 'The person to contact at the customer. A blank cell keeps the saved contact.'
     },
     {
         key: 'gstin', label: 'GSTIN', type: 'upperText',
@@ -68,7 +74,7 @@ const ADDRESS_PATHS = {
     shippingPincode: 'shippingAddress.pincode'
 };
 
-const PLAIN_FIELDS = ['externalCode', 'customerName', 'companyName', 'gstin', 'mobile', 'email', 'defaultDiscount', 'logoUrl'];
+const PLAIN_FIELDS = ['externalCode', 'customerName', 'companyName', 'contactPerson', 'gstin', 'mobile', 'email', 'defaultDiscount', 'logoUrl'];
 
 const nameKey = (data) => (
     data.companyName && data.customerName ? `${matchKey(data.companyName)}|${matchKey(data.customerName)}` : ''
@@ -143,7 +149,9 @@ module.exports = {
         if (byCode) return { record: byCode, by: 'customer code', field: 'externalCode' };
         const byGstin = data.gstin && context.byGstin.get(matchKey(data.gstin));
         if (byGstin) return { record: byGstin, by: 'GSTIN', field: 'gstin' };
-        const byName = context.byName.get(nameKey(data));
+        const byName = context.byName.get(nameKey(data))
+            // Imported before Contact Person had its own field: the contact is in the customer name.
+            || context.byName.get(nameKey({ companyName: data.companyName, customerName: data.contactPerson }));
         if (byName) return { record: byName, by: 'company and customer name', field: 'companyName' };
         return null;
     },
