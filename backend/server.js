@@ -795,6 +795,14 @@ const startBackgroundServices = async () => {
       },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
     );
+    // Releases from v6.1.1 on are kept as data: add new ones to config/releaseNotes.json.
+    for (const release of require("./config/releaseNotes.json")) {
+      await SystemUpdate.findOneAndUpdate(
+        { version: release.version },
+        release,
+        { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+      );
+    }
   } catch (err) {
     console.error("[Release Seed Error] Failed to seed system update:", err.message);
   }

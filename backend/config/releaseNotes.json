@@ -1,0 +1,672 @@
+[
+  {
+    "version": "v6.1.1",
+    "title": "Product Problem Lists, Searchable Complaint Dropdowns, City Master Upload & Employee Logins",
+    "message": "Release Updates (14 - 18 Sep 2026): Problems on the complaint form now follow the product. Complaint dropdowns can be searched and Ticket Sources and Designations have their own tabs in CSM Config. Product documents upload more reliably. The employee list, upload and logins were improved, City Master can be filled from Excel, and the ARCRM logo and browser icons were added.",
+    "releaseNotes": [
+      "Problem List: each entry in Product MGR Master has its own problems, and the complaint form shows the problems of the chosen product",
+      "Complaint Form: searchable dropdowns, a contact mobile that can be left blank, and three photo upload boxes",
+      "Product Documents: PDF uploads accept more files and show the reason when an upload fails",
+      "Field Attendance: check-in and check-out open as full pages",
+      "Employee Master: totals, Code and Status on Departments and Designations, a fuller upload template, and a login for every employee",
+      "City Master: Excel upload, state short code and page-by-page list",
+      "Logo: the ARCRM logo on the sidebar, login and website pages, with new browser and phone icons"
+    ],
+    "detailedChanges": [
+      {
+        "date": "14.09.2026",
+        "module": "Master Management",
+        "submodule": "Product MGR Master: Problem List",
+        "changes": "Each entry in Product MGR Master now has a Problem List, where you can add, edit and remove the problems that apply to it. On the complaint form, the Problem dropdown shows the problems of the selected product's MGRs and its MGR4 category. If none are set up, it shows all problems, so the list is never empty. A problem added with Quick Add on the complaint form is saved against that product and category, and changing the product clears the problem chosen earlier."
+      },
+      {
+        "date": "15.09.2026",
+        "module": "CSM Support",
+        "submodule": "Complaint Form: Dropdowns, Contacts & Photos",
+        "changes": "Source, Designation, Problem and Priority on the complaint form are now searchable dropdowns. Ticket Sources and Designations have their own tabs in CSM Config, where they can be added, edited and deleted. A mobile number on a new customer contact can be left blank; if entered, a +91 or leading 0 is accepted and it must come to 10 digits. A new contact's name, phone and email now also fill in on the manual ticket form. Both ticket forms now have three upload boxes: Product Photo, Serial / Issue Photo and Invoice / Bill Image, and the photos are saved with the ticket. The serial number search no longer lists the same serial twice. From 21.09, raising a complaint no longer shows a false 'active ticket already exists' message: the form used to check only the page of tickets loaded on screen, and the check now runs only in the system, against all tickets."
+      },
+      {
+        "date": "15.09.2026",
+        "module": "Master Management",
+        "submodule": "Product Master: Product Documents (PDF)",
+        "changes": "Uploading the Technical Specification, Operating User Manual and Repair & Troubleshooting PDFs now also accepts files that the browser labels as a general download instead of a PDF, and the reason is shown when an upload fails. View PDF and the Tech Spec, Manual and Repair links in the product list open the file in a new tab. A file that cannot be found now gives a 'file not found' message instead of opening the app's own page. The documents section now has its own full-width block on the product form."
+      },
+      {
+        "date": "15.09.2026",
+        "module": "CSM Support",
+        "submodule": "Field Attendance: Full Pages & My Attendance",
+        "changes": "Check-in and check-out now open as full pages with a Back to Attendance Register button, instead of popups. From 06.10, the register is called My Attendance Register: every user, admins included, sees only their own records and can check out only their own record."
+      },
+      {
+        "date": "15.09.2026",
+        "module": "Employee Master",
+        "submodule": "Employee List, Departments & Designations",
+        "changes": "The employee list now shows email and phone under each name, the total number of employees, and a 'Showing X of Y' line. The Excel export now includes EMP Code and Mobile. Mobile Number accepts 8 to 15 digits, so numbers other than standard 10-digit mobiles can be saved. Reporting To always offers every employee, even when the list is filtered. Department and Designation masters now have a Code and an Active / Inactive status. A code cannot be used twice, and an inactive one is not offered on the employee form unless that employee already has it."
+      },
+      {
+        "date": "16.09.2026",
+        "module": "Employee Master",
+        "submodule": "Employee Upload & Logins",
+        "changes": "Download Template on Employees now gives a sample sheet with all the employee columns. The employee upload now reads EMP Code and Location. Location is matched to Branch Master by name, code, prefix or city, and a Location that is not found goes to the OTHER branch. Every employee now gets their own login, even with no email or with an email another login already uses; in that case the login ID is made from the employee code."
+      },
+      {
+        "date": "18.09.2026",
+        "module": "Master Management",
+        "submodule": "City Master: Excel Upload, State Code & Pages",
+        "changes": "City Master can now be filled from an Excel file with Upload; each row is added or updated by its pincode, city and state. Each entry now carries the state's short code (for example MH), filled in when the state is chosen, and the search also finds it. The list shows the total number of records and opens page by page, with a choice of rows per page, instead of loading everything at once."
+      },
+      {
+        "date": "18.09.2026",
+        "module": "Platform",
+        "submodule": "App Logo & Browser Icons",
+        "changes": "The ARCRM logo now appears in the sidebar and on the Login, Register and website pages, replacing the letter A badge. New icons were added for the browser tab and for adding the site to a phone's home screen. From 21.09, uploaded branch logos also display correctly in Branch Master."
+      }
+    ],
+    "deployedBy": "Super Admin",
+    "deployedAt": "2026-09-18T20:00:00+05:30",
+    "isActive": true
+  },
+  {
+    "version": "v6.2.0",
+    "title": "Product BOM Master, Faster Load Times, Branch-Wise Data Access, Customer Service Fixes & Payroll Withdrawal",
+    "message": "Release Updates (21 - 28 Sep 2026): Introduced the Product BOM Master with bulk upload, serial-number lookup, remarks, Excel and PDF export including sub-BOMs, and a read-only BOM tab on complaints. BOMs are now deactivated with a status log instead of being deleted, and descriptions with MGR1-MGR5 are read from Product Master on every view. Branch-wise data access is enforced at the API, not only in the screens. Load times were cut with response compression, cached master data and route-level code splitting. Support ticket search now covers every field on the register, the Close Ticket screen keeps spare parts and expenses, and visit check-out records the real location. Payroll salary screens were withdrawn, the Master menu was renamed and sorted, and the page after sign-in is now blank.",
+    "releaseNotes": [
+      "Product BOM Master: one BOM per finished-good serial with item code, description, quantity, batch, serial number, remarks and MGR1-MGR5, plus bulk upload with a downloadable template that replaces a serial on re-upload",
+      "BOM on Complaints: a read-only BOM tab appears once a serial number is entered on a complaint, so engineers see the bill of materials without being able to change it",
+      "BOM Export: Export to Excel and Export to PDF on BOM Details, the PDF carrying invoice number, invoice date, customer code, customer name and MGR1-MGR5, with any sub-BOM printed underneath in a smaller font",
+      "BOM Safety: the Delete button was replaced by Deactivate / Activate, keeping the BOM and its components in the register with a status log of who switched it and why; a permanent delete is left to administrators",
+      "Live Product Master Data: component descriptions and MGR1-MGR5 are read from Product Master every time a BOM is opened, so a product maintained after the BOM was saved now shows up without re-entering anything",
+      "Menu: Products, BOM Master and MGR Master renamed to Product Master, Product BOM Master and Product MGR Master, and every submenu is sorted alphabetically",
+      "Branch-Wise Data Access: the server now filters records by branch, instead of relying on the screens to hide rows",
+      "Speed: responses are compressed, static assets are cached for a year, screens load as separate chunks with skeletons instead of a spinner, master data is cached in the browser and cleared on every write, and engineer synchronisation dropped from about 20 seconds to a fraction of a second",
+      "Support Ticket Search: the register now searches Sr No and Ticket No, customer and contact, subject, invoice number, product and serial number, and engineer, on partial or exact matches",
+      "Customer Service Fixes: ticket import template downloads again, Close Ticket saves spare parts and expenses, visit check-out records the engineer's real location, completed visits can be re-opened or rescheduled, and Service Reports and RCA have their own permission instead of following the CSM Dashboard",
+      "RCA Report: the Stelmec logo was added to the PDF and the date moved out of the heading",
+      "Payroll: salary runs, payments, payslips, letters and settings were withdrawn from the menus and routes; Employees, Department Master, Designation Master and the Org Chart stay under Master",
+      "Home Page: the screen after signing in is blank, so people go straight to the module they need instead of landing on quotation figures"
+    ],
+    "detailedChanges": [
+      {
+        "date": "21.09.2026",
+        "module": "CSM Support",
+        "submodule": "Ticket Import, Close Ticket & Visit Check-Out",
+        "changes": "Fixed the ticket import Template download. Close Ticket now stores spare parts and expenses against the ticket with resolution notes, an SLA breach flag and a Part Change entry on the timeline. Visit check-out records the coordinates read from the device instead of a fixed location, and a completed visit can be re-opened or rescheduled. Service Reports and RCA moved to their own permission, and existing roles keep working through the old CSM Dashboard permission."
+      },
+      {
+        "date": "21.09.2026",
+        "module": "Employee Master",
+        "submodule": "Employee Form Field Order",
+        "changes": "Reordered the employee form to Employee Name, Email Address, Reporting To. The rest of the form and its layout are unchanged."
+      },
+      {
+        "date": "23.09.2026",
+        "module": "CSM Support",
+        "submodule": "Support Ticket Register Search & RCA PDF",
+        "changes": "Search on the ticket register resolves customers, contacts, assets, invoices, products, engineers and salespeople before matching, so Sr No, Ticket No, customer and contact, subject, invoice number, product, serial number and engineer all find their tickets on partial or exact text. The RCA PDF carries the Stelmec logo and the date sits below the heading rather than beside it."
+      },
+      {
+        "date": "23.09.2026",
+        "module": "Security",
+        "submodule": "Branch-Wise Data Access",
+        "changes": "A non-admin user with assigned branches now has every query on a branch-aware model filtered at the API, including the branch list itself, instead of the screens hiding rows that the API had already returned."
+      },
+      {
+        "date": "23.09.2026",
+        "module": "Platform",
+        "submodule": "Load Time & Response Size",
+        "changes": "Pages download faster because responses are compressed and app files are kept in the browser, and Google Maps loads only on the screens that draw a map. Engineer synchronisation dropped from about 20 seconds to a fraction of a second."
+      },
+      {
+        "date": "24.09.2026",
+        "module": "Platform",
+        "submodule": "Route Splitting & API Response Cache",
+        "changes": "Screens load as separate chunks behind skeleton placeholders instead of a full-page spinner, with the most used screens prefetched while the browser is idle and skipped on slow or data-saving connections. Master data is kept in the browser for a limited time, is cleared whenever that data is saved, and is emptied on sign-out."
+      },
+      {
+        "date": "25.09.2026",
+        "module": "Payroll",
+        "submodule": "Salary Screens Withdrawn",
+        "changes": "Salary runs, payments, payslips, letters and payroll settings were removed from the menu, the routes and the permission catalogue. Employees, Department Master, Designation Master and the Org Chart remain under Master because other modules read that data."
+      },
+      {
+        "date": "25.09.2026",
+        "module": "Master Management",
+        "submodule": "Product BOM Master",
+        "changes": "New BOM register: one BOM per finished-good serial number, with each component carrying item code, description, quantity, batch number and serial number. Descriptions and MGR1-MGR5 come from Product Master when the item code is known, and a component that is not in the master keeps the description that was entered, marked as such. Complaint booking, edit and view gained a read-only BOM tab that appears once a serial number is entered."
+      },
+      {
+        "date": "25.09.2026",
+        "module": "Master Management",
+        "submodule": "BOM Bulk Upload & Template",
+        "changes": "Download Template and Upload on Product BOM Master. The workbook is read in memory, accepts either the template headings or the original layout with two Serial number columns, groups the rows by finished-good serial, and reports per-serial counts with the reason for every serial it could not take. Re-uploading a serial replaces the components of its BOM rather than duplicating them."
+      },
+      {
+        "date": "26.09.2026",
+        "module": "Master Management",
+        "submodule": "Serial Number Lookup, Remarks & Excel Export",
+        "changes": "The FG Serial Number box searches the serials registered in Invoice Bulk Upload and fills in the finished good when one is picked, so a BOM can no longer be filed against a serial that does not exist. A Remarks field runs through upload, new entry, edit and view. Export to Excel produces FG item code, description and serial, FG MGR1-5, then each component with its code, description, batch, serial, quantity, MGR1-5 and remarks. Products, BOM Master and MGR Master were renamed Product Master, Product BOM Master and Product MGR Master."
+      },
+      {
+        "date": "26.09.2026",
+        "module": "Master Management",
+        "submodule": "BOM Status Log & Live MGR Resolution",
+        "changes": "Delete was replaced by Deactivate / Activate. An inactive BOM keeps its components in the register, stops being offered on complaints, and can be switched back on; every switch is written to a status log with the user, the time and an optional reason, shown under the components, and creation and re-uploads are logged too. A permanent delete is now refused for anyone who is not an administrator. Component descriptions and MGR1-MGR5, and the finished good's own MGRs, are read from Product Master on every load, so a product maintained after the BOM was saved appears without re-entering the BOM."
+      },
+      {
+        "date": "27.09.2026",
+        "module": "Master Management",
+        "submodule": "BOM Export to PDF & Sub-BOMs",
+        "changes": "Export to PDF sits beside Export to Excel. The A4 landscape sheet follows the screen: the finished good with its invoice number, invoice date, customer code, customer name and MGR1-MGR5, then the components. Where a component has a BOM of its own it prints underneath, one font size smaller and indented per level, matched on the component serial number or on an unambiguous item code. Created and Last Updated were removed from the sheet and the screen, which now show the invoice, customer and MGR fields instead."
+      },
+      {
+        "date": "27.09.2026",
+        "module": "Navigation",
+        "submodule": "Alphabetical Submenus & Logo Shortcut",
+        "changes": "Every submenu in the sidebar is sorted alphabetically where it is rendered, so entries added later fall into place on their own. The ARCRM logo and title block is now a link back to the home page."
+      },
+      {
+        "date": "28.09.2026",
+        "module": "Dashboard",
+        "submodule": "Blank Home Page",
+        "changes": "The page after signing in no longer shows quotation totals, draft quotes, pipeline value or recent quotations, which only suited companies working that way. It is empty, nothing is fetched there, and people go straight to the module they need from the menu."
+      }
+    ],
+    "deployedBy": "Super Admin",
+    "deployedAt": "2026-09-28T20:00:00+05:30",
+    "isActive": true
+  },
+  {
+    "version": "v6.3.0",
+    "title": "Why-Why Analysis Sheet, Serial No Transfer, Division & Segment Masters and BOM by Product",
+    "message": "Release Updates (29 Sep - 12 Oct 2026): RCA reports now follow the Why-Why Analysis Sheet, with a new Why-Why Analysis dashboard. Serial No Transfer moves a serial between customers and keeps its history. Division and Segment masters were added. Product BOM Master now works by product and assembly and accepts the SAP costing report. You now work in one branch at a time, chosen in the header.",
+    "releaseNotes": [
+      "RCA Report: prints and downloads as the Why-Why Analysis Sheet, in PDF and Excel, with logos that can be changed",
+      "Why-Why Analysis: a new dashboard in the Reports menu",
+      "Serial No Transfer: a new screen for moving a serial to another customer, with history, past entries and a Customer Activity Log",
+      "Invoice Bulk Upload: suits the sales register, opens each serial on a full details page, and takes MGR values live from Product Master",
+      "Division and Segment Masters: two new screens, used on Invoice Bulk Upload",
+      "Product BOM Master: products, assemblies and sub-assemblies, numbered lines, Move, and upload of the SAP BOM Costing Report",
+      "Branches: the branch in the header is the branch you work in, for every role",
+      "Warranty and AMC: Add Warranty starts from the serial number",
+      "Also: ticket Audit Activity Log export to PDF and Excel, GRN moved to the Inventory menu, and one date format"
+    ],
+    "detailedChanges": [
+      {
+        "date": "29.09.2026",
+        "module": "CSM Support",
+        "submodule": "RCA Report: Why-Why Analysis Sheet",
+        "changes": "RCA reports now print, and download as PDF and Excel, in the layout of the Stelmec Why Why Analysis Sheet (Maintenance). The form gained the sheet's fields, including Section / Cell, Machine No., Symptom Before Breakdown, spare part replaced or not, final countermeasure, the five root cause reasons to choose from, Kaizen Idea and In Charge. An Edit Logos button sets the sheet's top-left and top-right logos for the whole company. From 03.10, the form and sheet also carry YYY Number, YYY Date, Product Code, Product Description, Serial Number, Customer Name and Postal Code, and downloaded files are named Why_Why_Analysis with that number. From 06.10, the sheet's lines are darker and the PDF is sharper."
+      },
+      {
+        "date": "01.10.2026",
+        "module": "Reports",
+        "submodule": "Why-Why Analysis Dashboard",
+        "changes": "New Why-Why Analysis screen in the Reports menu, for people with the RCA permission. For the last 30 days, last 90 days or all time, it shows the number of RCA reports, how many are open or in progress, how many are resolved, pending CAPA actions, the spread of root causes, and status counts. The RCA Analysis Register below can be searched."
+      },
+      {
+        "date": "05.10.2026",
+        "module": "Navigation",
+        "submodule": "GRN Moved to Inventory",
+        "changes": "GRN moved from the Material menu to the Inventory menu, and the Material menu was removed."
+      },
+      {
+        "date": "05.10.2026",
+        "module": "CSM Support",
+        "submodule": "Ticket Audit Activity Log Export",
+        "changes": "The Audit Activity Log on a ticket now has PDF and Excel buttons. The export lists each activity with its date and time, type and description, along with the ticket number and branch."
+      },
+      {
+        "date": "05.10.2026",
+        "module": "Quotations",
+        "submodule": "Invoice Bulk Upload: Sales Register Upload",
+        "changes": "The upload now suits the sales register. Mobile Number can be blank, and is then taken from Customer Master. A blank Location takes the name of the branch you are working in. New Project Code and Project Name columns are in the upload, list and export. A product is matched on its Product Code when a code is given, so different codes that share one description stay separate. A customer who is not in Customer Master is added using the code and name on the sheet."
+      },
+      {
+        "date": "06.10.2026",
+        "module": "Security",
+        "submodule": "Working in One Branch at a Time",
+        "changes": "The branch shown in the header is now the branch you are working in, for every role, admins included. Lists and reports such as customers, enquiries, quotations, stock, service visits, warranties, AMCs and invoice entries show that branch's records, and a branch you are not allowed to use is refused. New records are saved against the branch you are in. Switching branch in the header saves your choice and reloads the screen, and your next login opens in the branch you last used. Admins can choose any branch of the company; everyone else chooses from their assigned branches."
+      },
+      {
+        "date": "06.10.2026",
+        "module": "Master Management",
+        "submodule": "Product MGR: Live Values & Information",
+        "changes": "MGR 1 to MGR 5 on Invoice Bulk Upload are now read from Product Master every time, so an MGR assigned or changed later shows on older entries without uploading again. On the single entry form they are shown read-only. In Product Master, choosing Select MGR now clears an MGR, and a changed MGR shows straight away. Product Master is one list across all branches. From 05.10, the Product MGR Master heading has an information icon, and administrators can edit its text."
+      },
+      {
+        "date": "06.10.2026",
+        "module": "Master Management",
+        "submodule": "Division Master & Segment Master",
+        "changes": "Two new master screens. Division Master holds division codes and descriptions. Segment Master holds the segments under each division, with Import, Export and a template. On Invoice Bulk Upload, Single Entry now requires a Division and Segment, and only that division's segments can be picked. The upload sheet has optional Division and Segment code columns, which must exist and belong together. Both also show in the list, the details and the export. An active division must keep at least one active segment, and a division or segment in use cannot be deleted, only set Inactive. A division with no active segment shows a message and no entry can be saved under it. People with Product MGR Master access get these screens until an admin sets them separately."
+      },
+      {
+        "date": "07.10.2026",
+        "module": "Quotations",
+        "submodule": "Invoice Bulk Upload: Asset Lifecycle Detail",
+        "changes": "View details on an Invoice Bulk Upload row now opens a full page instead of a popup. It shows the entry's details, warranty and AMC coverage, last service, ticket counts, and an Activity Log of uploads, sales returns, customer changes, tickets and service visits, with a filter for each kind. The page can be exported to PDF and Excel. From 01.10, each row's actions are grouped in one menu under its information button."
+      },
+      {
+        "date": "07.10.2026",
+        "module": "Master Management",
+        "submodule": "Product BOM Master: Upload by Parent Item",
+        "changes": "BOM upload now uses the BOM relationship sheet: Parent Item Code, Item Code, Item Name, UOM and Quantity. Every parent item becomes a BOM, and a component that is also a parent becomes a sub-assembly with its own BOM. Lines that are not real BOM lines, such as printed footers, are skipped. Older serial-wise files still work. The components table now shows UOM in place of batch, serial and remarks. On a complaint, if a serial has no BOM of its own, the BOM of its product is shown."
+      },
+      {
+        "date": "08.10.2026",
+        "module": "Master Management",
+        "submodule": "Product BOM Master: Products, Assemblies & Import",
+        "changes": "The Product BOM Master list now shows products only. Opening a product shows its assemblies, and opening an assembly shows its components, with a path at the top to go back up. Create Assembly adds an assembly to a product and opens it. Import Data loads lines from an Excel or CSV file into that one product or assembly, either replacing the current lines or adding to them, with a template to download."
+      },
+      {
+        "date": "08.10.2026",
+        "module": "Quotations",
+        "submodule": "Serial No Transfer",
+        "changes": "New screen below Invoice Bulk Upload in the Quotations menu, for moving a serial number from one customer to another. Serial No List shows each serial with its current customer. Transfer Serial No lets you pick a customer from Customer Master or add a new one, then enter the date and optional remarks. The date cannot be in the future or before the current customer received the serial. The old customer's record stays as Inactive and only the latest is Active, so history is never overwritten. The new customer also shows on Invoice Bulk Upload, complaints and AMC. Transfer History lists every record. From 09.10, opening a serial shows its current customer and date-wise history. From 10.10, Add Past Entry records an earlier customer without changing the current one."
+      },
+      {
+        "date": "10.10.2026",
+        "module": "Master Management",
+        "submodule": "Product BOM Master: One BOM per Product & Costing Report",
+        "changes": "A product can now have only one BOM. The form says so as soon as the product is chosen, links to the existing BOM and blocks saving. Uploading a product again updates its BOM, and a second set of lines for one product in the same file is refused. A new BOM no longer asks for an FG Serial Number. BOM upload now also accepts the SAP BOM Costing Report directly: the product comes from the title block, the numbered lines keep their order, and every line with lines under it becomes an assembly. A sub-assembly that appears in several places is imported once, and if its lines differ, the later ones are reported. Drawing No and Rev columns now show on the components table."
+      },
+      {
+        "date": "11.10.2026",
+        "module": "Master Management",
+        "submodule": "Product BOM Master: Line Numbers, Add, Move & Export",
+        "changes": "BOM lines now carry numbers by level, such as 1, 1.3 and 1.3.2, and the screen and PDF show the same number. Add Component gives a new line the next number. Removing a line does not renumber the others, and Renumber numbers the lines 1, 2, 3 only when you ask. Move sends a component, with everything under it, to another parent, where it takes the next number. Assemblies can have their own sub-assemblies through Create Sub-Assembly. In the PDF, a sub-assembly used in several places prints under each of them. From 12.10, Export to Excel gives one block per finished good: FG Code and FG Name, then FG Serial Number, Item Code, Item Description, Qty, Batch Number and Component Serial Number."
+      },
+      {
+        "date": "12.10.2026",
+        "module": "CSM Support",
+        "submodule": "Warranty & AMC: Add Warranty by Serial Number",
+        "changes": "Add Warranty now starts from the serial number. Customer and Product fill in by themselves from the serial's current customer, and the purchase date comes from the invoice. The serial must be a sold entry in Invoice Bulk Upload. A serial cannot have two warranties with overlapping dates, and the message gives the date the existing one runs until. A renewal starting after that date is allowed."
+      },
+      {
+        "date": "12.10.2026",
+        "module": "Quotations",
+        "submodule": "Serial No Transfer: Customer Activity Log",
+        "changes": "New Customer Activity Log tab. Active shows the current customer of each serial and Inactive shows earlier customers. It can be searched, filtered by date and downloaded to Excel. Each row in Serial No List has a download button for that serial's log, where you choose Active or Inactive, and the serial's own page offers the same. Serial No List and Transfer History also have From Date and To Date filters."
+      },
+      {
+        "date": "12.10.2026",
+        "module": "Platform",
+        "submodule": "One Date Format",
+        "changes": "Dates now appear in one format across the screens, exports and messages. In upload files, a date typed as 05.10.2026 is read as 5 October, not 10 May."
+      },
+      {
+        "date": "12.10.2026",
+        "module": "Quotations",
+        "submodule": "Invoice Bulk Upload: Delete Removed",
+        "changes": "Delete Entry was removed from Invoice Bulk Upload, along with its permission in Authorization, so saved entries cannot be deleted. The Populate Maharashtra Utility Data button on the CSM Detail Dashboard now refuses to run for a company that already has entries, because it would replace its tickets, entries, warranties and AMCs."
+      }
+    ],
+    "deployedBy": "Super Admin",
+    "deployedAt": "2026-10-12T20:00:00+05:30",
+    "isActive": true
+  },
+  {
+    "version": "v6.4.0",
+    "title": "SAP Stock Audit, Type Test Register, View / Create / Modify / Delete Permissions & Manual Ticket Assignment",
+    "message": "Release Updates (13 - 24 Oct 2026): New SAP Stock Audit and Type Test Register screens. Authorization now sets View, Create, Modify and Delete for each screen. Tickets are assigned by hand instead of automatically. Invoice Bulk Upload loads page by page with branch-wise data and MGR filters. Dates read like 13.OCT.26, and signing in on one device no longer ends the session on another.",
+    "releaseNotes": [
+      "SAP Stock Audit: compare a physical count with SAP stock, with batches, counting, mismatches, a dashboard and an Excel export",
+      "Type Test Register: certificates, renewal reminders, a dashboard, a worklist and pending products",
+      "Authorization: View, Create, Modify and Delete for each screen, applied on buttons and on the server",
+      "Tickets: Branch box, Edit Ticket, assignment by hand, and new Created Today and Resolved Yesterday tiles",
+      "Invoice Bulk Upload: one page at a time, MGR 1 to MGR 5 filters, cards for the whole branch, and Export of every matching record",
+      "Products: unique codes and names, Warranty Period, and exact matches listed first in search",
+      "Service Visits: the queue and each visit now use the full page",
+      "Dates and Sign-In: dates read like 13.OCT.26 with a new date box, and a short network problem no longer sends you to the login page"
+    ],
+    "detailedChanges": [
+      {
+        "date": "13.10.2026",
+        "module": "Platform",
+        "submodule": "Date Format",
+        "changes": "Dates across the app now read like 13.OCT.26 instead of 13.10.2026, and dates with a time like 13.OCT.26, 02:30 PM. This covers the screens, notifications, emails, the printed RCA sheet and the dates in the downloaded Customer Activity Log. System Updates shows its dates this way and its date search box suggests the new form. Import files may carry dates as either 13.OCT.26 or 13.10.2026."
+      },
+      {
+        "date": "13.10.2026",
+        "module": "Master Management",
+        "submodule": "Product Warranty Period & Add Warranty",
+        "changes": "Product Master has a new Warranty section with a Warranty Period (Years) box. It defaults to 3 years, takes values from 0 to 50 and accepts part years such as 1.5 for 18 months. Products saved earlier count as 3 years. On Warranty & AMC, when a serial number is found on Add Warranty, the Expiry Date fills in as the purchase date plus the product's warranty period, and a line under the dates states the period used. Changing the purchase date recalculates it until someone types their own expiry date, which is then kept and noted on screen. A product with a period of 0 needs the expiry date typed in."
+      },
+      {
+        "date": "13.10.2026",
+        "module": "Quotations",
+        "submodule": "Invoice Bulk Upload MGR Filters",
+        "changes": "The All Products dropdown on Invoice Bulk Upload was replaced by five dropdowns, All MGR 1 to All MGR 5, which work together with the search box and the status filter."
+      },
+      {
+        "date": "13.10.2026",
+        "module": "Quotations",
+        "submodule": "Serial No Transfer MGR 4 Filter & Activity Log",
+        "changes": "Serial No Transfer gained an All MGR 4 filter on the Serial No List, Transfer History and Customer Activity Log tabs, matched on the MGR 4 of the serial's product in Product Master. The downloaded Customer Activity Log replaces the Product Description column with Indicator_Field."
+      },
+      {
+        "date": "14.10.2026",
+        "module": "Platform",
+        "submodule": "Date Boxes",
+        "changes": "Date boxes across the app now show the chosen date as 13.OCT.26 with a calendar icon, instead of the browser's own dd-mm-yyyy. Clicking the box opens the calendar. Date-and-time boxes show 13.OCT.26, 02:30 PM."
+      },
+      {
+        "date": "14.10.2026",
+        "module": "Quotations",
+        "submodule": "Invoice Bulk Upload Loading, Search & Totals",
+        "changes": "Invoice Bulk Upload now loads one page of 15 serials at a time instead of the whole list. The search box looks across serial number, product code, product name, invoice number and customer name in all records, and the status and MGR filters also apply to all records, not only those on screen. The Total Serials, In Stock, Sold (Customer) and Returned cards count the whole selected branch. If the list cannot be loaded, a red banner gives the reason with a Retry button."
+      },
+      {
+        "date": "14.10.2026",
+        "module": "Quotations",
+        "submodule": "Branch-Wise Invoice Bulk Upload, Customers & Serial No Transfer",
+        "changes": "An Invoice Bulk Upload import now belongs to the branch selected in the header, and the screen asks for a branch to be selected first. The list shows that branch only. A serial number can exist only once in the company: uploading a serial again updates the record in its own branch, a serial that belongs to another branch is refused with a message saying so, and a serial repeated inside one file is imported once. The Customers list and the Serial No List, Transfer History and Customer Activity Log tabs also show only the selected branch. Product Master and Product MGR Master stay shared across branches."
+      },
+      {
+        "date": "14.10.2026",
+        "module": "Platform",
+        "submodule": "Import File Limit",
+        "changes": "Imports now take at most 5,000 rows per file. The import window says so, and a larger file is refused with a message giving its row count and asking for it to be split into smaller files."
+      },
+      {
+        "date": "15.10.2026",
+        "module": "Master Management",
+        "submodule": "Export Every Matching Record",
+        "changes": "Export on Invoice Bulk Upload now downloads every record that matches the current search, status and MGR filters, up to 50,000, not only the page on screen. Export on its Return History tab follows the search box. Export on Product Master no longer stops at 100 products."
+      },
+      {
+        "date": "17.10.2026",
+        "module": "Master Management",
+        "submodule": "Type Test Register",
+        "changes": "New Type Test Register under Master, for product type test certificates. Each record holds the product, model, test name, standard and testing laboratory, the current certificate with its PDF and valid-until date, and a renewal owner and backup owner. Older certificates stay in the record's history. The owner and backup owner get a notification when a renewal reminder falls due and when a certificate expires, and opening the notification goes to the record. A record whose certificate has expired changes from Valid to Expired. A record can be marked inactive when the product is discontinued, which stops its reminders, and reactivated later. Anyone with Product Master access can open the register until their permissions are saved separately."
+      },
+      {
+        "date": "17.10.2026",
+        "module": "Master Management",
+        "submodule": "Unique Product Codes & Names, Exact-Match Search",
+        "changes": "Product codes and product names must now be unique within the company, ignoring capitals and extra spaces. Adding or editing a product with a code or name already in use is refused with a message. In imports, a new code whose name belongs to another code is refused on both Product Master and Invoice Bulk Upload, and two rows of one file cannot share a code or name. Searching Product Master now ignores doubled spaces in names, lists exact name or code matches first with an Exact match label, and shows a line counting exact and partial matches."
+      },
+      {
+        "date": "17.10.2026",
+        "module": "CSM Support",
+        "submodule": "New Ticket Branch, Optional Contact & Edit Ticket",
+        "changes": "The new ticket form has a required Branch box, filled with the branch selected in the header and listing the branches the user works in. Contact Person Name is now optional. Ticket Details shows the Branch and Raised By, and has a new Edit Ticket button for changing the subject, description, contact person, pincode and branch. Editing is open to admins and managers, the person who raised the ticket and the engineer assigned to it, and the person who raised a ticket can now open its details. Moving a ticket to another branch needs access to both branches and is written to the timeline. The engineer lists for scheduling a visit and for reassigning a ticket can be searched by name, employee code or mobile."
+      },
+      {
+        "date": "17.10.2026",
+        "module": "Platform",
+        "submodule": "Staying Signed In",
+        "changes": "Signing in on one device no longer ends the session on another device, and signing out ends only the device used. A short network or server problem no longer sends people back to the login page; only a session that is really no longer valid does."
+      },
+      {
+        "date": "18.10.2026",
+        "module": "Master Management",
+        "submodule": "Type Test Register Tabs & Several Tests per Product",
+        "changes": "The register was rearranged into tabs: Dashboard, with cards for total records, valid certificates, renewals due within 90 days and expired certificates, then Type Test Records, Product & Model Master and Renewal Worklist, with an Export CSV button. One product and model can now hold several type tests, told apart by test name; recording the same test twice is refused. Records gained Test result (Pending, Pass, Fail, Not Applicable), Test start date and Certificate issue date. Renewal status is now Not Due, Upcoming, In Progress, Submitted, Renewed or Overdue."
+      },
+      {
+        "date": "18.10.2026",
+        "module": "CSM Support",
+        "submodule": "CSM Dashboard Tiles",
+        "changes": "The CSM Dashboard tiles were restyled and their labels shortened to Open, Unassigned and Pending. The Overdue SLA tile was replaced by Resolved Yesterday, which counts tickets resolved the previous day including any closed since; clicking it opens those tickets in the register."
+      },
+      {
+        "date": "19.10.2026",
+        "module": "Master Management",
+        "submodule": "Applicable for Test Type & Pending Records",
+        "changes": "Product Master has a new Applicable for Test Type choice, Yes or No, default No. The product import has a matching Test Type column, where an empty cell keeps the current setting. Only products marked Yes appear in the product list of the type test form. A new Pending Records tab and dashboard card list the products marked Yes that have not been tested yet, with an Add test button, and a product leaves the list once its testing is completed. Hovering over a product in the register shows its MGR4 FG value. The test form now opens as a full screen of its own, so the browser Back button and a page refresh work on it."
+      },
+      {
+        "date": "20.10.2026",
+        "module": "Master Management",
+        "submodule": "Type Test Forms & History on Product Master",
+        "changes": "On the type test form the product is now chosen from two boxes, product code and product name, and choosing in one fills the other. Updating a renewal and viewing a record's history also open as full screens of their own. The reminder lead time is now one choice of 180, 90 or 30 days before expiry. Tests already recorded for the chosen product are listed under the form, latest first, and the edit screen of a product in Product Master has a Test Type History section with its tests. On Product Master, the Active / Inactive and Yes / No buttons now show the chosen option filled in the theme colour."
+      },
+      {
+        "date": "22.10.2026",
+        "module": "Inventory",
+        "submodule": "SAP Stock Audit: Batches, Access & SAP Stock Import",
+        "changes": "New SAP Stock Audit screen under Inventory, for comparing a physical count with SAP Business One stock. A batch has a unique name (one is suggested), an audit type (Perpetual, Cycle Count, Full Physical or Spot Check), an SAP reference, a stock-as-of time and planned dates. Whoever creates a batch is its owner and adds people by email as Auditors, who count and follow up, or Viewers, who can only look and export. They get an in-app notification and see the screen in their menu; the SAP Stock Audit permission is needed only to create batches. Company admins have owner rights on every batch. The owner loads the stock by uploading an SAP Excel export or the template, sees a preview before anything is saved, and picks Add new lines, Add new + refresh SAP qty, or Replace all lines (only while nothing is counted). Lines can also be added by hand, and lines not yet counted can be removed. A draft batch can be deleted."
+      },
+      {
+        "date": "22.10.2026",
+        "module": "Inventory",
+        "submodule": "SAP Stock Audit: Counting, Mismatches & Reports",
+        "changes": "A batch moves through Draft, In Progress, Under Review and Completed, and can be cancelled or reopened with a reason. It cannot start without lines, be submitted while lines are uncounted, or be completed while mismatches are unresolved. On the Count tab, auditors enter the counted quantity, condition (Good, Damaged, Expired, Obsolete or Not Found), where it was found and remarks. Pressing Enter saves and moves to the next line, the variance shows after saving, and a warning appears if someone else changed the line meanwhile. A difference from SAP opens a mismatch on the Mismatches tab with its status, root cause, follow-up owner and notes. A recount can be requested, a recount that matches SAP closes the mismatch, and only the owner can mark it Resolved with a resolution. The Dashboard tab shows progress, accuracy, short and excess values, warehouse-wise figures, the largest discrepancies and who counted what. Every change is kept on the Audit trail tab, and Export gives an Excel file with summary, lines, mismatches and audit trail."
+      },
+      {
+        "date": "22.10.2026",
+        "module": "CSM Support",
+        "submodule": "Engineers Master Source",
+        "changes": "CSM Config, Engineers Master has a new switch for admins: All Employees or Service Engineers. With All Employees, the default, every active employee in Employee Master appears there and can be assigned tickets and visits. With Service Engineers, only employees with that designation appear. A change applies at once."
+      },
+      {
+        "date": "22.10.2026",
+        "module": "CSM Support",
+        "submodule": "Manual Ticket Assignment & Created Today Tile",
+        "changes": "New complaints are no longer assigned automatically by PIN code or territory: a ticket stays unassigned until someone picks a person on it, and changing its PIN code no longer changes who is assigned. The assignment lists show people by name with no PIN matching, and Schedule Visit no longer preselects the first engineer in the list. The CSM Dashboard has a new Created Today tile that opens today's tickets in the register, and the Unassigned tile and the register now show the same tickets: still open, with nobody assigned."
+      },
+      {
+        "date": "23.10.2026",
+        "module": "CSM Support",
+        "submodule": "Service Visits & Field Attendance Screens",
+        "changes": "Service Visits now lists its queue across the full page. Selecting a visit opens it as a full-width page showing Ticket No, Customer, Service Engineer and Scheduled Date & Time, with Back to Service Visits and Reschedule buttons. Going back returns to the queue with that visit highlighted and in view. If a visit report, parts, photo or signature has not been saved, going back or rescheduling asks for confirmation first. If the queue cannot be loaded, a message with a Retry button appears. The attendance tab inside Service Visits was removed; attendance is now only on the Field Attendance screen."
+      },
+      {
+        "date": "23.10.2026",
+        "module": "CSM Support",
+        "submodule": "BOM on Tickets",
+        "changes": "The BOM tab was removed from the Ticket Details screen. The read-only BOM still appears on the complaint booking forms once a serial number is entered."
+      },
+      {
+        "date": "24.10.2026",
+        "module": "Authorization",
+        "submodule": "View, Create, Modify & Delete Permissions",
+        "changes": "Authorization now sets four permissions for each screen: View, Create, Modify and Delete. Screens that only show information have View alone, and some have no Delete. They are set per role on the Role Matrix tab and can be changed for one person under Team Users, Individual Permissions. A module's switch turned off removes all access to it; turned on it gives View on every screen in the module, with Create, Modify and Delete given separately. An All submodules row sets a whole column at once. Roles and people saved earlier keep the access they had. A person's individual settings hold only what differs from their role, so later role changes still reach them, and Reset to Role Defaults removes the differences. Nobody can change their own individual permissions. Every save is logged with the values before and after."
+      },
+      {
+        "date": "24.10.2026",
+        "module": "Authorization",
+        "submodule": "Permissions Applied on Every Screen",
+        "changes": "Add, Edit, Delete and Import buttons now appear only for people with that permission, and the server refuses the action as well. Typing the address of a new or edit form without permission shows a Permission required page with a Go back button. Without Modify, quotations and appointments open read-only as View Quotation and Appointment Details. Open sessions pick up changes when an administrator saves. Lists such as customers, products and branches stay readable so dropdowns on other screens keep working. City Master and State Master now have their own permissions instead of following Branch Master. Staff who can log complaints no longer need CSM Config rights for a missing category or type, which is now created with the complaint, and scheduling a visit on an unassigned ticket gives the ticket to that visit's engineer with only the permission to schedule visits."
+      }
+    ],
+    "deployedBy": "Super Admin",
+    "deployedAt": "2026-10-24T20:00:00+05:30",
+    "isActive": true
+  },
+  {
+    "version": "v6.5.0",
+    "title": "Preview-and-Fix Bulk Imports, Branch Transfer, Edit Entry on Invoice Bulk Upload & MGR Access",
+    "message": "Release Updates (25 - 31 Oct 2026): Bulk imports now check every row before anything is saved, and problem rows can be fixed on screen or in Excel. Serial No Transfer gained Branch Transfer, Transfer and Assign. Invoice Bulk Upload entries can be edited, and Add Single Entry fills in customer and product details. Admins can limit a user to chosen MGR values, and a new CSM Detail Dashboard was added.",
+    "releaseNotes": [
+      "Bulk Import: four steps with a preview, column matching, fixing of problem rows and Your recent imports",
+      "Invoice Bulk Upload: Edit button, auto-fill on Add Single Entry, Total Count, and current postal code from Customer Master",
+      "Serial No Transfer: Branch Transfer, Transfer and Assign for any status except scrapped, and an Invoice column",
+      "MGR Access: limit a user to chosen MGR values on Invoice Bulk Upload and Serial No Transfer",
+      "Customer Master: its own Contact Person box, unique customer codes and a fuller export",
+      "CSM Dashboards: count cards on the CSM Dashboard, with charts moved to a new CSM Detail Dashboard",
+      "Phones and Colours: card layout for these screens on phones, a clock on the home page, and one teal theme colour"
+    ],
+    "detailedChanges": [
+      {
+        "date": "25.10.2026",
+        "module": "Platform",
+        "submodule": "Bulk Import: Preview and Fix Rows",
+        "changes": "Bulk imports now work in four steps: Upload file, Check rows, Import and Review. Every row is checked after upload and nothing is saved until you confirm. The screen shows how many rows are ready to import, how many need attention and how many are ignored, with the reason beside each problem row. Column matching shows which column of your file feeds each field and lets you change it or add a backup column. Where an import can update records, Import type offers add new and update existing, only add new, or only update existing. Ready rows can be imported straight away while the others wait. Problem rows can be corrected on screen, skipped, or downloaded with Download rows to fix, corrected in Excel and brought back with Upload corrected file; only those rows are checked and imported again, and rows already imported are not imported twice. An import carries on after the window is closed, and Your recent imports reopens it. Files can be up to 10 MB and 5,000 rows. This covers Customers, Products, Product Attributes, Attributes Master, Invoice Bulk Upload, Employees, Contacts, Planning, Vendors, Price Books and their rates, Contracts, Tenders, Support Tickets, Warranties and AMCs. A vendor login's own catalog import, Segment Master and Vendor 360 keep the old import window. Imported customers go into the branch selected at the top of the screen. A two-digit year in an imported date now reads correctly, so 20.MAY.90 is 1990 and not 2090."
+      },
+      {
+        "date": "25.10.2026",
+        "module": "Master Management",
+        "submodule": "Customer Code and Branch Name Duplicate Checks",
+        "changes": "A customer code can now belong to only one customer in the whole company, across every branch and ignoring capital letters. Customer Master refuses a code that is already used and names the customer holding it. Customers without a code are not affected. Add Single Entry on Invoice Bulk Upload uses the existing customer when the code belongs to a customer of another branch, instead of creating a second one. Branch Master refuses a branch name that already exists, ignoring capitals and extra spaces, and a quick double click on Save no longer sends the save twice."
+      },
+      {
+        "date": "25.10.2026",
+        "module": "CSM Support",
+        "submodule": "One Engineer per Complaint and Register Layout",
+        "changes": "A complaint is now assigned to one person at a time. On the ticket, the tick-list of engineers was replaced by one search box (name, code or mobile), the button reads Update Assignee, and choosing someone new replaces the person before. A complaint that already has several engineers keeps showing them until it is next assigned. In the Tickets Register, long customer names, subjects and invoice numbers now wrap onto more lines, and the Engineer and Action columns stay fixed on the right, so Details can be reached without scrolling sideways. Service Visits now shows the branch beside each visit."
+      },
+      {
+        "date": "26.10.2026",
+        "module": "CSM Support",
+        "submodule": "CSM Dashboard Cards and New CSM Detail Dashboard",
+        "changes": "The CSM Dashboard now shows only the ticket count cards: Open, Unassigned, Pending, Created Yesterday, Resolved Yesterday, Created Today and Resolved Today. Clicking a card opens the Tickets Register on the tickets it counts. Resolution speed, SLA compliance, the Field Service Log, the ticket charts and the top engineers moved to a new CSM Detail Dashboard in the Customer Service menu. It has its own switch in Authorization, and anyone with CSM Dashboard access keeps access to it until an admin sets the new switch. Open now counts every ticket that is not resolved, closed or cancelled, the same as the register's Open Tickets filter, and Resolved Today also counts tickets that have since been closed."
+      },
+      {
+        "date": "27.10.2026",
+        "module": "Quotations",
+        "submodule": "Invoice Bulk Upload: Edit Entry and Customer Postal Code",
+        "changes": "Saved entries can now be changed with a new Edit button, using the same form as Add Single Entry. The serial number cannot be changed. A sold serial is returned with Sales Return and a returned serial is re-sold with Add Single Entry, not by editing. The customer and status of a transferred serial are changed through Serial No Transfer. Each edit appears as Entry edited in the serial's Activity Log, and entries still cannot be deleted. Edit and View Details are now separate switches in Authorization: Edit starts on for the admin role only, and View Details follows the user's existing Invoice Bulk Upload access. Customer Name and Customer Code now have separate boxes on the form. Customer Postal Code now shows the pincode currently in Customer Master, on entries uploaded earlier too; the pincode saved with the entry is used only when the customer has none. In the Customer Activity Log of Serial No Transfer, the current customer shows the current pincode and earlier customers keep the one recorded at the time."
+      },
+      {
+        "date": "27.10.2026",
+        "module": "Quotations",
+        "submodule": "Serial No Transfer: Branch Transfer",
+        "changes": "A new Branch Transfer tab moves serial numbers of any status from one branch to another, for users with Modify on the screen. Create Branch Transfer asks for the source branch, the destination branch, the serials to move, a transfer reference and remarks, then shows a confirmation step. Each transfer gets a number such as BT/2026-27/0001, counted per financial year. The serial then shows under its new branch and its history moves with it; its status, customer and invoice details do not change. Serials cannot be moved into an inactive branch. The tab lists every move, with filters for search, branches, status and dates, and opening a row shows the serial's branch history. Serial No List now covers every Invoice Bulk Upload serial, not only sold ones, with its branch and a status filter."
+      },
+      {
+        "date": "27.10.2026",
+        "module": "Navigation",
+        "submodule": "Home Page Clock",
+        "changes": "The screen after signing in, which was blank, now shows a clock with the time, the day and the date."
+      },
+      {
+        "date": "28.10.2026",
+        "module": "Quotations",
+        "submodule": "Invoice Bulk Upload and Serial No Transfer on Phones",
+        "changes": "On phones, the tables of Invoice Bulk Upload and Serial No Transfer, including the activity logs, now show each row as a card, and the filters stack to fit the screen. The side menu starts closed on phones. On both screens the columns now read Invoice Number and Invoice Date in place of Invoice Ref and Sale Date, and Serial No List gained both columns. The Excel export of Invoice Bulk Upload keeps the old headings."
+      },
+      {
+        "date": "29.10.2026",
+        "module": "Quotations",
+        "submodule": "Serial No Transfer: Transfer and Assign",
+        "changes": "A serial of any status except scrapped can now be given a new customer, in two ways. Transfer sells it to the new customer: a sold serial stays sold, and an in-stock or allocated serial becomes sold. Assign records the new customer and leaves the status as it is, for in-stock, allocated and returned serials. A return is saved in the serial's history, its page shows Current Customer as None (returned), and it is re-sold with Add Single Entry on Invoice Bulk Upload. A scrapped serial keeps its history and can only take a past entry. The invoice moves to the new customer and shows in a new Invoice column in Transfer History and the serial's history, and the entry filter now offers Original Sale, Allocated, Transferred, Assigned, Returned and Past Entry. Total Count above the lists shows all records matching the search and filters, apart from the rows on the page. On a serial's page the sale history, log download and activity log open and close from their headings and start closed."
+      },
+      {
+        "date": "29.10.2026",
+        "module": "Quotations",
+        "submodule": "Invoice Bulk Upload: Add Single Entry Auto-fill and Total Count",
+        "changes": "On Add Single Entry, typing a Customer Code fills the Customer Name and Postal Code from Customer Master, and the Location when it is empty, and the name stays fixed to that customer. Typing a Customer Name searches Customer Master and lists each match with its code, city and pincode; choosing one fills the rest. A Product Code fills its Product Name and the other way round, with suggestions as you type. A note under the boxes says Found in Customer Master or Found in Product Master, or that saving will add a new customer or product. A code and name that belong to different products are refused, as in the Excel upload. A Total Count bar above the list shows all records matching the search and filters, apart from the rows on the page. The Export button now shows Exporting and ignores further clicks while the list stays on screen. The form, the serial's details page and the Excel export now list customer fields in one order: name, code, segment, postal code."
+      },
+      {
+        "date": "29.10.2026",
+        "module": "Master Management",
+        "submodule": "Customer Master: Contact Person and Export",
+        "changes": "Contact Person is now its own box on the customer form, replacing the old Contact Person / Customer Name box. The Customer Name used by other modules now follows the Company Trade Name, unless a different name was saved earlier. Customer lists and Customer 360 show the customer code and contact person, and Customer Master search also finds them. For older customers, a different name in the old box shows as the Contact Person until the customer is saved again. Export to Excel now covers every page of the list, the Customer Code column holds the code, and the columns follow the import template, including shipping address and Logo URL, with Territory last."
+      },
+      {
+        "date": "29.10.2026",
+        "module": "Quotations",
+        "submodule": "MGR Access: Invoice Bulk Upload",
+        "changes": "Admins can now limit a user to chosen MGR values, in Authorization > Team Users > Individual Permissions > MGR Access, on any of MGR 1 to MGR 5. On Invoice Bulk Upload, a limited user sees and changes only the serial numbers whose product carries those values: list, cards, search, filters, export, return history, details, add, edit, return and Excel import. A notice above the list says what they are limited to. Within one MGR any ticked value counts, and ticks on two MGRs must both match. Admins and users with nothing ticked are not limited. In an import, rows outside the user's access and new products are held back with a message. If all of a user's values are later deleted from the Product MGR Master, the user sees no data until an admin saves again. Reports are not limited by this setting."
+      },
+      {
+        "date": "29.10.2026",
+        "module": "Platform",
+        "submodule": "Theme Colour",
+        "changes": "Buttons, badges, status labels and charts that were blue, indigo or sky across the app now use the teal theme colour, in both light and dark modes."
+      },
+      {
+        "date": "30.10.2026",
+        "module": "Quotations",
+        "submodule": "MGR Access: Serial No Transfer",
+        "changes": "The same MGR Access setting now also limits Serial No Transfer, with nothing further to set up. A limited user sees and changes only the serials of their MGR values on every tab: Serial No List, serial details, transfer, assign and past entry, Transfer History, Customer Activity Log with its download, and Branch Transfer. Moving a serial outside their access in a Branch Transfer is refused, with a message naming the serials."
+      },
+      {
+        "date": "31.10.2026",
+        "module": "Quotations",
+        "submodule": "Serial No Transfer Switch and Screens under Quotations",
+        "changes": "Serial No Transfer has had its own View and Modify switches in Authorization since 29.10, with Modify allowing transfers, past entries and branch transfers. Until a role or user is saved again it takes the values of Invoice Bulk Upload, so nobody gains or loses access. From 31.10, Invoice Bulk Upload, its View Details and Edit Entry switches, and Serial No Transfer are listed under Quotations in Authorization, where the menu already shows them, instead of under Master. The move changes nobody's access, and the default Sales role does not get these screens."
+      },
+      {
+        "date": "31.10.2026",
+        "module": "CSM Support",
+        "submodule": "Raise Ticket: Customer List",
+        "changes": "The Customer box on the Raise Ticket form now offers the customers of the branch being worked in to everyone who can use tickets. Before this, employees with no territory found the box empty. It loads the first 50 customers and searches as you type, by name, code, mobile, GSTIN or email."
+      }
+    ],
+    "deployedBy": "Super Admin",
+    "deployedAt": "2026-10-31T20:00:00+05:30",
+    "isActive": true
+  },
+  {
+    "version": "v6.6.0",
+    "title": "Customer Service Branch-Wise, Login Follows Employee Master & Invoice Bulk Upload Customer Search",
+    "message": "Release Updates (1 - 3 Nov 2026): Customer Service now shows the branch selected at the top of the screen. An employee's login follows Employee Master, and the Select Branch screen is gone. Staff with no branch assigned can no longer log in. Invoice Bulk Upload search now finds every customer shown in its list.",
+    "releaseNotes": [
+      "Invoice Bulk Upload Search: finds a serial by the customer name shown on its row, and by customer code and Product Master name or code",
+      "Customer Service: tickets, visits, RCA reports, warranties, AMCs and attendance show the selected branch",
+      "Customer Service Analytics: Branch and MGR 1 filters, Export to Excel, and a tighter layout",
+      "Employee Logins: an employee's name and login ID now follow Employee Master",
+      "Sign-In: no Select Branch screen, and staff with no branch assigned cannot log in; admins set this in the new Branch Access panel",
+      "Serial No Transfer: Asset No box and column, and an MGR 1 filter",
+      "Customers and Quotations: employees with no territory see the whole selected branch",
+      "Phones and Tablets: the top bar no longer pushes controls off the screen"
+    ],
+    "detailedChanges": [
+      {
+        "date": "01.11.2026",
+        "module": "Employee Master",
+        "submodule": "Login Follows Employee Master",
+        "changes": "An employee's login now follows Employee Master. When an employee's name or email changes, the login's name and login ID change with it, so the login ID to use is the email in Employee Master; if another account already holds that email, the login ID stays as it was. This covers employees who looked as if they had no user because their login was still under old details. A name or email changed on the login itself is saved on the employee too. Admin logins keep their own name and login. All employees are brought in line automatically each time the system restarts. An employee who was deleted and added again with the same email gets the earlier login back."
+      },
+      {
+        "date": "01.11.2026",
+        "module": "Navigation",
+        "submodule": "Select Branch Screen Removed",
+        "changes": "The screen that asked for a branch after login is gone. Login now goes straight into the app, in the branch last worked in, else the home branch, else the first of the user's branches. The branch is changed from the top bar whenever needed. If a branch stops being available to a user, the session moves to one they can use."
+      },
+      {
+        "date": "01.11.2026",
+        "module": "CSM Support",
+        "submodule": "Customer Service Branch-Wise",
+        "changes": "Tickets are no longer one company-wide register. Tickets, service visits, RCA reports, warranties, AMCs, attendance and the CSM Detail Dashboard now show only the branch selected at the top of the screen, and the Tickets Register's own Branch filter was removed. All Branches is no longer offered on a ticket: a new ticket belongs to one branch, the selected one unless another of the user's branches is chosen. When a ticket is raised under or moved to another branch, a message says to switch to that branch to see it, and opening a ticket of another branch you work in says which branch holds it. On Raise Ticket, only serials and customer contacts of the selected branch are found; a serial of another branch counts as not found and the form continues with manual entry. A serial can still have only one active ticket in the whole company. The engineer list shows engineers whose employee record includes the branch, and Territory Master still lists everyone. Older tickets with no branch show as No Branch and stay visible in every branch until a branch is set by editing the ticket."
+      },
+      {
+        "date": "01.11.2026",
+        "module": "Authorization",
+        "submodule": "No Branch, No Login and Branch Access",
+        "changes": "Staff with no branch assigned can no longer log in, and an open session ends the same way. The login page shows: No branch is assigned to your account. Please contact your administrator. Admins, super admins and vendor logins are not affected. A new Branch Access panel in Authorization > Team Users > Individual Permissions lists the branches a user may switch between. At least one must stay ticked, and saving also updates the user's Employee Master record. The Team Users list marks anyone affected with No branch · cannot log in. Branches can also be assigned in Employee Master."
+      },
+      {
+        "date": "01.11.2026",
+        "module": "CSM Support",
+        "submodule": "Customer Service Analytics: Branch and MGR 1 Filters, Export, MGR Access",
+        "changes": "Customer Service Analytics, the CSM Dashboard screen, now has an MGR 1 filter and, for users with more than one branch, its own Branch filter starting on All My Branches. Both offer only what the user has been given and are in view when the page opens. Choosing a branch in the top bar moves the filter to that branch. The cards count the same tickets the register shows, and a card opens the register on those tickets, with a notice saying what is shown and a button to return to the current branch. Opening a ticket of another branch switches to that branch first. Export to Excel downloads one row per branch with the card counts, a total, a No Branch row for older tickets, and the filters used at the top. The CSM Detail Dashboard stays on the branch in the top bar. MGR Access now also applies in Customer Service: on the dashboards, register, ticket details and visits, a limited user sees the tickets of their MGR's products plus any they raised or are assigned to."
+      },
+      {
+        "date": "02.11.2026",
+        "module": "Quotations",
+        "submodule": "Serial No Transfer: Asset No and MGR 1 Filter",
+        "changes": "A serial's page in Serial No Transfer now has an Asset No box (added 01.11) for your own asset number. It takes free text up to 100 characters, is not checked for format or duplicates, and a blank clears it. Users with Modify can change it and others can only read it. Serial No List now has an Asset No column. An MGR 1 filter joins MGR 4 on Serial No List, Transfer History and Customer Activity Log. The Transfers and Status columns were removed from Serial No List; the status filter stays and the status still shows on the serial's page."
+      },
+      {
+        "date": "02.11.2026",
+        "module": "Master Management",
+        "submodule": "Customers and Quotations: Employees with No Territory",
+        "changes": "An employee given Customer Master in Authorization who is not named in any territory now sees all customers of the selected branch. An employee named in a territory sees that territory's customers, the ones they created, and customers with no territory. Customer Analytics follows the same rule. The Quotations list and the quote conversion report also show the whole branch to an employee who has that screen's permission and no territory. Staff without the permission stay limited to their territories and their own records, and admins and managers are not limited."
+      },
+      {
+        "date": "02.11.2026",
+        "module": "Navigation",
+        "submodule": "Top Bar on Phones and Tablets",
+        "changes": "The top bar no longer pushes controls off the screen on phones and tablets. On phones, the branch and notification lists open across the screen width. Below laptop width, Dark or Light Mode and Daily CRM Changes Update move into the profile menu. The search box hides while the side menu is open until the screen is laptop width. The floating notepad no longer opens by itself on a phone's first visit."
+      },
+      {
+        "date": "03.11.2026",
+        "module": "CSM Support",
+        "submodule": "Customer Service Analytics Layout",
+        "changes": "The Customer Service Analytics screen is tighter. The List and Card view switch, added on 28.10 and remembered on each device, now sits in the title row with Export to Excel and Refresh. Branch, MGR 1 and the date buttons share one row, and Reset moved to the filter heading. On phones the cards show two to a row, with Open across the full width on top."
+      },
+      {
+        "date": "03.11.2026",
+        "module": "Quotations",
+        "submodule": "Invoice Bulk Upload: Customer Search",
+        "changes": "The search box now finds a serial by the customer name shown on its row. Before this, some customers could not be found by name even though the row showed them, because the search looked only at a copy of the name saved with the serial, which can be blank or out of date. The search now also looks in Customer Master by name and code, in Product Master by name and code, and in the customer code saved with the serial, and it ignores double spaces in names. Export follows the same search. You still see only the serials of your branch and MGR access."
+      }
+    ],
+    "deployedBy": "Super Admin",
+    "deployedAt": "2026-11-03T20:45:00+05:30",
+    "isActive": true
+  }
+]
