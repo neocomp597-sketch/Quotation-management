@@ -592,7 +592,7 @@
   {
     "version": "v6.6.0",
     "title": "Customer Service Branch-Wise, Login Follows Employee Master & Invoice Bulk Upload Customer Search",
-    "message": "Release Updates (1 - 3 Nov 2026): Customer Service now shows the branch selected at the top of the screen. An employee's login follows Employee Master, and the Select Branch screen is gone. Staff with no branch assigned can no longer log in. Invoice Bulk Upload search now finds every customer shown in its list.",
+    "message": "Release Updates (1 - 4 Nov 2026): Customer Service now shows the branch selected at the top of the screen. An employee's login follows Employee Master, and the Select Branch screen is gone. Staff with no branch assigned can no longer log in. Invoice Bulk Upload search now finds every customer shown in its list.",
     "releaseNotes": [
       "Invoice Bulk Upload Search: finds a serial by the customer name shown on its row, and by customer code and Product Master name or code",
       "Customer Service: tickets, visits, RCA reports, warranties, AMCs and attendance show the selected branch",
@@ -602,7 +602,8 @@
       "Serial No Transfer: Asset No box and column, and an MGR 1 filter",
       "Customers and Quotations: employees with no territory see the whole selected branch",
       "Phones and Tablets: the top bar no longer pushes controls off the screen",
-      "Also fixed: Serial No Transfer search by customer and product, older products in Product Master that could not be saved, product names on Invoice Bulk Upload rows, and Contact Person in the customer import"
+      "Also fixed: Serial No Transfer search by customer and product, older products in Product Master that could not be saved, product names on Invoice Bulk Upload rows, and Contact Person in the customer import",
+      "Raise Ticket: Asset Information shows the serial you searched, and a ticket no longer stays linked to an earlier serial after you type a different one"
     ],
     "detailedChanges": [
       {
@@ -688,6 +689,18 @@
         "module": "Master Management",
         "submodule": "Customer Import: Contact Person",
         "changes": "The Contact Person column of the customer import now goes into the customer's Contact Person box. Before this it was saved as the Customer Name and the box stayed empty. The Customer Name now follows the company name unless the file has its own Customer Name column, and a file with no name or company column still takes the name from Contact Person. A blank cell keeps the contact already saved. Customers imported before this fix are corrected by importing the same file again. The Company Trade Name column mentioned in the template is now read as well."
+      },
+      {
+        "date": "04.11.2026",
+        "module": "CSM Support",
+        "submodule": "Raise Ticket: Asset Information Shows the Searched Serial",
+        "changes": "Asset Information on the Raise Ticket page now shows the serial you searched, with its own invoice, warranty status and ticket counts. Before this, when a customer had several units of the same product, it could show another unit's details under the serial you searched, and could set the priority to Medium on a serial still under warranty. Choosing a customer and product without searching still fills in their first serial."
+      },
+      {
+        "date": "04.11.2026",
+        "module": "CSM Support",
+        "submodule": "Raise Ticket: Typing a Different Serial",
+        "changes": "Changing the text in the Product Serial No. box now clears Asset Information and removes the link to the earlier serial. Before this, the ticket stayed linked to the earlier serial. The details come back when you press Enter or leave the box and the serial is found. If it is not found, the ticket is saved with the serial you typed, and the register, Excel export and ticket details show it. Customer, product, invoice and contact stay filled in, so check them before raising the ticket. A serial typed over an automatic SN- number is now kept, and no record is created for the automatic number. If you click Raise Ticket while a serial is still being checked, a message asks you to review the details and click again."
       }
     ],
     "deployedBy": "Super Admin",
