@@ -124,6 +124,7 @@ const API_PERMISSION_RULES = [
         routes: { 'POST /generate': 'create', 'POST /import': 'create', 'POST /:id/restore/:versionId': 'modify' }
     },
     { prefix: '/api/salespersons', key: 'admin_salespersons', openRead: true },
+    { prefix: '/api/users/activity', key: 'admin_user_activity' },
 
     // ── Enquiry ───────────────────────────────────────────────────────────
     {

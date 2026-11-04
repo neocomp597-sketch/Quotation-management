@@ -181,7 +181,8 @@ const MENU_GROUPS = [
         description: 'Authorization and admin-only configuration',
         children: [
             { key: 'admin_authorization', label: 'Authorization', description: 'Role authorization controls' },
-            { key: 'admin_salespersons', label: 'Salespersons', description: 'Salesperson user administration' }
+            { key: 'admin_salespersons', label: 'Salespersons', description: 'Salesperson user administration' },
+            { key: 'admin_user_activity', label: 'User Activity', description: 'When each user was created and last modified' }
         ]
     },
     {
@@ -376,6 +377,7 @@ const MODULE_ACTIONS = {
     settings_profile: ['view', 'modify'],
     admin_authorization: ['view'],
     admin_salespersons: ['view', 'create', 'modify'],
+    admin_user_activity: ['view'],
     // Older per-action flowchart switches, superseded by the actions of flowchart_view
     flowchart_create: ['view'],
     flowchart_edit: ['view'],

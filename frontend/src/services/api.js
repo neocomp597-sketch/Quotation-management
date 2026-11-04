@@ -387,6 +387,7 @@ export const authService = {
 
 export const userService = {
   getAll: (params) => api.get("/users", { params }),
+  getActivity: (params) => api.get("/users/activity", { params }),
   create: (data) => api.post("/users", data),
   updateProfile: (data) => api.put("/users/profile", data),
   getNote: () => api.get("/users/note"),

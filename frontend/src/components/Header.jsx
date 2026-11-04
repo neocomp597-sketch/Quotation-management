@@ -54,6 +54,7 @@ const searchablePages = [
     { label: 'Settings', path: '/settings', permissionKey: 'settings_profile', keywords: ['profile'] },
     { label: 'Org Chart & My Team', path: '/settings?tab=org-chart', permissionKey: 'payroll_org_chart', keywords: ['org chart', 'my team', 'team', 'hierarchy', 'tree'] },
     { label: 'Authorization', path: '/admin/authorization', permissionKey: 'admin_authorization', keywords: ['permissions', 'roles'] },
+    { label: 'User Activity', path: '/admin/user-activity', permissionKey: 'admin_user_activity', keywords: ['user created', 'user modified', 'created date', 'modified date'] },
     { label: 'Salespersons', path: '/salespersons', permissionKey: 'admin_salespersons', adminOnly: true, keywords: ['sales person'] },
     { label: 'Sales Dashboard', path: '/sales/dashboard', permissionKey: 'sales_dashboard', keywords: ['sales overview'] },
     { label: 'Deals', path: '/sales/deals', permissionKey: 'sales_deals', keywords: ['deal board', 'pipeline deals'] },
@@ -365,6 +366,9 @@ const moduleSubmodulesMap = {
     '/admin/authorization': [
         { label: 'Authorization Matrix', path: '/admin/authorization' },
         { label: 'Roles & Module Access', path: '/admin/authorization' }
+    ],
+    '/admin/user-activity': [
+        { label: 'User Created & Modified Dates', path: '/admin/user-activity' }
     ],
     '/salespersons': [
         { label: 'Salespersons List', path: '/salespersons' },

@@ -28,6 +28,7 @@ import {
     MdLocalShipping,
     MdCalendarMonth,
     MdLock,
+    MdHistory,
     MdMap,
     MdLocationCity,
     MdBusiness,
@@ -344,6 +345,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             icon: <MdLock size={22} />,
             children: [
                 { key: 'admin_authorization', name: 'Authorization', icon: <MdLock size={18} />, path: '/admin/authorization' },
+                { key: 'admin_user_activity', name: 'User Activity', icon: <MdHistory size={18} />, path: '/admin/user-activity' },
                 ...(isAdmin || isSuperAdmin ? [
                     { key: 'admin_salespersons', name: 'Salespersons', icon: <MdPeople size={18} />, path: '/salespersons', adminOnly: true }
                 ] : []),

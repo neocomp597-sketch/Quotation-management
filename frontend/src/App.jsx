@@ -45,6 +45,7 @@ const Vendor360Workspace = lazy(() => import('./pages/Vendor360Workspace'));
 const Vouchers = lazy(() => import('./pages/Vouchers'));
 const CreateVoucher = lazy(() => import('./pages/CreateVoucher'));
 const Authorization = lazy(() => import('./pages/Authorization'));
+const UserActivity = lazy(() => import('./pages/UserActivity'));
 const StatusMaster = lazy(() => import('./pages/StatusMaster'));
 const TerritoryMaster = lazy(() => import('./pages/TerritoryMaster'));
 const BranchMaster = lazy(() => import('./pages/BranchMaster'));
@@ -303,6 +304,7 @@ function App() {
             <Route path="/status-master/new" element={<PermissionRoute adminOnly={true}><Layout><StatusMaster isCreatePage={true} /></Layout></PermissionRoute>} />
             <Route path="/status-master/edit/:id" element={<PermissionRoute adminOnly={true}><Layout><StatusMaster isEditPage={true} /></Layout></PermissionRoute>} />
             <Route path="/admin/authorization" element={<PermissionRoute permissionKey="admin_authorization"><Layout><Authorization /></Layout></PermissionRoute>} />
+            <Route path="/admin/user-activity" element={<PermissionRoute permissionKey="admin_user_activity"><Layout><UserActivity /></Layout></PermissionRoute>} />
             <Route path="/admin/landing-plans" element={<PermissionRoute adminOnly={true}><Layout><LandingPlanManager /></Layout></PermissionRoute>} />
             <Route path="/super-admin" element={<PermissionRoute superAdminOnly={true}><Layout><SuperAdmin /></Layout></PermissionRoute>} />
             <Route path="/system-updates" element={<PermissionRoute><Layout><SystemUpdates /></Layout></PermissionRoute>} />

@@ -52,6 +52,31 @@ const UserSchema = new mongoose.Schema({
     resetPasswordToken: { type: String, default: null },
     resetPasswordExpires: { type: Date, default: null },
     createdAt: { type: Date, default: Date.now },
+    // Last change to the user record; empty until the first one (see NOT_A_MODIFICATION).
+    updatedAt: { type: Date },
+});
+
+// Signing in, the branch picked in the header, a forgotten-password request and the personal
+// notepad write to this document on every use, but none of them change the user record.
+const NOT_A_MODIFICATION = new Set([
+    'refreshSessions', 'refreshTokenHash', 'refreshTokenExpiresAt', 'tokenVersion',
+    'activeBranchId', 'resetPasswordToken', 'resetPasswordExpires', 'personalNote', '__v',
+]);
+const changesUserRecord = (paths) => paths.some((path) => !NOT_A_MODIFICATION.has(path.split('.')[0]));
+
+UserSchema.pre('save', function () {
+    if (!this.isNew && changesUserRecord(this.modifiedPaths())) {
+        this.updatedAt = new Date();
+    }
+});
+
+UserSchema.pre(['findOneAndUpdate', 'updateOne', 'updateMany'], function () {
+    const paths = Object.entries(this.getUpdate() || {}).flatMap(([key, value]) => (
+        key.startsWith('$') ? Object.keys(value || {}) : [key]
+    ));
+    if (changesUserRecord(paths)) {
+        this.set('updatedAt', new Date());
+    }
 });
 
 UserSchema.index({ companyId: 1, email: 1 }, { unique: true });

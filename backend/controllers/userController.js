@@ -6,7 +6,7 @@ const AuditLog = require('../models/AuditLog');
 const bcrypt = require('bcryptjs');
 const { ROLE_OPTIONS, mergeUserPermissions, diffUserPermissions } = require('../config/authorization');
 const RolePermission = require('../models/RolePermission');
-const { getTenantId } = require('../middlewares/tenantContext');
+const { getTenantId, getScopedBranches } = require('../middlewares/tenantContext');
 const { getRolePermissions, toPlainObject } = require('../middlewares/permissionMiddleware');
 const { invalidateAuthUserCache, isSuperAdminRole } = require('../middlewares/authMiddleware');
 const { broadcastCrmUpdate } = require('../config/socket');
@@ -61,25 +61,27 @@ const getEffectiveCompanyId = async (req) => {
     return companyId?.toString ? companyId.toString() : companyId;
 };
 
+// The User model is not branch-scoped by tenantPlugin, so the active branch
+// is applied here: users of the scoped branches plus users without a branch.
+const withActiveBranchScope = (query) => {
+    const scopedBranchIds = getScopedBranches();
+    if (scopedBranchIds) {
+        query.$or = [
+            { branchId: { $in: scopedBranchIds } },
+            { assignedBranches: { $in: scopedBranchIds } },
+            { branchId: null, assignedBranches: { $size: 0 } },
+            { branchId: null, assignedBranches: { $exists: false } },
+            { branchId: { $exists: false }, assignedBranches: { $size: 0 } },
+            { branchId: { $exists: false }, assignedBranches: { $exists: false } },
+        ];
+    }
+    return query;
+};
+
 exports.getAllUsers = async (req, res) => {
     try {
         const companyId = await getEffectiveCompanyId(req);
-        const query = companyId ? { companyId } : {};
-
-        // The User model is not branch-scoped by tenantPlugin, so the active branch
-        // is applied here: users of the scoped branches plus users without a branch.
-        const { getScopedBranches } = require('../middlewares/tenantContext');
-        const scopedBranchIds = getScopedBranches();
-        if (scopedBranchIds) {
-            query.$or = [
-                { branchId: { $in: scopedBranchIds } },
-                { assignedBranches: { $in: scopedBranchIds } },
-                { branchId: null, assignedBranches: { $size: 0 } },
-                { branchId: null, assignedBranches: { $exists: false } },
-                { branchId: { $exists: false }, assignedBranches: { $size: 0 } },
-                { branchId: { $exists: false }, assignedBranches: { $exists: false } },
-            ];
-        }
+        const query = withActiveBranchScope(companyId ? { companyId } : {});
 
         const users = await User.find(query)
             .select('_id name email role reportsTo branchId assignedBranches status companyId customPermissions mgrAccess vendorId createdAt')
@@ -94,6 +96,92 @@ exports.getAllUsers = async (req, res) => {
     } catch (error) {
         console.error('[getAllUsers] Error:', error.message, error.stack);
         res.status(500).json({ message: 'Failed to load users', error: error.message });
+    }
+};
+
+const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const USER_ACTIVITY_SORTS = {
+    name: (a, b) => a.name.localeCompare(b.name),
+    createdAt: (a, b) => (a.createdAt || 0) - (b.createdAt || 0),
+    modifiedAt: (a, b) => (a.modifiedAt || 0) - (b.modifiedAt || 0),
+};
+
+/**
+ * Created and last modified dates of the users matching `query`. updatedAt holds every change since
+ * it was added; a user last changed before that shows the latest change recorded elsewhere on the
+ * record or in the audit log, and no date at all when nothing was recorded.
+ */
+const loadUserActivity = async (query) => {
+    const users = await User.find(query)
+        .select('name email role status isActive branchId createdAt updatedAt customPermissionsUpdatedAt passwordChangedAt')
+        .populate('branchId', 'name')
+        .sort({ createdAt: -1 })
+        .lean();
+
+    const auditDates = await AuditLog.aggregate([
+        { $match: { entityType: 'User', entityId: { $in: users.map((user) => user._id) } } },
+        { $group: { _id: '$entityId', timestamp: { $max: '$timestamp' } } },
+    ]);
+    const lastAudit = new Map(auditDates.map((row) => [row._id.toString(), row.timestamp]));
+
+    return users.map((user) => {
+        const changes = [user.updatedAt, user.customPermissionsUpdatedAt, user.passwordChangedAt, lastAudit.get(user._id.toString())].filter(Boolean);
+        return {
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            branch: user.branchId?.name || '',
+            isActive: user.status !== false && user.isActive !== false,
+            createdAt: user.createdAt,
+            modifiedAt: changes.length ? new Date(Math.max(...changes.map((date) => new Date(date).getTime()))) : null,
+        };
+    });
+};
+
+// GET /api/users/activity?search=&sortBy=name|createdAt|modifiedAt&order=asc|desc&page=&limit=
+exports.getUserActivity = async (req, res) => {
+    try {
+        const query = withActiveBranchScope({ companyId: req.user?.companyId });
+        const search = String(req.query.search || '').trim();
+        if (search) {
+            const regex = new RegExp(escapeRegex(search), 'i');
+            query.$and = [{ $or: [{ name: regex }, { email: regex }] }];
+        }
+
+        const rows = await loadUserActivity(query);
+        const compare = Object.hasOwn(USER_ACTIVITY_SORTS, req.query.sortBy)
+            ? USER_ACTIVITY_SORTS[req.query.sortBy]
+            : USER_ACTIVITY_SORTS.modifiedAt;
+        rows.sort(req.query.order === 'asc' ? compare : (a, b) => compare(b, a));
+
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 200);
+        const pages = Math.max(Math.ceil(rows.length / limit), 1);
+        const page = Math.min(Math.max(parseInt(req.query.page, 10) || 1, 1), pages);
+
+        res.json({
+            data: rows.slice((page - 1) * limit, page * limit),
+            pagination: { page, limit, total: rows.length, pages },
+        });
+    } catch (error) {
+        console.error('[getUserActivity] Error:', error.message);
+        res.status(500).json({ message: 'Failed to load user activity', error: error.message });
+    }
+};
+
+// GET /api/users/activity/:id
+exports.getUserActivityById = async (req, res) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ message: 'Invalid user id' });
+        }
+        const [row] = await loadUserActivity(withActiveBranchScope({ _id: req.params.id, companyId: req.user?.companyId }));
+        if (!row) return res.status(404).json({ message: 'User not found' });
+        res.json(row);
+    } catch (error) {
+        console.error('[getUserActivityById] Error:', error.message);
+        res.status(500).json({ message: 'Failed to load user activity', error: error.message });
     }
 };
 

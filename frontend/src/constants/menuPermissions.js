@@ -193,7 +193,8 @@ export const MENU_PERMISSION_GROUPS = [
         description: 'Authorization matrix and user permissions administration',
         defaultRoute: '/admin/authorization',
         children: [
-            { key: 'admin_authorization', label: 'Authorization', description: 'Role authorization matrix controls', defaultRoute: '/admin/authorization' }
+            { key: 'admin_authorization', label: 'Authorization', description: 'Role authorization matrix controls', defaultRoute: '/admin/authorization' },
+            { key: 'admin_user_activity', label: 'User Activity', description: 'When each user was created and last modified', defaultRoute: '/admin/user-activity' }
         ]
     }
 ];
