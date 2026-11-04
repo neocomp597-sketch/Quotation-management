@@ -276,6 +276,15 @@ const CSMTickets = () => {
 
     const lookupInFlightRef = useRef(false);
     const lastLookedUpSNRef = useRef('');
+    // The form as it is now, for responses that arrive after the render that asked for them
+    const latestFormRef = useRef(formData);
+    useEffect(() => {
+        latestFormRef.current = formData;
+    }, [formData]);
+    // True when a serial searched or chosen since has taken over the form from this asset
+    const isStaleSummary = (assetId) => lookupInFlightRef.current || latestFormRef.current.assetId !== assetId;
+    // False once the serial box has moved on from the serial a lookup was asked about
+    const boxStillHolds = (serialNo) => String(latestFormRef.current.serialNumber || '').trim().toLowerCase() === serialNo.toLowerCase();
 
     const manualLookupInFlightRef = useRef(false);
     const lastManualLookedUpSNRef = useRef('');
@@ -294,7 +303,15 @@ const CSMTickets = () => {
     };
 
     const handleSerialInputChange = async (val) => {
-        setFormData(prev => ({ ...prev, serialNumber: val }));
+        // Focusing the box passes the same text again. Only a real edit lets go of the asset,
+        // so the old serial's details and link cannot stay behind a different serial.
+        const edited = val !== (formData.serialNumber || '');
+        setFormData(prev => ({ ...prev, serialNumber: val, ...(edited ? { assetId: '' } : {}) }));
+        if (edited) {
+            setAssetSummary(null);
+            lastLookedUpSNRef.current = '';
+            if (val.trim()) setGeneratedSerial('');
+        }
         const query = val ? String(val).trim() : '';
         if (query.length >= 1) {
             setIsSearchingSerials(true);
@@ -803,6 +820,11 @@ const CSMTickets = () => {
                     });
                     
                     if (fetchedAssets.length > 0) {
+                        // The first asset is only a default for an empty form. A serial already
+                        // on the form (searched or typed) keeps its own Asset Information.
+                        const { assetId, serialNumber } = latestFormRef.current;
+                        if (assetId || (serialNumber && serialNumber !== generatedSerial) || lookupInFlightRef.current) return;
+
                         const firstAsset = fetchedAssets[0];
                         setFormData(prev => {
                             if (!prev.assetId) {
@@ -811,9 +833,10 @@ const CSMTickets = () => {
                             return prev;
                         });
                         setGeneratedSerial('');
-                        
+
                         csmService.getAssetSummary({ assetId: firstAsset._id })
                             .then(summaryRes => {
+                                if (isStaleSummary(firstAsset._id)) return;
                                 setAssetSummary(summaryRes.data);
                                 const hasCoverage = summaryRes.data.warranty?.status === 'Active' || summaryRes.data.amc?.status === 'Active';
                                 if (!hasCoverage) {
@@ -827,7 +850,7 @@ const CSMTickets = () => {
                     } else {
                         // Generate a serial number if no assets exist
                         setFormData(prev => {
-                            if (!prev.assetId && !generatedSerial) {
+                            if (!prev.assetId && !prev.serialNumber && !generatedSerial) {
                                 const selectedProd = products.find(p => p._id === formData.productId);
                                 const prodCode = selectedProd?.productCode || 'PROD';
                                 const randomNum = Math.floor(1000 + Math.random() * 9000);
@@ -994,6 +1017,7 @@ const CSMTickets = () => {
             // Fetch asset summary
             csmService.getAssetSummary({ assetId: autoAsset._id })
                 .then(res => {
+                    if (isStaleSummary(autoAsset._id)) return;
                     setAssetSummary(res.data);
                     const hasCoverage = res.data.warranty?.status === 'Active' || res.data.amc?.status === 'Active';
                     if (!hasCoverage) {
@@ -1005,6 +1029,7 @@ const CSMTickets = () => {
                 })
                 .catch(err => {
                     console.error('Error fetching asset summary:', err);
+                    if (isStaleSummary(autoAsset._id)) return;
                     setAssetSummary(null);
                 });
         } else {
@@ -1071,6 +1096,12 @@ const CSMTickets = () => {
 
     const { isSubmitting: isSavingTicket, execute: handleCreateTicket } = useSubmitGuard(async (e) => {
         e.preventDefault();
+
+        // Leaving the serial box starts a lookup that can still change the fields checked below
+        if (lookupInFlightRef.current) {
+            toast.info('Still checking the serial number. Please review the details and raise the ticket again.');
+            return;
+        }
 
         // Validation checks
         if (!formData.customerId) {
@@ -1437,8 +1468,9 @@ const CSMTickets = () => {
         try {
             const summaryParams = preloadedAsset?._id ? { assetId: preloadedAsset._id } : { serialNumber: cleanSN };
             const res = await csmService.getAssetSummary(summaryParams);
+            if (!boxStillHolds(cleanSN)) return;
             const asset = res.data?.asset || preloadedAsset;
-            
+
             if (res.data) {
                 setAssetSummary(res.data);
             }
@@ -1589,6 +1621,8 @@ const CSMTickets = () => {
                     }
                 }
 
+                if (!boxStillHolds(cleanSN)) return;
+
                 // Autofill
                 setFormData(prev => {
                     const custPincode = asset.customerPostalCode || asset.customerId?.billingAddress?.pincode || asset.pincode || asset.locationPincode || prev.pincode || '';
@@ -1697,7 +1731,7 @@ const CSMTickets = () => {
                 'Contact Email': t.contactEmail || '',
                 'Product Name': t.productId?.productName || '',
                 'Product Code': t.productId?.productCode || '',
-                'Serial No': t.assetId?.serialNumber || '',
+                'Serial No': t.assetId?.serialNumber || t.serialNumber || '',
                 'MGR4 Category': t.mgr4Category || '',
                 'Problem Name': t.problemName || '',
                 'Subject': t.issueTitle || '',
@@ -2505,7 +2539,7 @@ const CSMTickets = () => {
                                     {tickets.map((t) => {
                                         const isManual = t.isManual || !!t.manualInvoiceNo || (t.description && t.description.includes('--- Uploaded Images ---'));
                                         const invoiceNo = t.invoiceId?.voucherNumber || t.invoiceId?.invoiceNumber || t.manualInvoiceNo || 'N/A';
-                                        const productSrNo = t.assetId?.serialNumber || 'N/A';
+                                        const productSrNo = t.assetId?.serialNumber || t.serialNumber || 'N/A';
                                         // A long invoice number breaks only after a "/" (never inside "STN-1327"); <wbr> is
                                         // not copied with the text. Numbers without a "/" wrap normally.
                                         const invoiceParts = !invoiceNo.includes('/') || invoiceNo === 'N/A' ? invoiceNo

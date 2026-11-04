@@ -917,7 +917,7 @@ const TicketDetail = () => {
                                 <div>
                                     <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Product Sr. No</span>
                                     <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-teal-50 text-teal-800 border border-teal-200 inline-block mt-0.5">
-                                        {ticket.assetId?.serialNumber || 'N/A'}
+                                        {ticket.assetId?.serialNumber || ticket.serialNumber || 'N/A'}
                                     </span>
                                 </div>
                             </div>
