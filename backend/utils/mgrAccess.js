@@ -9,9 +9,11 @@ const { isSuperAdminRole } = require('../middlewares/authMiddleware');
  * Authorization > Team Users ("MGR Access"); one setting for all of them.
  *
  * A user given MGR values sees only the serial numbers whose product carries them: any of the
- * values of one level, and every level that has values (MGR 1 = IND sees IND products only;
- * MGR 1 = IND with MGR 2 = X sees the IND products of X). Users with no values, admins and super
- * admins see everything. Read from the user on each request, so a change applies at once.
+ * values of one level, on every level that has values, where a level the product leaves blank does
+ * not count against it; the product must match on at least one level (MGR 1 = IND sees IND products
+ * only; MGR 1 = IND with MGR 2 = X sees the IND products of X, plus IND products with no MGR 2 and
+ * X products with no MGR 1; a product with no MGR is never seen). Users with no values, admins and
+ * super admins see everything. Read from the user on each request, so a change applies at once.
  *
  * Applied to every Invoice Bulk Upload read and write: list, cards, search, MGR filters, export,
  * return history, details / activity log, serial search, add, edit, return and Excel import; and to
@@ -70,16 +72,30 @@ const describeMgrAccess = async (access) => {
     ]));
 };
 
-const productConditions = (access) => Object.entries(access).map(([field, ids]) => ({ [field]: { $in: ids } }));
+/**
+ * The Product condition of `access` (from getMgrAccess, not null), or null when it allows nothing.
+ * On each level the user was given values for, the product must carry one of them or nothing at all
+ * (a level the product leaves blank does not hide it), and it must carry a given value on at least
+ * one of those levels, so a product with no MGR stays hidden. A user given values on MGR 1 only
+ * therefore sees exactly the products of those MGR 1 values.
+ */
+const productCondition = (access) => {
+    const levels = Object.entries(access).filter(([, ids]) => ids?.length);
+    if (!levels.length) return null;
+    return {
+        $and: levels.map(([field, ids]) => ({ $or: [{ [field]: { $in: ids } }, { [field]: null }] })),
+        $or: levels.map(([field, ids]) => ({ [field]: { $in: ids } }))
+    };
+};
 
 /**
  * Ids of the products the access allows (`access` from getMgrAccess, not null). MGR ids belong to
  * one company, so they alone pick its products (pre-company products included).
  */
 const allowedProductIds = async (access) => {
-    const levels = productConditions(access);
-    if (!levels.length) return [];
-    return Product.distinct('_id', { $and: levels });
+    const condition = productCondition(access);
+    if (!condition) return [];
+    return Product.distinct('_id', condition);
 };
 
 /**
@@ -115,9 +131,9 @@ const allowedMgr1Ids = async (access) => {
 const accessAllowsProduct = async (access, productId) => {
     if (!access) return true;
     const id = String(productId?._id || productId || '');
-    const levels = productConditions(access);
-    if (!levels.length || !mongoose.Types.ObjectId.isValid(id)) return false;
-    return Boolean(await Product.exists({ _id: id, $and: levels }).setOptions({ bypassTenant: true }));
+    const condition = productCondition(access);
+    if (!condition || !mongoose.Types.ObjectId.isValid(id)) return false;
+    return Boolean(await Product.exists({ _id: id, ...condition }).setOptions({ bypassTenant: true }));
 };
 
 /** True when the request user may see an entry of this product. */

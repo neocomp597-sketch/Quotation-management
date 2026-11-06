@@ -709,10 +709,15 @@ const SerialNoMaster = () => {
     const filteredAssets = assets;
 
     // Options of each MGR filter: the values assigned to the products of the loaded entries, of
-    // the products the user's MGR access allows.
+    // the products the user's MGR access allows (the server's rule, utils/mgrAccess.js: on each
+    // level with values the product has one of them or none, and it matches on at least one level).
     const mgrOptions = useMemo(() => {
+        const levels = mgrAccess ? Object.entries(mgrAccess).filter(([, values]) => values?.length) : [];
+        const given = (key, product) => levels.find(([level]) => level === key)[1].some((mgr) => mgr._id === idOf(product[key]));
         const allowed = mgrAccess
-            ? products.filter((product) => Object.entries(mgrAccess).every(([key, values]) => values.some((mgr) => mgr._id === idOf(product[key]))))
+            ? products.filter((product) => levels.length > 0
+                && levels.every(([key]) => !idOf(product[key]) || given(key, product))
+                && levels.some(([key]) => given(key, product)))
             : products;
         return Object.fromEntries(MGR_FIELDS.map(({ key }) => [
             key,

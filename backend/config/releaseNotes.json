@@ -604,7 +604,8 @@
       "Phones and Tablets: the top bar no longer pushes controls off the screen",
       "Also fixed: Serial No Transfer search by customer and product, older products in Product Master that could not be saved, product names on Invoice Bulk Upload rows, and Contact Person in the customer import",
       "Raise Ticket: Asset Information shows the serial you searched, and a ticket no longer stays linked to an earlier serial after you type a different one",
-      "Employee Master: the same person can no longer be added twice; Add Employee Profile names the employee who already has that email, or that name and mobile number"
+      "Employee Master: the same person can no longer be added twice; Add Employee Profile names the employee who already has that email, or that name and mobile number",
+      "MGR Access: an MGR left blank on a product no longer hides its serial numbers from users given values on several MGR levels"
     ],
     "detailedChanges": [
       {
@@ -708,6 +709,12 @@
         "module": "Employee Master",
         "submodule": "No Duplicate Employees",
         "changes": "Add Employee Profile no longer creates a second record for someone already on the Employees screen. Saving is refused, with the name and EMP code of the existing employee, when an employee in any branch already has the same email, or the same name and mobile number. Before this, only the EMP code was checked, and a new code is generated for every new profile, so the same person could be added again. The email is the employee's login, so the second record also got a made-up login nobody knew. Editing an employee is refused the same way when the new email, or the new name and mobile number, belong to someone else. Employees who already share a mailbox can still be edited as before, and a different person with the same name can still be added with their own email and mobile number."
+      },
+      {
+        "date": "06.11.2026",
+        "module": "Authorization",
+        "submodule": "MGR Access: Blank MGR No Longer Hides a Product",
+        "changes": "A user given values on more than one MGR level no longer loses serial numbers because a product leaves one of those levels blank. Before this, a user ticked on all five MGR levels saw only products with all five filled in, so serials uploaded under a product with a blank MGR seemed to disappear, even though the user's access looked right. Now a product is shown when every MGR it has is one the user was given and at least one of them matches. A product with no MGR at all is still not shown to limited users until it is given one in Product Master. A user ticked on only one level sees exactly what they saw before. This applies to Invoice Bulk Upload, Serial No Transfer and Customer Service."
       }
     ],
     "deployedBy": "Super Admin",

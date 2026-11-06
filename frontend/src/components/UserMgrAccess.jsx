@@ -23,8 +23,9 @@ const isMgrUnrestrictedRole = (role) => ['admin', 'super_admin', 'superadmin'].i
 /**
  * MGR Access of one user (Authorization > Team Users): the MGR values their Invoice Bulk Upload,
  * Serial No Transfer and Customer Service data is limited to (one setting for all), on any of MGR 1-5. None
- * ticked = every value. Within one MGR any ticked
- * value is enough; ticks on two MGRs must both match. Admins always see everything; the server
+ * ticked = every value. Within one MGR any ticked value is enough; ticks on two MGRs must both
+ * match, except that an MGR the product leaves blank does not count against it (a product with no
+ * MGR at all is never shown). Admins always see everything; the server
  * applies the limit (backend/utils/mgrAccess.js), so it holds for exports and direct API calls too.
  *
  * `options` is every value of the Product MGR Master (all five types).
@@ -85,7 +86,7 @@ const UserMgrAccess = ({ user, options, params, disabled, onSaved }) => {
     const hint = isAdminUser
         ? 'Admins see every MGR value; MGR access does not apply to them.'
         : selected.length
-            ? `Sees and changes only the serial numbers whose product has ${summary}, in Invoice Bulk Upload and Serial No Transfer (lists, search, filters, exports, history, details, transfers), and the service tickets of those products plus their own in Customer Service. Within one MGR any ticked value counts; ticks on two MGRs must both match.`
+            ? `Sees and changes only the serial numbers whose product has ${summary}, in Invoice Bulk Upload and Serial No Transfer (lists, search, filters, exports, history, details, transfers), and the service tickets of those products plus their own in Customer Service. Within one MGR any ticked value counts; ticks on two MGRs must both match, but an MGR left blank on the product does not hide it. Products with no MGR are not shown.`
             : 'Nothing ticked: sees every MGR value. Tick values to limit what this user sees.';
 
     return (
