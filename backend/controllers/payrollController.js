@@ -199,6 +199,52 @@ const validateEmployeeFieldsBackend = (data) => {
     return null;
 };
 
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const emailKey = (value) => String(value || '').trim().toLowerCase();
+const nameKey = (value) => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+const mobileKey = (value) => String(value || '').replace(/\D/g, '').slice(-10);
+
+/**
+ * The employee already on Employee Master that saving `data` would make a second record of, as
+ * { employee, field }, or null. Same person = same email (the employee's login: a second employee
+ * with it gets a made-up login nobody knows) or same name and mobile number. Every branch is
+ * searched, since an employee is one person whichever branch is open. Only the fields given are
+ * checked, and `excludeId` (the employee being edited) is skipped.
+ */
+const findSameEmployee = async (companyId, { email, name, mobile } = {}, excludeId = null) => {
+    const wantedEmail = emailKey(email);
+    const wantedName = nameKey(name);
+    const wantedMobile = mobileKey(mobile);
+    const checkNameMobile = Boolean(wantedName) && wantedMobile.length >= 8;
+    const or = [];
+    if (wantedEmail) or.push({ email: new RegExp(`^\\s*${escapeRegex(wantedEmail)}\\s*$`, 'i') });
+    if (checkNameMobile) or.push({ name: new RegExp(`^\\s*${wantedName.split(' ').map(escapeRegex).join('\\s+')}\\s*$`, 'i') });
+    if (!or.length) return null;
+
+    const query = { $or: or };
+    if (companyId) query.companyId = companyId;
+    if (excludeId) query._id = { $ne: excludeId };
+    const candidates = await EmployeeProfile.find(query)
+        .select('name email mobile employeeId externalEmployeeCode')
+        .setOptions({ bypassBranch: true })
+        .lean();
+
+    const byEmail = wantedEmail && candidates.find((employee) => emailKey(employee.email) === wantedEmail);
+    if (byEmail) return { employee: byEmail, field: 'email' };
+    const byNameAndMobile = checkNameMobile && candidates.find((employee) => (
+        nameKey(employee.name) === wantedName && mobileKey(employee.mobile) === wantedMobile
+    ));
+    return byNameAndMobile ? { employee: byNameAndMobile, field: 'mobile' } : null;
+};
+
+const sameEmployeeMessage = ({ employee, field }) => {
+    const code = employee.employeeId || employee.externalEmployeeCode;
+    const who = code ? `${employee.name} (${code})` : employee.name;
+    return field === 'email'
+        ? `${who} already has the email ${emailKey(employee.email)}. An employee's email is their login, so the same person cannot be added twice. Open ${who} on the Employees screen instead, or use another email.`
+        : `${who} is already on the Employees screen with mobile ${employee.mobile}. Open that profile instead of adding the person again.`;
+};
+
 exports.createEmployee = async (req, res) => {
     try {
         const employeeData = { ...req.body };
@@ -210,6 +256,12 @@ exports.createEmployee = async (req, res) => {
         const validationError = validateEmployeeFieldsBackend(employeeData);
         if (validationError) {
             return res.status(400).json({ message: validationError });
+        }
+
+        // Before an Employee ID is generated, so a refused save does not use one up.
+        const sameEmployee = await findSameEmployee(employeeData.companyId, employeeData);
+        if (sameEmployee) {
+            return res.status(409).json({ message: sameEmployeeMessage(sameEmployee), code: 'EMPLOYEE_EXISTS', employeeId: sameEmployee.employee._id });
         }
 
         // Clean up empty strings for ObjectId fields
@@ -310,6 +362,26 @@ exports.updateEmployee = async (req, res) => {
         const validationError = validateEmployeeFieldsBackend(updateData);
         if (validationError) {
             return res.status(400).json({ message: validationError });
+        }
+
+        // A changed email, or name / mobile, must not make this employee a copy of another one.
+        // Unchanged values are not checked, so employees already sharing a mailbox still save.
+        const current = await EmployeeProfile.findById(req.params.id).select('companyId name email mobile').lean();
+        if (current) {
+            const changed = {};
+            if (updateData.email !== undefined && emailKey(updateData.email) !== emailKey(current.email)) {
+                changed.email = updateData.email;
+            }
+            const nextName = updateData.name !== undefined ? updateData.name : current.name;
+            const nextMobile = updateData.mobile !== undefined ? updateData.mobile : current.mobile;
+            if (nameKey(nextName) !== nameKey(current.name) || mobileKey(nextMobile) !== mobileKey(current.mobile)) {
+                changed.name = nextName;
+                changed.mobile = nextMobile;
+            }
+            const sameEmployee = await findSameEmployee(current.companyId, changed, current._id);
+            if (sameEmployee) {
+                return res.status(409).json({ message: sameEmployeeMessage(sameEmployee), code: 'EMPLOYEE_EXISTS', employeeId: sameEmployee.employee._id });
+            }
         }
 
         const employee = await EmployeeProfile.findByIdAndUpdate(

@@ -592,7 +592,7 @@
   {
     "version": "v6.6.0",
     "title": "Customer Service Branch-Wise, Login Follows Employee Master & Invoice Bulk Upload Customer Search",
-    "message": "Release Updates (1 - 4 Nov 2026): Customer Service now shows the branch selected at the top of the screen. An employee's login follows Employee Master, and the Select Branch screen is gone. Staff with no branch assigned can no longer log in. Invoice Bulk Upload search now finds every customer shown in its list.",
+    "message": "Release Updates (1 - 6 Nov 2026): Customer Service now shows the branch selected at the top of the screen. An employee's login follows Employee Master, and the Select Branch screen is gone. Staff with no branch assigned can no longer log in. Invoice Bulk Upload search now finds every customer shown in its list. The same employee can no longer be added twice.",
     "releaseNotes": [
       "Invoice Bulk Upload Search: finds a serial by the customer name shown on its row, and by customer code and Product Master name or code",
       "Customer Service: tickets, visits, RCA reports, warranties, AMCs and attendance show the selected branch",
@@ -603,7 +603,8 @@
       "Customers and Quotations: employees with no territory see the whole selected branch",
       "Phones and Tablets: the top bar no longer pushes controls off the screen",
       "Also fixed: Serial No Transfer search by customer and product, older products in Product Master that could not be saved, product names on Invoice Bulk Upload rows, and Contact Person in the customer import",
-      "Raise Ticket: Asset Information shows the serial you searched, and a ticket no longer stays linked to an earlier serial after you type a different one"
+      "Raise Ticket: Asset Information shows the serial you searched, and a ticket no longer stays linked to an earlier serial after you type a different one",
+      "Employee Master: the same person can no longer be added twice; Add Employee Profile names the employee who already has that email, or that name and mobile number"
     ],
     "detailedChanges": [
       {
@@ -701,6 +702,12 @@
         "module": "CSM Support",
         "submodule": "Raise Ticket: Typing a Different Serial",
         "changes": "Changing the text in the Product Serial No. box now clears Asset Information and removes the link to the earlier serial. Before this, the ticket stayed linked to the earlier serial. The details come back when you press Enter or leave the box and the serial is found. If it is not found, the ticket is saved with the serial you typed, and the register, Excel export and ticket details show it. Customer, product, invoice and contact stay filled in, so check them before raising the ticket. A serial typed over an automatic SN- number is now kept, and no record is created for the automatic number. If you click Raise Ticket while a serial is still being checked, a message asks you to review the details and click again."
+      },
+      {
+        "date": "06.11.2026",
+        "module": "Employee Master",
+        "submodule": "No Duplicate Employees",
+        "changes": "Add Employee Profile no longer creates a second record for someone already on the Employees screen. Saving is refused, with the name and EMP code of the existing employee, when an employee in any branch already has the same email, or the same name and mobile number. Before this, only the EMP code was checked, and a new code is generated for every new profile, so the same person could be added again. The email is the employee's login, so the second record also got a made-up login nobody knew. Editing an employee is refused the same way when the new email, or the new name and mobile number, belong to someone else. Employees who already share a mailbox can still be edited as before, and a different person with the same name can still be added with their own email and mobile number."
       }
     ],
     "deployedBy": "Super Admin",
