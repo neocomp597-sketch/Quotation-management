@@ -82,6 +82,15 @@ const EMPTY_SINGLE_FORM = {
 const STATUS_OPTIONS = ['IN_STOCK', 'SOLD', 'ALLOCATED', 'RETURN', 'SCRAPPED'];
 const RETURNED_STATUSES = ['RETURN', 'RETURNED'];
 
+// The Customer cell of an entry with no customer: "Stock (Unsold)" only for stock; a sold,
+// allocated or returned entry simply has none entered.
+const noCustomerLabel = (asset) => ((asset.status || 'IN_STOCK') === 'IN_STOCK' ? 'Stock (Unsold)' : 'Not entered');
+
+// Customer Name of an Excel export row. Blank when the entry has none, so a file exported, filled
+// in and uploaded again does not create a customer named after a placeholder.
+const exportCustomerName = (asset) => asset.customerId?.companyName || asset.customerId?.customerName
+    || asset.customerNameStr || asset.customerName || (asset.customerId ? 'Customer' : '');
+
 // A saved date as the 'YYYY-MM-DD' value of a date input, in the browser's own time zone.
 const toDateInputValue = (value) => {
     if (!value) return '';
@@ -493,7 +502,7 @@ const SerialNoMaster = () => {
             const buildRow = (asset) => {
                 const prodName = asset.productId?.productName || asset.productName || '';
                 const prodCode = asset.productId?.productCode || asset.productCode || '';
-                const custName = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || asset.customerName || (asset.customerId ? 'Customer' : 'Stock (Unsold)');
+                const custName = exportCustomerName(asset);
                 const sDate = asset.saleDate || asset.invoiceDate;
                 return {
                     'Serial Number': asset.serialNumber || '',
@@ -559,7 +568,7 @@ const SerialNoMaster = () => {
             const exportData = allAssets.map(asset => {
                 const prodName = asset.productId?.productName || asset.productName || '';
                 const prodCode = asset.productId?.productCode || asset.productCode || '';
-                const custName = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || asset.customerName || (asset.customerId ? 'Customer' : 'Stock (Unsold)');
+                const custName = exportCustomerName(asset);
                 const sDate = asset.saleDate || asset.invoiceDate;
                 return {
                     'Serial Number': asset.serialNumber || '',
@@ -1385,7 +1394,7 @@ const SerialNoMaster = () => {
                                             <MgrLine record={asset} />
                                             <MobileFields>
                                                 <MobileField label="Customer" wide>
-                                                    {custDisplay || <span className="text-slate-400 font-normal italic">Stock (Unsold)</span>}
+                                                    {custDisplay || <span className="text-slate-400 font-normal italic">{noCustomerLabel(asset)}</span>}
                                                     {asset.customerPostalCode && <span className="block text-[10px] text-slate-400 font-bold">Pin: {asset.customerPostalCode}</span>}
                                                 </MobileField>
                                                 <MobileField label="Invoice Number">
@@ -1467,7 +1476,7 @@ const SerialNoMaster = () => {
                                                         {custDisplay ? (
                                                             <span>{custDisplay}</span>
                                                         ) : (
-                                                            <span className="text-slate-400 font-normal italic">Stock (Unsold)</span>
+                                                            <span className="text-slate-400 font-normal italic">{noCustomerLabel(asset)}</span>
                                                         )}
                                                         {asset.customerPostalCode && (
                                                             <span className="block text-[10px] text-slate-400 font-bold">Pin: {asset.customerPostalCode}</span>

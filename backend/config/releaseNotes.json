@@ -609,7 +609,8 @@
       "Tickets: Print Call Sheet for the engineer, laid out like the Raise Support Ticket form with the Ticket Number added",
       "Raise Ticket: Asset Information shows the serial's Invoice Bulk Upload entry with the same fields and look",
       "Raise Ticket: a pasted serial fills Asset Information at once, and the entry's Project is shown",
-      "MGR Access: serials of products with no MGR are shown to every user, so uploaded data no longer seems missing"
+      "MGR Access: serials of products with no MGR are shown to every user, so uploaded data no longer seems missing",
+      "Invoice Bulk Upload: an entry with no customer no longer reads Stock (Unsold) when sold, and the import warns when no customer column is matched"
     ],
     "detailedChanges": [
       {
@@ -743,6 +744,12 @@
         "module": "Authorization",
         "submodule": "MGR Access: Products With No MGR Are Shown to Everyone",
         "changes": "Serial numbers of a product that has no MGR at all in Product Master are now shown to every user, including users limited by MGR Access. Before this, they were hidden from those users whatever they were given, so data a Branch Admin uploaded through Invoice Bulk Upload seemed missing: an upload adds a new product code to Product Master without MGR, and its serials disappeared for limited users, even after their login was made again. A product that has MGR values follows the same rule as before, and choosing an MGR in a screen's MGR filter still shows only the products with that MGR. Users limited by MGR Access still cannot add new products. Setting the MGR on such a product in Product Master limits it again. This applies to Invoice Bulk Upload, Serial No Transfer and Customer Service."
+      },
+      {
+        "date": "07.11.2026",
+        "module": "Master Management",
+        "submodule": "Invoice Bulk Upload: Missing Customer Shown Clearly",
+        "changes": "An entry with no customer now shows Stock (Unsold) only when its status is In Stock. A sold, allocated or returned entry with no customer shows N/A on its details page and Not entered in the list, instead of Stock (Unsold) next to the Sold status. Excel exports leave Customer Name blank for such entries, so a file exported, filled in and uploaded again does not create a customer called Stock (Unsold). When an upload file has no column matched to Customer Name or Customer Code, the import preview now warns that every row will be saved without a customer, before anything is imported. To add the customers to serials already uploaded, upload the same file again with a Customer Name column: it fills in the customer and keeps the rest."
       }
     ],
     "deployedBy": "Super Admin",

@@ -686,6 +686,13 @@ module.exports = {
     fields: FIELDS,
     // Every upload adds new serials and updates the ones already saved, as it always has.
     modes: ['upsert'],
+    // A file whose customer column is not matched saves every row without a customer, which on
+    // sold serials looks like lost data; the preview says so before anything is imported.
+    unmatchedNotices: [{
+        fields: ['customerName', 'customerCode'],
+        message: 'No column is matched to Customer Name or Customer Code, so every row will be saved without a customer.',
+        hint: 'If the file has a customer column, match it to Customer Name under Column matching. Uploading the file again later with the customer filled in adds it to the serials already saved.'
+    }],
 
     /** The branch selected in the header; the import keeps it even if the header changes. */
     async resolveParams(raw, { user }) {

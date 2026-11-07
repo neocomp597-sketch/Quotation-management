@@ -1146,7 +1146,9 @@ exports.exportAssets = async (req, res) => {
         for (const asset of populatedDocs) {
             const prodName = asset.productId?.productName || asset.productName || '';
             const prodCode = asset.productId?.productCode || asset.productCode || '';
-            const custName = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || asset.customerName || (asset.customerId ? 'Customer' : 'Stock (Unsold)');
+            // Blank when the entry has no customer, so the file can be filled in and uploaded again
+            // without creating a customer named after a placeholder.
+            const custName = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || asset.customerName || (asset.customerId ? 'Customer' : '');
             const sDate = asset.saleDate || asset.invoiceDate;
 
             sheet.addRow({
