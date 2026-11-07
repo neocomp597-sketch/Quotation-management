@@ -32,12 +32,17 @@ const codeLabel = (doc) => (doc && typeof doc === 'object' ? [doc.code, doc.desc
 
 const objectOrNull = (value) => (value && typeof value === 'object' ? value : null);
 
-/** [{ key, label, value }] of the entry's form fields, MGR and Indicator excepted. */
+/**
+ * [{ key, label, value }] of the entry's form fields, MGR and Indicator excepted. Project comes
+ * last and only when the entry has one: the upload file fills it (allocated items), and the
+ * Invoice Bulk Upload register and export show it, though the single-entry form has no box for it.
+ */
 export const assetEntryFields = (asset) => {
     if (!asset) return [];
     const product = objectOrNull(asset.productId);
     const customer = objectOrNull(asset.customerId);
     const saleDate = asset.saleDate || asset.invoiceDate;
+    const project = [text(asset.projectCode), text(asset.projectName)].filter(Boolean).join(' - ');
     return [
         { key: 'serialNumber', label: 'Serial Number', value: text(asset.serialNumber) },
         { key: 'productCode', label: 'Product Code', value: text(product?.productCode || asset.productCode) },
@@ -50,7 +55,8 @@ export const assetEntryFields = (asset) => {
         { key: 'customerPostalCode', label: 'Customer Postal Code', value: text(asset.customerPostalCode || customer?.billingAddress?.pincode) },
         { key: 'invoiceNumber', label: 'Invoice Number', value: text(asset.invoiceNumber || objectOrNull(asset.invoiceId)?.voucherNumber) },
         { key: 'saleDate', label: 'Invoice Date', value: saleDate ? formatDate(saleDate, '') : '' },
-        { key: 'location', label: 'Location', value: text(asset.location) }
+        { key: 'location', label: 'Location', value: text(asset.location) },
+        ...(project ? [{ key: 'project', label: 'Project', value: project }] : [])
     ];
 };
 

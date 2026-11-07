@@ -290,6 +290,9 @@ const CSMTickets = () => {
 
     const manualLookupInFlightRef = useRef(false);
     const lastManualLookedUpSNRef = useRef('');
+    // Set by a paste into a serial box, so the change it makes looks the serial up straight away
+    const serialPastedRef = useRef(false);
+    const manualSerialPastedRef = useRef(false);
 
     const deduplicateSerialSuggestions = (list = []) => {
         const seen = new Set();
@@ -2722,7 +2725,16 @@ const CSMTickets = () => {
                                 <input
                                     type="text"
                                     value={formData.serialNumber || ''}
-                                    onChange={(e) => handleSerialInputChange(e.target.value)}
+                                    onPaste={() => { serialPastedRef.current = true; }}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        handleSerialInputChange(val);
+                                        // A pasted serial fills Asset Information at once, as Enter does
+                                        if (serialPastedRef.current) {
+                                            serialPastedRef.current = false;
+                                            if (val.trim()) handleSerialNoLookup(val, null, true);
+                                        }
+                                    }}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
                                             e.preventDefault();
@@ -3809,7 +3821,15 @@ const CSMTickets = () => {
                                     type="text"
                                     placeholder="Enter or scan Serial No (e.g. SN-100202 or 2001)..."
                                     value={manualFormData.serialNumber || ''}
-                                    onChange={(e) => handleManualSerialInputChange(e.target.value)}
+                                    onPaste={() => { manualSerialPastedRef.current = true; }}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        handleManualSerialInputChange(val);
+                                        if (manualSerialPastedRef.current) {
+                                            manualSerialPastedRef.current = false;
+                                            if (val.trim()) handleManualSerialLookup(val, null, true);
+                                        }
+                                    }}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
                                             e.preventDefault();
