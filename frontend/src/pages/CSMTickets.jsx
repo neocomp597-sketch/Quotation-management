@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { csmService, customerService, productService, voucherService, userService, importService, uploadService, invalidateApiCache } from '../services/api';
 import { formatDate } from '../utils/helpers';
 import { toast } from 'react-toastify';
-import { MdAdd, MdSearch, MdFilterList, MdArrowForward, MdEdit, MdDelete, MdPublish, MdFileDownload, MdInfoOutline, MdPhotoCamera, MdCloudUpload, MdPeople, MdAccountTree, MdCorporateFare } from 'react-icons/md';
+import { MdAdd, MdSearch, MdFilterList, MdArrowForward, MdEdit, MdDelete, MdPublish, MdFileDownload, MdInfoOutline, MdPhotoCamera, MdCloudUpload, MdPeople, MdAccountTree, MdCorporateFare, MdPrint } from 'react-icons/md';
 import PaginationControls from '../components/PaginationControls';
 import PortalDropdown from '../components/PortalDropdown';
 import Modal from '../components/Modal';
@@ -15,6 +15,8 @@ import usePermission from '../hooks/usePermission';
 import { isValidMobile, isValidPincode, sanitizePhoneNumber } from '../utils/validation';
 import DateInput from '../components/DateInput';
 import ImportWizard from '../components/import/ImportWizard';
+import AssetEntryDetails from '../components/AssetEntryDetails';
+import { openCallSheetWindow, printTicketCallSheet } from '../utils/ticketCallSheet';
 
 const statusStyles = {
     'Open': 'bg-emerald-50 text-emerald-600 border-emerald-200',
@@ -716,6 +718,22 @@ const CSMTickets = () => {
             }
         }
         navigate(`/csm/tickets/${ticket._id}`);
+    };
+
+    // Call Sheet of a register row: the window opens on the click, then the full ticket is loaded into it.
+    const handlePrintCallSheet = async (row) => {
+        const win = openCallSheetWindow();
+        if (!win) {
+            toast.error('Allow pop-ups for this site to print the call sheet.');
+            return;
+        }
+        try {
+            const { data: ticket } = await csmService.getTicketById(row._id);
+            await printTicketCallSheet(win, ticket, async (assetId) => (await csmService.getAssetSummary({ assetId })).data);
+        } catch (error) {
+            win.close();
+            toast.error(error.response?.data?.message || `Could not load ticket ${row.ticketNo} for printing`);
+        }
     };
 
     useEffect(() => {
@@ -2531,8 +2549,8 @@ const CSMTickets = () => {
                                         <th className="px-2.5 py-3">Product Sr. No.</th>
                                         <th className="px-2.5 py-3">Priority</th>
                                         <th className="px-2.5 py-3">Status</th>
-                                        <th className="px-2.5 py-3 sticky right-[6.25rem] bg-slate-50 shadow-[-6px_0_6px_-6px_rgba(15,23,42,0.15)]">Engineer</th>
-                                        <th className="w-[6.25rem] min-w-[6.25rem] px-2 py-3 text-center whitespace-nowrap sticky right-0 bg-slate-50">Action</th>
+                                        <th className="px-2.5 py-3 sticky right-[8.5rem] bg-slate-50 shadow-[-6px_0_6px_-6px_rgba(15,23,42,0.15)]">Engineer</th>
+                                        <th className="w-[8.5rem] min-w-[8.5rem] px-2 py-3 text-center whitespace-nowrap sticky right-0 bg-slate-50">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50 text-sm font-semibold text-slate-700">
@@ -2602,7 +2620,7 @@ const CSMTickets = () => {
                                                         {t.status}
                                                     </span>
                                                 </td>
-                                                <td className="px-2.5 py-3 text-slate-500 sticky right-[6.25rem] bg-white shadow-[-6px_0_6px_-6px_rgba(15,23,42,0.15)]">
+                                                <td className="px-2.5 py-3 text-slate-500 sticky right-[8.5rem] bg-white shadow-[-6px_0_6px_-6px_rgba(15,23,42,0.15)]">
                                                     <div className="min-w-[5.75rem] max-w-[10rem] break-words leading-snug">
                                                         <div>{t.assignedEngineerId?.name || 'Unassigned'}</div>
                                                         {t.assignedSalespersonId && (
@@ -2612,7 +2630,7 @@ const CSMTickets = () => {
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="w-[6.25rem] min-w-[6.25rem] px-2 py-3 text-center whitespace-nowrap sticky right-0 bg-white">
+                                                <td className="w-[8.5rem] min-w-[8.5rem] px-2 py-3 text-center whitespace-nowrap sticky right-0 bg-white">
                                                     <div className="flex justify-center items-center gap-2">
                                                         <button
                                                             onClick={() => openTicket(t)}
@@ -2620,6 +2638,15 @@ const CSMTickets = () => {
                                                         >
                                                             Details
                                                             <MdArrowForward />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handlePrintCallSheet(t)}
+                                                            title="Print Call Sheet"
+                                                            aria-label={`Print call sheet of ${t.ticketNo}`}
+                                                            className="p-1.5 hover:bg-primary-50 text-primary-600 rounded-xl transition-all hover:scale-105 active:scale-95"
+                                                        >
+                                                            <MdPrint size={16} />
                                                         </button>
                                                     </div>
                                                 </td>
@@ -2901,11 +2928,12 @@ const CSMTickets = () => {
                             />
                         </div>
 
-                        {/* Asset Lookup Card */}
+                        {/* Asset Information: the Invoice Bulk Upload entry of the serial, with the fields
+                            and look of its entry form (components/AssetEntryDetails), then its service status. */}
                         {assetSummary && (
-                            <div className="md:col-span-2 p-5 bg-gradient-to-br from-slate-50 to-slate-100/50 border border-slate-200 rounded-3xl space-y-3 shadow-sm animate-fade-in">
-                                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                                    <span className="text-xs font-black uppercase tracking-wider text-slate-700">🔎 Asset Information Lookup</span>
+                            <div className="md:col-span-2 lg:col-span-3 p-5 md:p-6 bg-white border border-slate-200 rounded-[2rem] space-y-5 shadow-sm animate-fade-in">
+                                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                                    <span className="text-xs font-black uppercase tracking-wider text-slate-700">🔎 Asset Information (Invoice Bulk Upload Entry)</span>
                                     <div className="flex gap-2">
                                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
                                             assetSummary.asset?.status === 'SOLD'
@@ -2925,31 +2953,8 @@ const CSMTickets = () => {
                                         </span>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs font-semibold text-slate-600">
-                                    <div>
-                                        <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Customer</span>
-                                        <span className="text-slate-900">{assetSummary.asset?.customerId?.companyName || assetSummary.asset?.customerId?.customerName || 'Stock (Unsold)'}</span>
-                                    </div>
-                                    <div>
-                                        <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Product</span>
-                                        <span className="text-slate-900">{assetSummary.asset?.productId?.productName}</span>
-                                    </div>
-                                    <div>
-                                        <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Serial Number</span>
-                                        <span className="text-slate-900 font-mono">{assetSummary.asset?.serialNumber}</span>
-                                    </div>
-                                    <div>
-                                        <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Invoice Number</span>
-                                        <span className="text-slate-900">{assetSummary.asset?.invoiceNumber || 'N/A'}</span>
-                                    </div>
-                                    <div>
-                                        <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Date of Sale</span>
-                                        <span className="text-slate-900">
-                                            {assetSummary.asset?.saleDate || assetSummary.asset?.invoiceDate
-                                                ? formatDate(assetSummary.asset.saleDate || assetSummary.asset.invoiceDate)
-                                                : 'N/A'}
-                                        </span>
-                                    </div>
+                                <AssetEntryDetails asset={assetSummary.asset} />
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 pt-4 border-t border-slate-100 text-xs font-semibold text-slate-600">
                                     <div>
                                         <span className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Installation Date</span>
                                         <span className="text-slate-900">{formatDate(assetSummary.asset?.installationDate, 'N/A')}</span>

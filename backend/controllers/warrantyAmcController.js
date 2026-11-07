@@ -1202,7 +1202,7 @@ exports.getAssetSummary = async (req, res) => {
         let asset = null;
         if (assetId && isValidObjectId(assetId)) {
             asset = await Asset.findOne({ _id: assetId, companyId, ...access })
-                .populate({ path: 'customerId', select: 'customerName companyName gstin billingAddress mobile email', options: { bypassTenant: true } })
+                .populate({ path: 'customerId', select: 'customerName companyName externalCode gstin billingAddress mobile email', options: { bypassTenant: true } })
                 .populate(productMgrPopulate('basePrice mrp catalogType'))
                 .populate('invoiceId', 'voucherNumber date')
                 .populate(DIVISION_POPULATE)
@@ -1217,7 +1217,7 @@ exports.getAssetSummary = async (req, res) => {
             if (companyId) assetQuery.companyId = companyId;
 
             const matches = await Asset.find(assetQuery)
-            .populate({ path: 'customerId', select: 'customerName companyName gstin billingAddress mobile email', options: { bypassTenant: true } })
+            .populate({ path: 'customerId', select: 'customerName companyName externalCode gstin billingAddress mobile email', options: { bypassTenant: true } })
             .populate(productMgrPopulate('basePrice mrp catalogType'))
             .populate('invoiceId', 'voucherNumber date')
             .populate(DIVISION_POPULATE)
@@ -1263,7 +1263,7 @@ exports.getAssetSummary = async (req, res) => {
 
                 const historyDoc = await AssetHistory.findOne(historyQuery)
                 .sort({ createdAt: -1 })
-                .populate('customerId', 'customerName companyName gstin billingAddress mobile email')
+                .populate('customerId', 'customerName companyName externalCode gstin billingAddress mobile email')
                 .populate(productMgrPopulate('basePrice mrp catalogType'))
                 .lean();
 
