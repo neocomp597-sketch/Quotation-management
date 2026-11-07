@@ -12,8 +12,10 @@ const { isSuperAdminRole } = require('../middlewares/authMiddleware');
  * values of one level, on every level that has values, where a level the product leaves blank does
  * not count against it; the product must match on at least one level (MGR 1 = IND sees IND products
  * only; MGR 1 = IND with MGR 2 = X sees the IND products of X, plus IND products with no MGR 2 and
- * X products with no MGR 1; a product with no MGR is never seen). Users with no values, admins and
- * super admins see everything. Read from the user on each request, so a change applies at once.
+ * X products with no MGR 1). A product with no MGR at all is seen by everyone: an Invoice Bulk Upload
+ * adds a new product code to the Product Master without MGR, and its serials must not disappear for
+ * limited users until someone sets it. Users with no values, admins and super admins see everything.
+ * Read from the user on each request, so a change applies at once.
  *
  * Applied to every Invoice Bulk Upload read and write: list, cards, search, MGR filters, export,
  * return history, details / activity log, serial search, add, edit, return and Excel import; and to
@@ -24,6 +26,11 @@ const { isSuperAdminRole } = require('../middlewares/authMiddleware');
  */
 
 const MGR_FIELDS = { MGR1: 'mgr1', MGR2: 'mgr2', MGR3: 'mgr3', MGR4: 'mgr4', MGR5: 'mgr5' };
+
+// The company of a user's MGR access, kept on the access object under a symbol so that the level
+// lists (Object.entries / keys) stay as they are. Present only on a user's access, so the products
+// with no MGR are added there and not to a screen's MGR filter (mgr1FilterCondition).
+const ACCESS_COMPANY = Symbol('mgrAccessCompany');
 
 const isUnrestricted = (user) => {
     const role = String(user?.role || '').toLowerCase();
@@ -45,11 +52,13 @@ const getUserMgrAccess = async (user) => {
     const mgrs = await MGR.find({ _id: { $in: ids }, companyId: user.companyId })
         .select('mgrType')
         .lean();
-    return mgrs.reduce((access, mgr) => {
+    const access = mgrs.reduce((levels, mgr) => {
         const field = MGR_FIELDS[mgr.mgrType];
-        if (field) (access[field] = access[field] || []).push(mgr._id);
-        return access;
+        if (field) (levels[field] = levels[field] || []).push(mgr._id);
+        return levels;
     }, {});
+    access[ACCESS_COMPANY] = user.companyId;
+    return access;
 };
 
 /** getUserMgrAccess of the request user. */
@@ -76,21 +85,30 @@ const describeMgrAccess = async (access) => {
  * The Product condition of `access` (from getMgrAccess, not null), or null when it allows nothing.
  * On each level the user was given values for, the product must carry one of them or nothing at all
  * (a level the product leaves blank does not hide it), and it must carry a given value on at least
- * one of those levels, so a product with no MGR stays hidden. A user given values on MGR 1 only
- * therefore sees exactly the products of those MGR 1 values.
+ * one of those levels. A user's access also allows the products with no MGR at all, of the user's
+ * company or from before companies; a screen's MGR filter (no company on `access`) does not.
+ * Access whose values were all deleted from the MGR master allows nothing, not even those.
  */
 const productCondition = (access) => {
     const levels = Object.entries(access).filter(([, ids]) => ids?.length);
     if (!levels.length) return null;
-    return {
+    const byValues = {
         $and: levels.map(([field, ids]) => ({ $or: [{ [field]: { $in: ids } }, { [field]: null }] })),
         $or: levels.map(([field, ids]) => ({ [field]: { $in: ids } }))
     };
+    const companyId = access[ACCESS_COMPANY];
+    if (!companyId) return byValues;
+    const noMgr = {
+        companyId: { $in: [new mongoose.Types.ObjectId(String(companyId)), null] },
+        ...Object.fromEntries(Object.values(MGR_FIELDS).map((field) => [field, null]))
+    };
+    return { $or: [noMgr, byValues] };
 };
 
 /**
  * Ids of the products the access allows (`access` from getMgrAccess, not null). MGR ids belong to
- * one company, so they alone pick its products (pre-company products included).
+ * one company, so they alone pick its products (pre-company products included); the products with
+ * no MGR are limited to the user's company and pre-company ones by productCondition.
  */
 const allowedProductIds = async (access) => {
     const condition = productCondition(access);

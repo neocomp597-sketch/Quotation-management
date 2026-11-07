@@ -214,7 +214,8 @@ const resolveProduct = (index, legacy, data) => {
 
 /**
  * The issue of a row whose product is outside the importing user's MGR access (`allowed`: product
- * ids, or null when the user is not limited; utils/mgrAccess.js). A new product has no MGR yet.
+ * ids, or null when the user is not limited; utils/mgrAccess.js). A limited user cannot add a new
+ * product to the Product Master: an administrator adds it, with its MGR.
  */
 const mgrAccessIssue = (allowed, resolution) => {
     if (!allowed) return null;

@@ -608,7 +608,8 @@
       "MGR Access: an MGR left blank on a product no longer hides its serial numbers from users given values on several MGR levels",
       "Tickets: Print Call Sheet for the engineer, laid out like the Raise Support Ticket form with the Ticket Number added",
       "Raise Ticket: Asset Information shows the serial's Invoice Bulk Upload entry with the same fields and look",
-      "Raise Ticket: a pasted serial fills Asset Information at once, and the entry's Project is shown"
+      "Raise Ticket: a pasted serial fills Asset Information at once, and the entry's Project is shown",
+      "MGR Access: serials of products with no MGR are shown to every user, so uploaded data no longer seems missing"
     ],
     "detailedChanges": [
       {
@@ -736,6 +737,12 @@
         "module": "CSM Support",
         "submodule": "Raise Ticket: Pasting a Serial Fills Asset Information",
         "changes": "Pasting a serial number into the Product Serial No. box on Raise Ticket now fills Asset Information, customer, product and invoice straight away, as pressing Enter does. Before this, a pasted serial only opened the suggestions list until you pressed Enter or left the box. Manual Register fills its details on paste too. Typing still waits for Enter, the search button, a suggestion or leaving the box. Asset Information and the Call Sheet now also show the Project from the Invoice Bulk Upload file, for allocated items, after Location; a serial with no project shows no Project box."
+      },
+      {
+        "date": "07.11.2026",
+        "module": "Authorization",
+        "submodule": "MGR Access: Products With No MGR Are Shown to Everyone",
+        "changes": "Serial numbers of a product that has no MGR at all in Product Master are now shown to every user, including users limited by MGR Access. Before this, they were hidden from those users whatever they were given, so data a Branch Admin uploaded through Invoice Bulk Upload seemed missing: an upload adds a new product code to Product Master without MGR, and its serials disappeared for limited users, even after their login was made again. A product that has MGR values follows the same rule as before, and choosing an MGR in a screen's MGR filter still shows only the products with that MGR. Users limited by MGR Access still cannot add new products. Setting the MGR on such a product in Product Master limits it again. This applies to Invoice Bulk Upload, Serial No Transfer and Customer Service."
       }
     ],
     "deployedBy": "Super Admin",

@@ -372,7 +372,7 @@ const entryValidationError = (message) => Object.assign(new Error(message), { st
 // record, as in Excel bulk upload: a known code with another name, or a new code with the name
 // of an existing product, is refused instead of being saved under a product it does not name.
 // `mgrAccess` (utils/mgrAccess.js) refuses a product outside the user's MGR access, and a new
-// one, which has no MGR yet.
+// one: a limited user cannot add products to the Product Master.
 const resolveEntryProduct = async (companyId, cleanProductCode, productName, mgrAccess = null) => {
     const product = await findOrCreateEntryProduct(companyId, cleanProductCode, productName, !mgrAccess);
     if (!(await accessAllowsProduct(mgrAccess, product))) {
