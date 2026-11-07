@@ -134,15 +134,24 @@ const findProductByName = (products, name) => {
 };
 
 // Compact "MGR 1: … · MGR 2: …" line for a table row; renders nothing when none is assigned.
-const MgrLine = ({ record }) => {
+// `wrap` (phone cards) lets it run onto more lines instead of cutting it off after MGR 1.
+const MgrLine = ({ record, wrap = false }) => {
     const assigned = assignedMgrsOf(record);
     if (assigned.length === 0) return null;
     const text = assigned.map((m) => `${m.label}: ${m.value}`);
     return (
-        <span className="block text-[10px] text-teal-700 font-semibold mt-1 max-w-[260px] truncate" title={text.join(' | ')}>
+        <span className={`block text-[10px] text-teal-700 font-semibold mt-1 ${wrap ? 'ibu-mgr-line' : 'max-w-[260px] truncate'}`} title={text.join(' | ')}>
             {text.join(' · ')}
         </span>
     );
+};
+
+// "Name · Code" of an entry's product for a phone card, once when the name is the code.
+const productLine = (asset) => {
+    const name = asset.productId?.productName || asset.productName || '';
+    const code = asset.productId?.productCode || asset.productCode || '';
+    if (name && code && name.trim().toLowerCase() === code.trim().toLowerCase()) return name;
+    return [name, code].filter(Boolean).join(' · ') || 'N/A';
 };
 
 const ASSET_STATUS_STYLES = {
@@ -185,6 +194,16 @@ const SerialNoMaster = () => {
     // only says so and trims the filter options.
     const [mgrAccess, setMgrAccess] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
+    // Phone view: the MGR access values are folded until opened (see the notice above the list).
+    const [showMgrAccessValues, setShowMgrAccessValues] = useState(false);
+    // On a phone the pager sits below 15 tall cards: a new page starts back at the top of the list.
+    const listTopRef = useRef(null);
+    const changePage = useCallback((page) => {
+        setCurrentPage(page);
+        if (window.matchMedia?.('(max-width: 767px)').matches) {
+            listTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }, []);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
     const [openActionMenuAssetId, setOpenActionMenuAssetId] = useState(null);
@@ -739,6 +758,9 @@ const SerialNoMaster = () => {
         ? MGR_FIELDS.filter(({ key }) => mgrAccess[key]?.length)
             .map(({ key, label }) => `${label}: ${mgrAccess[key].map(formatMgrVal).join(', ')}`)
         : []), [mgrAccess]);
+    const mgrAccessValueCount = useMemo(() => (mgrAccess
+        ? MGR_FIELDS.reduce((count, { key }) => count + (mgrAccess[key]?.length || 0), 0)
+        : 0), [mgrAccess]);
 
     const filteredReturns = useMemo(() => {
         return returnHistory.filter(item => {
@@ -1086,7 +1108,7 @@ const SerialNoMaster = () => {
                 {/* Header (Requirement #1, #16) */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2 font-outfit uppercase">
+                    <h1 className="ibu-title text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2 font-outfit uppercase">
                         <MdTag className="text-primary-600" />
                         <span>Invoice Bulk Upload</span>
                     </h1>
@@ -1161,7 +1183,18 @@ const SerialNoMaster = () => {
                         <p className="text-sm font-black text-primary-800">
                             {mgrAccessLines.length ? 'You see only the serial numbers of your MGR access' : 'Your MGR access has no values'}
                         </p>
-                        <p className="text-[11px] font-semibold text-primary-700 mt-0.5 break-words">
+                        {/* On a phone the values (often dozens) fold into one line until opened, so the list starts on the first screen. */}
+                        {mgrAccessLines.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => setShowMgrAccessValues((open) => !open)}
+                                aria-expanded={showMgrAccessValues}
+                                className="ibu-access-toggle text-[11px] font-black uppercase tracking-wider text-primary-700"
+                            >
+                                {mgrAccessValueCount} MGR {mgrAccessValueCount === 1 ? 'value' : 'values'} · {showMgrAccessValues ? 'Hide' : 'Show'}
+                            </button>
+                        )}
+                        <p className={`text-[11px] font-semibold text-primary-700 mt-0.5 break-words${mgrAccessLines.length ? ` ibu-access-values${showMgrAccessValues ? ' is-open' : ''}` : ''}`}>
                             {mgrAccessLines.length
                                 ? mgrAccessLines.join(' · ')
                                 : 'The MGR values you were given have been removed from the Product MGR Master. Ask an administrator to set your MGR access again.'}
@@ -1221,8 +1254,9 @@ const SerialNoMaster = () => {
                     </button>
                 </div>
 
-                <div className="flex flex-col md:flex-row gap-4 items-center">
-                    <div className="flex-1 w-full relative group">
+                {/* The search keeps a usable width: when long MGR values make the dropdowns too wide, they move to the next row. */}
+                <div className="flex flex-col md:flex-row md:flex-wrap gap-4 items-center">
+                    <div className="flex-1 w-full md:min-w-[16rem] relative group">
                         <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-teal-600 transition-colors" size={20} />
                         <input
                             type="text"
@@ -1281,8 +1315,8 @@ const SerialNoMaster = () => {
             </div>
 
             {/* List Table (Requirement #16) */}
-            <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-3 md:p-6">
+            <div ref={listTopRef} className="ibu-list-panel bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
+                <div className="ibu-list-body p-3 md:p-6">
                     {loading || (activeTab === 'returns' && loadingHistory) ? (
                         <div className="py-20 text-center text-slate-400 font-medium">
                             <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary-500 border-t-transparent mb-4"></div>
@@ -1296,10 +1330,10 @@ const SerialNoMaster = () => {
                                     <MobileCard key={item._id}>
                                         <MobileCardHead
                                             title={<span className="font-mono tracking-wide">{item.serialNumber}</span>}
-                                            subtitle={[item.productId?.productName || item.productName, item.productId?.productCode || item.productCode].filter(Boolean).join(' · ') || 'N/A'}
+                                            subtitle={productLine(item)}
                                             aside={<AssetStatusBadge status="RETURN" />}
                                         />
-                                        <MgrLine record={item} />
+                                        <MgrLine record={item} wrap />
                                         <MobileFields>
                                             <MobileField label="Customer" wide>{item.customerId?.companyName || item.customerId?.customerName || item.customerName || 'Customer'}</MobileField>
                                             <MobileField label="Invoice Number">{item.invoiceNumber || '-'}</MobileField>
@@ -1371,7 +1405,7 @@ const SerialNoMaster = () => {
                                     </tbody>
                                 </table>
                             </div>
-                            <PaginationControls pagination={{ page: currentPage, limit: PAGE_SIZE, total: filteredReturns.length, pages: totalPages }} onPageChange={setCurrentPage} />
+                            <PaginationControls pagination={{ page: currentPage, limit: PAGE_SIZE, total: filteredReturns.length, pages: totalPages }} onPageChange={changePage} className="ibu-pager" />
                         </>
                     ) : (
                         /* ACTIVE INVENTORY TABLE (Requirement #16) */
@@ -1385,13 +1419,13 @@ const SerialNoMaster = () => {
                                         <MobileCard key={asset._id}>
                                             <MobileCardHead
                                                 title={<span className="font-mono tracking-wide">{asset.serialNumber}</span>}
-                                                subtitle={[asset.productId?.productName || asset.productName, asset.productId?.productCode || asset.productCode].filter(Boolean).join(' · ') || 'N/A'}
+                                                subtitle={productLine(asset)}
                                                 aside={<AssetStatusBadge status={asset.status} />}
                                             />
                                             {asset.indicatorField && (
                                                 <span className="block mt-1 text-[10px] font-bold text-primary-600 tracking-wider">Indicator: {asset.indicatorField}</span>
                                             )}
-                                            <MgrLine record={asset} />
+                                            <MgrLine record={asset} wrap />
                                             <MobileFields>
                                                 <MobileField label="Customer" wide>
                                                     {custDisplay || <span className="text-slate-400 font-normal italic">{noCustomerLabel(asset)}</span>}
@@ -1412,7 +1446,7 @@ const SerialNoMaster = () => {
                                                 </MobileField>
                                             </MobileFields>
                                             {(canViewDetails || canEdit || canReturn) && (
-                                                <MobileCardActions>
+                                                <MobileCardActions className="ibu-card-actions">
                                                     {canViewDetails && (
                                                         <button type="button" onClick={() => handleViewDetail(asset.serialNumber)} className={`${actionClass} border-slate-200 text-slate-700`}>
                                                             <MdInfoOutline size={16} /> Details
@@ -1578,7 +1612,7 @@ const SerialNoMaster = () => {
                                     </tbody>
                                 </table>
                             </div>
-                            <PaginationControls pagination={assetPagination} onPageChange={setCurrentPage} />
+                            <PaginationControls pagination={assetPagination} onPageChange={changePage} className="ibu-pager" />
                         </>
                     )}
                 </div>
