@@ -4,6 +4,40 @@ const { invalidateViaQueueOrNow } = require('../queues/cacheInvalidationQueue');
 
 const MGR_CACHE_TTL_SECONDS = Number(process.env.MGR_CACHE_TTL_SECONDS || 600);
 
+// An MGR code as saved: no spaces at the ends and single spaces inside, so "M 365 " is "M 365".
+const cleanCode = (value) => String(value ?? '').trim().replace(/\s+/g, ' ');
+const codeKey = (value) => cleanCode(value).toLowerCase();
+
+/**
+ * The saved value of `mgrType` whose code is `code` but for case and spaces, other than `exceptId`.
+ * A look-alike ("M 365 " next to "M 365") is a different value to MGR Access and Product Master, so a
+ * user given one does not see the products carrying the other: it is refused instead of saved.
+ */
+const findLookAlike = async (mgrType, code, exceptId = null) => {
+    const key = codeKey(code);
+    const sameType = await MGR.find({ mgrType, ...(exceptId ? { _id: { $ne: exceptId } } : {}) }).select('mgrType code').lean();
+    return sameType.find((mgr) => codeKey(mgr.code) === key) || null;
+};
+
+const lookAlikeMessage = (mgr, code) => (cleanCode(mgr.code) === cleanCode(code)
+    ? `${mgr.mgrType} "${cleanCode(mgr.code)}" already exists.`
+    : `${mgr.mgrType} "${mgr.code}" already exists. "${cleanCode(code)}" differs from it only in capital letters or spaces: use the existing value.`);
+
+/** The body's code and description cleaned; `res` answers 400 and null is returned when the code is taken. */
+const prepareMgrBody = async (req, res, mgrType, exceptId = null) => {
+    const body = { ...req.body };
+    if (body.code !== undefined) body.code = cleanCode(body.code);
+    if (body.description !== undefined) body.description = String(body.description ?? '').trim();
+    if (body.code !== undefined && mgrType) {
+        const lookAlike = await findLookAlike(mgrType, body.code, exceptId);
+        if (lookAlike) {
+            res.status(400).json({ message: lookAlikeMessage(lookAlike, body.code) });
+            return null;
+        }
+    }
+    return body;
+};
+
 const getPagination = (query) => {
     const page = Math.max(1, Number(query.page || 1));
     const limit = Math.min(100, Math.max(1, Number(query.limit || 20)));
@@ -76,9 +110,10 @@ exports.getMGRById = async (req, res) => {
 
 // Create a new MGR
 exports.createMGR = async (req, res) => {
-    const mgr = new MGR(req.body);
     try {
-        const newMGR = await mgr.save();
+        const body = await prepareMgrBody(req, res, req.body?.mgrType);
+        if (!body) return;
+        const newMGR = await new MGR(body).save();
         await invalidateViaQueueOrNow('mgrs:*', 'planning:*', 'products:*');
         res.status(201).json(newMGR);
     } catch (err) {
@@ -92,7 +127,11 @@ exports.createMGR = async (req, res) => {
 // Update an existing MGR
 exports.updateMGR = async (req, res) => {
     try {
-        const updatedMGR = await MGR.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+        const saved = await MGR.findById(req.params.id).select('mgrType').lean();
+        if (!saved) return res.status(404).json({ message: 'MGR not found' });
+        const body = await prepareMgrBody(req, res, req.body?.mgrType || saved.mgrType, saved._id);
+        if (!body) return;
+        const updatedMGR = await MGR.findByIdAndUpdate(req.params.id, body, { new: true, runValidators: true });
         if (!updatedMGR) return res.status(404).json({ message: 'MGR not found' });
         await invalidateViaQueueOrNow('mgrs:*', 'planning:*', 'products:*');
         res.json(updatedMGR);

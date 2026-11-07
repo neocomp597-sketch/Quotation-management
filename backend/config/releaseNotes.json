@@ -610,7 +610,8 @@
       "Raise Ticket: Asset Information shows the serial's Invoice Bulk Upload entry with the same fields and look",
       "Raise Ticket: a pasted serial fills Asset Information at once, and the entry's Project is shown",
       "MGR Access: serials of products with no MGR are shown to every user, so uploaded data no longer seems missing",
-      "Invoice Bulk Upload: an entry with no customer no longer reads Stock (Unsold) when sold, and the import warns when no customer column is matched"
+      "Invoice Bulk Upload: an entry with no customer no longer reads Stock (Unsold) when sold, and the import warns when no customer column is matched",
+      "MGR Master: a value that differs from an existing one only in capital letters or spaces is refused"
     ],
     "detailedChanges": [
       {
@@ -750,6 +751,12 @@
         "module": "Master Management",
         "submodule": "Invoice Bulk Upload: Missing Customer Shown Clearly",
         "changes": "An entry with no customer now shows Stock (Unsold) only when its status is In Stock. A sold, allocated or returned entry with no customer shows N/A on its details page and Not entered in the list, instead of Stock (Unsold) next to the Sold status. Excel exports leave Customer Name blank for such entries, so a file exported, filled in and uploaded again does not create a customer called Stock (Unsold). When an upload file has no column matched to Customer Name or Customer Code, the import preview now warns that every row will be saved without a customer, before anything is imported. To add the customers to serials already uploaded, upload the same file again with a Customer Name column: it fills in the customer and keeps the rest."
+      },
+      {
+        "date": "07.11.2026",
+        "module": "Master Management",
+        "submodule": "MGR Master: Look-Alike Values Refused",
+        "changes": "MGR Master no longer saves a value that differs from an existing one of the same MGR type only in capital letters or spaces, and saves codes without spaces at the ends. Before this, \"M 365 \" with a space at the end was saved next to \"M 365\" as a different value: products set to it were hidden from users given \"M 365\" in MGR Access, so a branch user saw fewer serial numbers in Invoice Bulk Upload than an administrator. Adding or renaming such a value now shows which value already exists, so the existing one is used."
       }
     ],
     "deployedBy": "Super Admin",
