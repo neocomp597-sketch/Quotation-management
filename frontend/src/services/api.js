@@ -1048,6 +1048,7 @@ export const csmService = {
   updateAsset: (id, data) => api.put(`/csm/assets/${id}`, data),
   returnAsset: (id, returnReason) => api.post(`/csm/assets/${id}/return`, { returnReason }),
   getReturnHistory: () => api.get("/csm/assets/return-history"),
+  getUploadHistory: (params = {}) => api.get("/csm/assets/upload-history", { params, cache: false }),
   getAssetSummary: (params = {}) => api.get("/csm/assets/summary", { params }),
   getAssetActivity: (serialNumber) => api.get("/csm/assets/activity", { params: { serialNumber } }),
   searchSerialNumbers: (q) => api.get("/csm/assets/search-serials", { params: { q } }),

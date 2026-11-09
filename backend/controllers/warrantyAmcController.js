@@ -953,6 +953,90 @@ exports.returnAsset = async (req, res) => {
     }
 };
 
+const UPLOAD_HISTORY_TYPES = { IMPORT: 'Excel upload', IMPORT_RESELL: 'Excel upload (resold)', SINGLE_ENTRY: 'Single entry', SINGLE_ENTRY_RESELL: 'Single entry (resold)' };
+
+/**
+ * Upload History (administrators): who added Invoice Bulk Upload data, when and to which branch,
+ * in every branch of the company. `uploads` are the Excel uploads kept by the import screen (one row
+ * per run; import jobs are kept 30 days) with file name and counts; `daily` counts the serial entries
+ * added per day, branch, person and way (Excel upload or single entry) over the last `days` (90).
+ * Reads only.
+ */
+exports.getUploadHistory = async (req, res) => {
+    try {
+        const ImportJob = require('../models/ImportJob');
+        const User = require('../models/User');
+        const Branch = require('../models/Branch');
+        const companyId = new mongoose.Types.ObjectId(String(req.user.companyId));
+        const days = Math.min(365, Math.max(1, Number.parseInt(req.query.days, 10) || 90));
+        const since = new Date(Date.now() - days * 86400000);
+
+        const [jobs, daily, branches] = await Promise.all([
+            ImportJob.find({ companyId, module: 'assets', 'runs.0': { $exists: true }, createdAt: { $gte: since } })
+                .select('file runs createdBy branchId createdAt')
+                .sort({ createdAt: -1 })
+                .limit(300)
+                .lean(),
+            AssetHistory.aggregate([
+                { $match: { companyId, createdAt: { $gte: since }, transactionType: { $in: Object.keys(UPLOAD_HISTORY_TYPES) } } },
+                {
+                    $group: {
+                        _id: {
+                            day: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'Asia/Kolkata' } },
+                            branchId: '$branchId',
+                            userId: '$createdBy',
+                            type: '$transactionType'
+                        },
+                        entries: { $sum: 1 },
+                        first: { $min: '$createdAt' },
+                        last: { $max: '$createdAt' }
+                    }
+                },
+                { $sort: { last: -1 } },
+                { $limit: 1000 }
+            ]).option({ bypassBranch: true }),
+            Branch.find({ companyId }).select('name code').lean()
+        ]);
+
+        const userIds = [
+            ...jobs.flatMap((job) => [job.createdBy?.userId, ...(job.runs || []).map((run) => run.userId)]),
+            ...daily.map((row) => row._id.userId)
+        ].filter(Boolean).map(String);
+        const users = await User.find({ _id: { $in: [...new Set(userIds)] } }).select('name email').setOptions({ bypassTenant: true }).lean();
+        const userName = new Map(users.map((user) => [String(user._id), user.name || user.email || '']));
+        const branchName = new Map(branches.map((branch) => [String(branch._id), branch.code || branch.name]));
+
+        const uploads = jobs.flatMap((job) => (job.runs || []).map((run) => ({
+            at: run.startedAt,
+            finishedAt: run.finishedAt,
+            by: userName.get(String(run.userId || job.createdBy?.userId)) || job.createdBy?.name || '',
+            branch: branchName.get(String(job.branchId)) || '',
+            file: job.file?.name || '',
+            created: run.created || 0,
+            updated: run.updated || 0,
+            failed: run.failed || 0
+        }))).sort((a, b) => new Date(b.at) - new Date(a.at));
+
+        res.json({
+            days,
+            jobRetentionDays: ImportJob.JOB_RETENTION_DAYS,
+            uploads,
+            daily: daily.map((row) => ({
+                day: row._id.day,
+                branch: branchName.get(String(row._id.branchId)) || '',
+                by: userName.get(String(row._id.userId)) || '',
+                how: UPLOAD_HISTORY_TYPES[row._id.type] || row._id.type,
+                entries: row.entries,
+                first: row.first,
+                last: row.last
+            }))
+        });
+    } catch (error) {
+        console.error('getUploadHistory error:', error);
+        res.status(500).json({ message: error.message || 'Could not load the upload history' });
+    }
+};
+
 // Return History List (Requirement #9)
 exports.getReturnHistory = async (req, res) => {
     try {

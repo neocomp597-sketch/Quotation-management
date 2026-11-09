@@ -10,6 +10,7 @@ import {
 } from 'react-icons/md';
 import Modal from '../components/Modal';
 import ImportWizard from '../components/import/ImportWizard';
+import IbuUploadHistory from '../components/IbuUploadHistory';
 import PaginationControls from '../components/PaginationControls';
 import { formatDate } from '../utils/helpers';
 import DateInput from '../components/DateInput';
@@ -171,8 +172,11 @@ const SerialNoMaster = () => {
     const navigate = useNavigate();
     const { canCreate, canModify } = usePermission('master_serials');
     // View Details and Edit are switches of their own in Authorization; the API checks them too.
-    const { hasAccess } = useAuth();
+    const { hasAccess, user } = useAuth();
     const canViewDetails = hasAccess('master_serials_view_details');
+    // Upload History lists every branch's uploads, so only administrators open it (the API checks too).
+    const canSeeUploadHistory = ['admin', 'super_admin', 'superadmin'].includes(String(user?.role || '').toLowerCase());
+    const [isUploadHistoryOpen, setIsUploadHistoryOpen] = useState(false);
     const canEdit = hasAccess('master_serials_edit');
     const [assets, setAssets] = useState([]);
     const [assetPagination, setAssetPagination] = useState({ page: 1, limit: PAGE_SIZE, total: 0, pages: 1 });
@@ -1144,6 +1148,16 @@ const SerialNoMaster = () => {
                         {isExporting ? <MdSync className="animate-spin" size={18} /> : <MdFileDownload size={18} />}
                         <span>{isExporting ? 'Exporting...' : 'Export'}</span>
                     </button>
+                    {canSeeUploadHistory && (
+                    <button
+                        onClick={() => setIsUploadHistoryOpen(true)}
+                        className="flex items-center justify-center gap-2 bg-white hover:bg-primary-50 text-primary-700 px-5 py-3 rounded-2xl font-black transition-all uppercase text-[10px] tracking-widest active:scale-95 border border-primary-200 shadow-sm"
+                        title="Who uploaded data, when and to which branch"
+                    >
+                        <MdHistory size={18} />
+                        <span>Upload History</span>
+                    </button>
+                    )}
                     <button
                         onClick={() => { fetchData(); if (activeTab === 'returns') fetchReturnHistory(); }}
                         className="flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-700 px-5 py-3 rounded-2xl font-black transition-all uppercase text-[10px] tracking-widest active:scale-95 border border-slate-200 shadow-sm"
@@ -1698,6 +1712,10 @@ const SerialNoMaster = () => {
                     fetchData();
                 }}
             />
+
+            {canSeeUploadHistory && (
+                <IbuUploadHistory isOpen={isUploadHistoryOpen} onClose={() => setIsUploadHistoryOpen(false)} />
+            )}
         </div>
     );
 };

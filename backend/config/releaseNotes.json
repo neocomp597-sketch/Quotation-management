@@ -772,14 +772,15 @@
   },
   {
     "version": "v6.7.0",
-    "title": "MGR Access Shows Every Serial It Should, Safer Deletes & Hidden Serials Check",
-    "message": "Release Updates (from 9 Nov 2026): Users limited by MGR Access no longer lose serial numbers that the screens show with no MGR: a product whose MGR value was deleted, a deleted product, or a product from before companies. An MGR value or a product still in use can no longer be deleted. Administrators can now see which serial numbers a user cannot see, and why.",
+    "title": "MGR Access Shows Every Serial It Should, Safer Deletes, Hidden Serials Check & Upload History",
+    "message": "Release Updates (from 9 Nov 2026): Users limited by MGR Access no longer lose serial numbers that the screens show with no MGR: a product whose MGR value was deleted, a deleted product, or a product from before companies. An MGR value or a product still in use can no longer be deleted. Administrators can now see which serial numbers a user cannot see, and why. Invoice Bulk Upload has an Upload History for administrators showing who added data, when and to which branch.",
     "releaseNotes": [
       "MGR Access: an MGR value deleted from MGR Master counts as blank, the way the screens already show it, so its products no longer disappear for limited users",
       "MGR Access: serial numbers whose product was deleted, or which use a product from before companies or of another company, count as having no MGR and are shown to every user",
       "MGR Master: a value used by products or ticked in a user's MGR Access cannot be deleted; the message names them",
       "Product Master: a product with serial numbers in Invoice Bulk Upload cannot be deleted; bulk delete keeps such products and names them",
-      "Authorization: Check hidden serials in a user's MGR Access panel lists the serial numbers of the selected branch that the user cannot see, by product, with the reason"
+      "Authorization: Check hidden serials in a user's MGR Access panel lists the serial numbers of the selected branch that the user cannot see, by product, with the reason",
+      "Invoice Bulk Upload: Upload History (administrators) shows who uploaded data, when, to which branch, from which file and how many serial numbers"
     ],
     "detailedChanges": [
       {
@@ -799,6 +800,12 @@
         "module": "Authorization",
         "submodule": "MGR Access: Check Hidden Serials",
         "changes": "In Authorization > Team Users, a user's MGR Access panel has a Check hidden serials button. It counts the Invoice Bulk Upload serial numbers of the branch selected at the top that the user's saved MGR access hides (for example \"sees 320 of the 468 serial numbers in EPC; 148 hidden\") and lists them by product, with the product's MGR 1-5 and the reason, such as MGR 4 is \"OTHER\", which the user does not have. To show them, tick the missing value for the user or change the product's MGR in Product Master. The check only reads data and is for administrators."
+      },
+      {
+        "date": "09.11.2026",
+        "module": "Master Management",
+        "submodule": "Invoice Bulk Upload: Upload History",
+        "changes": "Administrators have an Upload History button on Invoice Bulk Upload. It lists the Excel uploads of the last 30 days in every branch: when, who uploaded, the branch, the file name and how many serial numbers were added, updated or failed. Below it, the serial numbers added per day over the last 90 days, by person, branch and way (Excel upload or single entry), with the times between which they were added. Before this, the import screen showed each person only their own uploads, so nobody could see who uploaded a branch's data."
       }
     ],
     "deployedBy": "Super Admin",
