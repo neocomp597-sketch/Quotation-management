@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Product = require('../models/Product');
+const Asset = require('../models/Asset');
 const Vendor = require('../models/Vendor');
 const {
     sortVendorsByPriority,
@@ -733,6 +734,14 @@ const deleteProduct = async (req, res) => {
             }
         }
 
+        if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+            const serials = await Asset.countDocuments({ productId: req.params.id }).setOptions({ bypassTenant: true });
+            if (serials) {
+                const product = await Product.findById(req.params.id).select('productCode').lean();
+                return res.status(409).json({ message: productInUseMessage([product?.productCode || 'This product'], serials) });
+            }
+        }
+
         const deletedProduct = await Product.findByIdAndDelete(req.params.id);
 
         if (!deletedProduct) {
@@ -745,6 +754,19 @@ const deleteProduct = async (req, res) => {
         console.error(error);
         res.status(500).json({ message: 'Error deleting product' });
     }
+};
+
+/**
+ * Why products with serial numbers in Invoice Bulk Upload are not deleted. Their serials would stay
+ * on the screen for administrators but, with no product and so no MGR, could no longer be filed or
+ * found by product; a product that is no longer sold is set to Inactive instead.
+ */
+const productInUseMessage = (codes, serials = 0) => {
+    const listed = codes.slice(0, 5).join(', ') + (codes.length > 5 ? ` and ${codes.length - 5} more` : '');
+    const count = serials ? `${serials} serial number${serials === 1 ? '' : 's'}` : 'serial numbers';
+    return codes.length === 1
+        ? `${listed} was not deleted: it has ${count} in Invoice Bulk Upload. Set its Status to Inactive instead.`
+        : `${listed} were not deleted: they have serial numbers in Invoice Bulk Upload. Set their Status to Inactive instead.`;
 };
 
 // Bulk Delete Products
@@ -765,12 +787,22 @@ const bulkDeleteProducts = async (req, res) => {
             ];
         }
 
+        // Products that still have serial numbers in Invoice Bulk Upload are kept (see productInUseMessage).
+        const validIds = ids.filter((id) => mongoose.Types.ObjectId.isValid(id));
+        const inUseIds = await Asset.find({ productId: { $in: validIds } }).setOptions({ bypassTenant: true }).distinct('productId');
+        const kept = inUseIds.length
+            ? await Product.find({ _id: { $in: inUseIds } }).select('productCode').lean()
+            : [];
+        if (kept.length) deleteQuery._id = { $in: validIds, $nin: inUseIds };
+
         const result = await Product.deleteMany(deleteQuery);
         await clearProductsCache();
 
+        const deleted = `${result.deletedCount} product${result.deletedCount === 1 ? '' : 's'} deleted.`;
         res.json({
-            message: `${result.deletedCount} products deleted successfully`,
-            deletedCount: result.deletedCount
+            message: kept.length ? `${deleted} ${productInUseMessage(kept.map((p) => p.productCode))}` : `${result.deletedCount} products deleted successfully`,
+            deletedCount: result.deletedCount,
+            keptCodes: kept.map((p) => p.productCode)
         });
     } catch (error) {
         console.error(error);

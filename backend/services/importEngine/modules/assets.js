@@ -9,7 +9,7 @@ const { loadProductIndex } = require('../../../utils/productUniqueness');
 const { loadDivisionSegmentLookup, resolveDivisionSegment } = require('../../../utils/divisionSegment');
 const { chunk, insertRows, writeRows, describeWriteError } = require('../../../utils/importBatch');
 const { invalidateCustomerCaches, invalidateProductCaches, invalidateAssetCaches } = require('../../../utils/cacheInvalidation');
-const { allowedProductIdSet } = require('../../../utils/mgrAccess');
+const { productAccessChecker } = require('../../../utils/mgrAccess');
 const { ImportJobError } = require('../errors');
 
 /*
@@ -213,8 +213,8 @@ const resolveProduct = (index, legacy, data) => {
 };
 
 /**
- * The issue of a row whose product is outside the importing user's MGR access (`allowed`: product
- * ids, or null when the user is not limited; utils/mgrAccess.js). A limited user cannot add a new
+ * The issue of a row whose product is outside the importing user's MGR access (`allowed`: a check
+ * of a product id, or null when the user is not limited; utils/mgrAccess.js). A limited user cannot add a new
  * product to the Product Master: an administrator adds it, with its MGR.
  */
 const mgrAccessIssue = (allowed, resolution) => {
@@ -227,7 +227,7 @@ const mgrAccessIssue = (allowed, resolution) => {
             hint: 'Ask an administrator to add the product with its MGR first, or skip this row.'
         };
     }
-    if (allowed.has(String(resolution.product._id))) return null;
+    if (allowed(resolution.product._id)) return null;
     return {
         field: 'productCode',
         code: 'MGR_ACCESS',
@@ -747,7 +747,7 @@ module.exports = {
             products,
             legacy,
             divisions: await loadDivisionSegmentLookup(companyId),
-            mgrAllowed: await allowedProductIdSet(user),
+            mgrAllowed: await productAccessChecker(user),
             seenSerials: new Set()
         };
     },
@@ -810,7 +810,7 @@ module.exports = {
                 hint: 'A serial number belongs to one branch only. Import this row from that branch, or skip it.'
             });
         }
-        if (saved && context.mgrAllowed && !context.mgrAllowed.has(String(saved.productId || ''))) {
+        if (saved && context.mgrAllowed && !context.mgrAllowed(saved.productId)) {
             issues.push({
                 field: 'serialNumber',
                 code: 'MGR_ACCESS',

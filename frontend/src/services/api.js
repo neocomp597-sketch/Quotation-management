@@ -398,6 +398,7 @@ export const userService = {
   // payload: { permissions } (the full set the user should have) or { customPermissions: {} } (back to role defaults)
   updatePermissions: (id, payload, params) => api.put(`/users/${id}/permissions`, payload, { params }),
   updateMgrAccess: (id, mgrAccess, params) => api.put(`/users/${id}/mgr-access`, { mgrAccess }, { params }),
+  getMgrHiddenSerials: (id, params) => api.get(`/users/${id}/mgr-access/hidden-serials`, { params }),
   updateBranches: (id, assignedBranches, params) => api.put(`/users/${id}/branches`, { assignedBranches }, { params }),
 };
 

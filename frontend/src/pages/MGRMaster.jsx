@@ -221,7 +221,7 @@ const MGRMaster = ({ isCreatePage = false, isEditPage = false }) => {
                 fetchMGRs();
             } catch (err) {
                 console.error("Error deleting MGR:", err);
-                toast.error('Failed to delete');
+                toast.error(err.response?.data?.message || 'Failed to delete', { autoClose: 10000 });
             }
         }
     };

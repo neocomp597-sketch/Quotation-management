@@ -143,9 +143,43 @@ exports.updateMGR = async (req, res) => {
     }
 };
 
+const PRODUCT_MGR_FIELDS = { MGR1: 'mgr1', MGR2: 'mgr2', MGR3: 'mgr3', MGR4: 'mgr4', MGR5: 'mgr5' };
+const listNames = (names, total) => names.join(', ') + (total > names.length ? ` and ${total - names.length} more` : '');
+
+/**
+ * Why an MGR value cannot be deleted yet, or '' when nothing uses it. Products would keep pointing at
+ * the deleted value (shown as blank, but no longer matching anyone's MGR Access), and a user given it
+ * in MGR Access would silently lose that level, which widens or empties what they see.
+ */
+const mgrInUseMessage = async (mgr) => {
+    const Product = require('../models/Product');
+    const User = require('../models/User');
+    const field = PRODUCT_MGR_FIELDS[mgr.mgrType];
+    const label = `${mgr.mgrType.replace('MGR', 'MGR ')} "${mgr.code}"`;
+    const [productCount, products, userCount, users] = await Promise.all([
+        field ? Product.countDocuments({ [field]: mgr._id }).setOptions({ bypassTenant: true }) : 0,
+        field ? Product.find({ [field]: mgr._id }).select('productCode').limit(5).setOptions({ bypassTenant: true }).lean() : [],
+        User.countDocuments({ mgrAccess: mgr._id }).setOptions({ bypassTenant: true }),
+        User.find({ mgrAccess: mgr._id }).select('name').limit(5).setOptions({ bypassTenant: true }).lean()
+    ]);
+    const reasons = [];
+    if (productCount) {
+        reasons.push(`${productCount} product${productCount === 1 ? ' uses' : 's use'} it (${listNames(products.map((p) => p.productCode), productCount)}): change their ${mgr.mgrType.replace('MGR', 'MGR ')} in Product Master first`);
+    }
+    if (userCount) {
+        reasons.push(`${userCount} user${userCount === 1 ? ' has' : 's have'} it in MGR Access (${listNames(users.map((u) => u.name), userCount)}): untick it in Authorization > Team Users first`);
+    }
+    return reasons.length ? `${label} cannot be deleted. ${reasons.join('; ')}. Or set it to Inactive.` : '';
+};
+
 // Delete an MGR
 exports.deleteMGR = async (req, res) => {
     try {
+        const mgr = await MGR.findById(req.params.id).select('mgrType code').lean();
+        if (!mgr) return res.status(404).json({ message: 'MGR not found' });
+        const inUse = await mgrInUseMessage(mgr);
+        if (inUse) return res.status(409).json({ message: inUse });
+
         const deletedMGR = await MGR.findByIdAndDelete(req.params.id);
         if (!deletedMGR) return res.status(404).json({ message: 'MGR not found' });
         await invalidateViaQueueOrNow('mgrs:*', 'planning:*', 'products:*');

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
-import { MdSave, MdFilterAlt, MdSearch, MdWarningAmber } from 'react-icons/md';
+import { MdSave, MdFilterAlt, MdSearch, MdWarningAmber, MdVisibilityOff } from 'react-icons/md';
 import { userService } from '../services/api';
 
 const MGR_LEVELS = [
@@ -41,7 +41,11 @@ const UserMgrAccess = ({ user, options, params, disabled, onSaved }) => {
     const [level, setLevel] = useState('MGR1');
     const [search, setSearch] = useState('');
     const [saving, setSaving] = useState(false);
+    const [check, setCheck] = useState(null);
+    const [checking, setChecking] = useState(false);
     useEffect(() => setSelected(saved), [saved]);
+    // A result belongs to the access it was checked with.
+    useEffect(() => setCheck(null), [savedAll]);
 
     const byLevel = useMemo(() => Object.fromEntries(MGR_LEVELS.map(({ type }) => [
         type,
@@ -71,6 +75,19 @@ const UserMgrAccess = ({ user, options, params, disabled, onSaved }) => {
             toast.error(err?.response?.data?.message || 'Failed to save MGR access');
         } finally {
             setSaving(false);
+        }
+    };
+
+    // Which serial numbers of the branch selected at the top the saved access hides, and why.
+    const runCheck = async () => {
+        setChecking(true);
+        try {
+            const res = await userService.getMgrHiddenSerials(user._id, params);
+            setCheck(res.data);
+        } catch (err) {
+            toast.error(err?.response?.data?.message || 'Could not check the MGR access');
+        } finally {
+            setChecking(false);
         }
     };
 
@@ -209,6 +226,65 @@ const UserMgrAccess = ({ user, options, params, disabled, onSaved }) => {
                 </>
             ) : (
                 <p className="text-xs text-slate-400">No values in the Product MGR Master yet.</p>
+            )}
+
+            {!isAdminUser && savedAll.length > 0 && (
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-700 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={runCheck}
+                            disabled={checking}
+                            className="px-3 py-1.5 bg-white dark:bg-slate-900 border border-primary-300 dark:border-primary-700 text-primary-700 dark:text-primary-300 rounded-xl text-xs font-bold hover:bg-primary-50 dark:hover:bg-primary-950/60 disabled:opacity-60 transition-colors flex items-center gap-1.5"
+                        >
+                            <MdVisibilityOff size={14} /> {checking ? 'Checking...' : 'Check hidden serials'}
+                        </button>
+                        <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                            Invoice Bulk Upload serial numbers of the branch selected at the top that the saved access hides{changed ? ' (save first to check your new ticks)' : ''}.
+                        </span>
+                    </div>
+                    {check && (
+                        <div className="space-y-2">
+                            <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                                {check.allValuesDeleted
+                                    ? `${check.user} sees none of the ${check.total} serial numbers in ${check.branch}: all their MGR values were deleted.`
+                                    : `${check.user} sees ${check.total - check.hidden} of the ${check.total} serial numbers in ${check.branch}${check.hidden ? `; ${check.hidden} hidden:` : '. Nothing is hidden.'}`}
+                            </p>
+                            {check.products.length > 0 && (
+                                <div className="overflow-x-auto max-h-72 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <table className="w-full text-[11px]">
+                                        <thead className="bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px]">
+                                            <tr>
+                                                <th className="text-left px-2.5 py-2 font-black">Product</th>
+                                                <th className="text-right px-2.5 py-2 font-black">Serials</th>
+                                                <th className="text-left px-2.5 py-2 font-black">MGR 1-5 on the product</th>
+                                                <th className="text-left px-2.5 py-2 font-black">Why hidden</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700 text-slate-700 dark:text-slate-200">
+                                            {check.products.map((row) => (
+                                                <tr key={row.productCode + row.productName}>
+                                                    <td className="px-2.5 py-1.5 font-bold">
+                                                        {row.productCode}
+                                                        {row.productName && row.productName !== row.productCode && <span className="block font-semibold text-slate-400">{row.productName}</span>}
+                                                    </td>
+                                                    <td className="px-2.5 py-1.5 text-right font-black">{row.serials}</td>
+                                                    <td className="px-2.5 py-1.5 whitespace-nowrap">{Object.values(row.mgr).map((code) => code || '-').join(' / ')}</td>
+                                                    <td className="px-2.5 py-1.5">{row.reasons.join('; ')}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                            {check.hidden > 0 && (
+                                <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                                    To show them: tick the missing value for this user, or change the product's MGR in Product Master.
+                                </p>
+                            )}
+                        </div>
+                    )}
+                </div>
             )}
         </div>
     );

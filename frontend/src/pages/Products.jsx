@@ -759,7 +759,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                 fetchProducts();
             } catch (err) {
                 console.error("Error deleting product:", err);
-                toast.error('Failed to delete product');
+                toast.error(err.response?.data?.message || 'Failed to delete product', { autoClose: 10000 });
             }
         }
     };
@@ -787,13 +787,15 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
         if (window.confirm(`Are you sure you want to delete ${selectedIds.length} products? This cannot be undone.`)) {
             setIsBulkActionLoading(true);
             try {
-                await productService.bulkDelete(selectedIds);
+                const { data } = await productService.bulkDelete(selectedIds);
                 setSelectedIds([]);
                 fetchProducts();
-                toast.success(`${selectedIds.length} products deleted successfully`);
+                // Products with serial numbers in Invoice Bulk Upload are kept; the message names them.
+                if (data?.keptCodes?.length) toast.warning(data.message, { autoClose: 10000 });
+                else toast.success(data?.message || `${selectedIds.length} products deleted successfully`);
             } catch (err) {
                 console.error("Error bulk deleting:", err);
-                toast.error('Failed to delete products');
+                toast.error(err.response?.data?.message || 'Failed to delete products');
             } finally {
                 setIsBulkActionLoading(false);
             }

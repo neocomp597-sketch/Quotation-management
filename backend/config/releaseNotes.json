@@ -769,5 +769,40 @@
     "deployedBy": "Super Admin",
     "deployedAt": "2026-11-03T20:45:00+05:30",
     "isActive": true
+  },
+  {
+    "version": "v6.7.0",
+    "title": "MGR Access Shows Every Serial It Should, Safer Deletes & Hidden Serials Check",
+    "message": "Release Updates (from 9 Nov 2026): Users limited by MGR Access no longer lose serial numbers that the screens show with no MGR: a product whose MGR value was deleted, a deleted product, or a product from before companies. An MGR value or a product still in use can no longer be deleted. Administrators can now see which serial numbers a user cannot see, and why.",
+    "releaseNotes": [
+      "MGR Access: an MGR value deleted from MGR Master counts as blank, the way the screens already show it, so its products no longer disappear for limited users",
+      "MGR Access: serial numbers whose product was deleted, or which use a product from before companies or of another company, count as having no MGR and are shown to every user",
+      "MGR Master: a value used by products or ticked in a user's MGR Access cannot be deleted; the message names them",
+      "Product Master: a product with serial numbers in Invoice Bulk Upload cannot be deleted; bulk delete keeps such products and names them",
+      "Authorization: Check hidden serials in a user's MGR Access panel lists the serial numbers of the selected branch that the user cannot see, by product, with the reason"
+    ],
+    "detailedChanges": [
+      {
+        "date": "09.11.2026",
+        "module": "Authorization",
+        "submodule": "MGR Access: Deleted or Unknown MGR Values Count as Blank",
+        "changes": "A branch user limited by MGR Access saw fewer serial numbers in Invoice Bulk Upload than an administrator, with no reason shown on any screen. Three kinds of serial numbers were hidden from every limited user: those of a product whose MGR value had been deleted from MGR Master (Product Master and Invoice Bulk Upload show that MGR as blank, but MGR Access still treated it as a value the user did not have), those whose product had been deleted from Product Master, and those linked to a product from before companies, which Product Master does not list. Now an MGR level counts only when it holds a current value of your company, and a serial whose product is missing or belongs to no company or another company counts as having no MGR, so it is shown to everyone like other products without MGR. A product that carries a current MGR value follows the same rule as before. This applies to Invoice Bulk Upload, Serial No Transfer and Customer Service. Service tickets with no product stay as before."
+      },
+      {
+        "date": "09.11.2026",
+        "module": "Master Management",
+        "submodule": "MGR Master and Product Master: Values and Products in Use Are Not Deleted",
+        "changes": "Deleting an MGR value that products still use, or that is ticked in a user's MGR Access, is now refused. The message says how many products and users use it and names the first few, so they can be changed first, or the value can be set to Inactive instead. Deleting a product that has serial numbers in Invoice Bulk Upload, in any branch, is also refused; set its Status to Inactive instead. Bulk delete in Product Master deletes the other selected products and names the ones it kept. Before this, such deletes left serial numbers that limited users could no longer see."
+      },
+      {
+        "date": "09.11.2026",
+        "module": "Authorization",
+        "submodule": "MGR Access: Check Hidden Serials",
+        "changes": "In Authorization > Team Users, a user's MGR Access panel has a Check hidden serials button. It counts the Invoice Bulk Upload serial numbers of the branch selected at the top that the user's saved MGR access hides (for example \"sees 320 of the 468 serial numbers in EPC; 148 hidden\") and lists them by product, with the product's MGR 1-5 and the reason, such as MGR 4 is \"OTHER\", which the user does not have. To show them, tick the missing value for the user or change the product's MGR in Product Master. The check only reads data and is for administrators."
+      }
+    ],
+    "deployedBy": "Super Admin",
+    "deployedAt": "2026-11-09T20:00:00+05:30",
+    "isActive": true
   }
 ]

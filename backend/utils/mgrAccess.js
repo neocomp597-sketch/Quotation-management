@@ -17,6 +17,14 @@ const { isSuperAdminRole } = require('../middlewares/authMiddleware');
  * limited users until someone sets it. Users with no values, admins and super admins see everything.
  * Read from the user on each request, so a change applies at once.
  *
+ * "Blank" means what the screens show: a level counts only when it holds one of the company's current
+ * MGR values. A value since deleted from MGR Master, or one of another company or from before
+ * companies, shows as blank everywhere and counts as blank here. So the rule hides only serials whose
+ * product carries a current MGR value of the company that the user was not given; a serial whose
+ * product was deleted, belongs to no company or to another one has no MGR of the company and is seen
+ * by everyone, like any product without MGR. (Before, those serials were hidden from every limited
+ * user while admins still saw them, and nothing on the screens showed why.)
+ *
  * Applied to every Invoice Bulk Upload read and write: list, cards, search, MGR filters, export,
  * return history, details / activity log, serial search, add, edit, return and Excel import; and to
  * every Serial No Transfer tab: Serial No List, details, transfer / assign / past entry, Transfer
@@ -26,11 +34,14 @@ const { isSuperAdminRole } = require('../middlewares/authMiddleware');
  */
 
 const MGR_FIELDS = { MGR1: 'mgr1', MGR2: 'mgr2', MGR3: 'mgr3', MGR4: 'mgr4', MGR5: 'mgr5' };
+const PRODUCT_FIELDS = Object.values(MGR_FIELDS);
 
-// The company of a user's MGR access, kept on the access object under a symbol so that the level
-// lists (Object.entries / keys) stay as they are. Present only on a user's access, so the products
-// with no MGR are added there and not to a screen's MGR filter (mgr1FilterCondition).
+// Kept on a user's access object under symbols, so that the level lists (Object.entries / keys)
+// stay as they are: the user's company, and the company's current MGR ids by product field.
+// A screen's MGR filter (mgr1FilterCondition) carries neither and keeps the plain rule
+// "products carrying that value".
 const ACCESS_COMPANY = Symbol('mgrAccessCompany');
+const ACCESS_KNOWN = Symbol('mgrAccessKnownValues');
 
 const isUnrestricted = (user) => {
     const role = String(user?.role || '').toLowerCase();
@@ -49,15 +60,18 @@ const getUserMgrAccess = async (user) => {
     const ids = (saved?.mgrAccess || []).filter((id) => mongoose.Types.ObjectId.isValid(id));
     if (!ids.length) return null;
 
-    const mgrs = await MGR.find({ _id: { $in: ids }, companyId: user.companyId })
-        .select('mgrType')
-        .lean();
-    const access = mgrs.reduce((levels, mgr) => {
+    const given = new Set(ids.map(String));
+    const mgrs = await MGR.find({ companyId: user.companyId }).select('mgrType').lean();
+    const access = {};
+    const known = Object.fromEntries(PRODUCT_FIELDS.map((field) => [field, []]));
+    for (const mgr of mgrs) {
         const field = MGR_FIELDS[mgr.mgrType];
-        if (field) (levels[field] = levels[field] || []).push(mgr._id);
-        return levels;
-    }, {});
+        if (!field) continue;
+        known[field].push(mgr._id);
+        if (given.has(String(mgr._id))) (access[field] = access[field] || []).push(mgr._id);
+    }
     access[ACCESS_COMPANY] = user.companyId;
+    access[ACCESS_KNOWN] = known;
     return access;
 };
 
@@ -81,51 +95,87 @@ const describeMgrAccess = async (access) => {
     ]));
 };
 
+const givenLevels = (access) => Object.entries(access).filter(([, ids]) => ids?.length);
+
 /**
- * The Product condition of `access` (from getMgrAccess, not null), or null when it allows nothing.
- * On each level the user was given values for, the product must carry one of them or nothing at all
- * (a level the product leaves blank does not hide it), and it must carry a given value on at least
- * one of those levels. A user's access also allows the products with no MGR at all, of the user's
- * company or from before companies; a screen's MGR filter (no company on `access`) does not.
- * Access whose values were all deleted from the MGR master allows nothing, not even those.
+ * Product condition of the products a user's `access` hides: they carry a current MGR value of the
+ * company, and on some level the user was given values for they carry a current value the user was not
+ * given, or they carry none of the given values at all. null when the access allows nothing (all its
+ * values were deleted from MGR Master: fail closed).
  */
-const productCondition = (access) => {
-    const levels = Object.entries(access).filter(([, ids]) => ids?.length);
+const hiddenProductCondition = (access) => {
+    const levels = givenLevels(access);
     if (!levels.length) return null;
-    const byValues = {
-        $and: levels.map(([field, ids]) => ({ $or: [{ [field]: { $in: ids } }, { [field]: null }] })),
+    const known = access[ACCESS_KNOWN];
+    const carriesKnown = PRODUCT_FIELDS
+        .filter((field) => known[field].length)
+        .map((field) => ({ [field]: { $in: known[field] } }));
+    if (!carriesKnown.length) return { _id: null };
+    const visible = {
+        $and: levels.map(([field, ids]) => ({ $or: [{ [field]: { $in: ids } }, { [field]: { $nin: known[field] } }] })),
         $or: levels.map(([field, ids]) => ({ [field]: { $in: ids } }))
     };
-    const companyId = access[ACCESS_COMPANY];
-    if (!companyId) return byValues;
-    const noMgr = {
-        companyId: { $in: [new mongoose.Types.ObjectId(String(companyId)), null] },
-        ...Object.fromEntries(Object.values(MGR_FIELDS).map((field) => [field, null]))
-    };
-    return { $or: [noMgr, byValues] };
+    return { $and: [{ $or: carriesKnown }, { $nor: [visible] }] };
 };
 
 /**
- * Ids of the products the access allows (`access` from getMgrAccess, not null). MGR ids belong to
- * one company, so they alone pick its products (pre-company products included); the products with
- * no MGR are limited to the user's company and pre-company ones by productCondition.
+ * Why a user's `access` hides `product` (lean, MGR fields as ids), for an administrator's check:
+ * [{ field, value }] for each level where the product carries a current value the user was not
+ * given; or [{ field: null, fields }] when it carries none of the given values on any of those levels.
  */
-const allowedProductIds = async (access) => {
-    const condition = productCondition(access);
-    if (!condition) return [];
-    return Product.distinct('_id', condition);
+const hiddenReasons = (access, product) => {
+    const known = access[ACCESS_KNOWN];
+    const has = (ids, value) => Boolean(value) && ids.some((id) => String(id) === String(value));
+    const levels = givenLevels(access);
+    const reasons = levels
+        .filter(([field, ids]) => has(known[field], product[field]) && !has(ids, product[field]))
+        .map(([field]) => ({ field, value: String(product[field]) }));
+    return reasons.length ? reasons : [{ field: null, fields: levels.map(([field]) => field) }];
+};
+
+/** Ids of the products a user's `access` hides (see hiddenProductCondition), or null when it allows nothing. */
+const hiddenProductIds = async (access) => {
+    const condition = hiddenProductCondition(access);
+    if (!condition) return null;
+    // MGR ids belong to one company, so they alone pick its products, pre-company ones included.
+    return Product.find(condition).setOptions({ bypassTenant: true }).distinct('_id');
+};
+
+/** Products carrying one of the values of a screen's MGR filter (an access object without a company). */
+const filterProductIds = (access) => {
+    const levels = givenLevels(access);
+    if (!levels.length) return [];
+    return Product.distinct('_id', { $and: levels.map(([field, ids]) => ({ [field]: { $in: ids } })) });
 };
 
 /**
- * The condition to add to an Asset / AssetHistory query so that only the serials of `access`
- * (from getMgrAccess) are read, or null when it does not limit anything.
+ * The condition to add to an Asset / AssetHistory / Ticket / transfer query so that only the serials
+ * of `access` (from getMgrAccess) are read, or null when it does not limit anything. For a user it is
+ * `{ productId: { $nin: hidden products, $ne: null } }` (records without a product stay out, as before);
+ * for a screen's MGR filter `{ productId: { $in: products carrying the value } }`.
  */
-const accessCondition = async (access) => (
-    access ? { productId: { $in: await allowedProductIds(access) } } : null
-);
+const accessCondition = async (access) => {
+    if (!access) return null;
+    if (!access[ACCESS_KNOWN]) return { productId: { $in: await filterProductIds(access) } };
+    const hidden = await hiddenProductIds(access);
+    if (!hidden) return { productId: { $in: [] } };
+    return { productId: { $nin: hidden, $ne: null } };
+};
 
 /** accessCondition of the request user. */
 const mgrAccessCondition = async (req) => accessCondition(await getMgrAccess(req));
+
+/**
+ * True when the product id `id` passes an accessCondition result `condition` (null = no limit).
+ * For combining it with another list of product ids in code.
+ */
+const conditionAllowsId = (condition, id) => {
+    if (!condition) return true;
+    const { productId } = condition;
+    if (!id) return false;
+    if (productId.$in) return productId.$in.some((allowed) => String(allowed) === String(id));
+    return !(productId.$nin || []).some((hidden) => String(hidden) === String(id));
+};
 
 /**
  * The condition for a screen's MGR 1 filter (`mgr1Id`, e.g. from ?mgr1=): records of the products
@@ -141,29 +191,41 @@ const mgr1FilterCondition = async (mgr1Id) => {
 /** The MGR 1 values on the products `access` allows, for that filter's options; null when not limited. */
 const allowedMgr1Ids = async (access) => {
     if (!access) return null;
-    const ids = await Product.distinct('mgr1', { _id: { $in: await allowedProductIds(access) } });
+    const hidden = hiddenProductCondition(access);
+    if (!hidden) return [];
+    const ids = await Product.find({ mgr1: { $in: access[ACCESS_KNOWN].mgr1 }, $nor: [hidden] })
+        .setOptions({ bypassTenant: true })
+        .distinct('mgr1');
     return ids.filter(Boolean);
 };
 
-/** True when `access` (from getMgrAccess) allows the product (an id or a populated product). */
+/**
+ * True when `access` (from getMgrAccess) allows the product (an id or a populated product). A
+ * product that is not found carries no MGR of the company, so it is allowed; whether it may be used
+ * at all is for the caller to check.
+ */
 const accessAllowsProduct = async (access, productId) => {
     if (!access) return true;
     const id = String(productId?._id || productId || '');
-    const condition = productCondition(access);
-    if (!condition || !mongoose.Types.ObjectId.isValid(id)) return false;
-    return Boolean(await Product.exists({ _id: id, ...condition }).setOptions({ bypassTenant: true }));
+    const hidden = hiddenProductCondition(access);
+    if (!hidden || !mongoose.Types.ObjectId.isValid(id)) return false;
+    return !(await Product.exists({ _id: id, ...hidden }).setOptions({ bypassTenant: true }));
 };
 
 /** True when the request user may see an entry of this product. */
 const canSeeProduct = async (req, productId) => accessAllowsProduct(await getMgrAccess(req), productId);
 
 /**
- * Set of the product ids (strings) `user` may import or save entries for, or null when the user
- * is not limited. Used by the Invoice Bulk Upload importer, which checks many rows at once.
+ * For the Invoice Bulk Upload importer, which checks many rows at once: null when `user` is not
+ * limited, else a function telling whether a product id (or string) is allowed.
  */
-const allowedProductIdSet = async (user) => {
+const productAccessChecker = async (user) => {
     const access = await getUserMgrAccess(user);
-    return access ? new Set((await allowedProductIds(access)).map(String)) : null;
+    if (!access) return null;
+    const hidden = await hiddenProductIds(access);
+    if (!hidden) return () => false;
+    const hiddenSet = new Set(hidden.map(String));
+    return (productId) => Boolean(productId) && !hiddenSet.has(String(productId));
 };
 
 /**
@@ -188,13 +250,17 @@ module.exports = {
     getMgrAccess,
     getUserMgrAccess,
     describeMgrAccess,
+    hiddenProductCondition,
+    hiddenReasons,
     accessCondition,
     mgrAccessCondition,
+    conditionAllowsId,
     mgr1FilterCondition,
     allowedMgr1Ids,
     accessAllowsProduct,
     canSeeProduct,
-    allowedProductIdSet,
+    productAccessChecker,
     refuseMgrLimited,
-    MGR_ACCESS_DENIED
+    MGR_ACCESS_DENIED,
+    MGR_FIELDS
 };

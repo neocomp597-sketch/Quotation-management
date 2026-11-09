@@ -14,7 +14,7 @@ const { MGR_KEYS, formatMgrVal } = require('../utils/productMgr');
 const { formatDate } = require('../utils/dateFormat');
 const { getActiveBranchId } = require('../middlewares/tenantContext');
 const { limitedBranchIds, canMoveFrom, visibleTransfersCondition } = require('../utils/serialBranchAccess');
-const { getMgrAccess, accessCondition, describeMgrAccess, mgrAccessCondition } = require('../utils/mgrAccess');
+const { getMgrAccess, accessCondition, conditionAllowsId, describeMgrAccess, mgrAccessCondition } = require('../utils/mgrAccess');
 const { searchPattern, matchingMasterIds, assetSearchConditions } = require('../utils/assetSearch');
 
 /**
@@ -115,7 +115,7 @@ const mgrProductFilter = async (query) => {
 
 /**
  * Products a list request may show: the ?mgr1..?mgr5 filter together with the user's MGR access.
- * `products` is `{ $in: product ids }` or null when neither limits anything; `access` is the MGR
+ * `products` is a productId condition (`{ $in }` / `{ $nin }`) or null when neither limits anything; `access` is the MGR
  * access alone (an Asset / record condition, or null) and `mgrAccess` the user's MGR values.
  */
 const productScope = async (req, query = req.query) => {
@@ -123,8 +123,7 @@ const productScope = async (req, query = req.query) => {
     const [filter, access] = await Promise.all([mgrProductFilter(query), accessCondition(mgrAccess)]);
     if (!access) return { products: filter, access, mgrAccess };
     if (!filter) return { products: access.productId, access, mgrAccess };
-    const allowed = new Set(access.productId.$in.map(String));
-    return { products: { $in: filter.$in.filter((id) => allowed.has(String(id))) }, access, mgrAccess };
+    return { products: { $in: filter.$in.filter((id) => conditionAllowsId(access, id)) }, access, mgrAccess };
 };
 
 // Invoice Bulk Upload statuses offered by the status filters. Return covers both spellings
@@ -1175,8 +1174,7 @@ exports.createBranchTransfer = async (req, res) => {
         }
         const access = await mgrAccessCondition(req);
         if (access) {
-            const allowed = new Set(access.productId.$in.map(String));
-            const outside = assets.filter((asset) => !allowed.has(String(asset.productId || '')));
+            const outside = assets.filter((asset) => !conditionAllowsId(access, asset.productId));
             if (outside.length) {
                 throw httpError(403, `${serialList(outside)} ${outside.length === 1 ? 'is' : 'are'} outside your MGR access. Ask an administrator to move ${outside.length === 1 ? 'it' : 'them'}.`);
             }
