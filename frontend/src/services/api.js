@@ -319,6 +319,8 @@ export const productService = {
   update: (id, data) => api.put(`/products/${id}`, data),
   delete: (id) => api.delete(`/products/${id}`),
   bulkDelete: (ids) => api.post("/products/bulk-delete", { ids }),
+  getPreCompany: () => api.get("/products/pre-company", { cache: false }),
+  adoptPreCompany: (ids) => api.post("/products/pre-company/adopt", { ids }),
   bulkUpdate: (ids, updateData) =>
     api.patch("/products/bulk-update", { ids, updateData }),
 };

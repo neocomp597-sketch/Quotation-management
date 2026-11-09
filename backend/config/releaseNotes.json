@@ -772,15 +772,16 @@
   },
   {
     "version": "v6.7.0",
-    "title": "MGR Access Shows Every Serial It Should, Safer Deletes, Hidden Serials Check & Upload History",
-    "message": "Release Updates (from 9 Nov 2026): Users limited by MGR Access no longer lose serial numbers that the screens show with no MGR: a product whose MGR value was deleted, a deleted product, or a product from before companies. An MGR value or a product still in use can no longer be deleted. Administrators can now see which serial numbers a user cannot see, and why. Invoice Bulk Upload has an Upload History for administrators showing who added data, when and to which branch.",
+    "title": "MGR Access Fixes, Hidden Serials Check, Upload History & Pre-company Products",
+    "message": "Release Updates (from 9 Nov 2026): Users limited by MGR Access no longer lose serial numbers that the screens show with no MGR: a product whose MGR value was deleted, a deleted product, or a product from before companies. An MGR value or a product still in use can no longer be deleted. Administrators can now see which serial numbers a user cannot see, and why. Invoice Bulk Upload has an Upload History for administrators showing who added data, when and to which branch. Product Master can bring in the products from before companies that your serial numbers still use, so their MGR can be set.",
     "releaseNotes": [
       "MGR Access: an MGR value deleted from MGR Master counts as blank, the way the screens already show it, so its products no longer disappear for limited users",
       "MGR Access: serial numbers whose product was deleted, or which use a product from before companies or of another company, count as having no MGR and are shown to every user",
       "MGR Master: a value used by products or ticked in a user's MGR Access cannot be deleted; the message names them",
       "Product Master: a product with serial numbers in Invoice Bulk Upload cannot be deleted; bulk delete keeps such products and names them",
       "Authorization: Check hidden serials in a user's MGR Access panel lists the serial numbers of the selected branch that the user cannot see, by product, with the reason",
-      "Invoice Bulk Upload: Upload History (administrators) shows who uploaded data, when, to which branch, from which file and how many serial numbers"
+      "Invoice Bulk Upload: Upload History (administrators) shows who uploaded data, when, to which branch, from which file and how many serial numbers",
+      "Product Master: Pre-company Products (administrators) brings products from before companies that your serial numbers use into Product Master, so their MGR can be set"
     ],
     "detailedChanges": [
       {
@@ -806,6 +807,12 @@
         "module": "Master Management",
         "submodule": "Invoice Bulk Upload: Upload History",
         "changes": "Administrators have an Upload History button on Invoice Bulk Upload. It lists the Excel uploads of the last 30 days in every branch: when, who uploaded, the branch, the file name and how many serial numbers were added, updated or failed. Below it, the serial numbers added per day over the last 90 days, by person, branch and way (Excel upload or single entry), with the times between which they were added. Before this, the import screen showed each person only their own uploads, so nobody could see who uploaded a branch's data."
+      },
+      {
+        "date": "09.11.2026",
+        "module": "Master Management",
+        "submodule": "Product Master: Pre-company Products",
+        "changes": "Some serial numbers in Invoice Bulk Upload use products saved before companies existed. Product Master did not list those products, so their MGR could not be seen or set. Administrators now have a Pre-company Products button in Product Master. It lists those products with their serial count, their MGR now and after, and what will happen: a product used only by your company moves into your Product Master as it is; one also used outside your company is copied, and your serial numbers move to the copy; one whose code you already have is replaced by your product. A product whose name another of your products already uses is not moved, and the reason is shown. MGR values from before companies become your MGR value with the same code where you have one, or blank. Afterwards set the MGR in Product Master as usual. A product that gets an MGR follows MGR Access, so users limited to other MGR values stop seeing its serial numbers. Every change is recorded in the audit log, and running it again changes nothing more."
       }
     ],
     "deployedBy": "Super Admin",

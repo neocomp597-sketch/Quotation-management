@@ -841,7 +841,37 @@ const bulkUpdateProducts = async (req, res) => {
     }
 };
 
+/** Product Master > Pre-company Products (administrators): what would happen to each (services/preCompanyProducts.js). */
+const getPreCompanyProducts = async (req, res) => {
+    try {
+        const { planPreCompanyProducts } = require('../services/preCompanyProducts');
+        res.json({ data: await planPreCompanyProducts(req.user.companyId) });
+    } catch (error) {
+        console.error('getPreCompanyProducts error:', error);
+        res.status(500).json({ message: error.message || 'Could not load the pre-company products' });
+    }
+};
+
+/** Brings the chosen pre-company products (`ids`) into the company's Product Master. */
+const adoptPreCompanyProducts = async (req, res) => {
+    try {
+        const ids = Array.isArray(req.body?.ids) ? req.body.ids.filter((id) => mongoose.Types.ObjectId.isValid(id)).map(String) : [];
+        if (!ids.length) return res.status(400).json({ message: 'Select at least one product.' });
+        const { adoptPreCompanyProducts: adopt } = require('../services/preCompanyProducts');
+        const results = await adopt(req.user.companyId, ids, req.user);
+        await clearProductsCache();
+        await invalidateAssetCaches(req.user.companyId);
+        const done = results.filter((row) => row.done).length;
+        res.json({ message: `${done} of ${results.length} product${results.length === 1 ? '' : 's'} brought into Product Master.`, results });
+    } catch (error) {
+        console.error('adoptPreCompanyProducts error:', error);
+        res.status(500).json({ message: error.message || 'Could not move the pre-company products' });
+    }
+};
+
 module.exports = {
+    getPreCompanyProducts,
+    adoptPreCompanyProducts,
     createProduct,
     getAllProducts,
     getProductById,
