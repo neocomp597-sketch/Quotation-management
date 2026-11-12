@@ -372,7 +372,7 @@ const entryValidationError = (message) => Object.assign(new Error(message), { st
 // record, as in Excel bulk upload: a known code with another name, or a new code with the name
 // of an existing product, is refused instead of being saved under a product it does not name.
 // `mgrAccess` (utils/mgrAccess.js) refuses a product outside the user's MGR access, and a new
-// one, which has no MGR yet.
+// one: a limited user cannot add products to the Product Master.
 const resolveEntryProduct = async (companyId, cleanProductCode, productName, mgrAccess = null) => {
     const product = await findOrCreateEntryProduct(companyId, cleanProductCode, productName, !mgrAccess);
     if (!(await accessAllowsProduct(mgrAccess, product))) {
@@ -953,6 +953,90 @@ exports.returnAsset = async (req, res) => {
     }
 };
 
+const UPLOAD_HISTORY_TYPES = { IMPORT: 'Excel upload', IMPORT_RESELL: 'Excel upload (resold)', SINGLE_ENTRY: 'Single entry', SINGLE_ENTRY_RESELL: 'Single entry (resold)' };
+
+/**
+ * Upload History (administrators): who added Invoice Bulk Upload data, when and to which branch,
+ * in every branch of the company. `uploads` are the Excel uploads kept by the import screen (one row
+ * per run; import jobs are kept 30 days) with file name and counts; `daily` counts the serial entries
+ * added per day, branch, person and way (Excel upload or single entry) over the last `days` (90).
+ * Reads only.
+ */
+exports.getUploadHistory = async (req, res) => {
+    try {
+        const ImportJob = require('../models/ImportJob');
+        const User = require('../models/User');
+        const Branch = require('../models/Branch');
+        const companyId = new mongoose.Types.ObjectId(String(req.user.companyId));
+        const days = Math.min(365, Math.max(1, Number.parseInt(req.query.days, 10) || 90));
+        const since = new Date(Date.now() - days * 86400000);
+
+        const [jobs, daily, branches] = await Promise.all([
+            ImportJob.find({ companyId, module: 'assets', 'runs.0': { $exists: true }, createdAt: { $gte: since } })
+                .select('file runs createdBy branchId createdAt')
+                .sort({ createdAt: -1 })
+                .limit(300)
+                .lean(),
+            AssetHistory.aggregate([
+                { $match: { companyId, createdAt: { $gte: since }, transactionType: { $in: Object.keys(UPLOAD_HISTORY_TYPES) } } },
+                {
+                    $group: {
+                        _id: {
+                            day: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'Asia/Kolkata' } },
+                            branchId: '$branchId',
+                            userId: '$createdBy',
+                            type: '$transactionType'
+                        },
+                        entries: { $sum: 1 },
+                        first: { $min: '$createdAt' },
+                        last: { $max: '$createdAt' }
+                    }
+                },
+                { $sort: { last: -1 } },
+                { $limit: 1000 }
+            ]).option({ bypassBranch: true }),
+            Branch.find({ companyId }).select('name code').lean()
+        ]);
+
+        const userIds = [
+            ...jobs.flatMap((job) => [job.createdBy?.userId, ...(job.runs || []).map((run) => run.userId)]),
+            ...daily.map((row) => row._id.userId)
+        ].filter(Boolean).map(String);
+        const users = await User.find({ _id: { $in: [...new Set(userIds)] } }).select('name email').setOptions({ bypassTenant: true }).lean();
+        const userName = new Map(users.map((user) => [String(user._id), user.name || user.email || '']));
+        const branchName = new Map(branches.map((branch) => [String(branch._id), branch.code || branch.name]));
+
+        const uploads = jobs.flatMap((job) => (job.runs || []).map((run) => ({
+            at: run.startedAt,
+            finishedAt: run.finishedAt,
+            by: userName.get(String(run.userId || job.createdBy?.userId)) || job.createdBy?.name || '',
+            branch: branchName.get(String(job.branchId)) || '',
+            file: job.file?.name || '',
+            created: run.created || 0,
+            updated: run.updated || 0,
+            failed: run.failed || 0
+        }))).sort((a, b) => new Date(b.at) - new Date(a.at));
+
+        res.json({
+            days,
+            jobRetentionDays: ImportJob.JOB_RETENTION_DAYS,
+            uploads,
+            daily: daily.map((row) => ({
+                day: row._id.day,
+                branch: branchName.get(String(row._id.branchId)) || '',
+                by: userName.get(String(row._id.userId)) || '',
+                how: UPLOAD_HISTORY_TYPES[row._id.type] || row._id.type,
+                entries: row.entries,
+                first: row.first,
+                last: row.last
+            }))
+        });
+    } catch (error) {
+        console.error('getUploadHistory error:', error);
+        res.status(500).json({ message: error.message || 'Could not load the upload history' });
+    }
+};
+
 // Return History List (Requirement #9)
 exports.getReturnHistory = async (req, res) => {
     try {
@@ -1146,7 +1230,9 @@ exports.exportAssets = async (req, res) => {
         for (const asset of populatedDocs) {
             const prodName = asset.productId?.productName || asset.productName || '';
             const prodCode = asset.productId?.productCode || asset.productCode || '';
-            const custName = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || asset.customerName || (asset.customerId ? 'Customer' : 'Stock (Unsold)');
+            // Blank when the entry has no customer, so the file can be filled in and uploaded again
+            // without creating a customer named after a placeholder.
+            const custName = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || asset.customerName || (asset.customerId ? 'Customer' : '');
             const sDate = asset.saleDate || asset.invoiceDate;
 
             sheet.addRow({
@@ -1202,7 +1288,7 @@ exports.getAssetSummary = async (req, res) => {
         let asset = null;
         if (assetId && isValidObjectId(assetId)) {
             asset = await Asset.findOne({ _id: assetId, companyId, ...access })
-                .populate({ path: 'customerId', select: 'customerName companyName gstin billingAddress mobile email', options: { bypassTenant: true } })
+                .populate({ path: 'customerId', select: 'customerName companyName externalCode gstin billingAddress mobile email', options: { bypassTenant: true } })
                 .populate(productMgrPopulate('basePrice mrp catalogType'))
                 .populate('invoiceId', 'voucherNumber date')
                 .populate(DIVISION_POPULATE)
@@ -1217,7 +1303,7 @@ exports.getAssetSummary = async (req, res) => {
             if (companyId) assetQuery.companyId = companyId;
 
             const matches = await Asset.find(assetQuery)
-            .populate({ path: 'customerId', select: 'customerName companyName gstin billingAddress mobile email', options: { bypassTenant: true } })
+            .populate({ path: 'customerId', select: 'customerName companyName externalCode gstin billingAddress mobile email', options: { bypassTenant: true } })
             .populate(productMgrPopulate('basePrice mrp catalogType'))
             .populate('invoiceId', 'voucherNumber date')
             .populate(DIVISION_POPULATE)
@@ -1263,7 +1349,7 @@ exports.getAssetSummary = async (req, res) => {
 
                 const historyDoc = await AssetHistory.findOne(historyQuery)
                 .sort({ createdAt: -1 })
-                .populate('customerId', 'customerName companyName gstin billingAddress mobile email')
+                .populate('customerId', 'customerName companyName externalCode gstin billingAddress mobile email')
                 .populate(productMgrPopulate('basePrice mrp catalogType'))
                 .lean();
 

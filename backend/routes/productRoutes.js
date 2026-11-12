@@ -9,9 +9,11 @@ const {
     updateProductVendor,
     deleteProduct,
     bulkDeleteProducts,
-    bulkUpdateProducts
+    bulkUpdateProducts,
+    getPreCompanyProducts,
+    adoptPreCompanyProducts
 } = require('../controllers/productController');
-const { protect } = require('../middlewares/authMiddleware');
+const { protect, admin } = require('../middlewares/authMiddleware');
 
 router.use(protect);
 
@@ -21,6 +23,10 @@ router.get('/', getAllProducts);
 // Bulk operations (must come BEFORE /:id routes)
 router.post('/bulk-delete', bulkDeleteProducts);
 router.patch('/bulk-update', bulkUpdateProducts);
+
+// Pre-company products used by the company's serial numbers (administrators)
+router.get('/pre-company', admin, getPreCompanyProducts);
+router.post('/pre-company/adopt', admin, adoptPreCompanyProducts);
 
 // Product vendor operations
 router.get('/:id/vendors', getProductVendors);

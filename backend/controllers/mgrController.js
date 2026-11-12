@@ -4,6 +4,40 @@ const { invalidateViaQueueOrNow } = require('../queues/cacheInvalidationQueue');
 
 const MGR_CACHE_TTL_SECONDS = Number(process.env.MGR_CACHE_TTL_SECONDS || 600);
 
+// An MGR code as saved: no spaces at the ends and single spaces inside, so "M 365 " is "M 365".
+const cleanCode = (value) => String(value ?? '').trim().replace(/\s+/g, ' ');
+const codeKey = (value) => cleanCode(value).toLowerCase();
+
+/**
+ * The saved value of `mgrType` whose code is `code` but for case and spaces, other than `exceptId`.
+ * A look-alike ("M 365 " next to "M 365") is a different value to MGR Access and Product Master, so a
+ * user given one does not see the products carrying the other: it is refused instead of saved.
+ */
+const findLookAlike = async (mgrType, code, exceptId = null) => {
+    const key = codeKey(code);
+    const sameType = await MGR.find({ mgrType, ...(exceptId ? { _id: { $ne: exceptId } } : {}) }).select('mgrType code').lean();
+    return sameType.find((mgr) => codeKey(mgr.code) === key) || null;
+};
+
+const lookAlikeMessage = (mgr, code) => (cleanCode(mgr.code) === cleanCode(code)
+    ? `${mgr.mgrType} "${cleanCode(mgr.code)}" already exists.`
+    : `${mgr.mgrType} "${mgr.code}" already exists. "${cleanCode(code)}" differs from it only in capital letters or spaces: use the existing value.`);
+
+/** The body's code and description cleaned; `res` answers 400 and null is returned when the code is taken. */
+const prepareMgrBody = async (req, res, mgrType, exceptId = null) => {
+    const body = { ...req.body };
+    if (body.code !== undefined) body.code = cleanCode(body.code);
+    if (body.description !== undefined) body.description = String(body.description ?? '').trim();
+    if (body.code !== undefined && mgrType) {
+        const lookAlike = await findLookAlike(mgrType, body.code, exceptId);
+        if (lookAlike) {
+            res.status(400).json({ message: lookAlikeMessage(lookAlike, body.code) });
+            return null;
+        }
+    }
+    return body;
+};
+
 const getPagination = (query) => {
     const page = Math.max(1, Number(query.page || 1));
     const limit = Math.min(100, Math.max(1, Number(query.limit || 20)));
@@ -76,9 +110,10 @@ exports.getMGRById = async (req, res) => {
 
 // Create a new MGR
 exports.createMGR = async (req, res) => {
-    const mgr = new MGR(req.body);
     try {
-        const newMGR = await mgr.save();
+        const body = await prepareMgrBody(req, res, req.body?.mgrType);
+        if (!body) return;
+        const newMGR = await new MGR(body).save();
         await invalidateViaQueueOrNow('mgrs:*', 'planning:*', 'products:*');
         res.status(201).json(newMGR);
     } catch (err) {
@@ -92,7 +127,11 @@ exports.createMGR = async (req, res) => {
 // Update an existing MGR
 exports.updateMGR = async (req, res) => {
     try {
-        const updatedMGR = await MGR.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+        const saved = await MGR.findById(req.params.id).select('mgrType').lean();
+        if (!saved) return res.status(404).json({ message: 'MGR not found' });
+        const body = await prepareMgrBody(req, res, req.body?.mgrType || saved.mgrType, saved._id);
+        if (!body) return;
+        const updatedMGR = await MGR.findByIdAndUpdate(req.params.id, body, { new: true, runValidators: true });
         if (!updatedMGR) return res.status(404).json({ message: 'MGR not found' });
         await invalidateViaQueueOrNow('mgrs:*', 'planning:*', 'products:*');
         res.json(updatedMGR);
@@ -104,9 +143,43 @@ exports.updateMGR = async (req, res) => {
     }
 };
 
+const PRODUCT_MGR_FIELDS = { MGR1: 'mgr1', MGR2: 'mgr2', MGR3: 'mgr3', MGR4: 'mgr4', MGR5: 'mgr5' };
+const listNames = (names, total) => names.join(', ') + (total > names.length ? ` and ${total - names.length} more` : '');
+
+/**
+ * Why an MGR value cannot be deleted yet, or '' when nothing uses it. Products would keep pointing at
+ * the deleted value (shown as blank, but no longer matching anyone's MGR Access), and a user given it
+ * in MGR Access would silently lose that level, which widens or empties what they see.
+ */
+const mgrInUseMessage = async (mgr) => {
+    const Product = require('../models/Product');
+    const User = require('../models/User');
+    const field = PRODUCT_MGR_FIELDS[mgr.mgrType];
+    const label = `${mgr.mgrType.replace('MGR', 'MGR ')} "${mgr.code}"`;
+    const [productCount, products, userCount, users] = await Promise.all([
+        field ? Product.countDocuments({ [field]: mgr._id }).setOptions({ bypassTenant: true }) : 0,
+        field ? Product.find({ [field]: mgr._id }).select('productCode').limit(5).setOptions({ bypassTenant: true }).lean() : [],
+        User.countDocuments({ mgrAccess: mgr._id }).setOptions({ bypassTenant: true }),
+        User.find({ mgrAccess: mgr._id }).select('name').limit(5).setOptions({ bypassTenant: true }).lean()
+    ]);
+    const reasons = [];
+    if (productCount) {
+        reasons.push(`${productCount} product${productCount === 1 ? ' uses' : 's use'} it (${listNames(products.map((p) => p.productCode), productCount)}): change their ${mgr.mgrType.replace('MGR', 'MGR ')} in Product Master first`);
+    }
+    if (userCount) {
+        reasons.push(`${userCount} user${userCount === 1 ? ' has' : 's have'} it in MGR Access (${listNames(users.map((u) => u.name), userCount)}): untick it in Authorization > Team Users first`);
+    }
+    return reasons.length ? `${label} cannot be deleted. ${reasons.join('; ')}. Or set it to Inactive.` : '';
+};
+
 // Delete an MGR
 exports.deleteMGR = async (req, res) => {
     try {
+        const mgr = await MGR.findById(req.params.id).select('mgrType code').lean();
+        if (!mgr) return res.status(404).json({ message: 'MGR not found' });
+        const inUse = await mgrInUseMessage(mgr);
+        if (inUse) return res.status(409).json({ message: inUse });
+
         const deletedMGR = await MGR.findByIdAndDelete(req.params.id);
         if (!deletedMGR) return res.status(404).json({ message: 'MGR not found' });
         await invalidateViaQueueOrNow('mgrs:*', 'planning:*', 'products:*');

@@ -11,8 +11,9 @@ import {
     MdWarning, MdCheckCircleOutline, MdCheckCircle, MdChat,
     MdMyLocation, MdLocationOn, MdStar, MdStarBorder, MdMap, MdOpenInNew,
     MdPhotoCamera, MdCloudUpload, MdDelete, MdAssignmentTurnedIn,
-    MdZoomIn, MdClose, MdFileDownload, MdEdit
+    MdZoomIn, MdClose, MdFileDownload, MdEdit, MdPrint
 } from 'react-icons/md';
+import { openCallSheetWindow, printTicketCallSheet } from '../utils/ticketCallSheet';
 import Modal from '../components/Modal';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
 import usePermission from '../hooks/usePermission';
@@ -814,6 +815,16 @@ const TicketDetail = () => {
         }
     });
 
+    // Call Sheet: this ticket printed for the engineer, laid out like the Raise Support Ticket form.
+    const handlePrintCallSheet = async () => {
+        const win = openCallSheetWindow();
+        if (!win) {
+            toast.error('Allow pop-ups for this site to print the call sheet.');
+            return;
+        }
+        await printTicketCallSheet(win, ticket, async (assetId) => (await csmService.getAssetSummary({ assetId })).data);
+    };
+
     if (loading || !ticket) {
         return (
             <div className="flex flex-col items-center justify-center py-32 space-y-4">
@@ -826,7 +837,7 @@ const TicketDetail = () => {
     return (
         <div className="p-6 space-y-6 max-w-7xl mx-auto animate-fade-in-up">
             {/* Nav Header */}
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-4">
                 <button
                     onClick={() => navigate('/csm/tickets')}
                     className="p-2 bg-slate-100 hover:bg-slate-200 rounded-full transition-all text-slate-600"
@@ -839,6 +850,14 @@ const TicketDetail = () => {
                         {ticket.ticketNo}
                     </h1>
                 </div>
+                <button
+                    type="button"
+                    onClick={handlePrintCallSheet}
+                    title="Print this ticket as a call sheet for the engineer"
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-primary-200 bg-primary-50 hover:bg-primary-100 text-primary-700 font-black uppercase text-xs tracking-widest transition-all"
+                >
+                    <MdPrint size={16} /> Print Call Sheet
+                </button>
                 {canModify && ticket.permissions?.canEdit && (
                     <button
                         type="button"

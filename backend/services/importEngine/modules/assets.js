@@ -9,7 +9,7 @@ const { loadProductIndex } = require('../../../utils/productUniqueness');
 const { loadDivisionSegmentLookup, resolveDivisionSegment } = require('../../../utils/divisionSegment');
 const { chunk, insertRows, writeRows, describeWriteError } = require('../../../utils/importBatch');
 const { invalidateCustomerCaches, invalidateProductCaches, invalidateAssetCaches } = require('../../../utils/cacheInvalidation');
-const { allowedProductIdSet } = require('../../../utils/mgrAccess');
+const { productAccessChecker } = require('../../../utils/mgrAccess');
 const { ImportJobError } = require('../errors');
 
 /*
@@ -213,8 +213,9 @@ const resolveProduct = (index, legacy, data) => {
 };
 
 /**
- * The issue of a row whose product is outside the importing user's MGR access (`allowed`: product
- * ids, or null when the user is not limited; utils/mgrAccess.js). A new product has no MGR yet.
+ * The issue of a row whose product is outside the importing user's MGR access (`allowed`: a check
+ * of a product id, or null when the user is not limited; utils/mgrAccess.js). A limited user cannot add a new
+ * product to the Product Master: an administrator adds it, with its MGR.
  */
 const mgrAccessIssue = (allowed, resolution) => {
     if (!allowed) return null;
@@ -226,7 +227,7 @@ const mgrAccessIssue = (allowed, resolution) => {
             hint: 'Ask an administrator to add the product with its MGR first, or skip this row.'
         };
     }
-    if (allowed.has(String(resolution.product._id))) return null;
+    if (allowed(resolution.product._id)) return null;
     return {
         field: 'productCode',
         code: 'MGR_ACCESS',
@@ -685,6 +686,13 @@ module.exports = {
     fields: FIELDS,
     // Every upload adds new serials and updates the ones already saved, as it always has.
     modes: ['upsert'],
+    // A file whose customer column is not matched saves every row without a customer, which on
+    // sold serials looks like lost data; the preview says so before anything is imported.
+    unmatchedNotices: [{
+        fields: ['customerName', 'customerCode'],
+        message: 'No column is matched to Customer Name or Customer Code, so every row will be saved without a customer.',
+        hint: 'If the file has a customer column, match it to Customer Name under Column matching. Uploading the file again later with the customer filled in adds it to the serials already saved.'
+    }],
 
     /** The branch selected in the header; the import keeps it even if the header changes. */
     async resolveParams(raw, { user }) {
@@ -739,7 +747,7 @@ module.exports = {
             products,
             legacy,
             divisions: await loadDivisionSegmentLookup(companyId),
-            mgrAllowed: await allowedProductIdSet(user),
+            mgrAllowed: await productAccessChecker(user),
             seenSerials: new Set()
         };
     },
@@ -802,7 +810,7 @@ module.exports = {
                 hint: 'A serial number belongs to one branch only. Import this row from that branch, or skip it.'
             });
         }
-        if (saved && context.mgrAllowed && !context.mgrAllowed.has(String(saved.productId || ''))) {
+        if (saved && context.mgrAllowed && !context.mgrAllowed(saved.productId)) {
             issues.push({
                 field: 'serialNumber',
                 code: 'MGR_ACCESS',

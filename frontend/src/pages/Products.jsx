@@ -10,6 +10,7 @@ import ImportModal from '../components/ImportModal';
 import ImportWizard from '../components/import/ImportWizard';
 import PaginationControls from '../components/PaginationControls';
 import TypeTestHistory from '../components/TypeTestHistory';
+import PreCompanyProducts from '../components/PreCompanyProducts';
 import { resolveImageUrl, getPlaceholderImage } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
@@ -36,6 +37,9 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
     const { user } = useAuth();
     const isVendorUser = user?.role === 'vendor' || String(user?.role || '').toLowerCase() === 'vendor';
+    // Pre-company Products: administrators only (the API checks too).
+    const isAdminUser = ['admin', 'super_admin', 'superadmin'].includes(String(user?.role || '').toLowerCase());
+    const [isPreCompanyOpen, setIsPreCompanyOpen] = useState(false);
     const { id: routeId } = useParams();
     const { canCreate, canModify, canDelete } = usePermission('master_products');
     const [activeTab, setActiveTab] = useState(initialTab);
@@ -759,7 +763,7 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                 fetchProducts();
             } catch (err) {
                 console.error("Error deleting product:", err);
-                toast.error('Failed to delete product');
+                toast.error(err.response?.data?.message || 'Failed to delete product', { autoClose: 10000 });
             }
         }
     };
@@ -787,13 +791,15 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
         if (window.confirm(`Are you sure you want to delete ${selectedIds.length} products? This cannot be undone.`)) {
             setIsBulkActionLoading(true);
             try {
-                await productService.bulkDelete(selectedIds);
+                const { data } = await productService.bulkDelete(selectedIds);
                 setSelectedIds([]);
                 fetchProducts();
-                toast.success(`${selectedIds.length} products deleted successfully`);
+                // Products with serial numbers in Invoice Bulk Upload are kept; the message names them.
+                if (data?.keptCodes?.length) toast.warning(data.message, { autoClose: 10000 });
+                else toast.success(data?.message || `${selectedIds.length} products deleted successfully`);
             } catch (err) {
                 console.error("Error bulk deleting:", err);
-                toast.error('Failed to delete products');
+                toast.error(err.response?.data?.message || 'Failed to delete products');
             } finally {
                 setIsBulkActionLoading(false);
             }
@@ -1012,7 +1018,17 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight font-outfit uppercase">Product Master</h1>
                     <p className="text-slate-500 font-medium">All products at one place.</p>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-3">
+                    {isAdminUser && (
+                        <button
+                            onClick={() => setIsPreCompanyOpen(true)}
+                            className="flex items-center justify-center gap-2 bg-white hover:bg-primary-50 text-primary-700 border border-primary-200 px-5 py-3 rounded-2xl font-bold transition-all shadow-sm uppercase text-xs tracking-widest active:scale-95"
+                            title="Products from before companies that your serial numbers use"
+                        >
+                            <MdInventory size={20} />
+                            <span>Pre-company Products</span>
+                        </button>
+                    )}
                     <button
                         onClick={exportToExcel}
                         className="flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-5 py-3 rounded-2xl font-bold transition-all shadow-sm uppercase text-xs tracking-widest active:scale-95"
@@ -2226,6 +2242,17 @@ const Products = ({ initialTab = 'products', isCreatePage, isEditPage }) => {
                     }
                 }}
             />
+
+            {isAdminUser && (
+                <PreCompanyProducts
+                    isOpen={isPreCompanyOpen}
+                    onClose={() => setIsPreCompanyOpen(false)}
+                    onChanged={() => {
+                        invalidateApiCache('/products');
+                        fetchProducts();
+                    }}
+                />
+            )}
 
         </div >
     );

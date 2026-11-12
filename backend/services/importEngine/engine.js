@@ -850,7 +850,9 @@ const describeModule = (module) => ({
     recordLabel: module.recordLabel,
     recordLabelPlural: module.recordLabelPlural,
     modes: allowedModes(module),
-    fields: module.fields.map(publicField)
+    fields: module.fields.map(publicField),
+    // Notices the preview shows while none of `fields` is matched to a column (see modules/assets.js).
+    unmatchedNotices: module.unmatchedNotices || []
 });
 
 const serializeJob = (job, module) => ({

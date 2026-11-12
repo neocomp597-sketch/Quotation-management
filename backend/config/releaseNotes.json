@@ -592,7 +592,7 @@
   {
     "version": "v6.6.0",
     "title": "Customer Service Branch-Wise, Login Follows Employee Master & Invoice Bulk Upload Customer Search",
-    "message": "Release Updates (1 - 4 Nov 2026): Customer Service now shows the branch selected at the top of the screen. An employee's login follows Employee Master, and the Select Branch screen is gone. Staff with no branch assigned can no longer log in. Invoice Bulk Upload search now finds every customer shown in its list.",
+    "message": "Release Updates (1 - 7 Nov 2026): Customer Service now shows the branch selected at the top of the screen. An employee's login follows Employee Master, and the Select Branch screen is gone. Staff with no branch assigned can no longer log in. Invoice Bulk Upload search now finds every customer shown in its list. The same employee can no longer be added twice. Tickets can be printed as a Call Sheet for the engineer.",
     "releaseNotes": [
       "Invoice Bulk Upload Search: finds a serial by the customer name shown on its row, and by customer code and Product Master name or code",
       "Customer Service: tickets, visits, RCA reports, warranties, AMCs and attendance show the selected branch",
@@ -603,7 +603,16 @@
       "Customers and Quotations: employees with no territory see the whole selected branch",
       "Phones and Tablets: the top bar no longer pushes controls off the screen",
       "Also fixed: Serial No Transfer search by customer and product, older products in Product Master that could not be saved, product names on Invoice Bulk Upload rows, and Contact Person in the customer import",
-      "Raise Ticket: Asset Information shows the serial you searched, and a ticket no longer stays linked to an earlier serial after you type a different one"
+      "Raise Ticket: Asset Information shows the serial you searched, and a ticket no longer stays linked to an earlier serial after you type a different one",
+      "Employee Master: the same person can no longer be added twice; Add Employee Profile names the employee who already has that email, or that name and mobile number",
+      "MGR Access: an MGR left blank on a product no longer hides its serial numbers from users given values on several MGR levels",
+      "Tickets: Print Call Sheet for the engineer, laid out like the Raise Support Ticket form with the Ticket Number added",
+      "Raise Ticket: Asset Information shows the serial's Invoice Bulk Upload entry with the same fields and look",
+      "Raise Ticket: a pasted serial fills Asset Information at once, and the entry's Project is shown",
+      "MGR Access: serials of products with no MGR are shown to every user, so uploaded data no longer seems missing",
+      "Invoice Bulk Upload: an entry with no customer no longer reads Stock (Unsold) when sold, and the import warns when no customer column is matched",
+      "MGR Master: a value that differs from an existing one only in capital letters or spaces is refused",
+      "Invoice Bulk Upload: a cleaner phone layout, with a folded MGR access note, full MGR line and one row of buttons per card"
     ],
     "detailedChanges": [
       {
@@ -701,10 +710,113 @@
         "module": "CSM Support",
         "submodule": "Raise Ticket: Typing a Different Serial",
         "changes": "Changing the text in the Product Serial No. box now clears Asset Information and removes the link to the earlier serial. Before this, the ticket stayed linked to the earlier serial. The details come back when you press Enter or leave the box and the serial is found. If it is not found, the ticket is saved with the serial you typed, and the register, Excel export and ticket details show it. Customer, product, invoice and contact stay filled in, so check them before raising the ticket. A serial typed over an automatic SN- number is now kept, and no record is created for the automatic number. If you click Raise Ticket while a serial is still being checked, a message asks you to review the details and click again."
+      },
+      {
+        "date": "06.11.2026",
+        "module": "Employee Master",
+        "submodule": "No Duplicate Employees",
+        "changes": "Add Employee Profile no longer creates a second record for someone already on the Employees screen. Saving is refused, with the name and EMP code of the existing employee, when an employee in any branch already has the same email, or the same name and mobile number. Before this, only the EMP code was checked, and a new code is generated for every new profile, so the same person could be added again. The email is the employee's login, so the second record also got a made-up login nobody knew. Editing an employee is refused the same way when the new email, or the new name and mobile number, belong to someone else. Employees who already share a mailbox can still be edited as before, and a different person with the same name can still be added with their own email and mobile number."
+      },
+      {
+        "date": "06.11.2026",
+        "module": "Authorization",
+        "submodule": "MGR Access: Blank MGR No Longer Hides a Product",
+        "changes": "A user given values on more than one MGR level no longer loses serial numbers because a product leaves one of those levels blank. Before this, a user ticked on all five MGR levels saw only products with all five filled in, so serials uploaded under a product with a blank MGR seemed to disappear, even though the user's access looked right. Now a product is shown when every MGR it has is one the user was given and at least one of them matches. A product with no MGR at all is still not shown to limited users until it is given one in Product Master. A user ticked on only one level sees exactly what they saw before. This applies to Invoice Bulk Upload, Serial No Transfer and Customer Service."
+      },
+      {
+        "date": "07.11.2026",
+        "module": "CSM Support",
+        "submodule": "Print Call Sheet for the Engineer",
+        "changes": "A ticket can now be printed as a Call Sheet to hand to the engineer. Use Print Call Sheet at the top of the ticket's Details page, or the printer icon next to Details in the Tickets Register. The sheet has the same fields, labels, order and look as the Raise Support Ticket form, filled in from the ticket, with one addition: the Ticket Number at the top. A ticket linked to a serial number also shows that serial's Asset Information. It fits on one A4 page. If nothing opens, allow pop-ups for the site."
+      },
+      {
+        "date": "07.11.2026",
+        "module": "CSM Support",
+        "submodule": "Raise Ticket: Asset Information Matches Invoice Bulk Upload",
+        "changes": "When a serial number is searched on Raise Ticket, Asset Information now shows what was entered for it in Invoice Bulk Upload, with the same fields, labels, order and look as the Add Single Entry form: Serial Number, Product Code, Product Name, Status, Customer Name, Customer Code, Division, Segment, Customer Postal Code, Invoice Number, Invoice Date, Location, MGR 1 to 5 from Product Master, and Indicator. A field left blank shows Not entered. Installation date, warranty, AMC, last service and open and closed ticket counts stay below it."
+      },
+      {
+        "date": "07.11.2026",
+        "module": "CSM Support",
+        "submodule": "Raise Ticket: Pasting a Serial Fills Asset Information",
+        "changes": "Pasting a serial number into the Product Serial No. box on Raise Ticket now fills Asset Information, customer, product and invoice straight away, as pressing Enter does. Before this, a pasted serial only opened the suggestions list until you pressed Enter or left the box. Manual Register fills its details on paste too. Typing still waits for Enter, the search button, a suggestion or leaving the box. Asset Information and the Call Sheet now also show the Project from the Invoice Bulk Upload file, for allocated items, after Location; a serial with no project shows no Project box."
+      },
+      {
+        "date": "07.11.2026",
+        "module": "Authorization",
+        "submodule": "MGR Access: Products With No MGR Are Shown to Everyone",
+        "changes": "Serial numbers of a product that has no MGR at all in Product Master are now shown to every user, including users limited by MGR Access. Before this, they were hidden from those users whatever they were given, so data a Branch Admin uploaded through Invoice Bulk Upload seemed missing: an upload adds a new product code to Product Master without MGR, and its serials disappeared for limited users, even after their login was made again. A product that has MGR values follows the same rule as before, and choosing an MGR in a screen's MGR filter still shows only the products with that MGR. Users limited by MGR Access still cannot add new products. Setting the MGR on such a product in Product Master limits it again. This applies to Invoice Bulk Upload, Serial No Transfer and Customer Service."
+      },
+      {
+        "date": "07.11.2026",
+        "module": "Master Management",
+        "submodule": "Invoice Bulk Upload: Missing Customer Shown Clearly",
+        "changes": "An entry with no customer now shows Stock (Unsold) only when its status is In Stock. A sold, allocated or returned entry with no customer shows N/A on its details page and Not entered in the list, instead of Stock (Unsold) next to the Sold status. Excel exports leave Customer Name blank for such entries, so a file exported, filled in and uploaded again does not create a customer called Stock (Unsold). When an upload file has no column matched to Customer Name or Customer Code, the import preview now warns that every row will be saved without a customer, before anything is imported. To add the customers to serials already uploaded, upload the same file again with a Customer Name column: it fills in the customer and keeps the rest."
+      },
+      {
+        "date": "07.11.2026",
+        "module": "Master Management",
+        "submodule": "MGR Master: Look-Alike Values Refused",
+        "changes": "MGR Master no longer saves a value that differs from an existing one of the same MGR type only in capital letters or spaces, and saves codes without spaces at the ends. Before this, \"M 365 \" with a space at the end was saved next to \"M 365\" as a different value: products set to it were hidden from users given \"M 365\" in MGR Access, so a branch user saw fewer serial numbers in Invoice Bulk Upload than an administrator. Adding or renaming such a value now shows which value already exists, so the existing one is used."
+      },
+      {
+        "date": "07.11.2026",
+        "module": "Master Management",
+        "submodule": "Invoice Bulk Upload: Phone Layout",
+        "changes": "On a phone, Invoice Bulk Upload now starts the list sooner and shows more on each card. The note about your MGR access folds into one line (for example \"38 MGR values · Show\") that opens on tap. The cards use the full width of the screen, the MGR line wraps instead of being cut off after MGR 1, a product whose name is its code is shown once, and Details, Edit and Return share one row of buttons. The Prev and Next buttons are larger, and moving to another page goes back to the top of the list. On a computer the screen looks as before, except that the search box keeps a usable width: when long MGR values make the filters too wide, they move to the next row."
       }
     ],
     "deployedBy": "Super Admin",
     "deployedAt": "2026-11-03T20:45:00+05:30",
+    "isActive": true
+  },
+  {
+    "version": "v6.7.0",
+    "title": "MGR Access Fixes, Hidden Serials Check, Upload History & Pre-company Products",
+    "message": "Release Updates (from 9 Nov 2026): Users limited by MGR Access no longer lose serial numbers that the screens show with no MGR: a product whose MGR value was deleted, a deleted product, or a product from before companies. An MGR value or a product still in use can no longer be deleted. Administrators can now see which serial numbers a user cannot see, and why. Invoice Bulk Upload has an Upload History for administrators showing who added data, when and to which branch. Product Master can bring in the products from before companies that your serial numbers still use, so their MGR can be set.",
+    "releaseNotes": [
+      "MGR Access: an MGR value deleted from MGR Master counts as blank, the way the screens already show it, so its products no longer disappear for limited users",
+      "MGR Access: serial numbers whose product was deleted, or which use a product from before companies or of another company, count as having no MGR and are shown to every user",
+      "MGR Master: a value used by products or ticked in a user's MGR Access cannot be deleted; the message names them",
+      "Product Master: a product with serial numbers in Invoice Bulk Upload cannot be deleted; bulk delete keeps such products and names them",
+      "Authorization: Check hidden serials in a user's MGR Access panel lists the serial numbers of the selected branch that the user cannot see, by product, with the reason",
+      "Invoice Bulk Upload: Upload History (administrators) shows who uploaded data, when, to which branch, from which file and how many serial numbers",
+      "Product Master: Pre-company Products (administrators) brings products from before companies that your serial numbers use into Product Master, so their MGR can be set"
+    ],
+    "detailedChanges": [
+      {
+        "date": "09.11.2026",
+        "module": "Authorization",
+        "submodule": "MGR Access: Deleted or Unknown MGR Values Count as Blank",
+        "changes": "A branch user limited by MGR Access saw fewer serial numbers in Invoice Bulk Upload than an administrator, with no reason shown on any screen. Three kinds of serial numbers were hidden from every limited user: those of a product whose MGR value had been deleted from MGR Master (Product Master and Invoice Bulk Upload show that MGR as blank, but MGR Access still treated it as a value the user did not have), those whose product had been deleted from Product Master, and those linked to a product from before companies, which Product Master does not list. Now an MGR level counts only when it holds a current value of your company, and a serial whose product is missing or belongs to no company or another company counts as having no MGR, so it is shown to everyone like other products without MGR. A product that carries a current MGR value follows the same rule as before. This applies to Invoice Bulk Upload, Serial No Transfer and Customer Service. Service tickets with no product stay as before."
+      },
+      {
+        "date": "09.11.2026",
+        "module": "Master Management",
+        "submodule": "MGR Master and Product Master: Values and Products in Use Are Not Deleted",
+        "changes": "Deleting an MGR value that products still use, or that is ticked in a user's MGR Access, is now refused. The message says how many products and users use it and names the first few, so they can be changed first, or the value can be set to Inactive instead. Deleting a product that has serial numbers in Invoice Bulk Upload, in any branch, is also refused; set its Status to Inactive instead. Bulk delete in Product Master deletes the other selected products and names the ones it kept. Before this, such deletes left serial numbers that limited users could no longer see."
+      },
+      {
+        "date": "09.11.2026",
+        "module": "Authorization",
+        "submodule": "MGR Access: Check Hidden Serials",
+        "changes": "In Authorization > Team Users, a user's MGR Access panel has a Check hidden serials button. It counts the Invoice Bulk Upload serial numbers of the branch selected at the top that the user's saved MGR access hides (for example \"sees 320 of the 468 serial numbers in EPC; 148 hidden\") and lists them by product, with the product's MGR 1-5 and the reason, such as MGR 4 is \"OTHER\", which the user does not have. To show them, tick the missing value for the user or change the product's MGR in Product Master. The check only reads data and is for administrators."
+      },
+      {
+        "date": "09.11.2026",
+        "module": "Master Management",
+        "submodule": "Invoice Bulk Upload: Upload History",
+        "changes": "Administrators have an Upload History button on Invoice Bulk Upload. It lists the Excel uploads of the last 30 days in every branch: when, who uploaded, the branch, the file name and how many serial numbers were added, updated or failed. Below it, the serial numbers added per day over the last 90 days, by person, branch and way (Excel upload or single entry), with the times between which they were added. Before this, the import screen showed each person only their own uploads, so nobody could see who uploaded a branch's data."
+      },
+      {
+        "date": "09.11.2026",
+        "module": "Master Management",
+        "submodule": "Product Master: Pre-company Products",
+        "changes": "Some serial numbers in Invoice Bulk Upload use products saved before companies existed. Product Master did not list those products, so their MGR could not be seen or set. Administrators now have a Pre-company Products button in Product Master. It lists those products with their serial count, their MGR now and after, and what will happen: a product used only by your company moves into your Product Master as it is; one also used outside your company is copied, and your serial numbers move to the copy; one whose code you already have is replaced by your product. A product whose name another of your products already uses is not moved, and the reason is shown. MGR values from before companies become your MGR value with the same code where you have one, or blank. Afterwards set the MGR in Product Master as usual. A product that gets an MGR follows MGR Access, so users limited to other MGR values stop seeing its serial numbers. Every change is recorded in the audit log, and running it again changes nothing more."
+      }
+    ],
+    "deployedBy": "Super Admin",
+    "deployedAt": "2026-11-09T20:00:00+05:30",
     "isActive": true
   }
 ]

@@ -139,6 +139,7 @@ const Authorization = () => {
         })
         .filter(Boolean)
         .join(' · ');
+    const mgrAccessCount = (ids = []) => ids.filter((id) => mgrById[String(id)]).length;
 
     const fetchVendors = async () => {
         setVendorsLoading(true);
@@ -990,24 +991,19 @@ const Authorization = () => {
                                         return (
                                             <div key={user._id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
                                                 {/* User Summary Row */}
-                                                <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                                    <div className="flex items-center gap-4">
+                                                <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
+                                                    <div className="flex items-center gap-4 flex-1 min-w-0">
                                                         <div className="w-10 h-10 rounded-2xl bg-primary-100 dark:bg-primary-950/80 text-primary-700 dark:text-primary-300 font-black flex items-center justify-center text-sm shrink-0">
                                                             {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
                                                         </div>
-                                                        <div>
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-sm font-bold text-slate-900 dark:text-white">{user.name}</span>
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                                                <span className="text-sm font-bold text-slate-900 dark:text-white whitespace-nowrap">{user.name}</span>
                                                                 {isMe && <span className="text-[10px] font-bold bg-primary-100 dark:bg-primary-950 text-primary-700 dark:text-primary-300 px-2 py-0.5 rounded-full">You</span>}
                                                                 {isUserDirty && <span className="text-[10px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full">Unsaved changes</span>}
                                                                 {hasCustomOverrides && (
                                                                     <span className="text-[10px] font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-full flex items-center gap-1" title="User has custom permission overrides">
                                                                         <MdTune size={12} /> Custom Perms
-                                                                    </span>
-                                                                )}
-                                                                {mgrAccessText && (
-                                                                    <span className="text-[10px] font-bold bg-primary-50 dark:bg-primary-950/60 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800 px-2 py-0.5 rounded-full" title="Invoice Bulk Upload, Serial No Transfer and Customer Service are limited to these MGR values">
-                                                                        {mgrAccessText}
                                                                     </span>
                                                                 )}
                                                                 {!isBranchUnrestrictedRole(user.role) && userBranchIds(user).length === 0 && (
@@ -1016,11 +1012,23 @@ const Authorization = () => {
                                                                     </span>
                                                                 )}
                                                             </div>
-                                                            <p className="text-xs text-slate-500 dark:text-slate-400">{user.email}</p>
+                                                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user.email}</p>
+                                                            {mgrAccessText && (
+                                                                // One line under the email; the full list shows on hover and in Individual Permissions.
+                                                                <div
+                                                                    className="mt-1.5 flex items-center gap-1.5 min-w-0"
+                                                                    title={`Invoice Bulk Upload, Serial No Transfer and Customer Service are limited to: ${mgrAccessText}`}
+                                                                >
+                                                                    <span className="shrink-0 text-[10px] font-black uppercase tracking-wider bg-primary-50 dark:bg-primary-950/60 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800 px-2 py-0.5 rounded-full">
+                                                                        MGR Access · {mgrAccessCount(user.mgrAccess)}
+                                                                    </span>
+                                                                    <span className="min-w-0 truncate text-[11px] font-semibold text-slate-500 dark:text-slate-400">{mgrAccessText}</span>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
 
-                                                    <div className="flex flex-wrap items-center gap-4">
+                                                    <div className="flex flex-wrap md:flex-nowrap items-center gap-3 shrink-0">
                                                         {/* Role Dropdown */}
                                                         <div>
                                                             <select 

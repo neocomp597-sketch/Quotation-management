@@ -911,5 +911,77 @@ html, body {
   }
 }
 
+/* ==========================================================================
+   Invoice Bulk Upload on a phone (pages/SerialNoMaster.jsx). Only the ibu-*
+   classes of that screen, below 768px; the desktop table, the shared
+   serial-mobile-* cards of Serial No Transfer and the shared pager keep their
+   look. The MGR access notice folds its values behind a toggle, the list uses
+   the full width (no box around the cards), the MGR line wraps instead of
+   being cut off, a card's buttons share one row, and the pager is thumb-sized.
+   ========================================================================== */
+.ibu-access-toggle {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .ibu-title {
+    font-size: 1.5rem;
+    line-height: 2rem;
+  }
+
+  .ibu-access-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.25rem;
+    margin-top: 0.125rem;
+  }
+
+  .ibu-access-values:not(.is-open) {
+    display: none;
+  }
+
+  /* As specific as the theme rules for .bg-white (html:not(.dark) / html.dark), which come earlier. */
+  html:not(.dark) .ibu-list-panel,
+  html.dark .ibu-list-panel {
+    background-color: transparent !important;
+    border-color: transparent;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+    scroll-margin-top: 4.5rem;
+  }
+
+  .ibu-list-body {
+    padding: 0;
+  }
+
+  .ibu-mgr-line {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.35;
+  }
+
+  .ibu-card-actions {
+    flex-wrap: nowrap;
+  }
+
+  .ibu-card-actions > * {
+    min-width: 0;
+    min-height: 2.75rem;
+    padding-left: 0.375rem;
+    padding-right: 0.375rem;
+    letter-spacing: 0.04em;
+  }
+
+  .ibu-pager {
+    margin-top: 0.75rem;
+    border-radius: 1rem;
+  }
+
+  .ibu-pager button {
+    min-height: 2.75rem;
+  }
+}
+
 
 

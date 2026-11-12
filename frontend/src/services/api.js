@@ -319,6 +319,8 @@ export const productService = {
   update: (id, data) => api.put(`/products/${id}`, data),
   delete: (id) => api.delete(`/products/${id}`),
   bulkDelete: (ids) => api.post("/products/bulk-delete", { ids }),
+  getPreCompany: () => api.get("/products/pre-company", { cache: false }),
+  adoptPreCompany: (ids) => api.post("/products/pre-company/adopt", { ids }),
   bulkUpdate: (ids, updateData) =>
     api.patch("/products/bulk-update", { ids, updateData }),
 };
@@ -401,6 +403,7 @@ export const userService = {
   // payload: { permissions } (the full set the user should have) or { customPermissions: {} } (back to role defaults)
   updatePermissions: (id, payload, params) => api.put(`/users/${id}/permissions`, payload, { params }),
   updateMgrAccess: (id, mgrAccess, params) => api.put(`/users/${id}/mgr-access`, { mgrAccess }, { params }),
+  getMgrHiddenSerials: (id, params) => api.get(`/users/${id}/mgr-access/hidden-serials`, { params }),
   updateBranches: (id, assignedBranches, params) => api.put(`/users/${id}/branches`, { assignedBranches }, { params }),
 };
 
@@ -1050,6 +1053,7 @@ export const csmService = {
   updateAsset: (id, data) => api.put(`/csm/assets/${id}`, data),
   returnAsset: (id, returnReason) => api.post(`/csm/assets/${id}/return`, { returnReason }),
   getReturnHistory: () => api.get("/csm/assets/return-history"),
+  getUploadHistory: (params = {}) => api.get("/csm/assets/upload-history", { params, cache: false }),
   getAssetSummary: (params = {}) => api.get("/csm/assets/summary", { params }),
   getAssetActivity: (serialNumber) => api.get("/csm/assets/activity", { params: { serialNumber } }),
   searchSerialNumbers: (q) => api.get("/csm/assets/search-serials", { params: { q } }),

@@ -641,6 +641,78 @@ exports.updateUserMgrAccess = async (req, res) => {
     }
 };
 
+const MGR_LEVEL_LABELS = { mgr1: 'MGR 1', mgr2: 'MGR 2', mgr3: 'MGR 3', mgr4: 'MGR 4', mgr5: 'MGR 5' };
+
+/**
+ * Administrator's check in Authorization > Team Users > MGR Access: how many of the Invoice Bulk
+ * Upload serial numbers of the branch selected at the top one user's saved MGR access hides, by
+ * product, with the product's MGR values and why. Reads only. Answers "the admin sees 468, the
+ * user 320" without a database query.
+ */
+exports.getUserMgrHiddenSerials = async (req, res) => {
+    try {
+        const Asset = require('../models/Asset');
+        const Product = require('../models/Product');
+        const { getUserMgrAccess, hiddenProductCondition, hiddenReasons } = require('../utils/mgrAccess');
+
+        const companyId = req.user.companyId;
+        const branchId = req.user.activeBranchId;
+        if (!branchId || !mongoose.Types.ObjectId.isValid(String(branchId))) {
+            return res.status(400).json({ message: 'Select a branch at the top of the screen first.' });
+        }
+        const user = await User.findOne({ _id: req.params.id, companyId }).select('name role mgrAccess').lean();
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        const companyOid = new mongoose.Types.ObjectId(String(companyId));
+        const branchOid = new mongoose.Types.ObjectId(String(branchId));
+        const [branch, total, access] = await Promise.all([
+            Branch.findById(branchOid).select('name code').setOptions({ bypassTenant: true }).lean(),
+            Asset.countDocuments({ companyId: companyOid, branchId: branchOid }),
+            getUserMgrAccess({ id: String(user._id), role: user.role, companyId })
+        ]);
+        const base = { user: user.name, branch: branch ? (branch.code || branch.name) : '', total };
+        if (!access) return res.json({ ...base, limited: false, hidden: 0, products: [] });
+
+        const condition = hiddenProductCondition(access);
+        if (!condition) return res.json({ ...base, limited: true, allValuesDeleted: true, hidden: total, products: [] });
+
+        const hiddenIds = await Product.find(condition).setOptions({ bypassTenant: true }).distinct('_id');
+        const groups = hiddenIds.length
+            ? await Asset.aggregate([
+                { $match: { companyId: companyOid, branchId: branchOid, productId: { $in: hiddenIds } } },
+                { $group: { _id: '$productId', serials: { $sum: 1 } } },
+                { $sort: { serials: -1 } }
+            ])
+            : [];
+        const products = await Product.find({ _id: { $in: groups.map((group) => group._id) } })
+            .select('productCode productName mgr1 mgr2 mgr3 mgr4 mgr5')
+            .setOptions({ bypassTenant: true })
+            .lean();
+        const mgrIds = products.flatMap((product) => Object.keys(MGR_LEVEL_LABELS).map((field) => product[field]).filter(Boolean));
+        const mgrs = await MGR.find({ _id: { $in: mgrIds } }).select('code').setOptions({ bypassTenant: true }).lean();
+        const codeOf = new Map(mgrs.map((mgr) => [String(mgr._id), mgr.code]));
+        const productById = new Map(products.map((product) => [String(product._id), product]));
+
+        const rows = groups.map((group) => {
+            const product = productById.get(String(group._id)) || {};
+            const reasons = hiddenReasons(access, product).map((reason) => (reason.field
+                ? `${MGR_LEVEL_LABELS[reason.field]} is "${codeOf.get(reason.value) || '?'}", which ${user.name} does not have`
+                : `none of ${user.name}'s ${reason.fields.map((field) => MGR_LEVEL_LABELS[field]).join(' / ')} values`));
+            return {
+                productCode: product.productCode || '',
+                productName: product.productName || '',
+                serials: group.serials,
+                mgr: Object.fromEntries(Object.keys(MGR_LEVEL_LABELS).map((field) => [field, codeOf.get(String(product[field] || '')) || ''])),
+                reasons
+            };
+        });
+        res.json({ ...base, limited: true, hidden: rows.reduce((sum, row) => sum + row.serials, 0), products: rows });
+    } catch (error) {
+        console.error('[getUserMgrHiddenSerials] Error:', error.message);
+        res.status(500).json({ message: 'Could not check the MGR access', error: error.message });
+    }
+};
+
 /**
  * The branches one user may switch between (Authorization > Team Users). Staff without a branch
  * cannot log in, so this is also how an admin lets them back in. A login that follows an employee

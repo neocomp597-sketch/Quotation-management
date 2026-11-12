@@ -45,9 +45,9 @@ export const MobileField = ({ label, wide = false, children }) => (
     </div>
 );
 
-/** Row buttons; a tap on them does not also open the card. */
-export const MobileCardActions = ({ children }) => (
-    <div className="serial-mobile-actions" onClick={(e) => e.stopPropagation()}>{children}</div>
+/** Row buttons; a tap on them does not also open the card. `className` adds a screen's own layout. */
+export const MobileCardActions = ({ className = '', children }) => (
+    <div className={`serial-mobile-actions${className ? ` ${className}` : ''}`} onClick={(e) => e.stopPropagation()}>{children}</div>
 );
 
 export const MobileEmpty = ({ children }) => <p className="serial-mobile-empty text-slate-400">{children}</p>;

@@ -405,6 +405,15 @@ const ImportPreviewStep = ({ job, busy, onApplyMapping, onModeChange, onReplaceF
                     No row can be imported yet. Check the column matching below, or review the rows that need attention.
                 </p>
             )}
+            {/* Columns the import works without but that the file most likely has (the customer of Invoice Bulk Upload). */}
+            {counts.total > 0 && (job.module.unmatchedNotices || [])
+                .filter((notice) => !notice.fields.some((key) => job.mapping[key]?.length))
+                .map((notice) => (
+                    <p key={notice.fields.join('|')} className="flex items-start gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                        <MdWarning className="mt-0.5 shrink-0" size={15} />
+                        <span><span className="font-semibold">{notice.message}</span>{notice.hint ? ` ${notice.hint}` : ''}</span>
+                    </p>
+                ))}
 
             {/* Imports that can only add records (tickets...) have no choice to make. */}
             {modes.length > 1 && (

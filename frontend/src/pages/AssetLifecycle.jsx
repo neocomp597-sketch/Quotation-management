@@ -71,7 +71,10 @@ const AssetLifecycle = () => {
     // Field / value pairs shared by the page, the PDF and the Excel export.
     const detailRows = useMemo(() => {
         if (!asset) return [];
-        const customer = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || 'Stock (Unsold)';
+        // No customer saved: "Stock (Unsold)" only for stock; a sold, allocated or returned entry is left
+        // blank, so it reads N/A like the other fields that were not entered.
+        const customer = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr
+            || ((asset.status || 'IN_STOCK') === 'IN_STOCK' ? 'Stock (Unsold)' : '');
         return [
             ['Serial Number', asset.serialNumber],
             ['Status', asset.status || 'IN_STOCK'],
