@@ -172,7 +172,7 @@ const SerialNoMaster = () => {
     const navigate = useNavigate();
     const { canCreate, canModify } = usePermission('master_serials');
     // View Details and Edit are switches of their own in Authorization; the API checks them too.
-    const { hasAccess, user } = useAuth();
+    const { hasAccess, user, activeBranchId, setActiveBranch } = useAuth();
     const canViewDetails = hasAccess('master_serials_view_details');
     // Upload History lists every branch's uploads, so only administrators open it (the API checks too).
     const canSeeUploadHistory = ['admin', 'super_admin', 'superadmin'].includes(String(user?.role || '').toLowerCase());
