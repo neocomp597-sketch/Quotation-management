@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { csmService, productService, customerService, importService, divisionService, segmentService, invalidateApiCache } from '../services/api';
+import { csmService, productService, customerService, importService, divisionService, segmentService, invalidateApiCache, authService } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import {
     MdSearch, MdTag, MdInfoOutline, MdSync,
     MdLocalOffer, MdPeople, MdReceipt, MdAssignmentTurnedIn,
-    MdFileUpload, MdFileDownload, MdAdd, MdUndo, MdHistory, MdEdit, MdFilterAlt
+    MdFileUpload, MdFileDownload, MdAdd, MdUndo, MdHistory, MdEdit, MdFilterAlt, MdHome
 } from 'react-icons/md';
 import Modal from '../components/Modal';
 import ImportWizard from '../components/import/ImportWizard';
@@ -153,9 +153,15 @@ const SerialNoMaster = () => {
     const navigate = useNavigate();
     const { canCreate, canModify } = usePermission('master_serials');
     // View Details and Edit are switches of their own in Authorization; the API checks them too.
-    const { hasAccess } = useAuth();
+    const { hasAccess, activeBranchId, setActiveBranch } = useAuth();
     const canViewDetails = hasAccess('master_serials_view_details');
     const canEdit = hasAccess('master_serials_edit');
+    // The branches this user was given, home branch first. Picking one makes it the working
+    // branch (as the header switcher does), so the list, cards, returns, export and edits all
+    // follow it; the page then reloads in that branch.
+    const [myBranches, setMyBranches] = useState([]);
+    const [primaryBranchId, setPrimaryBranchId] = useState(null);
+    const [switchingBranchId, setSwitchingBranchId] = useState(null);
     const [assets, setAssets] = useState([]);
     const [assetPagination, setAssetPagination] = useState({ page: 1, limit: PAGE_SIZE, total: 0, pages: 1 });
     const [assetSummary, setAssetSummary] = useState({ total: 0, inStock: 0, sold: 0, returned: 0 });
@@ -398,6 +404,33 @@ const SerialNoMaster = () => {
     useEffect(() => {
         loadReferenceData();
     }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        authService.getMyBranches()
+            .then((res) => {
+                if (cancelled) return;
+                setMyBranches(Array.isArray(res.data?.branches) ? res.data.branches : []);
+                setPrimaryBranchId(res.data?.primaryBranchId ? String(res.data.primaryBranchId) : null);
+            })
+            .catch((err) => console.warn('Could not load your branches:', err));
+        return () => { cancelled = true; };
+    }, []);
+
+    const handleBranchChipClick = async (branch) => {
+        const id = idOf(branch);
+        if (!id || id === String(activeBranchId || '') || switchingBranchId) return;
+        setSwitchingBranchId(id);
+        try {
+            // Persisted and checked on the server first; the page then reloads in this branch (see Layout).
+            await setActiveBranch(branch);
+            toast.info(`Showing ${branch.name} branch data`);
+        } catch (err) {
+            toast.error(err.response?.data?.message || `Could not switch to ${branch.name}`);
+        } finally {
+            setSwitchingBranchId(null);
+        }
+    };
 
     const loadReferenceData = async () => {
         const [productsResult, divisionsResult, segmentsResult] = await Promise.allSettled([
@@ -1205,6 +1238,34 @@ const SerialNoMaster = () => {
                         <span>Return History</span>
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeTab === 'returns' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'}`}>{returnHistory.length}</span>
                     </button>
+                    {myBranches.length > 0 && (
+                        <div className="col-span-2 flex flex-wrap items-center gap-2 sm:ml-4" role="group" aria-label="Branches">
+                            {myBranches.map((branch) => {
+                                const id = idOf(branch);
+                                const isSelected = id === String(activeBranchId || '');
+                                const isPrimary = id === primaryBranchId;
+                                const isSwitching = id === switchingBranchId;
+                                return (
+                                    <button
+                                        key={id}
+                                        type="button"
+                                        onClick={() => handleBranchChipClick(branch)}
+                                        disabled={Boolean(switchingBranchId)}
+                                        aria-pressed={isSelected}
+                                        title={`${isPrimary ? 'Primary branch: ' : ''}${branch.name}${isSelected ? ' (showing)' : ''}`}
+                                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold border transition-all ${
+                                            isSelected
+                                                ? 'bg-teal-50 text-teal-700 border-teal-500 shadow-sm cursor-default'
+                                                : 'bg-white text-slate-700 border-slate-200 shadow-sm hover:border-teal-400 hover:text-teal-700 cursor-pointer'
+                                        } ${isSwitching ? 'opacity-60 animate-pulse' : ''} disabled:cursor-wait`}
+                                    >
+                                        {isPrimary && <MdHome size={15} className="shrink-0" aria-label="Primary branch" />}
+                                        <span>{branch.name}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex flex-col md:flex-row gap-4 items-center">

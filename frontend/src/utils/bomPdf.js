@@ -21,7 +21,7 @@ const HEAD_FILL = [241, 245, 249]; // slate-100
 // jsPDF's standard fonts are WinAnsi, so anything outside it (dashes and quotes pasted in
 // from Word, for instance) is folded down to plain ASCII rather than printed as a blob.
 const ASCII = { '\u2013': '-', '\u2014': '-', '\u2018': "'", '\u2019': "'", '\u201c': '\"', '\u201d': '\"', '\u2022': '-', '\u00b7': '-', '\u2026': '...', '\u00a0': ' ' };
-const text = (value) => (value === 0 ? '0' : String(value ?? '').replace(/[\u2013\u2014\u2018\u2019\u201c\u201d\u2022\u00b7\u2026\u00a0]/g, (c) => ASCII[c]).trim());
+export const text = (value) => (value === 0 ? '0' : String(value ?? '').replace(/[\u2013\u2014\u2018\u2019\u201c\u201d\u2022\u00b7\u2026\u00a0]/g, (c) => ASCII[c]).trim());
 const mgrLabel = (mgr) => (mgr ? (mgr.description || mgr.code || '') : '');
 const sameKey = (a, b) => text(a).toUpperCase() === text(b).toUpperCase();
 // A BOM tied to a real FG serial carries it; an item-level BOM stores its item code there.

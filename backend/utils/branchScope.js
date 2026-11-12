@@ -135,6 +135,41 @@ const listSelectableBranches = async (user, companyId) => {
 };
 
 /**
+ * The branches the user was given, for screens that let them move between their own branches
+ * (Invoice Bulk Upload): their home branch (`branchId`) first, then the rest of their Branch
+ * Access assignment by name. Unlike `listSelectableBranches`, an admin with an assignment gets
+ * only that assignment, not every branch of the company; one without any branch at all gets
+ * every branch they may select. Only branches the user may select are returned.
+ * Returns { primaryBranchId, branches }.
+ */
+const listOwnBranches = async (user, companyId) => {
+    const selectable = getSelectableBranchIds(user); // null: every branch of the company
+    const primaryId = idOf(user?.branchId);
+    const ownIds = [...new Set([primaryId, ...getAssignedBranchIds(user)].filter(isObjectIdString))]
+        .filter((id) => !selectable || selectable.includes(id));
+
+    let branches;
+    if (ownIds.length === 0) {
+        branches = await listSelectableBranches(user, companyId);
+    } else {
+        const query = { _id: { $in: ownIds } };
+        const resolvedCompanyId = companyId || idOf(user?.companyId);
+        if (resolvedCompanyId && mongoose.Types.ObjectId.isValid(resolvedCompanyId)) query.companyId = resolvedCompanyId;
+        branches = await Branch.find(query)
+            .select(BRANCH_SUMMARY_FIELDS)
+            .sort({ name: 1 })
+            .setOptions({ bypassTenant: true })
+            .lean();
+    }
+
+    const isPrimary = (branch) => Boolean(primaryId) && idOf(branch) === primaryId;
+    return {
+        primaryBranchId: branches.some(isPrimary) ? primaryId : null,
+        branches: [...branches.filter(isPrimary), ...branches.filter((branch) => !isPrimary(branch))],
+    };
+};
+
+/**
  * The branch condition of the current request for models that are not run through
  * tenantPlugin (they filter explicitly): records in the scoped branches plus records
  * without a branch. Returns null when the request is not branch-scoped.
@@ -163,4 +198,5 @@ module.exports = {
     forgetBranchLookups,
     canUseBranch,
     listSelectableBranches,
+    listOwnBranches,
 };

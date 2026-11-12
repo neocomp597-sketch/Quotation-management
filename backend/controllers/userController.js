@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const ExcelJS = require('exceljs');
 const User = require('../models/User');
 const MGR = require('../models/MGR');
 const Branch = require('../models/Branch');
@@ -12,6 +13,7 @@ const { invalidateAuthUserCache, isSuperAdminRole } = require('../middlewares/au
 const { broadcastCrmUpdate } = require('../config/socket');
 const EmployeeProfile = require('../models/EmployeeProfile');
 const { isBranchAdminRole } = require('../utils/branchScope');
+const { formatDateTime } = require('../utils/dateFormat');
 
 /**
  * An employee's login follows Employee Master (services/employeeUserService.js), so a name or email
@@ -140,21 +142,27 @@ const loadUserActivity = async (query) => {
     });
 };
 
+// The users matching the request's search, in the order it asks for. The list and the Excel share it.
+const listUserActivity = async (req) => {
+    const query = withActiveBranchScope({ companyId: req.user?.companyId });
+    const search = String(req.query.search || '').trim();
+    if (search) {
+        const regex = new RegExp(escapeRegex(search), 'i');
+        query.$and = [{ $or: [{ name: regex }, { email: regex }] }];
+    }
+
+    const rows = await loadUserActivity(query);
+    const compare = Object.hasOwn(USER_ACTIVITY_SORTS, req.query.sortBy)
+        ? USER_ACTIVITY_SORTS[req.query.sortBy]
+        : USER_ACTIVITY_SORTS.modifiedAt;
+    rows.sort(req.query.order === 'asc' ? compare : (a, b) => compare(b, a));
+    return rows;
+};
+
 // GET /api/users/activity?search=&sortBy=name|createdAt|modifiedAt&order=asc|desc&page=&limit=
 exports.getUserActivity = async (req, res) => {
     try {
-        const query = withActiveBranchScope({ companyId: req.user?.companyId });
-        const search = String(req.query.search || '').trim();
-        if (search) {
-            const regex = new RegExp(escapeRegex(search), 'i');
-            query.$and = [{ $or: [{ name: regex }, { email: regex }] }];
-        }
-
-        const rows = await loadUserActivity(query);
-        const compare = Object.hasOwn(USER_ACTIVITY_SORTS, req.query.sortBy)
-            ? USER_ACTIVITY_SORTS[req.query.sortBy]
-            : USER_ACTIVITY_SORTS.modifiedAt;
-        rows.sort(req.query.order === 'asc' ? compare : (a, b) => compare(b, a));
+        const rows = await listUserActivity(req);
 
         const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 200);
         const pages = Math.max(Math.ceil(rows.length / limit), 1);
@@ -167,6 +175,54 @@ exports.getUserActivity = async (req, res) => {
     } catch (error) {
         console.error('[getUserActivity] Error:', error.message);
         res.status(500).json({ message: 'Failed to load user activity', error: error.message });
+    }
+};
+
+const USER_ACTIVITY_COLUMNS = [
+    { header: 'Name', key: 'name', width: 30 },
+    { header: 'Email', key: 'email', width: 36 },
+    { header: 'Role', key: 'role', width: 14 },
+    { header: 'Branch', key: 'branch', width: 24 },
+    { header: 'Status', key: 'status', width: 10 },
+    // Dates are text in the ARCRM format, as in the other exports; Excel date formats cannot upper-case the month.
+    { header: 'Created On', key: 'createdOn', width: 22, style: { numFmt: '@' } },
+    { header: 'Last Modified', key: 'lastModified', width: 22, style: { numFmt: '@' } },
+];
+
+// GET /api/users/activity/export?search=&sortBy=name|createdAt|modifiedAt&order=asc|desc
+// .xlsx of every user matching the search, not just one page.
+exports.exportUserActivity = async (req, res) => {
+    try {
+        const rows = await listUserActivity(req);
+
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet('User Activity');
+        sheet.columns = USER_ACTIVITY_COLUMNS;
+        sheet.getRow(1).font = { bold: true };
+        sheet.views = [{ state: 'frozen', ySplit: 1 }];
+        sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: USER_ACTIVITY_COLUMNS.length } };
+        for (const row of rows) {
+            sheet.addRow({
+                name: row.name,
+                email: row.email,
+                role: row.role ? row.role.charAt(0).toUpperCase() + row.role.slice(1) : '',
+                branch: row.branch || '-',
+                status: row.isActive ? 'Active' : 'Inactive',
+                createdOn: formatDateTime(row.createdAt),
+                lastModified: formatDateTime(row.modifiedAt, 'No change recorded'),
+            });
+        }
+
+        const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date()).replace(/-/g, '');
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="User_Activity_${today}.xlsx"`);
+        res.setHeader('X-Total-Count', String(rows.length));
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, X-Total-Count');
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        console.error('[exportUserActivity] Error:', error.message);
+        res.status(500).json({ message: 'Failed to export user activity', error: error.message });
     }
 };
 

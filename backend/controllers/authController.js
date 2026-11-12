@@ -12,6 +12,7 @@ const {
     normalizeBranchId,
     canUseBranch,
     listSelectableBranches,
+    listOwnBranches,
     requiresBranch,
     NO_BRANCH_ASSIGNED,
 } = require('../utils/branchScope');
@@ -521,6 +522,24 @@ exports.getBranchOptions = async (req, res) => {
     try {
         const branches = await listSelectableBranches(req.user, req.user.companyId);
         res.json({
+            activeBranchId: req.user.activeBranchId || null,
+            branches: branches.map(branchSummary).filter(Boolean),
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to load branches', error: error.message });
+    }
+};
+
+/**
+ * GET /auth/my-branches - the branches the user was given (home branch first, then the rest
+ * of their Branch Access), for the branch chips on Invoice Bulk Upload. Picking one goes
+ * through PUT /auth/active-branch like the header switcher.
+ */
+exports.getMyBranches = async (req, res) => {
+    try {
+        const { primaryBranchId, branches } = await listOwnBranches(req.user, req.user.companyId);
+        res.json({
+            primaryBranchId,
             activeBranchId: req.user.activeBranchId || null,
             branches: branches.map(branchSummary).filter(Boolean),
         });

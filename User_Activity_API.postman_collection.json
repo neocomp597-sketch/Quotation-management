@@ -1,0 +1,177 @@
+{
+  "info": {
+    "name": "ARCRM User Activity API",
+    "description": "When each ARCRM user was created and last modified.\n\nHow to use:\n1. Open this collection's Variables tab. Set baseUrl, email and password, then save.\n2. Send 1. Login. It saves the token for the other requests.\n3. Send 2. List users. It saves the first user's id for 4. One user.\n4. For 3. Download Excel, open the arrow next to Send and choose Send and Download to save the file.\n\nTo report on a particular branch, turn on the x-active-branch header in a request and set the branchId variable. Without it, the server uses the branch saved on the user.\n\nThe user needs the User Activity view permission. When a request returns 401, send 1. Login again.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{token}}", "type": "string" }
+    ]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4003/api", "type": "string", "description": "The API address, ending in /api" },
+    { "key": "email", "value": "", "type": "string", "description": "ARCRM login email" },
+    { "key": "password", "value": "", "type": "string", "description": "ARCRM login password" },
+    { "key": "token", "value": "", "type": "string", "description": "Filled in by 1. Login" },
+    { "key": "userId", "value": "", "type": "string", "description": "Filled in by 2. List users" },
+    { "key": "branchId", "value": "", "type": "string", "description": "Optional branch id, used when the x-active-branch header is turned on" }
+  ],
+  "item": [
+    {
+      "name": "1. Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Login worked', function () {",
+              "    pm.response.to.have.status(200);",
+              "    const token = pm.response.json().accessToken;",
+              "    pm.expect(token, 'accessToken in the response').to.be.a('string');",
+              "    pm.collectionVariables.set('token', token);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "login"]
+        },
+        "description": "Logs in and saves the access token for the other requests."
+      },
+      "response": []
+    },
+    {
+      "name": "2. List users (one page)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "const body = pm.response.json();",
+              "pm.test('Has data and pagination', function () {",
+              "    pm.expect(body.data).to.be.an('array');",
+              "    pm.expect(body.pagination).to.be.an('object');",
+              "});",
+              "if (body.data && body.data.length) {",
+              "    pm.collectionVariables.set('userId', body.data[0]._id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "x-active-branch", "value": "{{branchId}}", "description": "Optional branch id", "disabled": true }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/users/activity?sortBy=modifiedAt&order=desc&page=1&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["users", "activity"],
+          "query": [
+            { "key": "search", "value": "", "description": "Text to match in name or email", "disabled": true },
+            { "key": "sortBy", "value": "modifiedAt", "description": "name, createdAt or modifiedAt" },
+            { "key": "order", "value": "desc", "description": "asc or desc" },
+            { "key": "page", "value": "1", "description": "Page number" },
+            { "key": "limit", "value": "20", "description": "1 to 200" }
+          ]
+        },
+        "description": "One page of users, as JSON. modifiedAt is null when no change was ever recorded."
+      },
+      "response": []
+    },
+    {
+      "name": "3. Download Excel (all users)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Is an Excel file', function () {",
+              "    pm.expect(pm.response.headers.get('Content-Type')).to.include('spreadsheetml');",
+              "});",
+              "pm.test('Says how many users it holds', function () {",
+              "    pm.expect(pm.response.headers.get('X-Total-Count')).to.match(/^\\d+$/);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "x-active-branch", "value": "{{branchId}}", "description": "Optional branch id", "disabled": true }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/users/activity/export?sortBy=modifiedAt&order=desc",
+          "host": ["{{baseUrl}}"],
+          "path": ["users", "activity", "export"],
+          "query": [
+            { "key": "search", "value": "", "description": "Text to match in name or email", "disabled": true },
+            { "key": "sortBy", "value": "modifiedAt", "description": "name, createdAt or modifiedAt" },
+            { "key": "order", "value": "desc", "description": "asc or desc" }
+          ]
+        },
+        "description": "Every matching user as an .xlsx file. Choose Send and Download to save it. The X-Total-Count header gives the number of users; 0 means the file has only the heading row."
+      },
+      "response": []
+    },
+    {
+      "name": "4. One user",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Is the chosen user', function () {",
+              "    pm.expect(pm.response.json()._id).to.eql(pm.collectionVariables.get('userId'));",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "x-active-branch", "value": "{{branchId}}", "description": "Optional branch id", "disabled": true }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/users/activity/{{userId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["users", "activity", "{{userId}}"]
+        },
+        "description": "One user, as JSON. Uses the id saved by 2. List users."
+      },
+      "response": []
+    }
+  ]
+}

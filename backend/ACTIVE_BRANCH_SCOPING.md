@@ -79,6 +79,7 @@ editing the ticket or with `scripts/backfillBranchIds.js` (their customer's bran
 | Method | Path                      | Purpose                                              |
 | ------ | ------------------------- | ---------------------------------------------------- |
 | GET    | `/api/auth/branches`      | Branches the user may select + current active branch |
+| GET    | `/api/auth/my-branches`   | Branches the user was given, home branch first (Invoice Bulk Upload branch chips; admins get their assignment, not every branch) |
 | PUT    | `/api/auth/active-branch` | Persist the active branch (`{ branchId }`)           |
 | GET    | `/api/auth/me`            | Includes `assignedBranches`, `activeBranchId`, `activeBranch` |
 | GET    | `/api/branches`           | Same list, full branch documents                     |

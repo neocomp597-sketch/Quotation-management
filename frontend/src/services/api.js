@@ -377,6 +377,8 @@ export const authService = {
   changePassword: (data) => api.post("/auth/change-password", data),
   // Branches this user may work in, plus the branch the server treats as active.
   getBranchOptions: () => api.get("/auth/branches", { cache: false }),
+  // The branches this user was given: home branch first, then the rest of their Branch Access.
+  getMyBranches: () => api.get("/auth/my-branches", { cache: false }),
   // Persists the active branch server-side. The new branch is sent as the header
   // too, so a stale branch in storage can never block the switch itself.
   setActiveBranch: (branchId) =>
@@ -388,6 +390,7 @@ export const authService = {
 export const userService = {
   getAll: (params) => api.get("/users", { params }),
   getActivity: (params) => api.get("/users/activity", { params }),
+  exportActivity: (params) => api.get("/users/activity/export", { params, responseType: "blob" }),
   create: (data) => api.post("/users", data),
   updateProfile: (data) => api.put("/users/profile", data),
   getNote: () => api.get("/users/note"),

@@ -171,6 +171,7 @@ router.get('/seed-employees-admin', async (req, res) => {
 // Define user routes here
 router.get('/', protect, userController.getAllUsers);
 router.get('/activity', protect, userController.getUserActivity);
+router.get('/activity/export', protect, userController.exportUserActivity);
 router.get('/activity/:id', protect, userController.getUserActivityById);
 router.post('/', protect, admin, userController.createUser);
 router.get('/note', protect, userController.getUserNote);

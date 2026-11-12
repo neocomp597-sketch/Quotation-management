@@ -12,6 +12,7 @@ router.get('/logout', authController.logout);
 router.post('/logout-all', protect, authController.logoutAll);
 router.get('/me', protect, authController.getMe);
 router.get('/branches', protect, authController.getBranchOptions);
+router.get('/my-branches', protect, authController.getMyBranches);
 router.put('/active-branch', protect, authController.setActiveBranch);
 router.post('/active-branch', protect, authController.setActiveBranch);
 router.post('/change-password', protect, authController.changePassword);
