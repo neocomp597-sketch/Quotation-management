@@ -12,6 +12,7 @@ import Modal from '../components/Modal';
 import { fetchAccurateLocation } from '../utils/reverseGeocode';
 import DateInput from '../components/DateInput';
 import usePermission from '../hooks/usePermission';
+import compressImage from '../utils/compressImage';
 
 const visitStatusClass = (status) => (
     status === 'Completed' ? 'bg-teal-50 text-teal-600 border-teal-200' :
@@ -26,6 +27,18 @@ const VISIT_MEDIA_FIELDS = ['productPhoto', 'customerSignature'];
 const pickVisitMedia = (visit) => Object.fromEntries(
     VISIT_MEDIA_FIELDS.filter((field) => visit && field in visit).map((field) => [field, visit[field]])
 );
+
+// Product photos are shrunk to this many pixels on the longer side before upload
+const PRODUCT_PHOTO_MAX_SIDE = 1600;
+// When the upload is unavailable a photo up to this size is kept inline in the visit instead
+const MAX_INLINE_PHOTO_BYTES = 1024 * 1024;
+
+const readAsDataUrl = (blob) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+});
 
 // Why a request failed, for when the server's reply carries no message of its own
 const describeLoadError = (error) => {
@@ -736,30 +749,40 @@ const ServiceVisits = () => {
     };
 
     const handlePhotoChange = async (e) => {
-        const file = e.target.files && e.target.files[0];
+        const input = e.target;
+        const file = input.files && input.files[0];
+        // Lets the same photo be picked again after a failed attempt
+        input.value = '';
         if (!file) return;
         setUploadingPhoto(true);
         try {
-            const res = await uploadService.uploadImage(file);
-            const photoUrl = res.data?.url || res.data?.imageUrl;
-            if (photoUrl) {
-                setProductPhoto(photoUrl);
-                toast.success('Product photo uploaded successfully!');
-            } else {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    setProductPhoto(reader.result);
-                    toast.success('Product photo attached!');
-                };
-                reader.readAsDataURL(file);
+            // A phone camera photo is often over the 5 MB upload limit: shrink it first so it uploads,
+            // and so that a photo kept in the visit itself (below) stays small
+            const photo = await compressImage(file, PRODUCT_PHOTO_MAX_SIDE, PRODUCT_PHOTO_MAX_SIDE, 0.75).catch(() => file);
+            let uploadError = null;
+            try {
+                const res = await uploadService.uploadImage(photo);
+                const photoUrl = res.data?.url || res.data?.imageUrl;
+                if (photoUrl) {
+                    setProductPhoto(photoUrl);
+                    toast.success('Product photo uploaded successfully!');
+                    return;
+                }
+            } catch (err) {
+                uploadError = err;
             }
+            // Upload unavailable: keep the photo in the visit itself, but only a small one,
+            // since it then travels with the visit everywhere it is loaded
+            if (photo.size > MAX_INLINE_PHOTO_BYTES) {
+                const reason = uploadError?.response?.data?.message;
+                toast.error(`Could not upload the product photo${reason ? ` (${reason})` : ''}. Please retake it or try again.`);
+                return;
+            }
+            setProductPhoto(await readAsDataUrl(photo));
+            toast.success('Product photo attached!');
         } catch (err) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setProductPhoto(reader.result);
-                toast.success('Product photo attached!');
-            };
-            reader.readAsDataURL(file);
+            console.error('Product photo could not be attached', err);
+            toast.error('Could not read the product photo. Please retake it.');
         } finally {
             setUploadingPhoto(false);
         }

@@ -7,59 +7,7 @@ import Modal from '../components/Modal';
 import DateInput from '../components/DateInput';
 import { fetchAccurateLocation } from '../utils/reverseGeocode';
 import usePermission from '../hooks/usePermission';
-
-// Client-side image compression & resizing helper before upload (max 800x800, quality 0.7)
-const compressSelfieImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.7) => {
-    return new Promise((resolve, reject) => {
-        if (!file || !file.type.startsWith('image/')) {
-            return resolve(file);
-        }
-
-        const reader = new FileReader();
-        reader.onerror = (err) => reject(err);
-        reader.onload = (event) => {
-            const img = new Image();
-            img.onerror = (err) => reject(err);
-            img.onload = () => {
-                let { width, height } = img;
-                if (width > maxWidth || height > maxHeight) {
-                    if (width > height) {
-                        height = Math.round((height * maxWidth) / width);
-                        width = maxWidth;
-                    } else {
-                        width = Math.round((width * maxHeight) / height);
-                        height = maxHeight;
-                    }
-                }
-
-                const canvas = document.createElement('canvas');
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-
-                canvas.toBlob(
-                    (blob) => {
-                        if (!blob) {
-                            return resolve(file);
-                        }
-                        const fileName = (file.name || 'selfie.jpg').replace(/\.[^/.]+$/, "") + "_compressed.jpg";
-                        const compressedFile = new File([blob], fileName, {
-                            type: 'image/jpeg',
-                            lastModified: Date.now(),
-                        });
-                        console.log(`Selfie compressed: Original ${(file.size / 1024).toFixed(1)}KB -> Compressed ${(compressedFile.size / 1024).toFixed(1)}KB`);
-                        resolve(compressedFile);
-                    },
-                    'image/jpeg',
-                    quality
-                );
-            };
-            img.src = event.target.result;
-        };
-        reader.readAsDataURL(file);
-    });
-};
+import compressImage from '../utils/compressImage';
 
 const FieldAttendance = () => {
     const { canCreate } = usePermission('csm_attendance');
@@ -195,7 +143,7 @@ const FieldAttendance = () => {
         if (!file) return;
         setUploadingSelfie(true);
         try {
-            const compressedFile = await compressSelfieImage(file);
+            const compressedFile = await compressImage(file);
             const res = await uploadService.uploadImage(compressedFile);
             const photoUrl = res.data?.url || res.data?.imageUrl;
             if (photoUrl) {
@@ -295,7 +243,7 @@ const FieldAttendance = () => {
         if (!file) return;
         setUploadingCheckOutSelfie(true);
         try {
-            const compressedFile = await compressSelfieImage(file);
+            const compressedFile = await compressImage(file);
             const res = await uploadService.uploadImage(compressedFile);
             const photoUrl = res.data?.url || res.data?.imageUrl;
             if (photoUrl) {
