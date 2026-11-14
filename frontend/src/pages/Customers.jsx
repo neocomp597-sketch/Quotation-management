@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdPerson, MdEmail, MdPhone, MdLocationOn, MdBusiness, MdCloudUpload, MdVisibility, MdFileUpload, MdCheckBox, MdCheckBoxOutlineBlank, MdDeleteSweep, MdFileDownload, MdArrowBack } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
-import { customerService, uploadService, importService, territoryService, userService, csmService, invalidateApiCache } from '../services/api';
+import { customerService, uploadService, importService, territoryService, userService, csmService, authService, invalidateApiCache } from '../services/api';
 import Modal from '../components/Modal';
 import ImportWizard from '../components/import/ImportWizard';
 import PaginationControls from '../components/PaginationControls';
@@ -90,6 +90,60 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
         fetchTerritories();
         fetchUsers();
     }, []);
+
+    // Branch transfer (edit screen): the branches this user may work in, as in the header switcher.
+    const [branchOptions, setBranchOptions] = useState({ branches: [], activeBranchId: null });
+    const [transferBranchId, setTransferBranchId] = useState('');
+    const [isTransferring, setIsTransferring] = useState(false);
+    const showBranchTransfer = Boolean(isEditPage && editingCustomer && !embedded && canModify);
+
+    useEffect(() => {
+        if (!showBranchTransfer) return;
+        let cancelled = false;
+        authService.getBranchOptions()
+            .then((res) => {
+                if (!cancelled) setBranchOptions({ branches: res.data?.branches || [], activeBranchId: res.data?.activeBranchId || null });
+            })
+            .catch((err) => console.error('Failed to load branches', err));
+        return () => { cancelled = true; };
+    }, [showBranchTransfer]);
+
+    useEffect(() => { setTransferBranchId(''); }, [editingCustomer?._id]);
+
+    // The customer list only holds the selected branch's customers, so an entry loaded without its
+    // branch (an older cached list) belongs to the active branch.
+    const currentBranchId = String(editingCustomer?.branchId?._id || editingCustomer?.branchId || branchOptions.activeBranchId || '');
+    const branchNameOf = (id) => {
+        const branch = branchOptions.branches.find((b) => String(b._id) === String(id));
+        return branch ? (branch.name || branch.code) : '';
+    };
+    const currentBranchName = currentBranchId ? (branchNameOf(currentBranchId) || 'A branch outside your access') : 'No branch';
+    const transferTargets = branchOptions.branches.filter((b) => String(b._id) !== currentBranchId);
+
+    const handleBranchTransfer = async () => {
+        if (!editingCustomer || !transferBranchId || isTransferring) return;
+        const name = editingCustomer.companyName || editingCustomer.customerName || 'this customer';
+        const targetName = branchNameOf(transferBranchId) || 'the selected branch';
+        const ok = window.confirm(
+            `Move ${name} from ${currentBranchName} to ${targetName}?\n\n`
+            + 'Only the customer moves. Its invoices, quotations, serial numbers and other records stay in the branch they were made in.\n'
+            + 'Other changes on this screen are not saved by the move: use Commit Changes first.'
+        );
+        if (!ok) return;
+        setIsTransferring(true);
+        try {
+            const res = await customerService.transferBranch(editingCustomer._id, transferBranchId);
+            invalidateApiCache('/customers');
+            toast.success(res.data?.message || `Customer moved to ${targetName}.`, { autoClose: 7000 });
+            setIsModalOpen(false);
+            navigate('/customers');
+            fetchCustomers();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'The customer could not be moved.');
+        } finally {
+            setIsTransferring(false);
+        }
+    };
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -779,6 +833,51 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
                                 </button>
                             </div>
                         </div>
+
+                        {/* Branch: current branch and Transfer to Branch (edit only, Customers Modify) */}
+                        {showBranchTransfer && (
+                            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                                <h4 className="text-[10px] font-black text-primary-600 uppercase tracking-[0.2em] mb-5 flex items-center gap-3">
+                                    <span className="h-px flex-1 bg-primary-100"></span>
+                                    Branch
+                                    <span className="h-px flex-1 bg-primary-100"></span>
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-4 md:items-end">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Current Branch</label>
+                                        <div className="w-full px-4 py-3.5 bg-slate-100 border border-slate-200 rounded-2xl text-sm font-bold text-slate-700">
+                                            {currentBranchName}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label htmlFor="customer-transfer-branch" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Transfer to Branch</label>
+                                        <select
+                                            id="customer-transfer-branch"
+                                            value={transferBranchId}
+                                            onChange={(e) => setTransferBranchId(e.target.value)}
+                                            disabled={isTransferring || transferTargets.length === 0}
+                                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold disabled:opacity-60"
+                                        >
+                                            <option value="">{transferTargets.length ? 'Select the destination branch' : 'No other branch available'}</option>
+                                            {transferTargets.map((b) => (
+                                                <option key={b._id} value={b._id}>{b.name || b.code}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleBranchTransfer}
+                                        disabled={!transferBranchId || isTransferring}
+                                        className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {isTransferring ? 'Moving...' : 'Transfer'}
+                                    </button>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-3">
+                                    Moves this customer to the selected branch. Its invoices, quotations, serial numbers and other records stay in the branch they were made in. After the move the customer shows under the new branch only.
+                                </p>
+                            </div>
+                        )}
 
                         {/* Form Card Body */}
                         <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">

@@ -9,7 +9,8 @@ const {
     deleteCustomer,
     bulkDeleteCustomers,
     bulkUpdateCustomers,
-    checkDuplicateCustomer
+    checkDuplicateCustomer,
+    transferCustomerBranch
 } = require('../controllers/customerController');
 
 const {
@@ -52,6 +53,8 @@ router.get('/check-duplicate', protect, checkDuplicateCustomer);
 router.get('/:id/360', protect, getCustomer360Data);
 router.get('/:id', protect, getCustomerById);
 router.put('/:id', protect, updateCustomer);
+// Customers Modify (config/apiPermissions.js: PATCH = modify); the new branch must be one the user may use.
+router.patch('/:id/branch', protect, transferCustomerBranch);
 router.delete('/:id', protect, deleteCustomer);
 
 module.exports = router;

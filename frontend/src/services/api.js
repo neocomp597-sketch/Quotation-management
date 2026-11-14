@@ -286,6 +286,8 @@ export const customerService = {
   bulkUpdate: (ids, updateData) =>
     api.patch("/customers/bulk-update", { ids, updateData }),
   checkDuplicate: (params) => api.get("/customers/check-duplicate", { params }),
+  // Customer Edit > Transfer to Branch: moves the customer only, not its invoices or other records.
+  transferBranch: (id, branchId) => api.patch(`/customers/${id}/branch`, { branchId }),
 };
 
 export const customerAnalyticsService = {
