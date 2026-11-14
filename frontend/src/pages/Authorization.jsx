@@ -23,7 +23,20 @@ const UNSAVED_CHANGES_MESSAGE = 'You have unsaved permission changes. Leave with
 const MATRIX_HINT = 'Module switch: off removes all access to the module; on gives View on all of its screens. Create, Modify and Delete are given separately and only on screens that can be viewed.';
 
 const Authorization = () => {
-    const { user: currentUser, isAdmin, isSuperAdmin, reloadPermissions } = useAuth();
+    const { user: currentUser, isAdmin, isSuperAdmin, reloadPermissions, hasAccess } = useAuth();
+    // Administrators, plus users an administrator gave the Authorization screen ("delegates").
+    // A delegate cannot change the Admin role, their own role, an administrator's login or their
+    // own login, and cannot give the Admin role; the server enforces the same limits.
+    const isDelegate = !isAdmin && !isSuperAdmin && hasAccess('admin_authorization');
+    const canManage = isAdmin || isSuperAdmin || isDelegate;
+    const isAdminLevelRole = (role) => ['admin', 'super_admin', 'superadmin'].includes(String(role || '').toLowerCase());
+    // Roles a delegate may not change, shown read-only with the reason.
+    const delegateLockReason = (roleKey) => {
+        if (!isDelegate) return '';
+        if (isAdminLevelRole(roleKey)) return 'Only an administrator can change this role';
+        if (roleKey === currentUser?.role) return 'Your own role: ask an administrator to change it';
+        return '';
+    };
 
     const [activeTab, setActiveTab] = useState('roles'); // 'roles' | 'team' | 'vendors'
     const [roles, setRoles] = useState([]);
@@ -85,7 +98,10 @@ const Authorization = () => {
         try {
             const params = companyId ? { companyId } : {};
             const res = await authorizationService.getAll(params);
-            setRoles(res.data.roles || []);
+            setRoles((res.data.roles || []).map((role) => {
+                const lockReason = delegateLockReason(role.role);
+                return lockReason ? { ...role, locked: true, lockReason } : role;
+            }));
             setMenuGroups(res.data.menuGroups || []);
             setPermissionActions(res.data.permissionActions || {});
         } catch (err) {
@@ -175,13 +191,14 @@ const Authorization = () => {
 
     // Load matrix, users, and vendors
     useEffect(() => {
-        if (!isAdmin && !isSuperAdmin) return;
+        if (!canManage) return;
         if (isSuperAdmin && !selectedCompanyId) return;
 
         (async () => {
             setLoading(true);
             const params = selectedCompanyId ? { companyId: selectedCompanyId } : {};
-            await authorizationService.initialize(params).catch(() => null);
+            // Resetting the role defaults is for administrators only.
+            if (!isDelegate) await authorizationService.initialize(params).catch(() => null);
             await Promise.all([
                 fetchMatrix(selectedCompanyId), 
                 fetchUsers(selectedCompanyId),
@@ -191,7 +208,7 @@ const Authorization = () => {
             ]);
             setLoading(false);
         })();
-    }, [isAdmin, isSuperAdmin, selectedCompanyId]);
+    }, [canManage, isDelegate, isSuperAdmin, selectedCompanyId]);
 
     const roleByKey = useMemo(() => Object.fromEntries(roles.map((role) => [role.role, role])), [roles]);
 
@@ -238,7 +255,7 @@ const Authorization = () => {
         };
     }, [hasUnsavedChanges]);
 
-    if (!isAdmin && !isSuperAdmin) return <Navigate to="/dashboard" replace />;
+    if (!canManage) return <Navigate to="/dashboard" replace />;
 
     const confirmDiscardChanges = () => !hasUnsavedChanges || window.confirm(UNSAVED_CHANGES_MESSAGE);
 
@@ -690,6 +707,13 @@ const Authorization = () => {
                 </div>
             </header>
 
+            {isDelegate && (
+                <p className="flex items-start gap-2 text-xs font-semibold text-primary-800 dark:text-primary-200 bg-primary-50 dark:bg-primary-950/40 border border-primary-100 dark:border-primary-800 rounded-xl px-3 py-2">
+                    <MdLock size={16} className="mt-0.5 shrink-0" />
+                    <span>An administrator gave you Authorization. You can change roles and users, except the Admin role, your own role, administrators&apos; logins and your own login.</span>
+                </p>
+            )}
+
             {loading ? (
                 <div className="py-20 text-center">
                     <div className="animate-spin w-8 h-8 border-2 border-slate-200 dark:border-slate-700 border-t-primary-600 rounded-full mx-auto" />
@@ -776,7 +800,7 @@ const Authorization = () => {
                                                     <div>
                                                         <div className="flex items-center gap-2">
                                                             <h3 className="text-base font-black text-slate-900 dark:text-white">{role.label}</h3>
-                                                            {role.locked && <MdLock className="text-slate-400 dark:text-slate-500" size={14} title="Standard System Role" />}
+                                                            {role.locked && <MdLock className="text-slate-400 dark:text-slate-500" size={14} title={role.lockReason || 'Standard System Role'} />}
                                                             {busy && <span className="text-[10px] text-primary-600 dark:text-primary-400 font-bold animate-pulse ml-1">Saving...</span>}
                                                             {!busy && isDirty && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold ml-1">Unsaved changes</span>}
                                                             {!busy && !isDirty && status === 'saved' && <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold ml-1">Saved</span>}
@@ -859,7 +883,7 @@ const Authorization = () => {
                                                     )}
                                                     {role.locked && (
                                                         <div className="flex-1 py-2 text-center text-slate-400 dark:text-slate-500 text-xs font-bold">
-                                                            Built-in Standard Role
+                                                            {role.lockReason || 'Built-in Standard Role'}
                                                         </div>
                                                     )}
                                                 </div>
@@ -918,6 +942,9 @@ const Authorization = () => {
                                     ) : (
                                         filteredTeamUsers.map((user) => {
                                         const isMe = currentUser?.id === user._id;
+                                        // A delegate (see isDelegate) cannot change an administrator's login or their own.
+                                        const isDelegateLocked = isDelegate && (isMe || isAdminLevelRole(user.role));
+                                        const isLockedRow = isMe || isDelegateLocked;
                                         const isUpdating = updatingUserId === user._id;
                                         const isEditing = editingUserId === user._id;
                                         const isUserExpanded = expandedUserCards[user._id] ?? false;
@@ -967,11 +994,11 @@ const Authorization = () => {
                                                         <label className="block text-[10px] font-bold uppercase text-primary-600 dark:text-primary-400 mb-1">Role</label>
                                                         <select 
                                                             value={editingUserData.role} 
-                                                            disabled={isMe || isUpdating}
+                                                            disabled={isLockedRow || isUpdating}
                                                             onChange={(e) => setEditingUserData(prev => ({...prev, role: e.target.value}))}
                                                             className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-primary-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-900 dark:text-slate-100 outline-none focus:border-primary-500 disabled:opacity-50 cursor-pointer"
                                                         >
-                                                            {roles.map(r => (
+                                                            {roles.filter((r) => !isDelegate || !isAdminLevelRole(r.role) || r.role === user.role).map(r => (
                                                                 <option key={r.role} value={r.role}>{r.label}</option>
                                                             ))}
                                                         </select>
@@ -1033,11 +1060,11 @@ const Authorization = () => {
                                                         <div>
                                                             <select 
                                                                 value={user.role} 
-                                                                disabled={isMe || isUpdating}
+                                                                disabled={isLockedRow || isUpdating}
                                                                 onChange={(e) => handleUserRoleChange(user._id, e.target.value)}
                                                                 className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-primary-600 disabled:opacity-50 transition-colors cursor-pointer"
                                                             >
-                                                                {roles.map(r => (
+                                                                {roles.filter((r) => !isDelegate || !isAdminLevelRole(r.role) || r.role === user.role).map(r => (
                                                                     <option key={r.role} value={r.role}>{r.label}</option>
                                                                 ))}
                                                             </select>
@@ -1063,6 +1090,7 @@ const Authorization = () => {
 
                                                         {/* Actions */}
                                                         <div className="flex items-center gap-1">
+                                                            {!isDelegateLocked && (<>
                                                             <button 
                                                                 onClick={() => {
                                                                     setPasswordModalUser(user);
@@ -1083,7 +1111,8 @@ const Authorization = () => {
                                                             >
                                                                 <MdEdit size={18} />
                                                             </button>
-                                                            {!isMe && (
+                                                            </>)}
+                                                            {!isLockedRow && (
                                                                 <button 
                                                                     onClick={() => handleDeleteUser(user._id)}
                                                                     disabled={isUpdating}
@@ -1112,7 +1141,7 @@ const Authorization = () => {
                                                                     {MATRIX_HINT} Screens shown in amber differ from the role.
                                                                 </p>
                                                             </div>
-                                                            {hasCustomOverrides && !isMe && (
+                                                            {hasCustomOverrides && !isLockedRow && (
                                                                 <button
                                                                     onClick={() => handleResetUserPermissions(user._id)}
                                                                     disabled={isUpdating}
@@ -1123,6 +1152,11 @@ const Authorization = () => {
                                                             )}
                                                         </div>
 
+                                                        {isDelegateLocked && !isMe && (
+                                                            <div className="flex items-center gap-2 text-xs font-semibold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2">
+                                                                <MdLock size={16} /> Only an administrator can change an administrator's login.
+                                                            </div>
+                                                        )}
                                                         {isMe && (
                                                             <div className="flex items-center gap-2 text-xs font-semibold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2">
                                                                 <MdLock size={16} /> You cannot change your own permissions. Another administrator can change them for you.
@@ -1154,7 +1188,7 @@ const Authorization = () => {
                                                                     expanded={isGroupExpanded(`user-${user._id}`, group.key)}
                                                                     onToggleExpand={() => toggleGroupAccordion(`user-${user._id}`, group.key)}
                                                                     onChange={(next) => setUserDrafts((prev) => ({ ...prev, [user._id]: next }))}
-                                                                    disabled={isMe || isUpdating}
+                                                                    disabled={isLockedRow || isUpdating}
                                                                 />
                                                             ))}
                                                         </div>
@@ -1163,7 +1197,7 @@ const Authorization = () => {
                                                             user={user}
                                                             options={mgrOptions}
                                                             params={companyParams()}
-                                                            disabled={isMe || isUpdating}
+                                                            disabled={isLockedRow || isUpdating}
                                                             onSaved={(ids) => setUsers((prev) => prev.map((u) => (u._id === user._id ? { ...u, mgrAccess: ids } : u)))}
                                                         />
 

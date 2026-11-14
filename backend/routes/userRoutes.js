@@ -1,9 +1,24 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController'); // Ensure you have this controller or remove if not needed yet
-const { protect, admin } = require('../middlewares/authMiddleware');
+const { protect, superAdmin } = require('../middlewares/authMiddleware');
+// Administrators, and users an administrator gave the Authorization screen (with limits).
+const { authorizationManager, guardDelegateUser } = require('../middlewares/authorizationAccess');
+const manageUsers = [authorizationManager, guardDelegateUser];
 
-router.get('/seed-employees-admin', async (req, res) => {
+// One-time setup tool: imports employees from Excel files on the server's disk, syncs logins and
+// rewrites the Admin role of the company. Switched off (answers 404) unless the server sets
+// ENABLE_SEED_EMPLOYEES_ADMIN=true, and then only for a signed-in platform super admin
+// (401 without a login, 403 for anyone else). Every run is logged with who ran it.
+const seedEmployeesAdminEnabled = (req, res, next) => (
+    String(process.env.ENABLE_SEED_EMPLOYEES_ADMIN || '').toLowerCase() === 'true'
+        ? next()
+        : res.status(404).json({ message: 'Not found' })
+);
+
+router.get('/seed-employees-admin', seedEmployeesAdminEnabled, protect, superAdmin, async (req, res) => {
+    const startedAt = new Date();
+    console.log(`[seed-employees-admin] started by ${req.user?.email || req.user?.id} at ${startedAt.toISOString()}`);
     try {
         const XLSX = require('xlsx');
         const fs = require('fs');
@@ -150,6 +165,25 @@ router.get('/seed-employees-admin', async (req, res) => {
             { upsert: true, returnDocument: 'after' }
         ) : null;
 
+        console.log(`[seed-employees-admin] finished for company ${companyId || 'none'}: ${totalCreated} created, ${totalUpdated} updated, admin role ${rolePermission ? 'rewritten' : 'unchanged'}`);
+        if (companyId) {
+            try {
+                const PlatformAuditLog = require('../models/PlatformAuditLog');
+                await PlatformAuditLog.create({
+                    actorId: req.user.id,
+                    actorEmail: req.user.email,
+                    action: 'SEED_EMPLOYEES_ADMIN',
+                    targetType: 'Company',
+                    targetId: companyId,
+                    nextState: { totalCreated, totalUpdated, files, adminPermissionsUpdated: Boolean(rolePermission), startedAt },
+                    ipAddress: req.ip,
+                    userAgent: req.headers['user-agent']
+                });
+            } catch (auditError) {
+                console.error('[seed-employees-admin] audit entry not recorded:', auditError.message);
+            }
+        }
+
         res.json({
             success: true,
             message: 'Employee import and Admin permissions successfully initialized',
@@ -164,7 +198,7 @@ router.get('/seed-employees-admin', async (req, res) => {
         });
     } catch (err) {
         console.error('Error in seed-employees-admin:', err);
-        res.status(500).json({ success: false, error: err.message, stack: err.stack });
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 
@@ -173,16 +207,16 @@ router.get('/', protect, userController.getAllUsers);
 router.get('/activity', protect, userController.getUserActivity);
 router.get('/activity/export', protect, userController.exportUserActivity);
 router.get('/activity/:id', protect, userController.getUserActivityById);
-router.post('/', protect, admin, userController.createUser);
+router.post('/', protect, manageUsers, userController.createUser);
 router.get('/note', protect, userController.getUserNote);
 router.put('/note', protect, userController.updateUserNote);
 router.put('/profile', protect, userController.updateUserProfile);
-router.put('/:id', protect, admin, userController.updateUser);
-router.put('/:id/permissions', protect, admin, userController.updateUserPermissions);
-router.put('/:id/mgr-access', protect, admin, userController.updateUserMgrAccess);
-router.get('/:id/mgr-access/hidden-serials', protect, admin, userController.getUserMgrHiddenSerials);
-router.put('/:id/branches', protect, admin, userController.updateUserBranches);
-router.patch('/:id/role', protect, admin, userController.updateUserRole);
-router.delete('/:id', protect, admin, userController.deleteUser);
+router.put('/:id', protect, manageUsers, userController.updateUser);
+router.put('/:id/permissions', protect, manageUsers, userController.updateUserPermissions);
+router.put('/:id/mgr-access', protect, manageUsers, userController.updateUserMgrAccess);
+router.get('/:id/mgr-access/hidden-serials', protect, authorizationManager, userController.getUserMgrHiddenSerials);
+router.put('/:id/branches', protect, manageUsers, userController.updateUserBranches);
+router.patch('/:id/role', protect, manageUsers, userController.updateUserRole);
+router.delete('/:id', protect, manageUsers, userController.deleteUser);
 
 module.exports = router;
