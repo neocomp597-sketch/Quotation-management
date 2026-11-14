@@ -44,6 +44,9 @@ export const readAsDataUrl = (blob) => new Promise((resolve, reject) => {
     reader.readAsDataURL(blob);
 });
 
+/** The link of an uploaded image from POST /upload/image, which answers `imageUrl`; '' when none. */
+export const uploadedImageUrl = (res) => res?.data?.url || res?.data?.imageUrl || '';
+
 /** A photo too large to keep in the visit when its upload failed; `message` is for the user. */
 export class PhotoUploadError extends Error {}
 
@@ -61,8 +64,7 @@ export const attachProductPhoto = async (file, { compress, upload, toDataUrl = r
     const photo = await Promise.resolve().then(() => compress(file)).catch(() => file);
     let uploadError = null;
     try {
-        const res = await upload(photo);
-        const photoUrl = res?.data?.url || res?.data?.imageUrl;
+        const photoUrl = uploadedImageUrl(await upload(photo));
         if (photoUrl) return { photo: photoUrl, uploaded: true };
     } catch (err) {
         uploadError = err;

@@ -3,8 +3,23 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
     pickVisitMedia, describeLoadError, ticketOptionLabel, mergeTickets,
-    attachProductPhoto, PhotoUploadError, MAX_INLINE_PHOTO_BYTES
+    attachProductPhoto, PhotoUploadError, MAX_INLINE_PHOTO_BYTES, uploadedImageUrl
 } from './serviceVisits.js';
+
+describe('uploadedImageUrl', () => {
+    test('reads `imageUrl`, which POST /upload/image answers', () => {
+        assert.equal(uploadedImageUrl({ data: { success: true, message: 'ok', imageUrl: 'https://cdn/a.jpg' } }), 'https://cdn/a.jpg');
+    });
+
+    test('also reads `url`', () => {
+        assert.equal(uploadedImageUrl({ data: { url: 'https://cdn/b.jpg' } }), 'https://cdn/b.jpg');
+    });
+
+    test("'' when the reply carries no link", () => {
+        assert.equal(uploadedImageUrl({ data: { success: true } }), '');
+        assert.equal(uploadedImageUrl(undefined), '');
+    });
+});
 
 describe('pickVisitMedia', () => {
     test('a visit from the list carries no photo or signature', () => {

@@ -10,7 +10,7 @@ import {
     MdFeedback, MdArrowBack, MdSave, 
     MdWarning, MdCheckCircleOutline, MdCheckCircle, MdChat,
     MdMyLocation, MdLocationOn, MdStar, MdStarBorder, MdMap, MdOpenInNew,
-    MdPhotoCamera, MdCloudUpload, MdDelete, MdAssignmentTurnedIn,
+    MdPhotoCamera, MdPhotoLibrary, MdCloudUpload, MdDelete, MdAssignmentTurnedIn,
     MdZoomIn, MdClose, MdFileDownload, MdEdit, MdPrint
 } from 'react-icons/md';
 import { openCallSheetWindow, printTicketCallSheet } from '../utils/ticketCallSheet';
@@ -20,6 +20,9 @@ import usePermission from '../hooks/usePermission';
 import { useAuth } from '../context/AuthContext';
 import DateInput from '../components/DateInput';
 import SearchableSelect from '../components/SearchableSelect';
+import PhotoPickButton from '../components/PhotoPickButton';
+import compressImage from '../utils/compressImage';
+import { PRODUCT_PHOTO_MAX_SIDE, uploadedImageUrl, describeLoadError } from '../utils/serviceVisits';
 
 const parseDescriptionAndImages = (rawDesc = '') => {
     if (!rawDesc) return { text: '', images: [] };
@@ -277,23 +280,41 @@ const TicketDetail = () => {
         if (!file) return;
         setUploadingCloseImage(true);
         try {
-            const res = await uploadService.uploadImage(file);
-            setCloseProductImage(res.data.url);
+            // A phone photo, from the camera or the gallery, is often over the 5 MB upload limit
+            const photo = await compressImage(file, PRODUCT_PHOTO_MAX_SIDE, PRODUCT_PHOTO_MAX_SIDE, 0.75).catch(() => file);
+            // The upload answers `imageUrl`; reading only `url` left the image empty after a "successful" upload
+            const url = uploadedImageUrl(await uploadService.uploadImage(photo));
+            if (!url) {
+                toast.error('Failed to upload product image: the server returned no image link.');
+                return;
+            }
+            setCloseProductImage(url);
             toast.success('Product image uploaded successfully');
         } catch (err) {
-            toast.error('Failed to upload product image');
+            toast.error(`Failed to upload product image: ${describeLoadError(err)}`);
         } finally {
             setUploadingCloseImage(false);
         }
     };
 
+    const handlePickCloseImage = (e) => {
+        const file = e.target.files?.[0];
+        // Lets the same photo be picked again after a failed attempt
+        e.target.value = '';
+        if (file) handleUploadCloseImage(file);
+    };
+
     const handleUploadRcaImage = async (file) => {
         if (!file) return;
         try {
-            const res = await uploadService.uploadImage(file);
+            const url = uploadedImageUrl(await uploadService.uploadImage(file));
+            if (!url) {
+                toast.error('Failed to upload RCA image: the server returned no image link.');
+                return;
+            }
             setRcaForm(prev => ({
                 ...prev,
-                rcaImages: [...prev.rcaImages, res.data.url]
+                rcaImages: [...prev.rcaImages, url]
             }));
             toast.success('RCA Image attached');
         } catch (err) {
@@ -2253,25 +2274,30 @@ const TicketDetail = () => {
                             <span>Product Image Attachment * (Mandatory)</span>
                             {!closeProductImage && <span className="text-rose-500 font-bold">Required</span>}
                         </label>
-                        <div className="flex items-center gap-3">
-                            <label className="cursor-pointer px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <PhotoPickButton
+                                fromCamera
+                                disabled={uploadingCloseImage}
+                                onChange={handlePickCloseImage}
+                                className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0"
+                            >
                                 <MdPhotoCamera size={16} />
-                                {uploadingCloseImage ? 'Uploading...' : 'Upload Image'}
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    capture="environment"
-                                    className="hidden"
-                                    disabled={uploadingCloseImage}
-                                    onChange={(e) => e.target.files?.[0] && handleUploadCloseImage(e.target.files[0])}
-                                />
-                            </label>
+                                {uploadingCloseImage ? 'Uploading...' : 'Take Photo'}
+                            </PhotoPickButton>
+                            <PhotoPickButton
+                                disabled={uploadingCloseImage}
+                                onChange={handlePickCloseImage}
+                                className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0"
+                            >
+                                <MdPhotoLibrary size={16} />
+                                Upload from Gallery
+                            </PhotoPickButton>
                             <input
                                 type="text"
                                 placeholder="Or paste Product Image URL..."
                                 value={closeProductImage}
                                 onChange={(e) => setCloseProductImage(e.target.value)}
-                                className="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-xl outline-none focus:border-emerald-600 font-medium"
+                                className="flex-1 min-w-[12rem] px-3 py-2 text-xs border border-slate-200 rounded-xl outline-none focus:border-emerald-600 font-medium"
                             />
                         </div>
                         {closeProductImage && (

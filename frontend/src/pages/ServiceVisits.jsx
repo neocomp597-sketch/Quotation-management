@@ -4,7 +4,7 @@ import { formatDate, formatDateTime } from '../utils/helpers';
 import { toast } from 'react-toastify';
 import {
     MdLocalShipping, MdMyLocation, MdCheckCircle,
-    MdEvent, MdDelete, MdAdd, MdCalendarMonth, MdPhotoCamera,
+    MdEvent, MdDelete, MdAdd, MdCalendarMonth, MdPhotoCamera, MdPhotoLibrary,
     MdMap, MdOpenInNew, MdSearch, MdClose, MdExpandMore, MdBuild, MdInventory2, MdEdit, MdPushPin,
     MdRefresh, MdArrowBack
 } from 'react-icons/md';
@@ -14,6 +14,7 @@ import DateInput from '../components/DateInput';
 import usePermission from '../hooks/usePermission';
 import compressImage from '../utils/compressImage';
 import SearchableSelect from '../components/SearchableSelect';
+import PhotoPickButton from '../components/PhotoPickButton';
 import {
     pickVisitMedia, describeLoadError, TICKET_OPTIONS_LIMIT, ticketOptionLabel, mergeTickets,
     PRODUCT_PHOTO_MAX_SIDE, attachProductPhoto, PhotoUploadError
@@ -1330,14 +1331,27 @@ const ServiceVisits = () => {
                                          {productPhoto ? (
                                              <div className="relative p-2.5 bg-slate-50 border-2 border-dashed border-teal-300 rounded-2xl flex flex-col items-center justify-center space-y-2">
                                                  <img src={productPhoto} alt="Product Photo" className="max-h-40 rounded-xl object-contain shadow-xs" />
-                                                 <div className="flex items-center gap-2">
-                                                     <label className="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold cursor-pointer transition-all shadow-xs">
-                                                         Change Photo
-                                                         <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} className="hidden" />
-                                                     </label>
-                                                     <button 
-                                                         type="button" 
-                                                         onClick={() => setProductPhoto('')} 
+                                                 <div className="flex flex-wrap items-center justify-center gap-2">
+                                                     <PhotoPickButton
+                                                         fromCamera
+                                                         disabled={uploadingPhoto}
+                                                         onChange={handlePhotoChange}
+                                                         className="inline-flex items-center gap-1 px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs"
+                                                     >
+                                                         <MdPhotoCamera size={14} />
+                                                         Retake
+                                                     </PhotoPickButton>
+                                                     <PhotoPickButton
+                                                         disabled={uploadingPhoto}
+                                                         onChange={handlePhotoChange}
+                                                         className="inline-flex items-center gap-1 px-3 py-1 bg-white hover:bg-teal-50 text-teal-700 border border-teal-300 rounded-lg text-xs font-bold transition-all shadow-xs"
+                                                     >
+                                                         <MdPhotoLibrary size={14} />
+                                                         Gallery
+                                                     </PhotoPickButton>
+                                                     <button
+                                                         type="button"
+                                                         onClick={() => setProductPhoto('')}
                                                          className="px-3 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-xs font-bold transition-all"
                                                      >
                                                          Remove
@@ -1345,22 +1359,40 @@ const ServiceVisits = () => {
                                                  </div>
                                              </div>
                                          ) : (
-                                             <label className="border-2 border-dashed border-slate-200 hover:border-teal-500 bg-slate-50/70 hover:bg-teal-50/30 rounded-2xl p-5 flex flex-col items-center justify-center cursor-pointer transition-all group text-center">
-                                                 <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} className="hidden" />
-                                                 <div className="w-12 h-12 bg-white rounded-2xl border border-slate-200 shadow-xs flex items-center justify-center text-slate-400 group-hover:text-teal-600 group-hover:border-teal-300 transition-all mb-2">
+                                             <div className="border-2 border-dashed border-slate-200 bg-slate-50/70 rounded-2xl p-5 flex flex-col items-center justify-center text-center">
+                                                 <div className="w-12 h-12 bg-white rounded-2xl border border-slate-200 shadow-xs flex items-center justify-center text-slate-400 mb-2">
                                                      {uploadingPhoto ? (
                                                          <div className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin"></div>
                                                      ) : (
                                                          <MdPhotoCamera size={26} />
                                                      )}
                                                  </div>
-                                                 <span className="text-xs font-black text-slate-800 group-hover:text-teal-800">
+                                                 <span className="text-xs font-black text-slate-800">
                                                      {uploadingPhoto ? 'Uploading Photo...' : 'Upload Photo'}
                                                  </span>
                                                  <span className="text-[10px] text-slate-400 font-semibold mt-0.5">
-                                                     Take photo of finished product
+                                                     Take a photo of the finished product or pick one from the gallery
                                                  </span>
-                                             </label>
+                                                 <div className="mt-3 w-full max-w-sm flex flex-col sm:flex-row gap-2">
+                                                     <PhotoPickButton
+                                                         fromCamera
+                                                         disabled={uploadingPhoto}
+                                                         onChange={handlePhotoChange}
+                                                         className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm active:scale-95"
+                                                     >
+                                                         <MdPhotoCamera size={16} />
+                                                         Take Photo
+                                                     </PhotoPickButton>
+                                                     <PhotoPickButton
+                                                         disabled={uploadingPhoto}
+                                                         onChange={handlePhotoChange}
+                                                         className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white hover:bg-teal-50 text-teal-700 border border-teal-300 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm active:scale-95"
+                                                     >
+                                                         <MdPhotoLibrary size={16} />
+                                                         Upload from Gallery
+                                                     </PhotoPickButton>
+                                                 </div>
+                                             </div>
                                          )}
                                      </div>
 
