@@ -8,6 +8,11 @@ const { getTicketMgrCondition } = require('./ticketController');
 // A ticket's customer and serial can belong to another branch than the visit list's.
 const CROSS_BRANCH = { bypassBranch: true };
 
+// The product photo and customer signature are stored inline as base64 images (a photo whose upload
+// failed is several MB), and every re-open keeps a copy of both. Sent for every visit, they made the
+// list too large to load in time. The list leaves them out; GET /visits/:id returns them for one visit.
+const VISIT_LIST_EXCLUDE = '-productPhoto -customerSignature -completionHistory';
+
 const generateVisitNumber = async (companyId) => {
     const year = new Date().getFullYear();
     const prefix = 'VST';
@@ -125,6 +130,7 @@ exports.getVisits = async (req, res) => {
         // A visit lives in its ticket's branch: the list holds the visits of the branch selected
         // in the header (tenantPlugin). An older visit with no branch still shows its ticket.
         const visits = await ServiceVisit.find(filter)
+            .select(VISIT_LIST_EXCLUDE)
             .populate({
                 path: 'ticketId',
                 select: 'ticketNo issueTitle customerId status invoiceId manualInvoiceNo assetId pincode',

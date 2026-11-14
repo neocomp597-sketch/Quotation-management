@@ -20,6 +20,21 @@ const visitStatusClass = (status) => (
     'bg-slate-50 text-slate-500 border-slate-200'
 );
 
+// The visits list leaves out the product photo and customer signature (large inline images);
+// the open visit loads them from GET /csm/visits/:id.
+const VISIT_MEDIA_FIELDS = ['productPhoto', 'customerSignature'];
+const pickVisitMedia = (visit) => Object.fromEntries(
+    VISIT_MEDIA_FIELDS.filter((field) => visit && field in visit).map((field) => [field, visit[field]])
+);
+
+// Why a request failed, for when the server's reply carries no message of its own
+const describeLoadError = (error) => {
+    if (error.response?.data?.message) return error.response.data.message;
+    if (error.code === 'ECONNABORTED') return 'The server took too long to respond. Please retry.';
+    if (error.response) return `The server returned an error (${error.response.status}). Please retry.`;
+    return 'Could not reach the server. Check the connection and retry.';
+};
+
 const VisitInfoField = ({ label, value }) => (
     <div className="min-w-0">
         <dt className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</dt>
@@ -325,12 +340,18 @@ const ServiceVisits = () => {
             const data = Array.isArray(res.data) ? res.data : (res.data?.data || []);
             setVisits(data);
             setLoadError('');
-            // Keep the open workspace on the same visit, refreshed from the populated list
-            setSelectedVisit((prev) => (prev ? data.find((v) => v._id === prev._id) || prev : prev));
+            // Keep the open workspace on the same visit, refreshed from the populated list,
+            // with the photo and signature it already loaded (the list doesn't carry them)
+            setSelectedVisit((prev) => {
+                if (!prev) return prev;
+                const fresh = data.find((v) => v._id === prev._id);
+                return fresh ? { ...fresh, ...pickVisitMedia(prev) } : prev;
+            });
             return data;
         } catch (error) {
-            setLoadError(error.response?.data?.message || 'Failed to load visits');
-            toast.error('Failed to load visits');
+            const reason = describeLoadError(error);
+            setLoadError(reason);
+            toast.error(`Failed to load visits: ${reason}`);
             return [];
         } finally {
             setLoading(false);
@@ -361,6 +382,28 @@ const ServiceVisits = () => {
         setRescheduleTicketType(selectedVisit.ticketType || '');
         setShowRescheduleModal(true);
     };
+
+    // A completed visit shows its product photo and customer signature: load them for this visit
+    // when it came from the list without them. Runs once per visit, also when the load fails.
+    const mediaVisitId = selectedVisit?.status === 'Completed' && !('productPhoto' in selectedVisit)
+        ? selectedVisit._id
+        : null;
+    useEffect(() => {
+        if (!mediaVisitId) return;
+        let cancelled = false;
+        csmService.getVisitById(mediaVisitId)
+            .then((res) => {
+                if (cancelled) return;
+                const media = { productPhoto: '', customerSignature: '', ...pickVisitMedia(res.data) };
+                setSelectedVisit((prev) => (prev && prev._id === mediaVisitId ? { ...prev, ...media } : prev));
+            })
+            .catch((error) => {
+                if (cancelled) return;
+                console.error('Failed to load visit photo and signature', error);
+                toast.error(`Could not load the visit photo and signature: ${describeLoadError(error)}`);
+            });
+        return () => { cancelled = true; };
+    }, [mediaVisitId]);
 
     // Back on the queue: bring the visit that was just open (or just scheduled) into view
     const isWorkspaceOpen = Boolean(selectedVisit);
