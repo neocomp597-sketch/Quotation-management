@@ -109,3 +109,14 @@ the rules, switched by `SERIAL_BRANCH_TRANSFER_ACCESS`:
 
 The Serial No List, Invoice Bulk Upload and the other Serial No Transfer tabs keep the
 normal active-branch scoping above, so a moved serial shows under its new branch.
+
+## Invoice Bulk Upload export of several branches
+
+`GET /api/csm/assets/export?branchIds=<id>,<id>` writes the entries of every listed branch
+into one Excel file (Branch Name column first). Each id must pass `canUseBranch` for the
+user (the branch switcher's rule: admins any branch of the company, others their Branch
+Access); one id outside it refuses the whole export (403, nothing written). The query then
+runs with `bypassBranch` and an explicit `branchId: { $in: ids }`. The screen's search,
+status and MGR filters and the user's MGR access apply to all branches. Without `branchIds`
+the export is the active branch only, with the old columns. More than `IBU_EXPORT_MAX_ROWS`
+(default 50,000) matching entries is refused with a message, never cut short.

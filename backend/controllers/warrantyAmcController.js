@@ -1126,15 +1126,171 @@ exports.getAssets = async (req, res) => {
     }
 };
 
-// Export all matching assets as Excel file
+// ── Excel export ──────────────────────────────────────────────────────────────
+
+// The columns of the Invoice Bulk Upload Excel export, in the order the screen and the import use.
+const ASSET_EXPORT_COLUMNS = [
+    { header: 'Serial Number', key: 'serialNumber', width: 22 },
+    { header: 'Product Name', key: 'productName', width: 35 },
+    { header: 'Product Code', key: 'productCode', width: 18 },
+    { header: 'Status', key: 'status', width: 14 },
+    { header: 'Customer Name', key: 'customer', width: 32 },
+    { header: 'Customer Code', key: 'customerCode', width: 16 },
+    { header: 'Division_Code', key: 'divisionCode', width: 16 },
+    { header: 'Division_Desc', key: 'divisionDesc', width: 22 },
+    { header: 'Segment_Code', key: 'segmentCode', width: 16 },
+    { header: 'Segment_Desc', key: 'segmentDesc', width: 22 },
+    { header: 'Customer Postal Code', key: 'customerPostalCode', width: 16 },
+    { header: 'Invoice Ref', key: 'invoiceNumber', width: 20 },
+    { header: 'Sale Date', key: 'saleDate', width: 15 },
+    { header: 'Location', key: 'location', width: 18 },
+    { header: 'Mgr 1', key: 'mgr1', width: 20 },
+    { header: 'Mgr 2', key: 'mgr2', width: 20 },
+    { header: 'Mgr 3', key: 'mgr3', width: 20 },
+    { header: 'Mgr 4', key: 'mgr4', width: 20 },
+    { header: 'Mgr 5', key: 'mgr5', width: 20 },
+    { header: 'Indicator_Field', key: 'indicatorField', width: 18 },
+    { header: 'Project Code', key: 'projectCode', width: 18 },
+    { header: 'Project Name', key: 'projectName', width: 25 }
+];
+
+// First column of an export that names its branches: the branch each entry belongs to. The import
+// does not read it (Location stays the branch field there), so the file can still be uploaded again.
+const BRANCH_NAME_COLUMN = { header: 'Branch Name', key: 'branchName', width: 20 };
+
+// Rows one export may hold. More is refused with a message rather than cut short. The screen's own
+// export stopped at 50,000 before it moved here.
+const ASSET_EXPORT_MAX_ROWS = Math.max(1, Number.parseInt(process.env.IBU_EXPORT_MAX_ROWS, 10) || 50000);
+const ASSET_EXPORT_MAX_BRANCHES = 100;
+const ASSET_EXPORT_SELECT = 'serialNumber productName productCode status customerCode customerNameStr customerPostalCode invoiceNumber saleDate invoiceDate location divisionId segmentId indicatorField projectCode projectName mgr1 mgr2 mgr3 mgr4 mgr5 productId customerId branchId';
+
+class ExportRequestError extends Error {
+    constructor(status, body) {
+        super(body.message);
+        this.status = status;
+        this.body = body;
+    }
+}
+
+/**
+ * The branch ids an export asks for, or null when it names none (the active branch is exported, as
+ * before). Accepts `branchIds` repeated, `branchIds[]`, or one comma-separated value; duplicates
+ * (in any letter case) count once.
+ */
+const requestedExportBranchIds = (query = {}) => {
+    const raw = query.branchIds !== undefined ? query.branchIds : query['branchIds[]'];
+    if (raw === undefined) return null;
+    const values = (Array.isArray(raw) ? raw : [raw])
+        .flatMap((value) => String(value ?? '').split(','))
+        .map((value) => value.trim())
+        .filter(Boolean);
+    if (!values.length) {
+        throw new ExportRequestError(400, { code: 'NO_BRANCH', message: 'Select at least one branch to export.' });
+    }
+    const malformed = values.filter((value) => !/^[a-f\d]{24}$/i.test(value));
+    if (malformed.length) {
+        throw new ExportRequestError(400, { code: 'INVALID_BRANCH', message: `Not a branch id: ${malformed.slice(0, 5).join(', ')}.` });
+    }
+    const ids = [...new Set(values.map((value) => value.toLowerCase()))];
+    if (ids.length > ASSET_EXPORT_MAX_BRANCHES) {
+        throw new ExportRequestError(400, { code: 'TOO_MANY_BRANCHES', message: `Select at most ${ASSET_EXPORT_MAX_BRANCHES} branches.` });
+    }
+    return ids;
+};
+
+/**
+ * Checks every requested branch against the branches this user may use (the same rule as the
+ * branch switcher: utils/branchScope canUseBranch) and returns their documents in the order asked.
+ * One branch outside the user's access refuses the whole export: nothing is left out silently.
+ */
+const authorizeExportBranches = async (req, companyId, ids) => {
+    const Branch = require('../models/Branch');
+    const { canUseBranch } = require('../utils/branchScope');
+    const branches = await Branch.find({ _id: { $in: ids }, companyId })
+        .select('name code')
+        .setOptions({ bypassTenant: true })
+        .lean();
+    const byId = new Map(branches.map((branch) => [String(branch._id), branch]));
+    const allowed = await Promise.all(ids.map((id) => canUseBranch(req.user, id, companyId)));
+    const refused = ids.filter((id, index) => !allowed[index] || !byId.has(id));
+    if (refused.length) {
+        const names = refused.map((id) => byId.get(id)?.name || id);
+        throw new ExportRequestError(403, {
+            code: 'BRANCH_NOT_ALLOWED',
+            message: `You do not have access to ${refused.length === 1 ? 'branch' : 'branches'} ${names.join(', ')}. Nothing was exported.`,
+            branchIds: refused
+        });
+    }
+    return ids.map((id) => byId.get(id));
+};
+
+// Invoice_Export_USGOAN_EPC_14-11-2026.xlsx; more than three branches: Invoice_Export_5_branches_14-11-2026.xlsx.
+const exportFileName = (branches, now = new Date()) => {
+    const ist = new Date(now.getTime() + 330 * 60000);
+    const date = [ist.getUTCDate(), ist.getUTCMonth() + 1].map((part) => String(part).padStart(2, '0')).join('-') + `-${ist.getUTCFullYear()}`;
+    const safe = (text) => String(text || '').trim().replace(/[^A-Za-z0-9-]+/g, '_').replace(/^_+|_+$/g, '') || 'Branch';
+    const label = branches.length > 3 ? `${branches.length}_branches` : branches.map((branch) => safe(branch.name || branch.code)).join('_');
+    return `Invoice_Export_${label}_${date}.xlsx`;
+};
+
+const assetExportRow = (asset, branchNames) => {
+    const prodName = asset.productId?.productName || asset.productName || '';
+    const prodCode = asset.productId?.productCode || asset.productCode || '';
+    // Blank when the entry has no customer, so the file can be filled in and uploaded again
+    // without creating a customer named after a placeholder.
+    const custName = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || asset.customerName || (asset.customerId ? 'Customer' : '');
+    const sDate = asset.saleDate || asset.invoiceDate;
+    return {
+        branchName: branchNames ? branchNames.get(String(asset.branchId)) || '' : undefined,
+        serialNumber: asset.serialNumber || '',
+        productName: prodName,
+        productCode: prodCode,
+        status: asset.status || 'IN_STOCK',
+        customerCode: asset.customerCode || asset.customerId?.externalCode || '',
+        customer: custName,
+        customerPostalCode: customerPostalCodeOf(asset),
+        invoiceNumber: asset.invoiceNumber || '',
+        saleDate: sDate ? formatDate(sDate, '') : '',
+        location: asset.location || '',
+        divisionCode: asset.divisionId?.code || '',
+        divisionDesc: asset.divisionId?.description || '',
+        segmentCode: asset.segmentId?.code || '',
+        segmentDesc: asset.segmentId?.description || '',
+        mgr1: asset.mgr1 || '',
+        mgr2: asset.mgr2 || '',
+        mgr3: asset.mgr3 || '',
+        mgr4: asset.mgr4 || '',
+        mgr5: asset.mgr5 || '',
+        indicatorField: asset.indicatorField || '',
+        projectCode: asset.projectCode || '',
+        projectName: asset.projectName || ''
+    };
+};
+
+/**
+ * GET /csm/assets/export - Invoice Bulk Upload entries as one Excel file.
+ *
+ * `branchIds` (repeated or comma-separated) exports those branches together, with a Branch Name
+ * column first; every id must be a branch this user may use, else nothing is exported (403).
+ * Without it the active branch is exported as before. The screen's filters apply to all of them:
+ * q (search), status, mgr1..mgr5, customerId, productId; so does the user's MGR access. The file
+ * is written row by row while the entries are read, so a large export does not sit in memory.
+ */
 exports.exportAssets = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
         if (!companyId) return res.status(401).json({ message: 'Authentication required: no company context found.' });
-        const branchId = req.user?.activeBranchId || req.user?.branchId;
+
+        const requestedIds = requestedExportBranchIds(req.query);
+        const branches = requestedIds ? await authorizeExportBranches(req, companyId, requestedIds) : null;
 
         const filter = { companyId };
-        if (branchId) filter.branchId = branchId;
+        if (branches) {
+            filter.branchId = { $in: branches.map((branch) => branch._id) };
+        } else {
+            const branchId = req.user?.activeBranchId || req.user?.branchId;
+            if (branchId) filter.branchId = branchId;
+        }
         const accessFilter = await mgrAccessCondition(req);
         if (accessFilter) filter.$and = [accessFilter];
         if (req.query.customerId) filter.customerId = req.query.customerId;
@@ -1145,40 +1301,7 @@ exports.exportAssets = async (req, res) => {
             .filter((field) => req.query[field] && mongoose.Types.ObjectId.isValid(req.query[field]));
         if (mgrFilters.length) {
             const productIds = await Product.find({ companyId, $and: mgrFilters.map((field) => ({ [field]: req.query[field] })) }).distinct('_id');
-            if (!productIds.length) {
-                const workbook = new ExcelJS.Workbook();
-                const sheet = workbook.addWorksheet('Invoice Bulk Upload');
-                sheet.columns = [
-                    { header: 'Serial Number', key: 'serialNumber', width: 22 },
-                    { header: 'Product Name', key: 'productName', width: 35 },
-                    { header: 'Product Code', key: 'productCode', width: 18 },
-                    { header: 'Status', key: 'status', width: 14 },
-                    { header: 'Customer Name', key: 'customer', width: 32 },
-                    { header: 'Customer Code', key: 'customerCode', width: 16 },
-                    { header: 'Division_Code', key: 'divisionCode', width: 16 },
-                    { header: 'Division_Desc', key: 'divisionDesc', width: 22 },
-                    { header: 'Segment_Code', key: 'segmentCode', width: 16 },
-                    { header: 'Segment_Desc', key: 'segmentDesc', width: 22 },
-                    { header: 'Customer Postal Code', key: 'customerPostalCode', width: 16 },
-                    { header: 'Invoice Ref', key: 'invoiceNumber', width: 20 },
-                    { header: 'Sale Date', key: 'saleDate', width: 15 },
-                    { header: 'Location', key: 'location', width: 18 },
-                    { header: 'Mgr 1', key: 'mgr1', width: 20 },
-                    { header: 'Mgr 2', key: 'mgr2', width: 20 },
-                    { header: 'Mgr 3', key: 'mgr3', width: 20 },
-                    { header: 'Mgr 4', key: 'mgr4', width: 20 },
-                    { header: 'Mgr 5', key: 'mgr5', width: 20 },
-                    { header: 'Indicator_Field', key: 'indicatorField', width: 18 },
-                    { header: 'Project Code', key: 'projectCode', width: 18 },
-                    { header: 'Project Name', key: 'projectName', width: 25 }
-                ];
-                sheet.getRow(1).font = { bold: true };
-                res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-                res.setHeader('Content-Disposition', 'attachment; filename="Invoice_Bulk_Upload.xlsx"');
-                res.setHeader('x-total-count', '0');
-                await workbook.xlsx.write(res);
-                return res.end();
-            }
+            // No product has those MGR values: the file holds the headings only.
             filter.productId = { $in: productIds };
         }
 
@@ -1186,94 +1309,72 @@ exports.exportAssets = async (req, res) => {
             filter.$or = await assetSearchConditions(companyId, req.query.q);
         }
 
-        const docs = await Asset.find(filter)
-            .select('serialNumber productName productCode status customerCode customerNameStr customerPostalCode invoiceNumber saleDate invoiceDate location divisionId segmentId indicatorField projectCode projectName mgr1 mgr2 mgr3 mgr4 mgr5 productId customerId')
+        // The branches were checked above; the tenant filter would otherwise narrow them to the
+        // active branch.
+        const queryOptions = branches ? { bypassBranch: true } : {};
+        const total = await Asset.countDocuments(filter).setOptions(queryOptions);
+        if (total > ASSET_EXPORT_MAX_ROWS) {
+            return res.status(413).json({
+                code: 'EXPORT_TOO_LARGE',
+                message: `${total.toLocaleString('en-IN')} entries match. One export can hold up to ${ASSET_EXPORT_MAX_ROWS.toLocaleString('en-IN')}: select fewer branches or narrow the filters.`,
+                total
+            });
+        }
+
+        const branchNames = branches ? new Map(branches.map((branch) => [String(branch._id), branch.name || branch.code || ''])) : null;
+        const filename = branches ? exportFileName(branches) : `Invoice_Bulk_Upload_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('x-total-count', String(total));
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, x-total-count');
+
+        const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ stream: res, useStyles: true });
+        const sheet = workbook.addWorksheet('Invoice Bulk Upload', { views: [{ state: 'frozen', ySplit: 1 }] });
+        sheet.columns = branches ? [BRANCH_NAME_COLUMN, ...ASSET_EXPORT_COLUMNS] : ASSET_EXPORT_COLUMNS;
+        sheet.getRow(1).font = { bold: true };
+        sheet.getRow(1).commit();
+
+        const cursor = Asset.find(filter)
+            .setOptions(queryOptions)
+            .select(ASSET_EXPORT_SELECT)
             .populate({ path: 'customerId', select: 'customerName companyName externalCode billingAddress pincode mobile', options: { bypassTenant: true } })
             .populate(productMgrPopulate())
             .populate(DIVISION_POPULATE)
             .populate(SEGMENT_POPULATE)
             .sort({ createdAt: -1, _id: -1 })
             .allowDiskUse(true)
-            .lean();
+            .lean()
+            .cursor({ batchSize: 500 });
 
-        const populatedDocs = applyProductMgrsToAll(docs);
-
-        const workbook = new ExcelJS.Workbook();
-        const sheet = workbook.addWorksheet('Invoice Bulk Upload');
-        sheet.columns = [
-            { header: 'Serial Number', key: 'serialNumber', width: 22 },
-            { header: 'Product Name', key: 'productName', width: 35 },
-            { header: 'Product Code', key: 'productCode', width: 18 },
-            { header: 'Status', key: 'status', width: 14 },
-            { header: 'Customer Name', key: 'customer', width: 32 },
-            { header: 'Customer Code', key: 'customerCode', width: 16 },
-            { header: 'Division_Code', key: 'divisionCode', width: 16 },
-            { header: 'Division_Desc', key: 'divisionDesc', width: 22 },
-            { header: 'Segment_Code', key: 'segmentCode', width: 16 },
-            { header: 'Segment_Desc', key: 'segmentDesc', width: 22 },
-            { header: 'Customer Postal Code', key: 'customerPostalCode', width: 16 },
-            { header: 'Invoice Ref', key: 'invoiceNumber', width: 20 },
-            { header: 'Sale Date', key: 'saleDate', width: 15 },
-            { header: 'Location', key: 'location', width: 18 },
-            { header: 'Mgr 1', key: 'mgr1', width: 20 },
-            { header: 'Mgr 2', key: 'mgr2', width: 20 },
-            { header: 'Mgr 3', key: 'mgr3', width: 20 },
-            { header: 'Mgr 4', key: 'mgr4', width: 20 },
-            { header: 'Mgr 5', key: 'mgr5', width: 20 },
-            { header: 'Indicator_Field', key: 'indicatorField', width: 18 },
-            { header: 'Project Code', key: 'projectCode', width: 18 },
-            { header: 'Project Name', key: 'projectName', width: 25 }
-        ];
-        sheet.getRow(1).font = { bold: true };
-        sheet.views = [{ state: 'frozen', ySplit: 1 }];
-
-        for (const asset of populatedDocs) {
-            const prodName = asset.productId?.productName || asset.productName || '';
-            const prodCode = asset.productId?.productCode || asset.productCode || '';
-            // Blank when the entry has no customer, so the file can be filled in and uploaded again
-            // without creating a customer named after a placeholder.
-            const custName = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || asset.customerName || (asset.customerId ? 'Customer' : '');
-            const sDate = asset.saleDate || asset.invoiceDate;
-
-            sheet.addRow({
-                serialNumber: asset.serialNumber || '',
-                productName: prodName,
-                productCode: prodCode,
-                status: asset.status || 'IN_STOCK',
-                customerCode: asset.customerCode || asset.customerId?.externalCode || '',
-                customer: custName,
-                customerPostalCode: customerPostalCodeOf(asset),
-                invoiceNumber: asset.invoiceNumber || '',
-                saleDate: sDate ? formatDate(sDate, '') : '',
-                location: asset.location || '',
-                divisionCode: asset.divisionId?.code || '',
-                divisionDesc: asset.divisionId?.description || '',
-                segmentCode: asset.segmentId?.code || '',
-                segmentDesc: asset.segmentId?.description || '',
-                mgr1: asset.mgr1 || '',
-                mgr2: asset.mgr2 || '',
-                mgr3: asset.mgr3 || '',
-                mgr4: asset.mgr4 || '',
-                mgr5: asset.mgr5 || '',
-                indicatorField: asset.indicatorField || '',
-                projectCode: asset.projectCode || '',
-                projectName: asset.projectName || ''
-            });
+        // Each entry once, however the read is batched.
+        const written = new Set();
+        try {
+            for await (const asset of cursor) {
+                const id = String(asset._id);
+                if (written.has(id)) continue;
+                written.add(id);
+                const row = assetExportRow(applyProductMgrs(asset), branchNames);
+                if (!branchNames) delete row.branchName;
+                sheet.addRow(row).commit();
+            }
+            sheet.commit();
+            await workbook.commit();
+        } catch (error) {
+            // Part of the file is already sent: break the download instead of ending it, so a
+            // failed read never reaches the user as a complete-looking file.
+            console.error('exportAssets stream error:', error);
+            res.destroy(error);
         }
-
-        const dateStr = new Date().toISOString().slice(0, 10);
-        const filename = `Invoice_Bulk_Upload_${dateStr}.xlsx`;
-
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        res.setHeader('x-total-count', String(populatedDocs.length));
-        await workbook.xlsx.write(res);
-        res.end();
     } catch (error) {
+        if (error instanceof ExportRequestError) return res.status(error.status).json(error.body);
         console.error('exportAssets error:', error);
+        if (res.headersSent) return res.destroy(error);
         res.status(500).json({ message: error.message || 'Error exporting assets' });
     }
 };
+
+exports.exportAssets.requestedExportBranchIds = requestedExportBranchIds;
+exports.exportAssets.exportFileName = exportFileName;
 
 exports.getAssetSummary = async (req, res) => {
     try {

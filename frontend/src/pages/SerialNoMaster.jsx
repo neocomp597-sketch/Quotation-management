@@ -11,6 +11,7 @@ import {
 import Modal from '../components/Modal';
 import ImportWizard from '../components/import/ImportWizard';
 import IbuUploadHistory from '../components/IbuUploadHistory';
+import { saveBlob } from '../components/import/importHelpers';
 import PaginationControls from '../components/PaginationControls';
 import { formatDate } from '../utils/helpers';
 import DateInput from '../components/DateInput';
@@ -91,6 +92,26 @@ const noCustomerLabel = (asset) => ((asset.status || 'IN_STOCK') === 'IN_STOCK' 
 // in and uploaded again does not create a customer named after a placeholder.
 const exportCustomerName = (asset) => asset.customerId?.companyName || asset.customerId?.customerName
     || asset.customerNameStr || asset.customerName || (asset.customerId ? 'Customer' : '');
+
+// File name of a branch export, the same one the server gives it: Invoice_Export_USGOAN_EPC_14-11-2026.xlsx,
+// or Invoice_Export_5_branches_14-11-2026.xlsx for more than three branches. Dates in India time.
+const branchExportFileName = (branches) => {
+    const ist = new Date(Date.now() + 330 * 60000);
+    const pad = (part) => String(part).padStart(2, '0');
+    const date = `${pad(ist.getUTCDate())}-${pad(ist.getUTCMonth() + 1)}-${ist.getUTCFullYear()}`;
+    const safe = (text) => String(text || '').trim().replace(/[^A-Za-z0-9-]+/g, '_').replace(/^_+|_+$/g, '') || 'Branch';
+    const label = branches.length > 3 ? `${branches.length}_branches` : branches.map((branch) => safe(branch.name || branch.code)).join('_');
+    return `Invoice_Export_${label}_${date}.xlsx`;
+};
+
+// The server's message for a failed download: its JSON answer arrives as a Blob.
+const downloadErrorMessage = async (err, fallback) => {
+    const data = err?.response?.data;
+    if (data instanceof Blob) {
+        try { return JSON.parse(await data.text()).message || fallback; } catch { return fallback; }
+    }
+    return data?.message || (err?.response ? fallback : 'The server could not be reached. Check your connection and try again.');
+};
 
 // A saved date as the 'YYYY-MM-DD' value of a date input, in the browser's own time zone.
 const toDateInputValue = (value) => {
@@ -194,6 +215,8 @@ const SerialNoMaster = () => {
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [activeTab, setActiveTab] = useState('active'); // 'active' | 'returns'
     const [isExporting, setIsExporting] = useState(false);
+    // Export dialog: the branches this login may use (GET /auth/branches) and the ones ticked.
+    const [exportDialog, setExportDialog] = useState({ open: false, loading: false, error: '', branches: [], selected: [] });
 
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedStatus, setSelectedStatus] = useState('ALL');
@@ -595,14 +618,44 @@ const SerialNoMaster = () => {
             return;
         }
 
-        // Active inventory: fetch ALL records from backend (bypassing page-size cap). The list stays
-        // on screen; the Export button shows the progress and ignores clicks until it finishes.
+        // Active inventory: ask which branches go in the file. Only branches this login may use are
+        // offered; the one on screen starts ticked.
         if (isExporting) return;
+        setExportDialog({ open: true, loading: true, error: '', branches: [], selected: [] });
+        try {
+            const res = await authService.getBranchOptions();
+            const branches = res.data?.branches || [];
+            const current = String(activeBranchId || res.data?.activeBranchId || '');
+            setExportDialog((prev) => ({
+                ...prev,
+                loading: false,
+                branches,
+                selected: branches.some((branch) => idOf(branch) === current) ? [current] : branches.length === 1 ? [idOf(branches[0])] : []
+            }));
+        } catch (err) {
+            setExportDialog((prev) => ({ ...prev, loading: false, error: err.response?.data?.message || 'Could not load your branches.' }));
+        }
+    };
+
+    const toggleExportBranch = (id) => setExportDialog((prev) => ({
+        ...prev,
+        selected: prev.selected.includes(id) ? prev.selected.filter((value) => value !== id) : [...prev.selected, id]
+    }));
+
+    const toggleAllExportBranches = () => setExportDialog((prev) => ({
+        ...prev,
+        selected: prev.selected.length === prev.branches.length ? [] : prev.branches.map(idOf)
+    }));
+
+    // One Excel file for every ticked branch, made by the server: it checks each branch against this
+    // login's access and applies the search, status and MGR filters on screen to all of them.
+    const runBranchExport = async () => {
+        if (isExporting || !exportDialog.selected.length) return;
         setIsExporting(true);
         try {
+            const chosen = exportDialog.branches.filter((branch) => exportDialog.selected.includes(idOf(branch)));
             const params = {
-                export: 'true',
-                limit: 50000,
+                branchIds: chosen.map(idOf).join(','),
                 q: searchQuery.trim() || undefined,
                 status: selectedStatus !== 'ALL' ? selectedStatus : undefined
             };
@@ -613,54 +666,15 @@ const SerialNoMaster = () => {
                 if (mgrId) params[key] = mgrId;
             });
 
-            const result = await csmService.getAssets(params);
-            const allAssets = result.data?.data || [];
-
-            if (!allAssets.length) {
-                toast.error('No records to export');
-                return;
-            }
-
-            const exportData = allAssets.map(asset => {
-                const prodName = asset.productId?.productName || asset.productName || '';
-                const prodCode = asset.productId?.productCode || asset.productCode || '';
-                const custName = exportCustomerName(asset);
-                const sDate = asset.saleDate || asset.invoiceDate;
-                return {
-                    'Serial Number': asset.serialNumber || '',
-                    'Product Name': prodName,
-                    'Product Code': prodCode,
-                    'Status': asset.status || 'IN_STOCK',
-                    // Customer fields in the screen order: name, code, segment, postal code.
-                    'Customer Name': custName,
-                    'Customer Code': asset.customerCode || asset.customerId?.externalCode || '',
-                    'Division_Code': asset.divisionId?.code || '',
-                    'Division_Desc': asset.divisionId?.description || '',
-                    'Segment_Code': asset.segmentId?.code || '',
-                    'Segment_Desc': asset.segmentId?.description || '',
-                    'Customer Postal Code': asset.customerPostalCode || '',
-                    'Invoice Ref': asset.invoiceNumber || '',
-                    'Sale Date': formatDate(sDate, ''),
-                    'Location': asset.location || '',
-                    'Mgr 1': resolveAssetMgr(asset, 'mgr1'),
-                    'Mgr 2': resolveAssetMgr(asset, 'mgr2'),
-                    'Mgr 3': resolveAssetMgr(asset, 'mgr3'),
-                    'Mgr 4': resolveAssetMgr(asset, 'mgr4'),
-                    'Mgr 5': resolveAssetMgr(asset, 'mgr5'),
-                    'Indicator_Field': asset.indicatorField || '',
-                    'Project Code': asset.projectCode || '',
-                    'Project Name': asset.projectName || ''
-                };
-            });
-
-            const ws = XLSX.utils.json_to_sheet(exportData);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Invoice Bulk Upload');
-            XLSX.writeFile(wb, `Invoice_Bulk_Upload_${new Date().toISOString().slice(0, 10)}.xlsx`);
-            toast.success(`Exported ${exportData.length} records`);
+            const response = await csmService.exportAssets(params);
+            const total = Number(response.headers?.['x-total-count']);
+            saveBlob(response.data, branchExportFileName(chosen));
+            setExportDialog((prev) => ({ ...prev, open: false }));
+            if (total === 0) toast.info('No entries match: the file holds the column headings only.');
+            else toast.success(Number.isFinite(total) ? `Exported ${total.toLocaleString('en-IN')} entries from ${chosen.length === 1 ? chosen[0].name : `${chosen.length} branches`}` : 'Export ready');
         } catch (err) {
             console.error('Export error:', err);
-            toast.error('Failed to export records');
+            toast.error(await downloadErrorMessage(err, 'Failed to export records'));
         } finally {
             setIsExporting(false);
         }
@@ -1696,6 +1710,107 @@ const SerialNoMaster = () => {
             )}
 
             {/* --- SALES RETURN FORM MODAL (Requirement #6) --- */}
+            <Modal
+                isOpen={exportDialog.open}
+                onClose={() => { if (!isExporting) setExportDialog((prev) => ({ ...prev, open: false })); }}
+                title="Export Invoice Data"
+                maxWidth="max-w-lg"
+            >
+                <div className="space-y-4">
+                    <p className="text-sm font-semibold text-slate-600">
+                        Select one or more branches. They go into one Excel file, with a Branch Name column.
+                        Only branches your account can use are shown.
+                    </p>
+
+                    {exportDialog.loading && (
+                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-500 py-6 justify-center">
+                            <MdSync className="animate-spin" size={18} /> Loading your branches...
+                        </div>
+                    )}
+                    {!exportDialog.loading && exportDialog.error && (
+                        <p className="text-sm font-semibold text-rose-700 bg-rose-50 border border-rose-100 rounded-2xl px-4 py-3">{exportDialog.error}</p>
+                    )}
+                    {!exportDialog.loading && !exportDialog.error && exportDialog.branches.length === 0 && (
+                        <p className="text-sm font-semibold text-slate-600 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3">No branch is assigned to your account, so there is nothing to export.</p>
+                    )}
+
+                    {!exportDialog.loading && exportDialog.branches.length > 0 && (
+                        <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                            {exportDialog.branches.length > 1 && (
+                                <label className="flex items-center gap-3 px-4 py-3 bg-slate-50 border-b border-slate-200 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        className="h-4 w-4 accent-teal-600 cursor-pointer"
+                                        checked={exportDialog.selected.length === exportDialog.branches.length}
+                                        ref={(el) => {
+                                            if (el) el.indeterminate = exportDialog.selected.length > 0 && exportDialog.selected.length < exportDialog.branches.length;
+                                        }}
+                                        onChange={toggleAllExportBranches}
+                                        disabled={isExporting}
+                                    />
+                                    <span className="text-xs font-black uppercase tracking-widest text-slate-700">Select all</span>
+                                </label>
+                            )}
+                            <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
+                                {exportDialog.branches.map((branch) => {
+                                    const id = idOf(branch);
+                                    const isCurrent = id === String(activeBranchId || '');
+                                    return (
+                                        <label key={id} className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-teal-50/50 select-none">
+                                            <input
+                                                type="checkbox"
+                                                className="h-4 w-4 accent-teal-600 cursor-pointer"
+                                                checked={exportDialog.selected.includes(id)}
+                                                onChange={() => toggleExportBranch(id)}
+                                                disabled={isExporting}
+                                            />
+                                            <span className="flex-1 min-w-0 text-sm font-bold text-slate-800 truncate">{branch.name}</span>
+                                            {branch.code && branch.code !== branch.name && (
+                                                <span className="text-[10px] font-black text-slate-400 uppercase">{branch.code}</span>
+                                            )}
+                                            {isCurrent && (
+                                                <span className="text-[9px] font-black uppercase tracking-wider text-teal-700 bg-teal-50 border border-teal-200 rounded-full px-2 py-0.5">On screen</span>
+                                            )}
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {!exportDialog.loading && exportDialog.branches.length > 0 && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-slate-500">
+                            <span>
+                                <span className="font-black text-slate-800">{exportDialog.selected.length}</span> of {exportDialog.branches.length} {exportDialog.branches.length === 1 ? 'branch' : 'branches'} selected · Excel (.xlsx)
+                            </span>
+                            {(searchQuery.trim() || selectedStatus !== 'ALL' || MGR_FIELDS.some(({ key }) => mgrFilters[key] !== 'ALL')) && (
+                                <span className="text-amber-700">Your search and filters on screen apply to every branch.</span>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-3 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={() => setExportDialog((prev) => ({ ...prev, open: false }))}
+                            disabled={isExporting}
+                            className="px-6 py-3 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 rounded-2xl font-bold uppercase text-xs"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={runBranchExport}
+                            disabled={isExporting || exportDialog.loading || exportDialog.selected.length === 0}
+                            className="flex items-center justify-center gap-2 px-8 py-3 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-black uppercase text-xs tracking-wider shadow-lg shadow-teal-600/20 active:scale-95"
+                        >
+                            {isExporting ? <MdSync className="animate-spin" size={16} /> : <MdFileDownload size={16} />}
+                            {isExporting ? 'Exporting...' : exportDialog.selected.length > 1 ? `Export ${exportDialog.selected.length} branches` : 'Export'}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
             <Modal
                 isOpen={isReturnModalOpen}
                 onClose={() => { setIsReturnModalOpen(false); setReturnTargetAsset(null); }}
