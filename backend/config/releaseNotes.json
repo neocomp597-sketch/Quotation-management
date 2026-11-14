@@ -818,5 +818,52 @@
     "deployedBy": "Super Admin",
     "deployedAt": "2026-11-09T20:00:00+05:30",
     "isActive": true
+  },
+  {
+    "version": "v6.8.0",
+    "title": "Branch Transfer for Customers and Employees, Export of Several Branches & Authorization Access",
+    "message": "Release Updates (from 14 Nov 2026): Customers and employees can be moved to another branch from their Edit screen; their earlier records keep their branch and every move is recorded. Invoice Bulk Upload can export several branches into one Excel file. Authorization now opens for users an administrator gave it to, who before saw it in the menu but could not open it.",
+    "releaseNotes": [
+      "Authorization: opens for every user an administrator gave the Authorization screen, not only for administrators; such users cannot change the Admin role, administrators' logins or their own access",
+      "Customer Master: Transfer to Branch on Customer Edit moves a customer to another branch you work in; earlier invoices, quotations, serial numbers and tickets keep their branch",
+      "Employee Master: Branch Transfer on Edit Employee moves an employee to another branch; their login follows, and attendance, payroll and earlier records are not changed",
+      "Employee Master: every other way of changing an employee's branches (Assign Branch, batch branch assignment, Branch Access in Authorization, employee upload) now follows the same rule and is recorded",
+      "Invoice Bulk Upload: Export lets you tick one or more of your branches and gives one Excel file with a Branch Name column"
+    ],
+    "detailedChanges": [
+      {
+        "date": "14.11.2026",
+        "module": "Authorization",
+        "submodule": "Authorization Opens for Users Given It",
+        "changes": "An administrator can give the Authorization screen to a role in the Role Matrix, or to one person in Individual Permissions. Such users saw Authorization in the menu, but opening it sent them back to the dashboard, because the screen only opened for administrators. It now opens for them. They can change roles and users of their own company, except the Admin role and their own role, and they cannot change an administrator's login or their own, or give anyone the Admin role. Those parts are shown locked with the reason. Only administrators can reset the role defaults. Users who were not given Authorization still do not see it, and nobody was given it by this update: an administrator still decides who gets it."
+      },
+      {
+        "date": "14.11.2026",
+        "module": "Master Management",
+        "submodule": "Customer Master: Transfer to Branch",
+        "changes": "Customer Edit has a Branch card showing the customer's current branch and a Transfer to Branch list of the other branches you can work in. Choose a branch and press Transfer, then confirm. The customer is moved, not copied: the same customer with the same code, now in the new branch. It then shows only under the new branch, so select that branch at the top of the screen to see it. Invoices, quotations, payments, serial numbers, tickets and other records already made for the customer keep the branch they were made in. Each move is recorded with who made it, when, and the old and new branch. It needs Modify on Customers, and only branches you can work in are offered or accepted. Moving branches through bulk update is no longer possible; use Transfer to Branch."
+      },
+      {
+        "date": "14.11.2026",
+        "module": "Employee Master",
+        "submodule": "Edit Employee: Branch Transfer",
+        "changes": "Edit Employee has a Branch Transfer panel with the employee's name, code and current branch and a Transfer To Branch list of the branches you can work in. After you confirm, the new branch becomes the employee's branch and replaces the old one in their branch list; other branches they were also given stay. Their login follows, so from their next sign-in they work in the new branch. The employee code, role, login ID and reporting manager do not change, and attendance, payroll, payslips, service visits and tickets keep their branch. Each transfer is recorded with who made it, when, and the old and new branch. Like editing an employee, it is for administrators. The employee then shows under the new branch only."
+      },
+      {
+        "date": "14.11.2026",
+        "module": "Employee Master",
+        "submodule": "One Rule for Every Change of an Employee's Branches",
+        "changes": "The Assign Branch switches on Edit Employee, batch branch assignment, Branch Access in Authorization > Team Users and the Location column of the employee upload could change an employee's branches without checking the branch and without leaving a record. They now follow the rule of Branch Transfer: every branch added must be an active branch of your company that you work in, and you can only change the branches of an employee in a branch you work in. A refused change is not saved and the message says why; in batch branch assignment the other employees are still updated, and in the employee upload the row shows the reason before anything is imported. Every change is recorded with who made it, when, the old and new branches and the screen it was made on. Batch branch assignment now also replaces the old branch in the employee's branch list, as Branch Transfer does. Removing a branch is allowed as before."
+      },
+      {
+        "date": "14.11.2026",
+        "module": "Master Management",
+        "submodule": "Invoice Bulk Upload: Export Several Branches",
+        "changes": "Export on Invoice Bulk Upload now opens Export Invoice Data. It lists the branches you can work in, with the branch on screen ticked; tick one or more, or Select all, and press Export to get one Excel file named after the branches and the date. The file has a Branch Name column first; the other columns and their formats are as before, and the file can still be uploaded again. The search and filters on screen apply to every ticked branch, and MGR Access still applies. A branch you cannot work in is refused rather than left out. An export of more than 50,000 entries is refused with a message asking for fewer branches, instead of being cut short as before."
+      }
+    ],
+    "deployedBy": "Super Admin",
+    "deployedAt": "2026-11-14T21:00:00+05:30",
+    "isActive": true
   }
 ]
