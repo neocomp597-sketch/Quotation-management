@@ -14,6 +14,10 @@ import DateInput from '../components/DateInput';
 import usePermission from '../hooks/usePermission';
 import compressImage from '../utils/compressImage';
 import SearchableSelect from '../components/SearchableSelect';
+import {
+    pickVisitMedia, describeLoadError, TICKET_OPTIONS_LIMIT, ticketOptionLabel, mergeTickets,
+    PRODUCT_PHOTO_MAX_SIDE, attachProductPhoto, PhotoUploadError
+} from '../utils/serviceVisits';
 
 const visitStatusClass = (status) => (
     status === 'Completed' ? 'bg-teal-50 text-teal-600 border-teal-200' :
@@ -21,38 +25,6 @@ const visitStatusClass = (status) => (
     status === 'Cancelled' ? 'bg-rose-50 text-rose-600 border-rose-200' :
     'bg-slate-50 text-slate-500 border-slate-200'
 );
-
-// The visits list leaves out the product photo and customer signature (large inline images);
-// the open visit loads them from GET /csm/visits/:id.
-const VISIT_MEDIA_FIELDS = ['productPhoto', 'customerSignature'];
-const pickVisitMedia = (visit) => Object.fromEntries(
-    VISIT_MEDIA_FIELDS.filter((field) => visit && field in visit).map((field) => [field, visit[field]])
-);
-
-// The schedule form lists the newest tickets (the most the tickets API returns at once); any
-// other ticket is found by typing in the ticket search, which asks the server
-const TICKET_OPTIONS_LIMIT = 100;
-const ticketOptionLabel = (t) => `${t.ticketNo} - ${t.issueTitle} (${t.customerId?.customerName || t.customerId?.companyName || 'Customer'})`;
-
-// Product photos are shrunk to this many pixels on the longer side before upload
-const PRODUCT_PHOTO_MAX_SIDE = 1600;
-// When the upload is unavailable a photo up to this size is kept inline in the visit instead
-const MAX_INLINE_PHOTO_BYTES = 1024 * 1024;
-
-const readAsDataUrl = (blob) => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-});
-
-// Why a request failed, for when the server's reply carries no message of its own
-const describeLoadError = (error) => {
-    if (error.response?.data?.message) return error.response.data.message;
-    if (error.code === 'ECONNABORTED') return 'The server took too long to respond. Please retry.';
-    if (error.response) return `The server returned an error (${error.response.status}). Please retry.`;
-    return 'Could not reach the server. Check the connection and retry.';
-};
 
 const VisitInfoField = ({ label, value }) => (
     <div className="min-w-0">
@@ -464,11 +436,7 @@ const ServiceVisits = () => {
             try {
                 const res = await csmService.getTickets({ search: term, limit: TICKET_OPTIONS_LIMIT });
                 const found = Array.isArray(res.data) ? res.data : (res.data?.data || []);
-                setTickets((prev) => {
-                    const known = new Set(prev.map((t) => String(t._id)));
-                    const added = found.filter((t) => !known.has(String(t._id)));
-                    return added.length ? [...prev, ...added] : prev;
-                });
+                setTickets((prev) => mergeTickets(prev, found));
             } catch (error) {
                 console.error('Ticket search failed:', error);
             }
@@ -791,33 +759,19 @@ const ServiceVisits = () => {
         if (!file) return;
         setUploadingPhoto(true);
         try {
-            // A phone camera photo is often over the 5 MB upload limit: shrink it first so it uploads,
-            // and so that a photo kept in the visit itself (below) stays small
-            const photo = await compressImage(file, PRODUCT_PHOTO_MAX_SIDE, PRODUCT_PHOTO_MAX_SIDE, 0.75).catch(() => file);
-            let uploadError = null;
-            try {
-                const res = await uploadService.uploadImage(photo);
-                const photoUrl = res.data?.url || res.data?.imageUrl;
-                if (photoUrl) {
-                    setProductPhoto(photoUrl);
-                    toast.success('Product photo uploaded successfully!');
-                    return;
-                }
-            } catch (err) {
-                uploadError = err;
-            }
-            // Upload unavailable: keep the photo in the visit itself, but only a small one,
-            // since it then travels with the visit everywhere it is loaded
-            if (photo.size > MAX_INLINE_PHOTO_BYTES) {
-                const reason = uploadError?.response?.data?.message;
-                toast.error(`Could not upload the product photo${reason ? ` (${reason})` : ''}. Please retake it or try again.`);
-                return;
-            }
-            setProductPhoto(await readAsDataUrl(photo));
-            toast.success('Product photo attached!');
+            const { photo, uploaded } = await attachProductPhoto(file, {
+                compress: (f) => compressImage(f, PRODUCT_PHOTO_MAX_SIDE, PRODUCT_PHOTO_MAX_SIDE, 0.75),
+                upload: (f) => uploadService.uploadImage(f)
+            });
+            setProductPhoto(photo);
+            toast.success(uploaded ? 'Product photo uploaded successfully!' : 'Product photo attached!');
         } catch (err) {
-            console.error('Product photo could not be attached', err);
-            toast.error('Could not read the product photo. Please retake it.');
+            if (err instanceof PhotoUploadError) {
+                toast.error(err.message);
+            } else {
+                console.error('Product photo could not be attached', err);
+                toast.error('Could not read the product photo. Please retake it.');
+            }
         } finally {
             setUploadingPhoto(false);
         }
