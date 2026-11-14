@@ -13,6 +13,7 @@ import { fetchAccurateLocation } from '../utils/reverseGeocode';
 import DateInput from '../components/DateInput';
 import usePermission from '../hooks/usePermission';
 import compressImage from '../utils/compressImage';
+import SearchableSelect from '../components/SearchableSelect';
 
 const visitStatusClass = (status) => (
     status === 'Completed' ? 'bg-teal-50 text-teal-600 border-teal-200' :
@@ -27,6 +28,11 @@ const VISIT_MEDIA_FIELDS = ['productPhoto', 'customerSignature'];
 const pickVisitMedia = (visit) => Object.fromEntries(
     VISIT_MEDIA_FIELDS.filter((field) => visit && field in visit).map((field) => [field, visit[field]])
 );
+
+// The schedule form lists the newest tickets (the most the tickets API returns at once); any
+// other ticket is found by typing in the ticket search, which asks the server
+const TICKET_OPTIONS_LIMIT = 100;
+const ticketOptionLabel = (t) => `${t.ticketNo} - ${t.issueTitle} (${t.customerId?.customerName || t.customerId?.companyName || 'Customer'})`;
 
 // Product photos are shrunk to this many pixels on the longer side before upload
 const PRODUCT_PHOTO_MAX_SIDE = 1600;
@@ -438,7 +444,7 @@ const ServiceVisits = () => {
 
     const fetchTickets = async () => {
         try {
-            const res = await csmService.getTickets();
+            const res = await csmService.getTickets({ limit: TICKET_OPTIONS_LIMIT });
             const data = Array.isArray(res.data) ? res.data : (res.data?.data || []);
             setTickets(data);
             return data;
@@ -447,6 +453,28 @@ const ServiceVisits = () => {
             return [];
         }
     };
+
+    // Typing in the ticket search also asks the server, so older tickets can be scheduled too
+    const ticketSearchTimerRef = useRef(null);
+    const searchTickets = (text) => {
+        clearTimeout(ticketSearchTimerRef.current);
+        const term = String(text || '').trim();
+        if (!term) return;
+        ticketSearchTimerRef.current = setTimeout(async () => {
+            try {
+                const res = await csmService.getTickets({ search: term, limit: TICKET_OPTIONS_LIMIT });
+                const found = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+                setTickets((prev) => {
+                    const known = new Set(prev.map((t) => String(t._id)));
+                    const added = found.filter((t) => !known.has(String(t._id)));
+                    return added.length ? [...prev, ...added] : prev;
+                });
+            } catch (error) {
+                console.error('Ticket search failed:', error);
+            }
+        }, 300);
+    };
+    useEffect(() => () => clearTimeout(ticketSearchTimerRef.current), []);
 
     const fetchMgr5Parts = async () => {
         try {
@@ -526,6 +554,13 @@ const ServiceVisits = () => {
     const handleOpenCreateModal = async (preselectedTicketId = '') => {
         const fetchedTickets = await fetchTickets();
         const currentTickets = (Array.isArray(fetchedTickets) && fetchedTickets.length > 0) ? fetchedTickets : (Array.isArray(tickets) ? tickets : []);
+        // "Schedule New Visit for Ticket" can be for a ticket older than the newest ones loaded
+        const preselectedTicket = preselectedTicketId && selectedVisit?.ticketId?._id === preselectedTicketId
+            ? selectedVisit.ticketId
+            : null;
+        if (preselectedTicket) {
+            setTickets((prev) => (prev.some((t) => t._id === preselectedTicket._id) ? prev : [preselectedTicket, ...prev]));
+        }
         const availableTicket = preselectedTicketId || (currentTickets.length > 0 ? currentTickets[0]._id : '');
         setCreateTicketId(availableTicket);
         setCreateEngineerId(engineers.length > 0 ? engineers[0]._id : '');
@@ -1675,19 +1710,14 @@ const ServiceVisits = () => {
                 <form id="create-visit-form" onSubmit={handleCreateVisit} className="space-y-4">
                     <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Select Ticket / Complaint *</label>
-                        <select
-                            required
+                        <SearchableSelect
+                            options={(Array.isArray(tickets) ? tickets : []).map((t) => ({ value: t._id, label: ticketOptionLabel(t) }))}
                             value={createTicketId}
-                            onChange={(e) => setCreateTicketId(e.target.value)}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold"
-                        >
-                            <option value="">-- Select Ticket --</option>
-                            {(Array.isArray(tickets) ? tickets : []).map(t => (
-                                <option key={t._id} value={t._id}>
-                                    {t.ticketNo} - {t.issueTitle} ({t.customerId?.customerName || 'Customer'})
-                                </option>
-                            ))}
-                        </select>
+                            onChange={(val) => setCreateTicketId(val || '')}
+                            onSearchChange={searchTickets}
+                            placeholder="-- Select Ticket --"
+                            noResultsText="No ticket matches yet. Keep typing the ticket no, issue or customer name."
+                        />
                     </div>
                     <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Appointment Date & Time *</label>
