@@ -2672,7 +2672,20 @@ const importEmployees = async (req, res) => {
                 const matched = employeeNameMap.get(normalizedName);
 
                 if (matched) {
+                    // Moving an existing employee follows the rule of Branch Transfer: a branch the user
+                    // works in, recorded in the audit log (services/employeeBranchService.js). A refused
+                    // row fails with the reason.
+                    const { checkEmployeeBranchChange, recordEmployeeBranchChange } = require('../services/employeeBranchService');
+                    const branchChange = await checkEmployeeBranchChange({
+                        user: req.user,
+                        companyId,
+                        current: matched,
+                        next: { branchId: empData.branchId, assignedBranches: empData.assignedBranches }
+                    });
                     await EmployeeProfile.findByIdAndUpdate(matched._id, empData);
+                    if (branchChange.changed) {
+                        await recordEmployeeBranchChange({ user: req.user, companyId, employee: matched, change: branchChange, via: 'Employee import (API)' });
+                    }
                     results.updated++;
                 } else {
                     await EmployeeProfile.create(empData);

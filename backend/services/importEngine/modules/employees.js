@@ -179,7 +179,7 @@ module.exports = {
                 .select('name employeeId externalEmployeeCode branchId assignedBranches')
                 .setOptions({ bypassBranch: true })
                 .lean(),
-            Branch.find({ companyId: user?.companyId }).select('name code branchPrefix city').lean()
+            Branch.find({ companyId: user?.companyId }).select('name code branchPrefix city status').lean()
         ]);
 
         const byCode = new Map();
@@ -216,7 +216,11 @@ module.exports = {
             return !ids.length || ids.some((id) => allowed.has(id));
         };
 
-        return { byCode, byName, branchByKey, otherBranch, reachable };
+        // For the branch rule of Branch Transfer when a Location moves an existing employee.
+        const byId = new Map(employees.map((employee) => [String(employee._id), employee]));
+        const branchById = new Map(branches.map((branch) => [String(branch._id), branch]));
+
+        return { byCode, byName, branchByKey, otherBranch, reachable, allowed, byId, branchById };
     },
 
     validate(data, { context }) {
@@ -263,6 +267,25 @@ module.exports = {
                 message: `${found.record.name} belongs to a branch you do not work in.`,
                 hint: 'Ask an admin to import this row, or skip it.'
             });
+        } else if (found.record && data.branch?.fromLocation && String(found.record.branchId || '') !== data.branch.id) {
+            // A Location that moves an existing employee follows the rule of Branch Transfer
+            // (services/employeeBranchService.js): an active branch the importing user works in.
+            const branch = context.branchById.get(data.branch.id);
+            if (branch?.status === 'Inactive') {
+                issues.push({
+                    field: 'location',
+                    code: 'BRANCH_INACTIVE',
+                    message: `Branch ${branch.name} is inactive, so ${found.record.name} cannot be moved there.`,
+                    hint: "Use an active branch, or leave Location blank to keep the employee's branch."
+                });
+            } else if (context.allowed && !context.allowed.has(data.branch.id)) {
+                issues.push({
+                    field: 'location',
+                    code: 'NO_ACCESS',
+                    message: `You do not work in branch ${branch?.name || data.location}, so ${found.record.name} cannot be moved there.`,
+                    hint: "Ask an admin to import this row, or leave Location blank to keep the employee's branch."
+                });
+            }
         }
         return issues;
     },
@@ -332,6 +355,26 @@ module.exports = {
      * employees. The logins are made for the employees of every branch, because rows can put
      * employees in other branches than the one open on the screen.
      */
+    /** Records every employee a Location moved to another branch, as Branch Transfer does. */
+    async afterWrite(plans, { user, companyId, context }) {
+        const { recordEmployeeBranchChange } = require('../../employeeBranchService');
+        const nameOf = (id) => (id ? context.branchById.get(String(id))?.name || '' : '');
+        for (const plan of plans) {
+            if (plan.action !== 'update' || !plan.data.branch?.fromLocation) continue;
+            const previous = context.byId.get(String(plan.recordId));
+            const toId = String(plan.data.branch.id);
+            if (!previous || String(previous.branchId || '') === toId) continue;
+            const fromAssigned = (previous.assignedBranches || []).map(String);
+            const change = {
+                before: { branchId: previous.branchId ? String(previous.branchId) : null, branchName: nameOf(previous.branchId), assignedBranches: fromAssigned, assignedBranchNames: fromAssigned.map(nameOf) },
+                after: { branchId: toId, branchName: nameOf(toId), assignedBranches: [toId], assignedBranchNames: [nameOf(toId)] }
+            };
+            await recordEmployeeBranchChange({ user, companyId, employee: { _id: plan.recordId }, change, via: 'Employee import (Location column)' });
+            previous.branchId = toId;
+            previous.assignedBranches = [toId];
+        }
+    },
+
     async afterImport({ user }) {
         const companyId = user?.companyId;
         if (!companyId) return;

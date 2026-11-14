@@ -876,6 +876,8 @@ export const payrollService = {
   getEmployee: (id) => api.get(`/payroll/employees/${id}`),
   createEmployee: (data) => api.post("/payroll/employees", data),
   updateEmployee: (id, data) => api.put(`/payroll/employees/${id}`, data),
+  // Branch Transfer: moves the employee (same record, same Employee ID) to another branch.
+  transferEmployeeBranch: (id, branchId, reason) => api.put(`/payroll/employees/${id}/branch`, { branchId, reason }),
   updateReportingManager: (id, reportingTo) => api.put(`/payroll/employees/${id}/reporting`, { reportingTo }),
   batchAssignBranchAndId: (assignments) => api.post("/payroll/employees/batch-assign-branch-id", { assignments }),
   createVacantPosition: (data) => api.post("/payroll/employees/vacant-position", data),

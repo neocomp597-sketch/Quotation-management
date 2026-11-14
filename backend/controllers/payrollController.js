@@ -10,6 +10,12 @@ const Company = require('../models/Company');
 const { getTenantId } = require('../middlewares/tenantContext');
 const mongoose = require('mongoose');
 const { broadcastCrmUpdate } = require('../config/socket');
+const {
+    checkEmployeeBranchChange,
+    recordEmployeeBranchChange,
+    sendBranchChangeError,
+    movedAssignedBranches
+} = require('../services/employeeBranchService');
 
 const getEffectiveCompanyId = async (req) => {
     let companyId = req.query?.companyId || req.headers?.['x-company-id'] || req.body?.companyId || req.user?.companyId || getTenantId?.();
@@ -334,6 +340,9 @@ exports.updateEmployee = async (req, res) => {
     try {
         const updateData = { ...req.body };
         delete updateData.employeeId;
+        // Never moved to another company or record through Edit.
+        delete updateData.companyId;
+        delete updateData._id;
 
         // Clean up empty strings for ObjectId fields
         if (updateData.reportingTo === '' || updateData.reportingTo === null) {
@@ -366,7 +375,7 @@ exports.updateEmployee = async (req, res) => {
 
         // A changed email, or name / mobile, must not make this employee a copy of another one.
         // Unchanged values are not checked, so employees already sharing a mailbox still save.
-        const current = await EmployeeProfile.findById(req.params.id).select('companyId name email mobile').lean();
+        const current = await EmployeeProfile.findById(req.params.id).select('companyId name email mobile branchId assignedBranches').lean();
         if (current) {
             const changed = {};
             if (updateData.email !== undefined && emailKey(updateData.email) !== emailKey(current.email)) {
@@ -384,6 +393,26 @@ exports.updateEmployee = async (req, res) => {
             }
         }
 
+        // The Assign Branch switches follow the rule of Branch Transfer: every branch added must be
+        // one the user may work in, and the change is recorded (services/employeeBranchService.js).
+        let branchChange = null;
+        if (current && (updateData.branchId !== undefined || updateData.assignedBranches !== undefined)) {
+            try {
+                branchChange = await checkEmployeeBranchChange({
+                    user: req.user,
+                    companyId: req.user?.companyId || current.companyId,
+                    current,
+                    next: {
+                        branchId: updateData.branchId !== undefined ? updateData.branchId : current.branchId,
+                        assignedBranches: updateData.assignedBranches !== undefined ? updateData.assignedBranches : current.assignedBranches
+                    }
+                });
+            } catch (error) {
+                if (sendBranchChangeError(res, error)) return;
+                throw error;
+            }
+        }
+
         const employee = await EmployeeProfile.findByIdAndUpdate(
             req.params.id, 
             { $set: updateData }, 
@@ -396,6 +425,25 @@ exports.updateEmployee = async (req, res) => {
         
         if (!employee) {
             return res.status(404).json({ message: 'Employee not found' });
+        }
+
+        if (branchChange?.changed) {
+            try {
+                await recordEmployeeBranchChange({
+                    user: req.user,
+                    companyId: employee.companyId,
+                    employee,
+                    change: branchChange,
+                    via: 'Edit Employee (Assign Branch)'
+                });
+            } catch (auditError) {
+                // No branch change without its audit record: put the branches back.
+                await EmployeeProfile.updateOne(
+                    { _id: employee._id },
+                    { $set: { branchId: current.branchId || null, assignedBranches: current.assignedBranches || [] } }
+                ).setOptions({ bypassBranch: true });
+                throw auditError;
+            }
         }
         
         // Auto-sync User account if email present
@@ -412,6 +460,129 @@ exports.updateEmployee = async (req, res) => {
     } catch (error) {
         console.error('Failed to update employee details:', error);
         res.status(500).json({ message: 'Failed to update employee details', error: error.message });
+    }
+};
+
+/**
+ * PUT /payroll/employees/:id/branch - Branch Transfer on Edit Employee.
+ *
+ * Moves the employee to another branch the signed-in user may use (the same branch rule as the
+ * branch switcher: utils/branchScope canUseBranch). The same record is kept: same _id, same Employee
+ * ID (the code is never renumbered). The new branch becomes the home branch and takes the old home
+ * branch's place among the employee's branches; other branches they were given stay. Their login
+ * follows through syncUserForEmployee, as for any edit. Attendance, payroll, payslips, tickets,
+ * service visits and other saved records keep the branch they were saved with. Every transfer is
+ * written to the audit log (old branch, new branch, who, when).
+ */
+exports.transferEmployeeBranch = async (req, res) => {
+    try {
+        const Branch = require('../models/Branch');
+        const User = require('../models/User');
+        const { normalizeBranchId, isBranchAdminRole } = require('../utils/branchScope');
+        const { invalidateAuthUserCache } = require('../middlewares/authMiddleware');
+
+        const { id } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: 'Invalid employee.', code: 'INVALID_EMPLOYEE' });
+        }
+        const branchId = normalizeBranchId(req.body?.branchId);
+        if (!branchId || !mongoose.Types.ObjectId.isValid(branchId)) {
+            return res.status(400).json({ message: 'Choose the branch to transfer the employee to.', code: 'BRANCH_REQUIRED' });
+        }
+
+        // Found in the branch the user is working in, like every other edit of an employee.
+        const employee = await EmployeeProfile.findById(id).select('name employeeId companyId branchId assignedBranches').lean();
+        if (!employee) {
+            return res.status(404).json({ message: 'Employee not found' });
+        }
+
+        const companyId = String(req.user?.companyId || employee.companyId || '');
+        const destination = await Branch.findOne({ _id: branchId, ...(companyId ? { companyId } : {}) })
+            .select('name code branchPrefix status')
+            .setOptions({ bypassTenant: true, bypassBranch: true })
+            .lean();
+        if (!destination) {
+            return res.status(400).json({ message: 'The selected branch does not belong to this company.', code: 'BRANCH_INVALID' });
+        }
+        if (destination.status === 'Inactive') {
+            return res.status(400).json({ message: `Branch ${destination.name} is inactive. Choose an active branch.`, code: 'BRANCH_INACTIVE' });
+        }
+        const fromId = employee.branchId ? String(employee.branchId) : null;
+        if (fromId === branchId) {
+            return res.status(400).json({ message: `${employee.name} is already in branch ${destination.name}.`, code: 'SAME_BRANCH' });
+        }
+        const source = fromId
+            ? await Branch.findById(fromId).select('name').setOptions({ bypassTenant: true, bypassBranch: true }).lean()
+            : null;
+
+        const assignedBranches = movedAssignedBranches(employee, branchId);
+
+        // The same rule as every other change of an employee's branches (services/employeeBranchService.js):
+        // the new branch must be one the user may work in, and so must the branch the employee leaves.
+        let change;
+        try {
+            change = await checkEmployeeBranchChange({ user: req.user, companyId, current: employee, next: { branchId, assignedBranches } });
+        } catch (error) {
+            if (sendBranchChangeError(res, error)) return;
+            throw error;
+        }
+        const reason = String(req.body?.reason || '').trim().slice(0, 500);
+        const before = { ...change.before, branchName: change.before.branchName || source?.name || '' };
+        const after = { ...change.after, branchName: change.after.branchName || destination.name };
+
+        await EmployeeProfile.updateOne(
+            { _id: employee._id },
+            { $set: { branchId: new mongoose.Types.ObjectId(branchId), assignedBranches: assignedBranches.map((value) => new mongoose.Types.ObjectId(value)) } }
+        );
+
+        try {
+            await recordEmployeeBranchChange({ user: req.user, companyId: employee.companyId, employee, change: { before, after }, reason });
+        } catch (auditError) {
+            // No transfer without its audit record: put the branches back.
+            await EmployeeProfile.updateOne(
+                { _id: employee._id },
+                { $set: { branchId: employee.branchId || null, assignedBranches: employee.assignedBranches || [] } }
+            ).setOptions({ bypassBranch: true });
+            throw auditError;
+        }
+        await writePayrollAudit(req, 'EMPLOYEE_BRANCH_TRANSFER', `Transferred ${employee.name} (${employee.employeeId || 'no code'}) from ${before.branchName || 'no branch'} to ${after.branchName}`, employee._id, 'EmployeeProfile');
+
+        // The employee has left the branch being worked in, so read it without the branch filter.
+        const updated = await EmployeeProfile.findById(employee._id)
+            .setOptions({ bypassBranch: true })
+            .populate('reportingTo', 'name email designation')
+            .populate('branchId', 'name code branchPrefix')
+            .populate('assignedBranches', 'name code branchPrefix')
+            .populate('assignedTerritories', 'name code type');
+
+        // The login follows Employee Master (home branch + branches). A branch being worked in that
+        // the login no longer has moves to the new branch, so the next sign-in opens there.
+        const { syncUserForEmployee } = require('../services/employeeUserService');
+        const login = await syncUserForEmployee(updated);
+        let loginInfo = null;
+        if (login?._id) {
+            const keep = new Set(assignedBranches);
+            if (!isBranchAdminRole(login.role) && login.activeBranchId && !keep.has(String(login.activeBranchId))) {
+                await User.updateOne({ _id: login._id }, { $set: { activeBranchId: new mongoose.Types.ObjectId(branchId) } });
+                await invalidateAuthUserCache(String(login._id));
+            }
+            loginInfo = { userId: login._id, email: login.email, branchId };
+        }
+
+        const { syncEmployeeToEngineer } = require('../services/engineerSyncService');
+        await syncEmployeeToEngineer(updated);
+
+        broadcastCrmUpdate('EMPLOYEE', 'UPDATE', updated);
+        res.json({
+            message: `${employee.name} was transferred to ${destination.name}.`,
+            employee: updated,
+            from: before,
+            to: after,
+            login: loginInfo
+        });
+    } catch (error) {
+        console.error('Failed to transfer employee branch:', error);
+        res.status(500).json({ message: 'Failed to transfer the employee', error: error.message });
     }
 };
 
@@ -1262,6 +1433,7 @@ exports.batchAssignBranchAndEmployeeId = async (req, res) => {
 
         const companyId = req.user?.companyId;
         const updatedEmployees = [];
+        const skipped = [];
 
         for (const item of assignments) {
             const emp = await EmployeeProfile.findById(item.employeeId_db);
@@ -1272,6 +1444,27 @@ exports.batchAssignBranchAndEmployeeId = async (req, res) => {
 
             const branch = await Branch.findById(targetBranchId).lean();
             if (!branch) continue;
+
+            // A new branch follows the rule of Branch Transfer (services/employeeBranchService.js): it
+            // must be one the user may work in, it replaces the old home branch in the employee's
+            // branch list, and the change is recorded. A refused employee is left as it is.
+            const before = { branchId: emp.branchId, assignedBranches: (emp.assignedBranches || []).map(String) };
+            let branchChange = null;
+            if (String(emp.branchId || '') !== String(branch._id)) {
+                try {
+                    branchChange = await checkEmployeeBranchChange({
+                        user: req.user,
+                        companyId,
+                        current: before,
+                        next: { branchId: branch._id, assignedBranches: movedAssignedBranches(before, String(branch._id)) }
+                    });
+                } catch (error) {
+                    if (error.name !== 'BranchChangeError') throw error;
+                    skipped.push({ employeeId: emp._id, name: emp.name, reason: error.message });
+                    continue;
+                }
+                if (branchChange.changed) emp.assignedBranches = branchChange.after.assignedBranches;
+            }
 
             emp.branchId = branch._id;
             emp.branchPrefix = branch.branchPrefix;
@@ -1286,13 +1479,29 @@ exports.batchAssignBranchAndEmployeeId = async (req, res) => {
             }
 
             await emp.save();
+            if (branchChange?.changed) {
+                try {
+                    await recordEmployeeBranchChange({ user: req.user, companyId: emp.companyId, employee: emp, change: branchChange, via: 'Batch branch assignment' });
+                } catch (auditError) {
+                    // No branch change without its audit record: put the branches back.
+                    await EmployeeProfile.updateOne(
+                        { _id: emp._id },
+                        { $set: { branchId: before.branchId || null, assignedBranches: before.assignedBranches } }
+                    ).setOptions({ bypassBranch: true });
+                    throw auditError;
+                }
+            }
             await syncUserForEmployee(emp);
             await syncEmployeeToEngineer(emp);
             updatedEmployees.push(emp);
         }
 
         await writePayrollAudit(req, 'EMPLOYEE_BATCH_BRANCH_ASSIGN', `Assigned branch and employee ID for ${updatedEmployees.length} employees`, null, 'EmployeeProfile');
-        res.json({ message: `Successfully updated ${updatedEmployees.length} employees`, count: updatedEmployees.length });
+        res.json({
+            message: `Successfully updated ${updatedEmployees.length} employees${skipped.length ? `; ${skipped.length} not changed (no access to the branch)` : ''}`,
+            count: updatedEmployees.length,
+            skipped
+        });
     } catch (error) {
         console.error('batchAssignBranchAndEmployeeId error:', error);
         res.status(500).json({ message: 'Failed to batch assign branch and employee IDs', error: error.message });

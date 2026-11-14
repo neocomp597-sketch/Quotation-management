@@ -13,6 +13,7 @@ const { invalidateAuthUserCache, isSuperAdminRole } = require('../middlewares/au
 const { broadcastCrmUpdate } = require('../config/socket');
 const EmployeeProfile = require('../models/EmployeeProfile');
 const { isBranchAdminRole } = require('../utils/branchScope');
+const { checkEmployeeBranchChange, recordEmployeeBranchChange, sendBranchChangeError } = require('../services/employeeBranchService');
 const { formatDateTime } = require('../utils/dateFormat');
 
 /**
@@ -747,6 +748,37 @@ exports.updateUserBranches = async (req, res) => {
 
         const previous = (user.assignedBranches || []).map(String);
         const branchId = ids.includes(String(user.branchId)) ? String(user.branchId) : ids[0];
+
+        // The rule of Branch Transfer (services/employeeBranchService.js): every branch added must be
+        // one the signed-in user may work in, for the login and for the employee it moves with it.
+        let employee = null;
+        let employeeChange = null;
+        try {
+            await checkEmployeeBranchChange({
+                user: req.user,
+                companyId: req.user.companyId,
+                current: { branchId: user.branchId, assignedBranches: user.assignedBranches },
+                next: { branchId, assignedBranches: ids }
+            });
+            if (user.employeeProfileId) {
+                employee = await EmployeeProfile.findById(user.employeeProfileId)
+                    .select('name branchId assignedBranches companyId')
+                    .setOptions({ bypassBranch: true })
+                    .lean();
+                if (employee) {
+                    employeeChange = await checkEmployeeBranchChange({
+                        user: req.user,
+                        companyId: req.user.companyId,
+                        current: employee,
+                        next: { branchId, assignedBranches: ids }
+                    });
+                }
+            }
+        } catch (error) {
+            if (sendBranchChangeError(res, error)) return;
+            throw error;
+        }
+
         await User.updateOne({ _id: user._id }, { $set: { assignedBranches: ids, branchId } });
         await invalidateAuthUserCache(user._id.toString());
 
@@ -755,6 +787,19 @@ exports.updateUserBranches = async (req, res) => {
                 { _id: user.employeeProfileId },
                 { $set: { assignedBranches: ids, branchId } }
             ).setOptions({ bypassBranch: true });
+            if (employee && employeeChange?.changed) {
+                try {
+                    await recordEmployeeBranchChange({
+                        user: req.user,
+                        companyId: user.companyId,
+                        employee,
+                        change: employeeChange,
+                        via: `Authorization > Team Users > Branch Access of ${user.name}`
+                    });
+                } catch (auditError) {
+                    console.warn('[updateUserBranches] Employee branch audit failed:', auditError.message);
+                }
+            }
         }
 
         try {

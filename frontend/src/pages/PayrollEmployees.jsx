@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { payrollService, importService, branchService, territoryService, invalidateApiCache } from '../services/api';
+import { payrollService, importService, branchService, territoryService, authService, invalidateApiCache } from '../services/api';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 import ImportWizard from '../components/import/ImportWizard';
@@ -19,8 +19,14 @@ import { useAuth } from '../context/AuthContext';
 const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
     const { id: routeId } = useParams();
-    const { can } = useAuth();
+    const { can, isAdmin, isSuperAdmin, activeBranchId } = useAuth();
     const { canCreate, canModify, canDelete } = usePermission('payroll_employees');
+    // Branch Transfer (Edit Employee): the branches this user may use, and the one picked.
+    // Same rule as editing an employee on the server: administrators only.
+    const canTransferBranch = (isAdmin || isSuperAdmin) && canModify;
+    const [transferBranchOptions, setTransferBranchOptions] = useState([]);
+    const [transferBranchId, setTransferBranchId] = useState('');
+    const [transferringBranch, setTransferringBranch] = useState(false);
     const [employees, setEmployees] = useState([]);
     const [allEmployees, setAllEmployees] = useState([]);
     const [branches, setBranches] = useState([]);
@@ -318,6 +324,63 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
             }
         }
     }, [isCreatePage, isEditPage, routeId, employees]);
+
+    // Destination branches for Branch Transfer: only the branches this user may work in.
+    useEffect(() => {
+        if (!isEditPage || !canTransferBranch) return;
+        let cancelled = false;
+        authService.getBranchOptions()
+            .then((res) => { if (!cancelled) setTransferBranchOptions(res.data?.branches || []); })
+            .catch((err) => console.error('Failed to load branches for transfer', err));
+        return () => { cancelled = true; };
+    }, [isEditPage, canTransferBranch]);
+
+    useEffect(() => { setTransferBranchId(''); }, [routeId]);
+
+    const handleTransferBranch = async () => {
+        if (!selectedEmp?._id) return;
+        const target = transferBranchOptions.find((b) => String(b._id) === String(transferBranchId));
+        if (!target) {
+            toast.warn('Choose the branch to transfer this employee to.');
+            return;
+        }
+        const confirmed = window.confirm(
+            `Transfer ${selectedEmp.name} to ${target.name}?\n\n`
+            + 'The employee keeps the same Employee ID, and their login moves to the new branch. '
+            + 'Attendance, payroll, tickets and visits already saved stay with the branch they were saved in.\n\n'
+            + 'The transfer is saved on its own: save any other changes on this form first.'
+        );
+        if (!confirmed) return;
+        try {
+            setTransferringBranch(true);
+            const res = await payrollService.transferEmployeeBranch(selectedEmp._id, target._id);
+            const emp = res.data?.employee;
+            invalidateApiCache('/payroll');
+            invalidateApiCache('/users');
+            setTransferBranchId('');
+            const stillHere = !activeBranchId || (emp?.assignedBranches || []).some((b) => String(b?._id || b) === String(activeBranchId));
+            if (emp && stillHere) {
+                setSelectedEmp(emp);
+                setBasicForm((prev) => ({
+                    ...prev,
+                    branchId: emp.branchId?._id || emp.branchId || '',
+                    assignedBranches: (emp.assignedBranches || []).map((b) => b?._id || b).filter(Boolean)
+                }));
+                toast.success(res.data?.message || `Transferred to ${target.name}.`);
+                fetchEmployees();
+            } else {
+                // The employee has left the branch being worked in, so they leave this list too.
+                toast.success(`${res.data?.message || `Transferred to ${target.name}.`} Select ${target.name} at the top to see them.`);
+                setIsModalOpen(false);
+                fetchEmployees();
+                navigate('/payroll/employees');
+            }
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Could not transfer the employee.');
+        } finally {
+            setTransferringBranch(false);
+        }
+    };
 
     const handleOpenAdd = () => {
         navigate('/payroll/employees/new');
@@ -1130,6 +1193,65 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            {modalMode === 'edit' && selectedEmp && canTransferBranch && (() => {
+                                                const currentBranchId = String(selectedEmp.branchId?._id || selectedEmp.branchId || '');
+                                                const currentBranchName = selectedEmp.branchId?.name
+                                                    || transferBranchOptions.find((b) => String(b._id) === currentBranchId)?.name
+                                                    || branches.find((b) => String(b._id) === currentBranchId)?.name
+                                                    || 'No branch';
+                                                const destinations = transferBranchOptions.filter((b) => String(b._id) !== currentBranchId);
+                                                return (
+                                                    <div className="md:col-span-3 bg-primary-50/50 p-4 border border-primary-100 rounded-2xl space-y-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <MdLocationOn className="text-primary-600" size={18} />
+                                                            <span className="text-sm font-black text-slate-800">Branch Transfer</span>
+                                                        </div>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                                            <div>
+                                                                <p className={labelClass}>Employee Name</p>
+                                                                <p className="text-sm font-bold text-slate-800 break-words">{selectedEmp.name || basicForm.name || '-'}</p>
+                                                            </div>
+                                                            <div>
+                                                                <p className={labelClass}>Employee Code</p>
+                                                                <p className="text-sm font-bold text-slate-800">{selectedEmp.employeeId || basicForm.employeeId || '-'}</p>
+                                                            </div>
+                                                            <div>
+                                                                <p className={labelClass}>Current Branch</p>
+                                                                <p className="text-sm font-bold text-slate-800">{currentBranchName}</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+                                                            <div className="flex-1 min-w-0">
+                                                                <label className={labelClass} htmlFor="employee-transfer-branch">Transfer To Branch</label>
+                                                                <select
+                                                                    id="employee-transfer-branch"
+                                                                    value={transferBranchId}
+                                                                    onChange={(e) => setTransferBranchId(e.target.value)}
+                                                                    className={inputClass}
+                                                                    disabled={transferringBranch || destinations.length === 0}
+                                                                >
+                                                                    <option value="">{destinations.length ? 'Select branch' : 'No other branch available'}</option>
+                                                                    {destinations.map((b) => (
+                                                                        <option key={b._id} value={b._id}>{b.name}{b.code ? ` (${b.code})` : ''}</option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleTransferBranch}
+                                                                disabled={!transferBranchId || transferringBranch}
+                                                                className="px-5 py-2.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-xs transition-all shadow-sm whitespace-nowrap"
+                                                            >
+                                                                {transferringBranch ? 'Transferring...' : 'Transfer'}
+                                                            </button>
+                                                        </div>
+                                                        <p className="text-[11px] text-slate-500 font-medium">
+                                                            The employee will be assigned to the selected branch and keeps the same Employee ID. Their login follows.
+                                                            Attendance, payroll, tickets and visits already saved keep their branch.
+                                                        </p>
+                                                    </div>
+                                                );
+                                            })()}
                                             <div className="md:col-span-3 bg-slate-50/80 p-4 border border-slate-200 rounded-2xl space-y-3">
                                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                                                     <div className="flex items-center gap-2">

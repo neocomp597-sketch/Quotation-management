@@ -707,6 +707,16 @@ const writeBatch = async (module, rows, { user, companyId, params, context }) =>
         errors = await defaultWrite(module, plans, { user, companyId, params });
     }
 
+    // Follow-up on the rows that were saved (audit entries...). Its failure is logged; the rows stay saved.
+    if (module.afterWrite) {
+        const saved = plans.filter((plan) => !errors.has(plan.rowId))
+            .map(({ rowId, rowNumber, action, recordId, data }) => ({ rowId, rowNumber, action, recordId, data }));
+        if (saved.length) {
+            await module.afterWrite(saved, { user, companyId, params, context })
+                .catch((error) => console.error(`Import ${module.key}: follow-up after saving failed:`, error));
+        }
+    }
+
     const outcome = { created: 0, updated: 0, failed: 0 };
     const importedAt = new Date();
     await ImportJobRow.bulkWrite(plans.map(({ row, rowId, action }) => {

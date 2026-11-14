@@ -50,6 +50,8 @@ router.post('/employees/vacant-position', checkAdmin, payrollController.createVa
 router.put('/employees/:id/reporting', checkAdmin, payrollController.updateReportingManager);
 router.put('/employees/:id/kra', payrollController.updateEmployeeKra);
 router.put('/employees/:id/structure', checkAdmin, payrollController.updateEmployeeStructure);
+// Branch Transfer on Edit Employee: same rule as editing an employee (admin, plus payroll_employees Modify).
+router.put('/employees/:id/branch', checkAdmin, payrollController.transferEmployeeBranch);
 router.get('/employees/:id', checkAdmin, payrollController.getEmployee);
 router.put('/employees/:id', checkAdmin, payrollController.updateEmployee);
 router.delete('/employees/:id', checkAdmin, payrollController.deleteEmployee);
