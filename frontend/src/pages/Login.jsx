@@ -3,7 +3,7 @@ import { useNavigate, Link, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import { authService, readLoginNotice, clearLoginNotice } from "../services/api";
-import { Eye, EyeOff, CheckCircle } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { getFallbackRoute } from "../constants/menuPermissions";
 import SiteLogo from "../components/SiteLogo";
 import "./Auth.css";
@@ -52,46 +52,23 @@ const Login = () => {
 
       const session = await login(res.data);
 
-      toast.success(
-        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-          <span style={{ fontSize: "1.1rem", fontWeight: "bold" }}>
-            Welcome Back!
-          </span>
-          <div style={{ fontSize: "0.85rem", opacity: 0.8 }}>
-            Login successful
-          </div>
-        </div>,
-        {
-          icon: <CheckCircle size={24} color="#0d9488" />,
-          style: {
-            background: "#fff",
-            color: "#1e293b",
-            borderRadius: "16px",
-            boxShadow: "0 10px 30px -5px rgba(0, 0, 0, 0.1)",
-            border: "1px solid #ccfbf1",
-            padding: "16px",
-          },
-        },
-      );
+      // No "Login successful" popup (client's request): opening the app is the confirmation.
+      const storedReturnTo = sessionStorage.getItem("arcrm:returnTo");
+      if (storedReturnTo) {
+        sessionStorage.removeItem("arcrm:returnTo");
+      }
 
-      setTimeout(() => {
-        const storedReturnTo = sessionStorage.getItem("arcrm:returnTo");
-        if (storedReturnTo) {
-          sessionStorage.removeItem("arcrm:returnTo");
-        }
+      const role = session.user?.role;
+      const isSuperAdmin = role === "SUPER_ADMIN" || role === "super_admin";
+      const fallbackTarget = isSuperAdmin
+        ? "/dashboard"
+        : getFallbackRoute(session.permissions, session.user) || "/dashboard";
+      const target = storedReturnTo && storedReturnTo !== "/login"
+        ? storedReturnTo
+        : location.state?.from?.pathname || fallbackTarget;
 
-        const role = session.user?.role;
-        const isSuperAdmin = role === "SUPER_ADMIN" || role === "super_admin";
-        const fallbackTarget = isSuperAdmin
-          ? "/dashboard"
-          : getFallbackRoute(session.permissions, session.user) || "/dashboard";
-        const target = storedReturnTo && storedReturnTo !== "/login"
-          ? storedReturnTo
-          : location.state?.from?.pathname || fallbackTarget;
-
-        // The session opens in the user's default branch (AuthContext); they switch from the header.
-        navigate(target, { replace: true });
-      }, 800);
+      // The session opens in the user's default branch (AuthContext); they switch from the header.
+      navigate(target, { replace: true });
     } catch (err) {
       const errorMessage = err.response?.data?.message || "Login failed";
       setError(errorMessage);

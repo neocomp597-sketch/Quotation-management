@@ -107,8 +107,17 @@ the rules, switched by `SERIAL_BRANCH_TRANSFER_ACCESS`:
   user's selectable branches), and only transfers out of or into those branches are
   listed.
 
-The Serial No List, Invoice Bulk Upload and the other Serial No Transfer tabs keep the
-normal active-branch scoping above, so a moved serial shows under its new branch.
+Invoice Bulk Upload keeps the normal active-branch scoping above, so a moved serial shows
+under its new branch.
+
+The other Serial No Transfer tabs (Serial No List, the serial's details and customer
+transfers, Transfer History, Customer Activity Log) show a branch the serials it holds
+**and** the serials whose current customer belongs to it in Customer Master, whichever
+branch sold them (client, 2026-11-15: "sales can be done by any branch"; an EPC
+customer's serials show in EPC). `serialBranchScope` in serialTransferController.js
+builds that condition and turns off tenantPlugin's own branch filter for those queries;
+history records (SerialTransfer) follow their serial. Without an active branch nothing
+changes.
 
 ## Invoice Bulk Upload export of several branches
 

@@ -55,10 +55,50 @@ const activeBranchFilter = () => {
         : null;
 };
 
-const addActiveBranchFilter = (query) => {
+// For records already checked to be visible (a serial found through serialBranchScope, its history).
+const ANY_BRANCH = { bypassBranch: true };
+
+/**
+ * The serials a branch sees on this screen: the serials it holds (the branch of their Invoice Bulk
+ * Upload row), and also the serials whose current customer belongs to it in Customer Master,
+ * whichever branch sold them. A sale can be made by any branch; the customer is looked after by
+ * their own branch, so an EPC customer's serials show in EPC.
+ *
+ * `condition` is null when no branch is active, and tenantPlugin's own filter applies as before.
+ * Otherwise `condition` replaces the plugin's branch filter (which would hide the serials of other
+ * branches), so every Asset query using it must also pass `options`.
+ */
+const serialBranchScope = async () => {
     const branchFilter = activeBranchFilter();
-    return branchFilter ? { $and: [query, branchFilter] } : query;
+    if (!branchFilter) return { condition: null, options: {}, branchFilter: null, customerIds: [] };
+    const customers = await Customer.find(branchFilter).select('_id').lean();
+    const customerIds = customers.map((customer) => customer._id);
+    return {
+        condition: customerIds.length ? { $or: [branchFilter, { customerId: { $in: customerIds } }] } : branchFilter,
+        options: ANY_BRANCH,
+        branchFilter,
+        customerIds
+    };
 };
+
+const inScope = (query, scope) => (scope.condition ? { $and: [query, scope.condition] } : query);
+
+/**
+ * The same rule for customer history records (SerialTransfer), which carry the branch of their
+ * serial: the branch's own records, plus every record of the serials its customers hold now.
+ * Null when no branch is active.
+ */
+const recordScopeCondition = async (scope) => {
+    if (!scope.condition) return null;
+    if (!scope.customerIds.length) return scope.branchFilter;
+    const held = await Asset.find({ customerId: { $in: scope.customerIds } }).select('_id').setOptions(ANY_BRANCH).lean();
+    return held.length ? { $or: [scope.branchFilter, { assetId: { $in: held.map((asset) => asset._id) } }] } : scope.branchFilter;
+};
+
+// The query for one serial the branch sees (`scope` from serialBranchScope), within `access`.
+const scopedSerial = (scope, assetId, access = null) => (
+    Asset.findOne(inScope({ _id: assetId, ...access }, scope)).setOptions(scope.options)
+);
 
 // From/To dates are calendar days as users see them in India (UTC+05:30); both ends are inclusive.
 // Sale dates are stored as UTC midnight of the day and transfer dates as the chosen day at the
@@ -281,13 +321,15 @@ const returnDateOf = (asset, holder, fallback) => {
 // The serial's saved records, inside a transaction. The first time, the invoice row's customer is
 // saved as the first record.
 const savedHistory = async (asset, user, session) => {
-    const records = await SerialTransfer.find({ assetId: asset._id }).session(session).lean();
+    const records = await SerialTransfer.find({ assetId: asset._id }).session(session).setOptions(ANY_BRANCH).lean();
     if (records.length || !hasSaleCustomer(asset)) return records;
     const [first] = await SerialTransfer.create([{ ...saleRecord(asset), ...user }], { session });
     return [first.toObject()];
 };
 
-const historyOf = (assetId) => SerialTransfer.find(addActiveBranchFilter({ assetId }))
+// The whole customer history of a serial the user may see (its records may be of the branch that sold it).
+const historyOf = (assetId) => SerialTransfer.find({ assetId })
+    .setOptions(ANY_BRANCH)
     .sort({ transferDate: 1, createdAt: 1 })
     .lean();
 
@@ -295,18 +337,19 @@ const historyOf = (assetId) => SerialTransfer.find(addActiveBranchFilter({ asset
 // that have been transferred or assigned to a new customer at least once.
 const ownershipFilter = async (ownership) => {
     if (ownership !== 'Transferred' && ownership !== 'Sold') return null;
+    // Every branch's records: the list it filters may hold serials of other branches (serialBranchScope).
     const rows = await SerialTransfer.aggregate([
         { $match: { entryType: { $in: CHANGE_TYPES } } },
         { $group: { _id: '$assetId' } }
-    ]);
+    ]).option(ANY_BRANCH);
     const ids = rows.map((row) => row._id);
     return ownership === 'Transferred' ? { $in: ids } : { $nin: ids };
 };
 
 /**
  * Serial No List: every Invoice Bulk Upload serial, of every status, with its current branch and
- * current customer (?status filters by status). The list follows the same branch rule as Invoice
- * Bulk Upload.
+ * current customer (?status filters by status). A branch sees the serials it holds and the serials
+ * of its own customers sold by another branch (serialBranchScope).
  */
 exports.listSerials = async (req, res) => {
     try {
@@ -337,10 +380,12 @@ exports.listSerials = async (req, res) => {
 
         const assetFilter = await ownershipFilter(req.query.ownership);
         if (assetFilter) query._id = assetFilter;
-        const scopedQuery = addActiveBranchFilter(query);
+        const scope = await serialBranchScope();
+        const scopedQuery = inScope(query, scope);
 
         const [assets, total] = await Promise.all([
             Asset.find(scopedQuery)
+                .setOptions(scope.options)
                 .select('serialNumber assetNo productId productCode productName status branchId customerId customerCode customerNameStr saleDate invoiceDate invoiceNumber createdAt')
                 .populate(customerPopulate)
                 .populate(productPopulate)
@@ -349,7 +394,7 @@ exports.listSerials = async (req, res) => {
                 .skip(skip)
                 .limit(limit)
                 .lean(),
-            Asset.countDocuments(scopedQuery)
+            Asset.countDocuments(scopedQuery).setOptions(scope.options)
         ]);
 
         const data = assets.map((asset) => ({
@@ -382,7 +427,7 @@ exports.listSerials = async (req, res) => {
 
 // `access`: the user's MGR access condition (mgrAccessCondition); a serial outside it is not found.
 const loadSerial = async (assetId, access = null) => {
-    const asset = await Asset.findOne(addActiveBranchFilter({ _id: assetId, ...access })).populate(customerPopulate).populate(branchPopulate).lean();
+    const asset = await scopedSerial(await serialBranchScope(), assetId, access).populate(customerPopulate).populate(branchPopulate).lean();
     if (!asset) return null;
 
     let history = (await historyOf(asset._id)).map((entry) => withInvoice(entry, asset));
@@ -421,7 +466,7 @@ const loadSerial = async (assetId, access = null) => {
 
 // The serial a customer transfer or past entry is saved for, of any status, within `access`.
 const loadTransferSerial = async (assetId, access = null) => {
-    const asset = await Asset.findOne(addActiveBranchFilter({ _id: assetId, ...access })).populate(customerPopulate).lean();
+    const asset = await scopedSerial(await serialBranchScope(), assetId, access).populate(customerPopulate).lean();
     if (!asset) throw httpError(404, 'Serial number not found');
     return asset;
 };
@@ -457,7 +502,9 @@ exports.updateAssetNo = async (req, res) => {
         }
         const access = await mgrAccessCondition(req);
         const assetNo = cleanText(req.body.assetNo).slice(0, ASSET_NO_MAX_LENGTH);
-        const previous = await Asset.findOneAndUpdate(addActiveBranchFilter({ _id: assetId, ...access }), { $set: { assetNo } })
+        const scope = await serialBranchScope();
+        const previous = await Asset.findOneAndUpdate(inScope({ _id: assetId, ...access }, scope), { $set: { assetNo } })
+            .setOptions(scope.options)
             .select('assetNo serialNumber companyId')
             .lean();
         if (!previous) return res.status(404).json({ message: 'Serial number not found' });
@@ -526,7 +573,7 @@ exports.transferSerial = async (req, res) => {
         if (startOfDay(transferDate) > startOfDay(new Date())) throw httpError(400, 'Transfer date cannot be in the future.');
         access = await mgrAccessCondition(req);
 
-        if (requestId && await SerialTransfer.exists({ requestId })) {
+        if (requestId && await SerialTransfer.exists({ requestId }).setOptions(ANY_BRANCH)) {
             return repeatedRequest(res, assetId, access);
         }
 
@@ -551,7 +598,7 @@ exports.transferSerial = async (req, res) => {
             const returning = unrecordedReturn(asset, records);
             if (returning) {
                 const date = returnDateOf(asset, returning, transferDate);
-                await SerialTransfer.updateOne({ _id: returning._id }, { $set: { isActive: false, endedAt: date } }, { session });
+                await SerialTransfer.updateOne({ _id: returning._id }, { $set: { isActive: false, endedAt: date } }, { session }).setOptions(ANY_BRANCH);
                 const [saved] = await SerialTransfer.create([{ ...returnRecord(asset, returning, date), ...user }], { session });
                 returned = saved.toObject();
                 current = null;
@@ -568,7 +615,7 @@ exports.transferSerial = async (req, res) => {
             }
 
             if (current) {
-                await SerialTransfer.updateOne({ _id: current._id }, { $set: { isActive: false, endedAt: transferDate } }, { session });
+                await SerialTransfer.updateOne({ _id: current._id }, { $set: { isActive: false, endedAt: transferDate } }, { session }).setOptions(ANY_BRANCH);
             }
             // The invoice flows to the new customer: the previous record's, else the serial's own.
             const invoice = withInvoice(previous || { entryType: 'Sold' }, asset);
@@ -605,7 +652,7 @@ exports.transferSerial = async (req, res) => {
                     // Sold by this transfer; a serial with no invoice date was sold on the transfer date.
                     ...(sells ? { status: 'SOLD', ...(invoiceDateOf(asset) ? {} : { saleDate: transferDate }) } : {})
                 }
-            }, { session });
+            }, { session }).setOptions(ANY_BRANCH);
         });
 
         return res.status(201).json(await loadSerial(asset._id));
@@ -613,7 +660,7 @@ exports.transferSerial = async (req, res) => {
         if (error.status) return res.status(error.status).json({ message: error.message });
         if (error.code === 11000) {
             // Same request sent twice: the first one saved it.
-            if (requestId && await SerialTransfer.exists({ requestId })) return repeatedRequest(res, assetId, access);
+            if (requestId && await SerialTransfer.exists({ requestId }).setOptions(ANY_BRANCH)) return repeatedRequest(res, assetId, access);
             return res.status(409).json({ message: 'This serial number was just changed by someone else. Reload the page and try again.' });
         }
         console.error('Serial transfer failed:', error);
@@ -643,7 +690,7 @@ exports.addPastEntry = async (req, res) => {
         if (startOfDay(entryDate) > startOfDay(new Date())) throw httpError(400, 'A past entry cannot be dated in the future.');
         access = await mgrAccessCondition(req);
 
-        if (requestId && await SerialTransfer.exists({ requestId })) {
+        if (requestId && await SerialTransfer.exists({ requestId }).setOptions(ANY_BRANCH)) {
             return repeatedRequest(res, assetId, access);
         }
 
@@ -679,7 +726,7 @@ exports.addPastEntry = async (req, res) => {
         return res.status(201).json(await loadSerial(asset._id));
     } catch (error) {
         if (error.status) return res.status(error.status).json({ message: error.message });
-        if (error.code === 11000 && requestId && await SerialTransfer.exists({ requestId })) {
+        if (error.code === 11000 && requestId && await SerialTransfer.exists({ requestId }).setOptions(ANY_BRANCH)) {
             return repeatedRequest(res, assetId, access);
         }
         console.error('Serial past entry failed:', error);
@@ -689,11 +736,14 @@ exports.addPastEntry = async (req, res) => {
     }
 };
 
-/** Transfer History: every saved record, newest first, with search and Active/Inactive filter. */
+/**
+ * Transfer History: every saved record of the serials the branch sees (recordScopeCondition),
+ * newest first, with search and Active/Inactive filter.
+ */
 exports.listHistory = async (req, res) => {
     try {
         const { page, limit, skip } = getPagination(req.query);
-        const query = activeBranchFilter() || {};
+        const query = {};
         const search = cleanText(req.query.search);
         if (search) {
             const pattern = searchPattern(search);
@@ -710,13 +760,17 @@ exports.listHistory = async (req, res) => {
         if (range) query.transferDate = range;
         const { products } = await productScope(req);
         if (products) query.productId = products;
+        const scope = await serialBranchScope();
+        const branchRecords = await recordScopeCondition(scope);
+        const scopedQuery = branchRecords ? { $and: [query, branchRecords] } : query;
 
         const [records, total] = await Promise.all([
-            SerialTransfer.find(query).sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit).lean(),
-            SerialTransfer.countDocuments(query)
+            SerialTransfer.find(scopedQuery).setOptions(scope.options).sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit).lean(),
+            SerialTransfer.countDocuments(scopedQuery).setOptions(scope.options)
         ]);
         const assets = records.length
             ? await Asset.find({ _id: { $in: [...new Set(records.map((r) => String(r.assetId)))] } })
+                .setOptions(ANY_BRANCH)
                 .select('invoiceNumber invoiceDate saleDate').lean()
             : [];
         const assetById = new Map(assets.map((asset) => [String(asset._id), asset]));
@@ -742,12 +796,15 @@ exports.listHistory = async (req, res) => {
  */
 const OWNERSHIPS = ['Active', 'Inactive'];
 
-const activeOwners = async ({ companyId, search, range, assetId, products, skip, limit }) => {
+// `scope` (serialBranchScope) and `records` (recordScopeCondition) limit both logs to the serials the branch sees.
+const activeOwners = async ({ companyId, search, range, assetId, products, skip, limit, scope, records }) => {
     // Serials with an active history record have a current owner whatever their status.
-    const owned = await SerialTransfer.find({ isActive: true }).select('assetId').lean();
+    const owned = await SerialTransfer.find(records ? { $and: [{ isActive: true }, records] } : { isActive: true })
+        .setOptions(scope.options)
+        .select('assetId')
+        .lean();
     const match = { $and: [{ $or: [{ status: 'SOLD' }, { _id: { $in: owned.map((record) => record.assetId) } }] }] };
-    const branchFilter = activeBranchFilter();
-    if (branchFilter) Object.assign(match, branchFilter);
+    if (scope.condition) match.$and.push(scope.condition);
     // Aggregation does not cast, so the ids must already be ObjectIds (distinct returns ObjectIds).
     if (assetId) match._id = new mongoose.Types.ObjectId(String(assetId));
     if (products) match.productId = products;
@@ -782,7 +839,7 @@ const activeOwners = async ({ companyId, search, range, assetId, products, skip,
         { $addFields: { ownerSince: { $ifNull: ['$current.transferDate', { $ifNull: ['$saleDate', { $ifNull: ['$invoiceDate', '$createdAt'] }] }] } } },
         ...(range ? [{ $match: { ownerSince: range } }] : []),
         { $facet: { rows: page, total: [{ $count: 'count' }] } }
-    ]);
+    ]).option(scope.options);
 
     const rows = (result?.rows || []).map((asset) => {
         const current = asset.current;
@@ -809,10 +866,9 @@ const activeOwners = async ({ companyId, search, range, assetId, products, skip,
     return { rows, total: result?.total?.[0]?.count || 0 };
 };
 
-const inactiveOwners = async ({ companyId, search, range, assetId, products, skip, limit }) => {
+const inactiveOwners = async ({ companyId, search, range, assetId, products, skip, limit, scope, records: branchRecords }) => {
     const query = { isActive: false };
-    const branchFilter = activeBranchFilter();
-    if (branchFilter) Object.assign(query, branchFilter);
+    if (branchRecords) query.$and = [branchRecords];
     if (assetId) query.assetId = assetId;
     if (products) query.productId = products;
     if (search) {
@@ -825,13 +881,14 @@ const inactiveOwners = async ({ companyId, search, range, assetId, products, ski
     }
     if (range) query.transferDate = range;
 
-    let find = SerialTransfer.find(query).sort({ transferDate: -1, _id: -1 });
+    let find = SerialTransfer.find(query).setOptions(scope.options).sort({ transferDate: -1, _id: -1 });
     if (skip) find = find.skip(skip);
     if (limit) find = find.limit(limit);
-    const [records, total] = await Promise.all([find.lean(), SerialTransfer.countDocuments(query)]);
+    const [records, total] = await Promise.all([find.lean(), SerialTransfer.countDocuments(query).setOptions(scope.options)]);
 
     const assets = records.length
         ? await Asset.find({ _id: { $in: [...new Set(records.map((r) => String(r.assetId)))] } })
+            .setOptions(ANY_BRANCH)
             .select('invoiceNumber invoiceDate saleDate indicatorField').lean()
         : [];
     const assetById = new Map(assets.map((asset) => [String(asset._id), asset]));
@@ -901,10 +958,10 @@ const withMasterData = async (rows) => {
 };
 
 // ?assetId limits the log to one serial number (the serial's details page), within `access`.
-const activitySerial = async (assetId, access) => {
+const activitySerial = async (scope, assetId, access) => {
     if (!assetId) return null;
     if (!mongoose.Types.ObjectId.isValid(assetId)) throw httpError(400, 'Invalid serial record');
-    const asset = await Asset.findOne(addActiveBranchFilter({ _id: assetId, ...access })).select('serialNumber').lean();
+    const asset = await scopedSerial(scope, assetId, access).select('serialNumber').lean();
     if (!asset) throw httpError(404, 'Serial number not found');
     return asset;
 };
@@ -913,13 +970,16 @@ const loadActivity = async (req, paging = {}) => {
     const { query } = req;
     const ownership = OWNERSHIPS.includes(query.ownership) ? query.ownership : 'Active';
     const { products, access } = await productScope(req);
-    const serial = await activitySerial(query.assetId, access);
+    const scope = await serialBranchScope();
+    const serial = await activitySerial(scope, query.assetId, access);
     const options = {
         companyId: req.user.companyId,
         search: cleanText(query.search),
         range: dateRange(query),
         assetId: serial?._id,
         products,
+        scope,
+        records: await recordScopeCondition(scope),
         ...paging
     };
     const { rows, total } = await (ownership === 'Active' ? activeOwners(options) : inactiveOwners(options));

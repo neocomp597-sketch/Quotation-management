@@ -865,5 +865,31 @@
     "deployedBy": "Super Admin",
     "deployedAt": "2026-11-14T21:00:00+05:30",
     "isActive": true
+  },
+  {
+    "version": "v6.8.1",
+    "title": "Serial Numbers Show in the Customer's Branch & No Login Popup",
+    "message": "Release Updates (from 15 Nov 2026): Serial No Transfer now also shows the serial numbers of a branch's own customers that another branch sold. The \"Welcome Back! Login successful\" message no longer appears after signing in.",
+    "releaseNotes": [
+      "Serial No Transfer: a branch now sees the serial numbers of its own customers even when another branch made the sale, as well as the serial numbers it sold itself",
+      "Login: the \"Welcome Back! Login successful\" message after signing in has been removed; the app opens straight away"
+    ],
+    "detailedChanges": [
+      {
+        "date": "15.11.2026",
+        "module": "Master Management",
+        "submodule": "Serial No Transfer: Serials of the Branch's Own Customers",
+        "changes": "Any branch can make a sale, so a customer's serial numbers were often uploaded under another branch and did not show in the customer's own branch. Serial No List now shows a branch the serial numbers it holds and also every serial number whose current customer belongs to that branch in Customer Master. For example, a serial sold by Nashik to an EPC customer shows in EPC and in Nashik. The Branch column still shows the branch that holds the serial. From the customer's branch you can open the serial, see its history, transfer it to another customer, add a past entry and save its Asset No. Transfer History and Customer Activity Log follow the same rule. If a customer is moved to another branch, their serial numbers follow them. Invoice Bulk Upload is not changed and still shows the serial numbers uploaded in the branch, and MGR Access still applies."
+      },
+      {
+        "date": "15.11.2026",
+        "module": "Login",
+        "submodule": "No Welcome Popup After Signing In",
+        "changes": "The \"Welcome Back! Login successful\" message that appeared at the top of the screen after every sign-in has been removed, and the app now opens without the short wait that kept it on screen. Messages for a wrong email or password are unchanged."
+      }
+    ],
+    "deployedBy": "Super Admin",
+    "deployedAt": "2026-11-15T21:00:00+05:30",
+    "isActive": true
   }
 ]
