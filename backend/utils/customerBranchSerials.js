@@ -15,6 +15,8 @@ const { getActiveBranchId } = require('../middlewares/tenantContext');
 // For records already checked to be visible (a serial found through serialBranchScope, its history).
 const ANY_BRANCH = { bypassBranch: true };
 
+const toObjectId = (id) => (id instanceof mongoose.Types.ObjectId ? id : new mongoose.Types.ObjectId(String(id)));
+
 const activeBranchFilter = () => {
     const branchId = getActiveBranchId();
     return branchId && mongoose.Types.ObjectId.isValid(branchId)
@@ -23,15 +25,19 @@ const activeBranchFilter = () => {
 };
 
 /**
- * The rule for the request's active branch. `condition` is null when no branch is active, and
- * tenantPlugin's own filter applies as before. Otherwise `condition` replaces the plugin's branch
- * filter (which would hide the serials of other branches), so every Asset query using it must
- * also pass `options`. `customerIds` are ObjectIds, so `condition` also works in aggregations.
+ * The rule for the request's active branch, or for `branchIds` when given (several branches shown
+ * together; the caller has checked the user may use them). `condition` is null when there is
+ * neither, and tenantPlugin's own filter applies as before. Otherwise `condition` replaces the
+ * plugin's branch filter (which would hide the serials of other branches), so every Asset query
+ * using it must also pass `options`. `customerIds` are ObjectIds, so `condition` also works in
+ * aggregations.
  */
-const serialBranchScope = async () => {
-    const branchFilter = activeBranchFilter();
+const serialBranchScope = async (branchIds = null) => {
+    const ids = Array.isArray(branchIds) && branchIds.length ? branchIds.map(toObjectId) : null;
+    const branchFilter = ids ? (ids.length === 1 ? { branchId: ids[0] } : { branchId: { $in: ids } }) : activeBranchFilter();
     if (!branchFilter) return { condition: null, options: {}, branchFilter: null, customerIds: [] };
-    const customers = await Customer.find(branchFilter).select('_id').lean();
+    // The filter names its branches; the plugin would add the active branch on top of it.
+    const customers = await Customer.find(branchFilter).select('_id').setOptions(ANY_BRANCH).lean();
     const customerIds = customers.map((customer) => customer._id);
     return {
         condition: customerIds.length ? { $or: [branchFilter, { customerId: { $in: customerIds } }] } : branchFilter,
@@ -41,7 +47,18 @@ const serialBranchScope = async () => {
     };
 };
 
+/**
+ * The same rule over every branch the user may use (req.user.allowedBranchIds; null = every
+ * branch of the company): for one serial opened from a list that shows several branches.
+ */
+const myBranchesScope = async (req) => {
+    const allowed = req.user?.allowedBranchIds;
+    if (allowed === null) return { condition: null, options: ANY_BRANCH, branchFilter: null, customerIds: [] };
+    if (!Array.isArray(allowed) || !allowed.length) return serialBranchScope();
+    return serialBranchScope(allowed.filter((id) => mongoose.Types.ObjectId.isValid(String(id))));
+};
+
 /** `query` limited to the serials of `scope` (from serialBranchScope). */
 const inScope = (query, scope) => (scope.condition ? { $and: [query, scope.condition] } : query);
 
-module.exports = { ANY_BRANCH, activeBranchFilter, serialBranchScope, inScope };
+module.exports = { ANY_BRANCH, activeBranchFilter, serialBranchScope, myBranchesScope, inScope };

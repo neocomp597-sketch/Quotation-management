@@ -1044,5 +1044,39 @@
     "deployedBy": "Super Admin",
     "deployedAt": "2026-11-16T00:30:00+05:30",
     "isActive": true
+  },
+  {
+    "version": "v6.8.7",
+    "title": "Several Branches in Serial No Transfer; Employee Items Shared with Invoice Bulk Upload",
+    "message": "Release Updates (from 16 Nov 2026): Serial No Transfer can show several branches together, as Invoice Bulk Upload does. Invoice Bulk Upload and Employee Master now share one record for items given to employees: an entry made against an employee in either screen shows in the other, and no second customer is made for the employee.",
+    "releaseNotes": [
+      "Serial No Transfer: tick one or several branch buttons to see their serial numbers, transfer history and customer activity together",
+      "Invoice Bulk Upload: an entry against an employee (by employee code, or by name) goes to the employee's own customer and shows in Employee Edit under Assign Asset",
+      "Employee Master: an item assigned there shows in Invoice Bulk Upload and Serial No Transfer with the employee as its customer",
+      "Customer Master: extra customers made earlier for employees from Invoice Bulk Upload are joined into the employee's customer, with their items and history"
+    ],
+    "detailedChanges": [
+      {
+        "date": "16.11.2026",
+        "module": "Master Management",
+        "submodule": "Serial No Transfer: Several Branches",
+        "changes": "The branch buttons at the top of Serial No Transfer now work as in Invoice Bulk Upload: tick one or several of your branches, or All branches, to see them together in Serial No List, Transfer History and Customer Activity Log (and its Excel download). A line under the buttons names the branches shown, and the Branch column shows where each serial number is. The choice is kept while you work on the screen, until you change the working branch at the top of the screen; untick the others to go back to the working branch alone. A serial number of any of your branches can be opened, given an Asset No and transferred; the Transfer box lists the customers of the working branch. Branch Transfer is unchanged. A branch you do not have access to cannot be shown."
+      },
+      {
+        "date": "16.11.2026",
+        "module": "Master Management",
+        "submodule": "Invoice Bulk Upload and Employee Master: One Record",
+        "changes": "Invoice Bulk Upload is used for company items given to employees (such as laptops) as well as for sales to customers. When Add Single Entry or the Excel upload names an employee, by the Employee ID as Customer Code (a short form of the name is fine, such as first and last name) or by the employee's name when no other employee has it, the entry now goes to the employee's own customer, the one made for every employee, instead of making a second customer. The item then shows in Employee Edit under Assign Asset, among the items the employee holds. The other way round, an item assigned or transferred in Employee Master shows in Invoice Bulk Upload and Serial No Transfer with the employee as its customer. Entries for real customers are not changed."
+      },
+      {
+        "date": "16.11.2026",
+        "module": "Master Management",
+        "submodule": "Customer Master: Employee Duplicates Joined",
+        "changes": "Customers made earlier from Invoice Bulk Upload for an employee are joined into the employee's customer: one with the Employee ID as its code and the same name or a short form of it, or with the same name and email. Its serial numbers, their history, tickets and other records move to the employee's customer and the extra customer is removed, so each employee has one customer with all their items. When an employee is added, a customer already made for them in Invoice Bulk Upload is used as their customer. This runs when the system starts and after each Invoice Bulk Upload Excel upload. Matching by name alone is used only when one customer has the name and no other employee shares it, and never for a customer with a GSTIN."
+      }
+    ],
+    "deployedBy": "Super Admin",
+    "deployedAt": "2026-11-16T01:00:00+05:30",
+    "isActive": true
   }
 ]

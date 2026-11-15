@@ -858,6 +858,14 @@ module.exports = {
 
     async afterImport({ user, run }) {
         const companyId = companyOf(user);
+        // Customers this file added that are employees (code / name) become the employee's one
+        // customer, so their items show under Employee Master > Assign Asset (no duplicates).
+        try {
+            const { syncCustomersForExistingEmployees } = require('../../employeeCustomerService');
+            await syncCustomersForExistingEmployees(companyId);
+        } catch (error) {
+            console.error('Invoice Bulk Upload import: employee customer sync failed:', error);
+        }
         await Promise.all([invalidateCustomerCaches(), invalidateProductCaches(), invalidateAssetCaches(companyId)]);
         const saved = run.created + run.updated;
         if (!saved) return;

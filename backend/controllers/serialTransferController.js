@@ -12,7 +12,15 @@ const SerialTransfer = require('../models/SerialTransfer');
 const SerialBranchTransfer = require('../models/SerialBranchTransfer');
 const { MGR_KEYS, formatMgrVal } = require('../utils/productMgr');
 const { formatDate } = require('../utils/dateFormat');
-const { ANY_BRANCH, serialBranchScope, inScope } = require('../utils/customerBranchSerials');
+const { ANY_BRANCH, serialBranchScope, myBranchesScope, inScope } = require('../utils/customerBranchSerials');
+const { requestedViewBranches } = require('../utils/viewBranches');
+
+// The branches a list shows: ?branchIds (several at once, checked against the user's branches),
+// else the active branch.
+const listScope = async (req) => {
+    const view = await requestedViewBranches(req);
+    return serialBranchScope(view ? view.map((branch) => branch._id) : null);
+};
 const { limitedBranchIds, canMoveFrom, visibleTransfersCondition } = require('../utils/serialBranchAccess');
 const { getMgrAccess, accessCondition, conditionAllowsId, describeMgrAccess, mgrAccessCondition } = require('../utils/mgrAccess');
 const { searchPattern, matchingMasterIds, assetSearchConditions } = require('../utils/assetSearch');
@@ -345,7 +353,7 @@ exports.listSerials = async (req, res) => {
 
         const assetFilter = await ownershipFilter(req.query.ownership);
         if (assetFilter) query._id = assetFilter;
-        const scope = await serialBranchScope();
+        const scope = await listScope(req);
         const scopedQuery = inScope(query, scope);
 
         const [assets, total] = await Promise.all([
@@ -391,8 +399,10 @@ exports.listSerials = async (req, res) => {
 };
 
 // `access`: the user's MGR access condition (mgrAccessCondition); a serial outside it is not found.
-const loadSerial = async (assetId, access = null) => {
-    const asset = await scopedSerial(await serialBranchScope(), assetId, access).populate(customerPopulate).populate(branchPopulate).lean();
+// `scope`: which branches it may be in (default the active branch; myBranchesScope for a serial
+// opened from a list showing several branches).
+const loadSerial = async (assetId, access = null, scope = null) => {
+    const asset = await scopedSerial(scope || await serialBranchScope(), assetId, access).populate(customerPopulate).populate(branchPopulate).lean();
     if (!asset) return null;
 
     let history = (await historyOf(asset._id)).map((entry) => withInvoice(entry, asset));
@@ -430,15 +440,15 @@ const loadSerial = async (assetId, access = null) => {
 };
 
 // The serial a customer transfer or past entry is saved for, of any status, within `access`.
-const loadTransferSerial = async (assetId, access = null) => {
-    const asset = await scopedSerial(await serialBranchScope(), assetId, access).populate(customerPopulate).lean();
+const loadTransferSerial = async (assetId, access = null, scope = null) => {
+    const asset = await scopedSerial(scope || await serialBranchScope(), assetId, access).populate(customerPopulate).lean();
     if (!asset) throw httpError(404, 'Serial number not found');
     return asset;
 };
 
 // An earlier request repeated: the serial as saved, if the user may still see it.
-const repeatedRequest = async (res, assetId, access) => {
-    const saved = await loadSerial(assetId, access);
+const repeatedRequest = async (res, assetId, access, scope = null) => {
+    const saved = await loadSerial(assetId, access, scope);
     return saved ? res.json(saved) : res.status(404).json({ message: 'Serial number not found' });
 };
 
@@ -448,7 +458,7 @@ exports.getSerial = async (req, res) => {
         if (!mongoose.Types.ObjectId.isValid(req.params.assetId)) {
             return res.status(400).json({ message: 'Invalid serial record' });
         }
-        const result = await loadSerial(req.params.assetId, await mgrAccessCondition(req));
+        const result = await loadSerial(req.params.assetId, await mgrAccessCondition(req), await myBranchesScope(req));
         if (!result) return res.status(404).json({ message: 'Serial number not found' });
         return res.json(result);
     } catch (error) {
@@ -467,7 +477,7 @@ exports.updateAssetNo = async (req, res) => {
         }
         const access = await mgrAccessCondition(req);
         const assetNo = cleanText(req.body.assetNo).slice(0, ASSET_NO_MAX_LENGTH);
-        const scope = await serialBranchScope();
+        const scope = await myBranchesScope(req);
         const previous = await Asset.findOneAndUpdate(inScope({ _id: assetId, ...access }, scope), { $set: { assetNo } })
             .setOptions(scope.options)
             .select('assetNo serialNumber companyId')
@@ -491,7 +501,7 @@ exports.updateAssetNo = async (req, res) => {
                 console.error('Asset No audit log error:', auditError);
             }
         }
-        return res.json(await loadSerial(assetId, access));
+        return res.json(await loadSerial(assetId, access, scope));
     } catch (error) {
         return res.status(500).json({ message: 'Failed to save the Asset No', error: error.message });
     }
@@ -604,6 +614,7 @@ exports.transferSerial = async (req, res) => {
     const requestId = cleanText(req.body.requestId).slice(0, 100) || undefined;
     let session;
     let access = null;
+    let scope = null;
     try {
         if (!mongoose.Types.ObjectId.isValid(assetId)) throw httpError(400, 'Invalid serial record');
         const customerId = req.body.customerId;
@@ -612,12 +623,13 @@ exports.transferSerial = async (req, res) => {
         if (!transferDate) throw httpError(400, 'Transfer date is not a valid date.');
         if (startOfDay(transferDate) > startOfDay(new Date())) throw httpError(400, 'Transfer date cannot be in the future.');
         access = await mgrAccessCondition(req);
+        scope = await myBranchesScope(req);
 
         if (requestId && await SerialTransfer.exists({ requestId }).setOptions(ANY_BRANCH)) {
-            return repeatedRequest(res, assetId, access);
+            return repeatedRequest(res, assetId, access, scope);
         }
 
-        const asset = await loadTransferSerial(assetId, access);
+        const asset = await loadTransferSerial(assetId, access, scope);
         if (asset.status === 'SCRAPPED') {
             throw httpError(400, `${asset.serialNumber} is scrapped. Its customer history is kept, but a scrapped serial number cannot be assigned or transferred to a customer.`);
         }
@@ -634,12 +646,12 @@ exports.transferSerial = async (req, res) => {
             transferDate, sells, remarks: req.body.remarks, requestId, user
         }, session));
 
-        return res.status(201).json(await loadSerial(asset._id));
+        return res.status(201).json(await loadSerial(asset._id, null, scope));
     } catch (error) {
         if (error.status) return res.status(error.status).json({ message: error.message });
         if (error.code === 11000) {
             // Same request sent twice: the first one saved it.
-            if (requestId && await SerialTransfer.exists({ requestId }).setOptions(ANY_BRANCH)) return repeatedRequest(res, assetId, access);
+            if (requestId && await SerialTransfer.exists({ requestId }).setOptions(ANY_BRANCH)) return repeatedRequest(res, assetId, access, scope);
             return res.status(409).json({ message: 'This serial number was just changed by someone else. Reload the page and try again.' });
         }
         console.error('Serial transfer failed:', error);
@@ -660,6 +672,7 @@ exports.addPastEntry = async (req, res) => {
     const requestId = cleanText(req.body.requestId).slice(0, 100) || undefined;
     let session;
     let access = null;
+    let scope = null;
     try {
         if (!mongoose.Types.ObjectId.isValid(assetId)) throw httpError(400, 'Invalid serial record');
         if (!mongoose.Types.ObjectId.isValid(req.body.customerId)) throw httpError(400, 'Select the customer.');
@@ -668,12 +681,13 @@ exports.addPastEntry = async (req, res) => {
         if (!entryDate) throw httpError(400, 'Date is not a valid date.');
         if (startOfDay(entryDate) > startOfDay(new Date())) throw httpError(400, 'A past entry cannot be dated in the future.');
         access = await mgrAccessCondition(req);
+        scope = await myBranchesScope(req);
 
         if (requestId && await SerialTransfer.exists({ requestId }).setOptions(ANY_BRANCH)) {
-            return repeatedRequest(res, assetId, access);
+            return repeatedRequest(res, assetId, access, scope);
         }
 
-        const asset = await loadTransferSerial(assetId, access);
+        const asset = await loadTransferSerial(assetId, access, scope);
         const customer = await Customer.findById(req.body.customerId).select(CUSTOMER_SELECT).lean();
         if (!customer) throw httpError(404, 'Customer not found in Customer Master.');
         const user = { createdBy: req.user?.id || null, createdByName: req.user?.name || '' };
@@ -702,11 +716,11 @@ exports.addPastEntry = async (req, res) => {
             }], { session });
         });
 
-        return res.status(201).json(await loadSerial(asset._id));
+        return res.status(201).json(await loadSerial(asset._id, null, scope));
     } catch (error) {
         if (error.status) return res.status(error.status).json({ message: error.message });
         if (error.code === 11000 && requestId && await SerialTransfer.exists({ requestId }).setOptions(ANY_BRANCH)) {
-            return repeatedRequest(res, assetId, access);
+            return repeatedRequest(res, assetId, access, scope);
         }
         console.error('Serial past entry failed:', error);
         return res.status(500).json({ message: `Failed to save the past entry: ${error.message}` });
@@ -739,7 +753,7 @@ exports.listHistory = async (req, res) => {
         if (range) query.transferDate = range;
         const { products } = await productScope(req);
         if (products) query.productId = products;
-        const scope = await serialBranchScope();
+        const scope = await listScope(req);
         const branchRecords = await recordScopeCondition(scope);
         const scopedQuery = branchRecords ? { $and: [query, branchRecords] } : query;
 
@@ -949,7 +963,8 @@ const loadActivity = async (req, paging = {}) => {
     const { query } = req;
     const ownership = OWNERSHIPS.includes(query.ownership) ? query.ownership : 'Active';
     const { products, access } = await productScope(req);
-    const scope = await serialBranchScope();
+    // One serial's log (its page) covers every branch the user may use; the log list follows the list's branches.
+    const scope = query.assetId ? await myBranchesScope(req) : await listScope(req);
     const serial = await activitySerial(scope, query.assetId, access);
     const options = {
         companyId: req.user.companyId,

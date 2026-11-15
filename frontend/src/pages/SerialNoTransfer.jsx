@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { MdSearch, MdSwapHoriz, MdVisibility, MdArrowBack, MdPersonAdd, MdHistory, MdCheckCircle, MdFileDownload, MdAdd, MdClose, MdArrowForward, MdStore, MdExpandMore } from 'react-icons/md';
 import { toast } from 'react-toastify';
@@ -126,6 +126,21 @@ const InvoiceCell = ({ entry }) => (
 );
 
 const EMPTY_PAGINATION = { page: 1, limit: PAGE_SIZE, total: 0, pages: 1 };
+
+// The branches the lists show (the branch buttons, several at a time) as the ?branchIds value, or
+// undefined when only the working branch is shown. Branch Transfer and one serial's page ignore it.
+const ViewBranchesContext = createContext(undefined);
+const useViewBranches = () => useContext(ViewBranchesContext);
+// Back to page 1 when the shown branches change (not on the first render, so a page kept while
+// visiting a serial is restored).
+const useFirstPageOnChange = (value, setPage) => {
+    const first = useRef(true);
+    useEffect(() => {
+        if (first.current) { first.current = false; return; }
+        setPage(1);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [value]);
+};
 
 // Debounced list loader shared by the tabs: rows are "loading" until they belong to the current
 // request. Nothing is requested while `enabled` is false (e.g. an invalid date range). `mgrAccess`
@@ -290,9 +305,11 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
     const range = useDateRange('list');
     const debouncedSearch = useDebounced(search.trim());
 
+    const viewBranches = useViewBranches();
+    useFirstPageOnChange(viewBranches, setPage);
     const { rows, pagination, loading, mgrAccess } = useList(serialTransferService.listSerials, {
         page, limit: PAGE_SIZE, search: debouncedSearch || undefined, field: field || undefined, status: status || undefined,
-        ownership: ownership || undefined, mgr1: mgr1 || undefined, mgr4: mgr4 || undefined, ...range.params,
+        ownership: ownership || undefined, mgr1: mgr1 || undefined, mgr4: mgr4 || undefined, ...range.params, branchIds: viewBranches,
     }, !range.invalid);
     const offset = (pagination.page - 1) * pagination.limit;
     // The row whose Download Customer Activity Log dialog is open.
@@ -448,8 +465,10 @@ const HistoryTab = ({ onOpen }) => {
     const range = useDateRange('history');
     const debouncedSearch = useDebounced(search.trim());
 
+    const viewBranches = useViewBranches();
+    useFirstPageOnChange(viewBranches, setPage);
     const { rows, pagination, loading } = useList(serialTransferService.listHistory, {
-        page, limit: PAGE_SIZE, search: debouncedSearch || undefined, flag: flag || undefined, entryType: entryType || undefined, mgr1: mgr1 || undefined, mgr4: mgr4 || undefined, ...range.params,
+        page, limit: PAGE_SIZE, search: debouncedSearch || undefined, flag: flag || undefined, entryType: entryType || undefined, mgr1: mgr1 || undefined, mgr4: mgr4 || undefined, ...range.params, branchIds: viewBranches,
     }, !range.invalid);
 
     const emptyText = range.invalid ? 'Correct the date range to see results.'
@@ -687,9 +706,11 @@ const ActivityTab = ({ onOpen, assetId }) => {
     const debouncedSearch = useDebounced(search.trim());
     const [downloading, setDownloading] = useState(false);
 
+    const viewBranches = useViewBranches();
+    useFirstPageOnChange(viewBranches, setPage);
     const filters = assetId
         ? { ownership, assetId }
-        : { ownership, search: debouncedSearch || undefined, mgr1: mgr1 || undefined, mgr4: mgr4 || undefined, ...range.params };
+        : { ownership, search: debouncedSearch || undefined, mgr1: mgr1 || undefined, mgr4: mgr4 || undefined, ...range.params, branchIds: viewBranches };
     const { rows, pagination, loading } = useList(serialTransferService.listActivity, { ...filters, page, limit: PAGE_SIZE }, !range.invalid);
     const offset = (pagination.page - 1) * pagination.limit;
     const inactive = ownership === 'Inactive';
@@ -2008,6 +2029,30 @@ const BranchTransferDetails = ({ transfer, onClose }) => {
 };
 
 const SerialNoTransfer = () => {
+    const { user, activeBranchId } = useAuth();
+    // The branches shown, as in Invoice Bulk Upload: one or several of the user's branches; kept in
+    // this browser tab until the working branch is changed at the top of the screen.
+    const viewStorageKey = `snt:viewBranches:${user?._id || user?.id || ''}`;
+    const [myBranches, setMyBranches] = useState([]);
+    const [viewBranchIds, setViewBranchIds] = useState(() => (activeBranchId ? [String(activeBranchId)] : []));
+    const handleBranchesLoaded = (branches) => {
+        setMyBranches(branches);
+        const allowed = new Set(branches.map((branch) => String(branch?._id || branch)));
+        let stored = null;
+        try { stored = JSON.parse(sessionStorage.getItem(viewStorageKey) || 'null'); } catch { stored = null; }
+        if (!stored || stored.workingBranchId !== String(activeBranchId || '') || !Array.isArray(stored.ids)) return;
+        const kept = stored.ids.map(String).filter((id) => allowed.has(id));
+        if (kept.length) setViewBranchIds(kept);
+    };
+    const changeViewBranches = (ids) => {
+        setViewBranchIds(ids);
+        try {
+            sessionStorage.setItem(viewStorageKey, JSON.stringify({ workingBranchId: String(activeBranchId || ''), ids }));
+        } catch { /* storage unavailable: not remembered */ }
+    };
+    const showsOtherBranches = viewBranchIds.length > 1 || (viewBranchIds.length === 1 && viewBranchIds[0] !== String(activeBranchId || ''));
+    const viewBranchParam = showsOtherBranches ? viewBranchIds.join(',') : undefined;
+    const branchNameOf = (id) => myBranches.find((branch) => String(branch?._id || branch) === String(id))?.name || '';
     const [searchParams, setSearchParams] = useSearchParams();
     const tab = TABS.some((item) => item.key === searchParams.get('tab')) ? searchParams.get('tab') : 'serials';
     const navigate = useNavigate();
@@ -2021,9 +2066,21 @@ const SerialNoTransfer = () => {
             </div>
 
             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                {/* The branches this user was given, as in Invoice Bulk Upload: picking one makes it the
-                    working branch, and every tab then shows that branch. */}
-                <BranchChips className="flex flex-wrap items-center gap-2 px-3 sm:px-5 pt-3 sm:pt-5" />
+                {/* The branches this user was given, as in Invoice Bulk Upload: tick one or several to show
+                    them together in Serial No List, Transfer History and Customer Activity Log. */}
+                <BranchChips
+                    className="flex flex-wrap items-center gap-2 px-3 sm:px-5 pt-3 sm:pt-5"
+                    multiple
+                    selected={viewBranchIds}
+                    onChange={changeViewBranches}
+                    onLoaded={handleBranchesLoaded}
+                />
+                {showsOtherBranches && tab !== 'branch' && (
+                    <p className="px-3 sm:px-5 pt-2 text-xs font-semibold text-slate-500">
+                        Showing {viewBranchIds.length === 1 ? 'branch' : `${viewBranchIds.length} branches`}: <span className="font-black text-slate-700">{viewBranchIds.map(branchNameOf).filter(Boolean).join(', ')}</span>.
+                        {' '}The Branch column shows where each serial number is.
+                    </p>
+                )}
                 <div className="flex gap-1 overflow-x-auto border-b border-slate-100 px-2 sm:px-4 pt-2 sm:pt-4">
                     {TABS.map((item) => (
                         <button
@@ -2036,12 +2093,14 @@ const SerialNoTransfer = () => {
                         </button>
                     ))}
                 </div>
+                <ViewBranchesContext.Provider value={viewBranchParam}>
                 {tab === 'serials' && (
                     <SerialListTab onOpen={openSerial} onTransfer={(assetId, mode) => navigate(`/serial-no-transfer/${assetId}/transfer${mode === 'assign' ? '?mode=assign' : ''}`)} />
                 )}
                 {tab === 'history' && <HistoryTab onOpen={openSerial} />}
                 {tab === 'activity' && <ActivityTab onOpen={openSerial} />}
                 {tab === 'branch' && <BranchTransferTab />}
+                </ViewBranchesContext.Provider>
             </div>
         </div>
     );

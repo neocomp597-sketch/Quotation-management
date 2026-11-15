@@ -479,6 +479,12 @@ const resolveEntryCustomer = async (req, { companyId, customerCode, customerInpu
     if (searchTarget) {
         customer = await findEntryCustomer(companyId, searchTarget);
 
+        // An entry for an employee (by code or name) goes to that employee's customer, never a new one.
+        if (!customer) {
+            const { customerForEmployeeMatch } = require('../services/employeeCustomerService');
+            customer = await customerForEmployeeMatch({ companyId, code: finalCustomerCode, name: customerInput || (finalCustomerCode ? '' : searchTarget) });
+        }
+
         if (!customer) {
             customer = await Customer.create({
                 companyId,
