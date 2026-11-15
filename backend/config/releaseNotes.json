@@ -891,5 +891,39 @@
     "deployedBy": "Super Admin",
     "deployedAt": "2026-11-15T21:00:00+05:30",
     "isActive": true
+  },
+  {
+    "version": "v6.8.2",
+    "title": "Tickets Close Only From the Service Visit & Tickets Register on Phones",
+    "message": "Release Updates (from 15 Nov 2026): A ticket is now closed only from its Service Visit, with Close Ticket at check-out; Ticket Details no longer has a Close Ticket button. The Tickets Register shows Status next to the ticket number and shows tickets as cards on phones.",
+    "releaseNotes": [
+      "Ticket Details: the Close Ticket button and Closed in Update Status are removed; close a ticket by checking out its service visit with Close Ticket",
+      "Service Visits: check-out needs a check-in, a visit report and a product photo (and a next action for Close Visit), and these are now checked for every check-out",
+      "Tickets Register: Status and Priority come right after the ticket number, so they are never hidden behind the Engineer and Action columns",
+      "Tickets Register on phones: each ticket is a card with its status, customer, subject, priority, engineer, invoice and serial number, and the Details and Call Sheet buttons"
+    ],
+    "detailedChanges": [
+      {
+        "date": "15.11.2026",
+        "module": "CSM Support",
+        "submodule": "Ticket Details: Close a Ticket From Its Service Visit Only",
+        "changes": "Users could close a ticket in two places: Close Ticket in Ticket Details and Close Ticket at the check-out of a service visit. Ticket Details no longer has the Close Ticket button, and Update Status no longer offers Closed. In their place the Actions card says to close the ticket from its service visit, with a link to the Field Visits tab. A ticket is closed when the engineer checks out of its visit with Close Ticket, after checking in and adding the visit report and product photo. Closing a ticket any other way is refused with a message saying so. A closed ticket still shows Ticket Closed with the date, can still be re-opened with Update Status, and keeps all its history and visit records. Every other action in Ticket Details is unchanged."
+      },
+      {
+        "date": "15.11.2026",
+        "module": "CSM Support",
+        "submodule": "Service Visits: Check-Out Rules",
+        "changes": "Check-out of a service visit is accepted only for a visit that has been checked in, and only with a visit report and a product photo; Close Visit also needs the next action. The screen already asked for these; they are now checked for every check-out, so a visit cannot be completed, and its ticket cannot be closed, without them. A completed visit cannot be checked out a second time: re-open or reschedule it instead."
+      },
+      {
+        "date": "15.11.2026",
+        "module": "CSM Support",
+        "submodule": "Tickets Register: Status Always Visible, Cards on Phones",
+        "changes": "The Engineer and Action columns stay fixed at the right of the Tickets Register so Details is always within reach, but on many screens they covered the Status column. Status and Priority now come right after Ticket No. On screens narrower than a laptop the two columns are no longer fixed, and the table scrolls sideways. On phones every ticket is a card showing its number, status, branch, customer and contact, subject, priority, engineer, invoice and serial number, with Details and Call Sheet buttons; tapping the card opens the ticket. The tab buttons wrap onto a second line instead of running off the screen."
+      }
+    ],
+    "deployedBy": "Super Admin",
+    "deployedAt": "2026-11-15T22:00:00+05:30",
+    "isActive": true
   }
 ]

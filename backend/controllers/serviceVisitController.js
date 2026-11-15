@@ -237,6 +237,10 @@ exports.checkIn = async (req, res) => {
     }
 };
 
+// Check-out ends a started visit either way: Close Visit (more work needed, the ticket stays open)
+// or Close Ticket, the only way a ticket is closed (Ticket Details and the ticket APIs refuse it).
+const CHECKOUT_ACTIONS = ['close_visit', 'close_ticket'];
+
 exports.checkOut = async (req, res) => {
     try {
         const { latitude, longitude, address, visitReport, nextAction, customerSignature, productPhoto, billingStatus, expenses, actionType } = req.body;
@@ -244,6 +248,28 @@ exports.checkOut = async (req, res) => {
 
         const visit = await ServiceVisit.findOne({ _id: req.params.id, companyId });
         if (!visit) return res.status(404).json({ message: 'Service visit not found' });
+
+        // The screen's checks, made here too so a direct call cannot complete a visit (and close its
+        // ticket) without a check-in, a visit report and a product photo. Nothing is saved on refusal.
+        if (!CHECKOUT_ACTIONS.includes(actionType)) {
+            return res.status(400).json({ message: 'Choose Close Visit or Close Ticket to check out of the visit.' });
+        }
+        if (visit.status !== 'Started') {
+            return res.status(400).json({
+                message: visit.status === 'Completed'
+                    ? 'This visit is already completed. Re-open or reschedule it to visit again.'
+                    : 'Check in to the visit (Stamp Check-In Location) before checking out.'
+            });
+        }
+        if (!String(visitReport || '').trim()) {
+            return res.status(400).json({ message: 'Visit Report / Actions Taken is required' });
+        }
+        if (!productPhoto) {
+            return res.status(400).json({ message: 'Product photo is mandatory to close visit or close ticket' });
+        }
+        if (actionType === 'close_visit' && !String(nextAction || '').trim()) {
+            return res.status(400).json({ message: 'Please specify mandatory "Next Action / Next Step" to Close Visit' });
+        }
 
         visit.checkOut = {
             time: new Date(),
@@ -305,7 +331,7 @@ exports.checkOut = async (req, res) => {
                     performedBy: req.user?.id
                 });
             } else {
-                // Ticket is closed permanently as resolved
+                // close_ticket: the ticket is closed permanently as resolved
                 ticket.status = 'Closed';
                 ticket.resolvedAt = new Date();
                 ticket.closedAt = new Date();

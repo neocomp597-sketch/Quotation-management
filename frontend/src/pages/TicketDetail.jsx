@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { csmService, userService, uploadService, mgrService, productService } from '../services/api';
+import { csmService, userService, uploadService } from '../services/api';
 import { formatDate, formatDateTime } from '../utils/helpers';
 import { toast } from 'react-toastify';
 import { jsPDF } from 'jspdf';
@@ -9,8 +9,8 @@ import {
     MdAssignment, MdPerson, MdCalendarMonth, 
     MdFeedback, MdArrowBack, MdSave, 
     MdWarning, MdCheckCircleOutline, MdCheckCircle, MdChat,
-    MdMyLocation, MdLocationOn, MdStar, MdStarBorder, MdMap, MdOpenInNew,
-    MdPhotoCamera, MdPhotoLibrary, MdCloudUpload, MdDelete, MdAssignmentTurnedIn,
+    MdMyLocation, MdLocationOn, MdMap, MdOpenInNew,
+    MdPhotoCamera, MdCloudUpload, MdAssignmentTurnedIn,
     MdZoomIn, MdClose, MdFileDownload, MdEdit, MdPrint
 } from 'react-icons/md';
 import { openCallSheetWindow, printTicketCallSheet } from '../utils/ticketCallSheet';
@@ -20,9 +20,7 @@ import usePermission from '../hooks/usePermission';
 import { useAuth } from '../context/AuthContext';
 import DateInput from '../components/DateInput';
 import SearchableSelect from '../components/SearchableSelect';
-import PhotoPickButton from '../components/PhotoPickButton';
-import compressImage from '../utils/compressImage';
-import { PRODUCT_PHOTO_MAX_SIDE, uploadedImageUrl, describeLoadError } from '../utils/serviceVisits';
+import { uploadedImageUrl } from '../utils/serviceVisits';
 
 const parseDescriptionAndImages = (rawDesc = '') => {
     if (!rawDesc) return { text: '', images: [] };
@@ -124,145 +122,6 @@ const TicketDetail = () => {
     const [isCapturingGps, setIsCapturingGps] = useState(false);
     const [manualAddress, setManualAddress] = useState('');
 
-    // Ticket Closing Modal & Parts State
-    const [showCloseModal, setShowCloseModal] = useState(false);
-    const [closeResolutionNotes, setCloseResolutionNotes] = useState('');
-    const [closeIsFcr, setCloseIsFcr] = useState(true);
-    const [closeRating, setCloseRating] = useState(5);
-    const [closeFeedbackComment, setCloseFeedbackComment] = useState('');
-    const [closeGps, setCloseGps] = useState(null);
-    const [closeProductImage, setCloseProductImage] = useState('');
-    const [uploadingCloseImage, setUploadingCloseImage] = useState(false);
-    const [isClosingTicket, setIsClosingTicket] = useState(false);
-
-    // MGR5 Spares Parts State
-    const [mgr5Parts, setMgr5Parts] = useState([]);
-    const [selectedMgr5PartId, setSelectedMgr5PartId] = useState('');
-    const [expDesc, setExpDesc] = useState('');
-    const [expQty, setExpQty] = useState(1);
-    const [expRate, setExpRate] = useState('');
-    const [isPartChange, setIsPartChange] = useState(true);
-    const [isCustomExpDesc, setIsCustomExpDesc] = useState(false);
-    const [closeExpenses, setCloseExpenses] = useState([]);
-
-    const fetchMgr5PartsForTicket = async () => {
-        try {
-            const [mgrRes, prodRes] = await Promise.allSettled([
-                mgrService.getAll('MGR5'),
-                productService.getAll({ limit: 1000 })
-            ]);
-            
-            let sparesMgr5Id = null;
-            if (mgrRes.status === 'fulfilled') {
-                const mgrData = Array.isArray(mgrRes.value.data) ? mgrRes.value.data : (mgrRes.value.data?.data || []);
-                const sparesItem = mgrData.find(m => 
-                    (m.code || '').toLowerCase().includes('spr') || 
-                    (m.description || m.name || '').toLowerCase().includes('spare')
-                ) || mgrData[0];
-                if (sparesItem) sparesMgr5Id = sparesItem._id;
-            }
-
-            let prodList = [];
-            if (prodRes.status === 'fulfilled') {
-                const prodData = Array.isArray(prodRes.value.data) ? prodRes.value.data : (prodRes.value.data?.data || []);
-                const productsUnderMgr5Spares = prodData.filter(p => {
-                    if (!p.mgr5 && !p.mgr5Id) return false;
-                    const mgr5Obj = p.mgr5 || p.mgr5Id;
-                    if (typeof mgr5Obj === 'object') {
-                        const code = (mgr5Obj.code || '').toLowerCase();
-                        const desc = (mgr5Obj.description || mgr5Obj.name || '').toLowerCase();
-                        if (sparesMgr5Id && (mgr5Obj._id === sparesMgr5Id || mgr5Obj.id === sparesMgr5Id)) return true;
-                        return code.includes('spr') || desc.includes('spare');
-                    }
-                    if (typeof mgr5Obj === 'string') {
-                        return (sparesMgr5Id && mgr5Obj === sparesMgr5Id) || mgr5Obj.toLowerCase().includes('spr') || mgr5Obj.toLowerCase().includes('spare');
-                    }
-                    return false;
-                });
-
-                const listToUse = productsUnderMgr5Spares.length > 0 ? productsUnderMgr5Spares : prodData;
-                listToUse.forEach(p => {
-                    prodList.push({
-                        id: p._id,
-                        code: p.productCode,
-                        name: p.productName,
-                        label: `${p.productName} (${p.productCode})`,
-                        rate: p.mrp || p.basePrice || 0,
-                        source: 'Product'
-                    });
-                });
-            }
-
-            setMgr5Parts(prodList);
-
-            if (prodList.length > 0 && !selectedMgr5PartId) {
-                const defaultProd = prodList[0];
-                setSelectedMgr5PartId(defaultProd.id);
-                setExpDesc(`${defaultProd.name}${defaultProd.code ? ` (${defaultProd.code})` : ''}`);
-                if (defaultProd.rate > 0) setExpRate(defaultProd.rate);
-                setIsPartChange(true);
-            }
-        } catch (error) {
-            console.error('Failed to load MGR5 catalog for ticket close', error);
-        }
-    };
-
-    useEffect(() => {
-        if (showCloseModal) {
-            fetchMgr5PartsForTicket();
-        }
-    }, [showCloseModal]);
-
-    const handleSelectMgr5PartForTicket = (itemOrId) => {
-        if (typeof itemOrId === 'string') {
-            if (itemOrId === '__custom__') {
-                setIsCustomExpDesc(true);
-                setSelectedMgr5PartId('');
-                setExpDesc('');
-                return;
-            }
-            setSelectedMgr5PartId(itemOrId);
-            const found = mgr5Parts.find(p => p.id === itemOrId);
-            if (found) {
-                setExpDesc(`${found.name} (${found.code})`);
-                if (found.rate > 0) setExpRate(found.rate);
-                setIsPartChange(true);
-                setIsCustomExpDesc(false);
-            }
-        } else if (itemOrId && typeof itemOrId === 'object') {
-            setSelectedMgr5PartId(itemOrId.id);
-            setExpDesc(`${itemOrId.name}${itemOrId.code ? ` (${itemOrId.code})` : ''}`);
-            if (itemOrId.rate > 0) setExpRate(itemOrId.rate);
-            setIsPartChange(true);
-            setIsCustomExpDesc(false);
-        }
-    };
-
-    const handleAddCloseExpense = (e) => {
-        if (e) e.preventDefault();
-        if (!expDesc.trim()) {
-            toast.error('Please select an MGR5 Part or enter Part/Charge name');
-            return;
-        }
-        const qtyNum = Number(expQty) || 1;
-        const rateNum = Number(expRate) || 0;
-        const newExpense = {
-            mgr5Id: selectedMgr5PartId || null,
-            description: expDesc.trim(),
-            quantity: qtyNum,
-            rate: rateNum,
-            amount: qtyNum * rateNum,
-            isPartChange
-        };
-        setCloseExpenses(prev => [...prev, newExpense]);
-        setExpQty(1);
-        toast.success(`Recorded expense/part: ${expDesc}`);
-    };
-
-    const handleRemoveCloseExpense = (idx) => {
-        setCloseExpenses(prev => prev.filter((_, i) => i !== idx));
-    };
-
     // RCA Report Form State
     const [rcaForm, setRcaForm] = useState({
         problemDescription: '',
@@ -275,34 +134,6 @@ const TicketDetail = () => {
         rcaImages: []
     });
     const [savingRca, setSavingRca] = useState(false);
-
-    const handleUploadCloseImage = async (file) => {
-        if (!file) return;
-        setUploadingCloseImage(true);
-        try {
-            // A phone photo, from the camera or the gallery, is often over the 5 MB upload limit
-            const photo = await compressImage(file, PRODUCT_PHOTO_MAX_SIDE, PRODUCT_PHOTO_MAX_SIDE, 0.75).catch(() => file);
-            // The upload answers `imageUrl`; reading only `url` left the image empty after a "successful" upload
-            const url = uploadedImageUrl(await uploadService.uploadImage(photo));
-            if (!url) {
-                toast.error('Failed to upload product image: the server returned no image link.');
-                return;
-            }
-            setCloseProductImage(url);
-            toast.success('Product image uploaded successfully');
-        } catch (err) {
-            toast.error(`Failed to upload product image: ${describeLoadError(err)}`);
-        } finally {
-            setUploadingCloseImage(false);
-        }
-    };
-
-    const handlePickCloseImage = (e) => {
-        const file = e.target.files?.[0];
-        // Lets the same photo be picked again after a failed attempt
-        e.target.value = '';
-        if (file) handleUploadCloseImage(file);
-    };
 
     const handleUploadRcaImage = async (file) => {
         if (!file) return;
@@ -458,28 +289,6 @@ const TicketDetail = () => {
         );
     };
 
-    const handleCaptureGpsForClose = () => {
-        if (!navigator.geolocation) {
-            toast.error('Geolocation is not supported by your browser');
-            return;
-        }
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords;
-                setCloseGps({
-                    latitude,
-                    longitude,
-                    address: manualAddress || ''
-                });
-                toast.success('GPS coordinates attached for closing!');
-            },
-            (err) => {
-                toast.error(`GPS Error: ${err.message}`);
-            },
-            { enableHighAccuracy: true }
-        );
-    };
-
     const handleStampCheckInForTicket = async () => {
         if (!activeVisit) return;
         const executeCheckIn = async (lat, lng, addr) => {
@@ -534,113 +343,6 @@ const TicketDetail = () => {
         );
     };
 
-    const closeCanvasRef = React.useRef(null);
-    const [isDrawingCloseSig, setIsDrawingCloseSig] = useState(false);
-
-    const startDrawingCloseSig = (e) => {
-        setIsDrawingCloseSig(true);
-        drawCloseSig(e);
-    };
-
-    const stopDrawingCloseSig = () => {
-        setIsDrawingCloseSig(false);
-        const canvas = closeCanvasRef.current;
-        if (canvas) {
-            const ctx = canvas.getContext('2d');
-            ctx.beginPath();
-        }
-    };
-
-    const drawCloseSig = (e) => {
-        if (!isDrawingCloseSig) return;
-        const canvas = closeCanvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const rect = canvas.getBoundingClientRect();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        const x = clientX - rect.left;
-        const y = clientY - rect.top;
-
-        ctx.lineWidth = 2;
-        ctx.lineCap = 'round';
-        ctx.strokeStyle = '#0f172a';
-        ctx.lineTo(x, y);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-    };
-
-    const clearCloseSignature = () => {
-        const canvas = closeCanvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-    };
-
-    useEffect(() => {
-        if (showCloseModal) {
-            setTimeout(() => {
-                const canvas = closeCanvasRef.current;
-                if (canvas) {
-                    canvas.width = 380;
-                    canvas.height = 120;
-                    const ctx = canvas.getContext('2d');
-                    ctx.lineWidth = 2;
-                    ctx.lineCap = 'round';
-                    ctx.strokeStyle = '#0f172a';
-                }
-            }, 100);
-        }
-    }, [showCloseModal]);
-
-    const handleCloseTicketSubmit = async (e) => {
-        if (e) e.preventDefault();
-        if (!closeResolutionNotes.trim()) {
-            toast.error('Please enter resolution notes to close the ticket');
-            return;
-        }
-
-        if (!closeProductImage) {
-            toast.error('Product photo is mandatory to close ticket');
-            return;
-        }
-
-        let signatureData = '';
-        const canvas = closeCanvasRef.current;
-        if (canvas) {
-            signatureData = canvas.toDataURL('image/png');
-        }
-
-        try {
-            setIsClosingTicket(true);
-            const locData = closeGps ? {
-                latitude: closeGps.latitude,
-                longitude: closeGps.longitude,
-                address: closeGps.address || manualAddress || ''
-            } : {};
-
-            await csmService.closeTicket(id, {
-                resolutionNotes: closeResolutionNotes,
-                isFirstCallResolved: closeIsFcr,
-                rating: closeRating,
-                comment: closeFeedbackComment,
-                productImage: closeProductImage,
-                customerSignature: signatureData,
-                expenses: closeExpenses,
-                ...locData
-            });
-
-            toast.success('Ticket closed successfully!');
-            setShowCloseModal(false);
-            fetchTicketDetails();
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to close ticket');
-        } finally {
-            setIsClosingTicket(false);
-        }
-    };
-
     const fetchTicketDetails = async () => {
         try {
             const res = await csmService.getTicketById(id);
@@ -661,9 +363,6 @@ const TicketDetail = () => {
                     rcaStatus: ticketData.rcaReport.rcaStatus || 'Draft',
                     rcaImages: ticketData.rcaReport.rcaImages || []
                 });
-            }
-            if (ticketData.productImage) {
-                setCloseProductImage(ticketData.productImage);
             }
             const currentEng = ticketData.assignedEngineerId || ticketData.assignedEngineerIds?.[0];
             setAssignEngineer(currentEng?._id || currentEng || '');
@@ -1138,7 +837,8 @@ const TicketDetail = () => {
                                     <option value="In Progress">In Progress</option>
                                     <option value="Pending Customer">Pending Customer</option>
                                     <option value="Resolved">Resolved</option>
-                                    <option value="Closed">Closed</option>
+                                    {/* Closed is set by the Service Visit only; shown here for a ticket that is already closed. */}
+                                    {ticket.status === 'Closed' && <option value="Closed" disabled>Closed</option>}
                                     <option value="Cancelled">Cancelled</option>
                                 </select>
                             </div>
@@ -1168,19 +868,19 @@ const TicketDetail = () => {
                                 </button>
                             )}
 
-                            {ticket.status !== 'Closed' ? canModify && (
-                                <button
-                                    onClick={() => {
-                                        setCloseResolutionNotes('');
-                                        setCloseIsFcr(ticket.isFirstCallResolved || false);
-                                        setCloseGps(ticket.location?.latitude ? ticket.location : null);
-                                        setShowCloseModal(true);
-                                    }}
-                                    className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95"
-                                >
-                                    <MdCheckCircle size={16} />
-                                    Close Ticket
-                                </button>
+                            {/* A ticket is closed only from its Service Visit (check-out with Close Ticket),
+                                so the visit report, product photo and signature are always recorded. */}
+                            {ticket.status !== 'Closed' ? (
+                                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-semibold text-slate-600 leading-snug">
+                                    To close this ticket, check out its service visit with <span className="font-black">Close Ticket</span>.
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveTab('visits')}
+                                        className="block mt-1.5 text-primary-600 hover:text-primary-700 font-black uppercase tracking-widest text-[10px]"
+                                    >
+                                        Go to Field Visits &rarr;
+                                    </button>
+                                </div>
                             ) : (
                                 <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
                                     <span className="text-xs font-black text-emerald-800 flex items-center justify-center gap-1.5">
@@ -2055,314 +1755,6 @@ const TicketDetail = () => {
                             onChange={(e) => setReassignNotes(e.target.value)}
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium"
                         />
-                    </div>
-                </form>
-            </Modal>
-
-            {/* Close Ticket Modal */}
-            <Modal
-                isOpen={showCloseModal}
-                onClose={() => setShowCloseModal(false)}
-                title="Close Ticket & Record Resolution"
-                footer={
-                    <div className="flex items-center justify-end gap-3 w-full">
-                        <button
-                            type="button"
-                            onClick={() => setShowCloseModal(false)}
-                            className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold uppercase text-xs hover:bg-slate-50 transition-all"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleCloseTicketSubmit}
-                            disabled={isClosingTicket}
-                            className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-xs tracking-widest rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 flex items-center gap-2"
-                        >
-                            <MdCheckCircle size={16} />
-                            {isClosingTicket ? 'Closing Ticket...' : 'Confirm & Close Ticket'}
-                        </button>
-                    </div>
-                }
-            >
-                <form onSubmit={handleCloseTicketSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Resolution Summary / Notes *</label>
-                        <textarea
-                            required
-                            rows={3}
-                            placeholder="Describe how the ticket was resolved..."
-                            value={closeResolutionNotes}
-                            onChange={(e) => setCloseResolutionNotes(e.target.value)}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium outline-none focus:border-emerald-600"
-                        />
-                    </div>
-
-                    {/* Expenses & Part Change Log for Ticket Close */}
-                    <div className="space-y-3 p-4 bg-slate-50/80 rounded-2xl border border-slate-200/60">
-                        <div className="flex justify-between items-center pb-1">
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-600 uppercase tracking-widest">
-                                    PART CHANGE & EXPENSE LOG
-                                </label>
-                                <p className="text-[10px] text-slate-400 font-semibold">Select MGR5 parts or products to log field expenses</p>
-                            </div>
-                            <label className="flex items-center gap-1.5 cursor-pointer bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
-                                <input 
-                                    type="checkbox" 
-                                    checked={isPartChange} 
-                                    onChange={(e) => setIsPartChange(e.target.checked)} 
-                                    className="h-3.5 w-3.5 text-emerald-600 rounded border-slate-300 cursor-pointer"
-                                />
-                                <span className="text-[10px] font-black text-emerald-800 uppercase">Replaced Spare Part</span>
-                            </label>
-                        </div>
-
-                        {/* MGR5 Spares Default Active Badge */}
-                        <div className="w-full px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between">
-                            <div className="flex items-center gap-2 truncate">
-                                <span className="px-1.5 py-0.5 bg-amber-200/80 text-amber-900 font-black text-[9px] rounded uppercase">
-                                    MGR5 SPARE
-                                </span>
-                                <span className="text-xs font-black text-amber-950">SPARES (SPRS) — Selected by Default</span>
-                            </div>
-                            <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md shrink-0">
-                                {mgr5Parts.length} Products Configured
-                            </span>
-                        </div>
-
-                        {/* Part / Change Name Dropdown populated from Product Grouping -> MGR5 -> Spares */}
-                        <div className="grid grid-cols-12 gap-2 items-center pt-1">
-                            <div className="col-span-5">
-                                {isCustomExpDesc ? (
-                                    <input 
-                                        type="text" 
-                                        placeholder="Custom Part / Charge Name" 
-                                        value={expDesc} 
-                                        onChange={e => setExpDesc(e.target.value)} 
-                                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
-                                    />
-                                ) : (
-                                    <select 
-                                        value={selectedMgr5PartId || ''} 
-                                        onChange={e => {
-                                            const val = e.target.value;
-                                            if (val === '__custom__') {
-                                                setIsCustomExpDesc(true);
-                                                setSelectedMgr5PartId('');
-                                                setExpDesc('');
-                                                return;
-                                            }
-                                            if (!val) {
-                                                setSelectedMgr5PartId('');
-                                                setExpDesc('');
-                                                setExpRate('');
-                                                return;
-                                            }
-                                            handleSelectMgr5PartForTicket(val);
-                                        }} 
-                                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer truncate"
-                                    >
-                                        <option value="">-- Select Spare / Product (MGR5 → Spares) --</option>
-                                        {mgr5Parts.map(item => (
-                                            <option key={item.id} value={item.id}>
-                                                📦 {item.name} {item.code ? `(${item.code})` : ''} {item.rate > 0 ? `- ₹${item.rate}` : ''}
-                                            </option>
-                                        ))}
-                                        <option value="__custom__">✍️ Custom Manual Entry...</option>
-                                    </select>
-                                )}
-                            </div>
-                            <div className="col-span-2">
-                                <input 
-                                    type="number" 
-                                    min="1"
-                                    placeholder="Qty" 
-                                    value={expQty} 
-                                    onChange={e => setExpQty(e.target.value)} 
-                                    className="w-full px-2 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 text-center bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
-                                />
-                            </div>
-                            <div className="col-span-2">
-                                <input 
-                                    type="number" 
-                                    min="0"
-                                    placeholder="Rate ₹" 
-                                    value={expRate} 
-                                    onChange={e => setExpRate(e.target.value)} 
-                                    className="w-full px-2 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 text-center bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
-                                />
-                            </div>
-                            <div className="col-span-3">
-                                <button 
-                                    type="button"
-                                    onClick={handleAddCloseExpense}
-                                    className="w-full py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm active:scale-95"
-                                >
-                                    + Add Item
-                                </button>
-                            </div>
-                        </div>
-
-                        {closeExpenses.length > 0 && (
-                            <div className="space-y-1.5 pt-2">
-                                {closeExpenses.map((ex, idx) => (
-                                    <div key={idx} className="flex justify-between items-center text-xs font-bold text-slate-600 bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
-                                        <div className="flex items-center gap-2">
-                                            {ex.isPartChange && (
-                                                <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[9px] font-black uppercase rounded tracking-wider">
-                                                    Part Changed
-                                                </span>
-                                            )}
-                                            <span className="text-slate-900 font-extrabold">{ex.description}</span>
-                                            <span className="text-[10px] text-slate-400 font-semibold ml-2">({ex.quantity || 1} x ₹{ex.rate || 0})</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-emerald-700 font-black">₹{ex.amount}</span>
-                                            <button type="button" onClick={() => handleRemoveCloseExpense(idx)} className="text-rose-500 hover:text-rose-700"><MdDelete /></button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                        <div>
-                            <span className="text-xs font-bold text-slate-900 block">First Call Resolved (FCR)</span>
-                            <span className="text-[10px] text-slate-500">Was the issue resolved on the first interaction?</span>
-                        </div>
-                        <input
-                            type="checkbox"
-                            checked={closeIsFcr}
-                            onChange={(e) => setCloseIsFcr(e.target.checked)}
-                            className="h-5 w-5 text-emerald-600 rounded focus:ring-emerald-500 border-slate-300 cursor-pointer"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Customer Feedback Rating</label>
-                        <div className="flex items-center gap-2 py-2">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                                <button
-                                    key={star}
-                                    type="button"
-                                    onClick={() => setCloseRating(star)}
-                                    className="p-1 text-amber-400 hover:scale-125 transition-transform"
-                                >
-                                    {star <= closeRating ? <MdStar size={24} /> : <MdStarBorder size={24} />}
-                                </button>
-                            ))}
-                            <span className="text-xs font-bold text-slate-700 ml-2">{closeRating} / 5 Stars</span>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Feedback Remarks (Optional)</label>
-                        <input
-                            type="text"
-                            placeholder="Customer remarks..."
-                            value={closeFeedbackComment}
-                            onChange={(e) => setCloseFeedbackComment(e.target.value)}
-                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium outline-none focus:border-emerald-600"
-                        />
-                    </div>
-
-                    {/* Requirement: Mandatory Product Image Attachment */}
-                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                        <label className="block text-[10px] font-black text-rose-600 uppercase tracking-widest flex items-center justify-between">
-                            <span>Product Image Attachment * (Mandatory)</span>
-                            {!closeProductImage && <span className="text-rose-500 font-bold">Required</span>}
-                        </label>
-                        <div className="flex flex-wrap items-center gap-2">
-                            <PhotoPickButton
-                                fromCamera
-                                disabled={uploadingCloseImage}
-                                onChange={handlePickCloseImage}
-                                className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0"
-                            >
-                                <MdPhotoCamera size={16} />
-                                {uploadingCloseImage ? 'Uploading...' : 'Take Photo'}
-                            </PhotoPickButton>
-                            <PhotoPickButton
-                                disabled={uploadingCloseImage}
-                                onChange={handlePickCloseImage}
-                                className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0"
-                            >
-                                <MdPhotoLibrary size={16} />
-                                Upload from Gallery
-                            </PhotoPickButton>
-                            <input
-                                type="text"
-                                placeholder="Or paste Product Image URL..."
-                                value={closeProductImage}
-                                onChange={(e) => setCloseProductImage(e.target.value)}
-                                className="flex-1 min-w-[12rem] px-3 py-2 text-xs border border-slate-200 rounded-xl outline-none focus:border-emerald-600 font-medium"
-                            />
-                        </div>
-                        {closeProductImage && (
-                            <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-emerald-200 mt-2 group">
-                                <img src={closeProductImage} alt="Product Close Evidence" className="w-full h-full object-cover" />
-                                <button
-                                    type="button"
-                                    onClick={() => setCloseProductImage('')}
-                                    className="absolute top-1 right-1 p-1 bg-rose-600 text-white rounded-md opacity-90 hover:opacity-100 transition-opacity"
-                                >
-                                    <MdDelete size={12} />
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Requirement: Customer Signature Canvas */}
-                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
-                        <div className="flex items-center justify-between">
-                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                                CUSTOMER SIGNATURE
-                            </label>
-                            <button
-                                type="button"
-                                onClick={clearCloseSignature}
-                                className="text-[10px] font-bold text-rose-600 hover:text-rose-700 underline"
-                            >
-                                Clear Signature
-                            </button>
-                        </div>
-                        <div className="bg-white border-2 border-dashed border-slate-200 rounded-xl p-2 flex justify-center">
-                            <canvas
-                                ref={closeCanvasRef}
-                                onMouseDown={startDrawingCloseSig}
-                                onMouseMove={drawCloseSig}
-                                onMouseUp={stopDrawingCloseSig}
-                                onMouseLeave={stopDrawingCloseSig}
-                                onTouchStart={startDrawingCloseSig}
-                                onTouchMove={drawCloseSig}
-                                onTouchEnd={stopDrawingCloseSig}
-                                className="border border-slate-200 rounded-lg bg-slate-50/80 cursor-crosshair w-full max-w-full touch-none"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="p-3 bg-emerald-50/60 border border-emerald-100 rounded-xl space-y-2">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                                <MdLocationOn size={16} /> Attach Geolocation Stamp
-                            </span>
-                            <button
-                                type="button"
-                                onClick={handleCaptureGpsForClose}
-                                className="px-3 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-extrabold uppercase hover:bg-emerald-700 transition-all"
-                            >
-                                Capture GPS
-                            </button>
-                        </div>
-                        {closeGps ? (
-                            <p className="text-[11px] font-semibold text-emerald-800">
-                                📍 Lat: {closeGps.latitude.toFixed(6)}, Lng: {closeGps.longitude.toFixed(6)}
-                            </p>
-                        ) : (
-                            <p className="text-[10px] text-slate-500 font-medium">Click Capture GPS to attach live coordinates to this closure.</p>
-                        )}
                     </div>
                 </form>
             </Modal>

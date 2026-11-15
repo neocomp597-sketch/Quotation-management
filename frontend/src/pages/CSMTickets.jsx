@@ -17,6 +17,7 @@ import DateInput from '../components/DateInput';
 import ImportWizard from '../components/import/ImportWizard';
 import AssetEntryDetails from '../components/AssetEntryDetails';
 import { openCallSheetWindow, printTicketCallSheet } from '../utils/ticketCallSheet';
+import { MobileCard, MobileCardActions, MobileCardHead, MobileCardList, MobileField, MobileFields } from '../components/SerialMobileCards';
 
 const statusStyles = {
     'Open': 'bg-emerald-50 text-emerald-600 border-emerald-200',
@@ -28,6 +29,13 @@ const statusStyles = {
     'Escalated': 'bg-rose-50 text-rose-600 border-rose-200',
     'Cancelled': 'bg-rose-50/50 text-rose-400 border-rose-100'
 };
+
+// What the Tickets Register shows of a ticket, in the table and on the phone cards.
+const ticketListInfo = (t) => ({
+    isManual: Boolean(t.isManual || t.manualInvoiceNo || (t.description && t.description.includes('--- Uploaded Images ---'))),
+    invoiceNo: t.invoiceId?.voucherNumber || t.invoiceId?.invoiceNumber || t.manualInvoiceNo || 'N/A',
+    productSrNo: t.assetId?.serialNumber || t.serialNumber || 'N/A'
+});
 
 const getManualImagesForTicket = (ticket) => {
     const images = {
@@ -2402,7 +2410,7 @@ const CSMTickets = () => {
             )}
 
             {/* Ticket Register Hierarchy Tabs */}
-            <div className="flex items-center gap-3 border-b border-slate-200/80 pb-3 relative z-20">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 border-b border-slate-200/80 pb-3 relative z-20">
                 <button
                     onClick={() => handleTabChange('my')}
                     className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer ${
@@ -2537,30 +2545,79 @@ const CSMTickets = () => {
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        <div className="overflow-x-auto">
+                        {/* Below 768px the table is hidden (serial-desktop-table) and each ticket is a card. */}
+                        <MobileCardList>
+                            {tickets.map((t) => {
+                                const { isManual, invoiceNo, productSrNo } = ticketListInfo(t);
+                                return (
+                                    <MobileCard key={t._id} onClick={() => openTicket(t)}>
+                                        <MobileCardHead
+                                            title={t.ticketNo}
+                                            subtitle={`${isManual ? 'Manual' : 'System'} · ${t.branchId?.name || 'No Branch'}`}
+                                            aside={(
+                                                <span className={`inline-block px-2 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider text-center leading-tight ${statusStyles[t.status] || 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                                    {t.status}
+                                                </span>
+                                            )}
+                                        />
+                                        <MobileFields>
+                                            <MobileField label="Customer & Contact" wide>
+                                                {t.customerId?.customerName || 'N/A'}
+                                                <span className="block text-xs text-slate-500">
+                                                    {t.contactName || t.contactPhone || 'No Contact'}
+                                                    {t.pincode ? ` | Pin: ${t.pincode}` : ''}
+                                                </span>
+                                            </MobileField>
+                                            <MobileField label="Subject" wide>{t.issueTitle || '-'}</MobileField>
+                                            <MobileField label="Priority">
+                                                <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ backgroundColor: t.priorityId?.color || '#64748b' }}>
+                                                    {t.priorityId?.name || 'Medium'}
+                                                </span>
+                                            </MobileField>
+                                            <MobileField label="Engineer">
+                                                {t.assignedEngineerId?.name || 'Unassigned'}
+                                                {t.assignedSalespersonId && <span className="block text-xs text-primary-600">Sales rep: {t.assignedSalespersonId.name}</span>}
+                                            </MobileField>
+                                            <MobileField label="Invoice No.">{invoiceNo}</MobileField>
+                                            <MobileField label="Product Sr. No.">{productSrNo}</MobileField>
+                                        </MobileFields>
+                                        <MobileCardActions>
+                                            <button type="button" onClick={() => openTicket(t)} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 bg-white text-primary-600 font-black uppercase text-[10px] tracking-widest">
+                                                Details <MdArrowForward size={16} />
+                                            </button>
+                                            <button type="button" onClick={() => handlePrintCallSheet(t)} aria-label={`Print call sheet of ${t.ticketNo}`} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 bg-white text-primary-600 font-black uppercase text-[10px] tracking-widest">
+                                                <MdPrint size={16} /> Call Sheet
+                                            </button>
+                                        </MobileCardActions>
+                                    </MobileCard>
+                                );
+                            })}
+                        </MobileCardList>
+                        <div className="overflow-x-auto serial-desktop-table">
                             <table className="w-full text-left border-collapse">
                                 <thead>
-                                    {/* Text columns wrap so the table fits wide screens. On narrower ones the
+                                    {/* Text columns wrap so the table fits wide screens. From 1024px up the
                                         Engineer and Action columns stay pinned on the right (Engineer's offset is
                                         the Action column's fixed width), so Details is reachable without
-                                        scrolling the table sideways. */}
+                                        scrolling the table sideways; Status and Priority come right after the
+                                        ticket number, so the pinned columns do not cover them. Below 1024px
+                                        nothing is pinned (the two columns would fill a tablet's width) and the
+                                        table scrolls; below 768px tickets are cards. */}
                                     <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
                                         <th className="pl-3 pr-2.5 py-3 whitespace-nowrap">Ticket No</th>
+                                        <th className="px-2.5 py-3">Status</th>
+                                        <th className="px-2.5 py-3">Priority</th>
                                         <th className="px-2.5 py-3">Customer & Contact</th>
                                         <th className="px-2.5 py-3">Subject</th>
                                         <th className="px-2.5 py-3">Invoice No.</th>
                                         <th className="px-2.5 py-3">Product Sr. No.</th>
-                                        <th className="px-2.5 py-3">Priority</th>
-                                        <th className="px-2.5 py-3">Status</th>
-                                        <th className="px-2.5 py-3 sticky right-[8.5rem] bg-slate-50 shadow-[-6px_0_6px_-6px_rgba(15,23,42,0.15)]">Engineer</th>
-                                        <th className="w-[8.5rem] min-w-[8.5rem] px-2 py-3 text-center whitespace-nowrap sticky right-0 bg-slate-50">Action</th>
+                                        <th className="px-2.5 py-3 lg:sticky lg:right-[8.5rem] bg-slate-50 lg:shadow-[-6px_0_6px_-6px_rgba(15,23,42,0.15)]">Engineer</th>
+                                        <th className="w-[8.5rem] min-w-[8.5rem] px-2 py-3 text-center whitespace-nowrap lg:sticky lg:right-0 bg-slate-50">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50 text-sm font-semibold text-slate-700">
                                     {tickets.map((t) => {
-                                        const isManual = t.isManual || !!t.manualInvoiceNo || (t.description && t.description.includes('--- Uploaded Images ---'));
-                                        const invoiceNo = t.invoiceId?.voucherNumber || t.invoiceId?.invoiceNumber || t.manualInvoiceNo || 'N/A';
-                                        const productSrNo = t.assetId?.serialNumber || t.serialNumber || 'N/A';
+                                        const { isManual, invoiceNo, productSrNo } = ticketListInfo(t);
                                         // A long invoice number breaks only after a "/" (never inside "STN-1327"); <wbr> is
                                         // not copied with the text. Numbers without a "/" wrap normally.
                                         const invoiceParts = !invoiceNo.includes('/') || invoiceNo === 'N/A' ? invoiceNo
@@ -2583,6 +2640,19 @@ const CSMTickets = () => {
                                                             📍 {t.branchId?.name || 'No Branch'}
                                                         </span>
                                                     </div>
+                                                </td>
+                                                <td className="px-2.5 py-3">
+                                                    <span className={`inline-block px-2 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider text-center leading-tight ${statusStyles[t.status] || 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                                        {t.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-2.5 py-3 whitespace-nowrap">
+                                                    <span
+                                                        className="px-2 py-1 rounded-full text-xs font-bold text-white shadow-sm"
+                                                        style={{ backgroundColor: t.priorityId?.color || '#64748b' }}
+                                                    >
+                                                        {t.priorityId?.name || 'Medium'}
+                                                    </span>
                                                 </td>
                                                 <td className="px-2.5 py-3">
                                                     {/* Bounded width: a long name wraps onto 2-3 lines instead of widening the column */}
@@ -2610,20 +2680,7 @@ const CSMTickets = () => {
                                                         {productSrNo}
                                                     </span>
                                                 </td>
-                                                <td className="px-2.5 py-3 whitespace-nowrap">
-                                                    <span
-                                                        className="px-2 py-1 rounded-full text-xs font-bold text-white shadow-sm"
-                                                        style={{ backgroundColor: t.priorityId?.color || '#64748b' }}
-                                                    >
-                                                        {t.priorityId?.name || 'Medium'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-2.5 py-3">
-                                                    <span className={`inline-block px-2 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider text-center leading-tight ${statusStyles[t.status] || 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                                                        {t.status}
-                                                    </span>
-                                                </td>
-                                                <td className="px-2.5 py-3 text-slate-500 sticky right-[8.5rem] bg-white shadow-[-6px_0_6px_-6px_rgba(15,23,42,0.15)]">
+                                                <td className="px-2.5 py-3 text-slate-500 lg:sticky lg:right-[8.5rem] bg-white lg:shadow-[-6px_0_6px_-6px_rgba(15,23,42,0.15)]">
                                                     <div className="min-w-[5.75rem] max-w-[10rem] break-words leading-snug">
                                                         <div>{t.assignedEngineerId?.name || 'Unassigned'}</div>
                                                         {t.assignedSalespersonId && (
@@ -2633,7 +2690,7 @@ const CSMTickets = () => {
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="w-[8.5rem] min-w-[8.5rem] px-2 py-3 text-center whitespace-nowrap sticky right-0 bg-white">
+                                                <td className="w-[8.5rem] min-w-[8.5rem] px-2 py-3 text-center whitespace-nowrap lg:sticky lg:right-0 bg-white">
                                                     <div className="flex justify-center items-center gap-2">
                                                         <button
                                                             onClick={() => openTicket(t)}

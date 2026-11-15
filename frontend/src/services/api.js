@@ -1022,7 +1022,6 @@ export const csmService = {
   submitFeedback: (id, data) => api.post(`/csm/tickets/${id}/feedback`, data),
   updateTicketLocation: (id, data) => api.patch(`/csm/tickets/${id}/location`, data),
   updateRca: (id, data) => api.patch(`/csm/tickets/${id}/rca`, data),
-  closeTicket: (id, data) => api.patch(`/csm/tickets/${id}/close`, data),
 
   getRcaReports: (params = {}) => api.get("/csm/rca-reports", { params }),
   getRcaReportById: (id) => api.get(`/csm/rca-reports/${id}`),

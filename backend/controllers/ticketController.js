@@ -39,6 +39,7 @@ exports.createTicket = async (req, res) => {
         const responseDue = new Date(now.getTime() + priority.responseSlaHours * 60 * 60 * 1000);
         const resolutionDue = new Date(now.getTime() + priority.resolutionSlaHours * 60 * 60 * 1000);
         const ticketBody = { ...req.body };
+        if (ticketBody.status === 'Closed') return res.status(403).json(CLOSE_VIA_SERVICE_VISIT);
 
         // ── Requirement: Prevent Duplicate Ticket Creation for Same Product Serial No. ──
         let targetSerialNo = (ticketBody.serialNumber || ticketBody.productSerialNo || '').trim();
@@ -250,6 +251,14 @@ const parseTicketBranch = (raw) => {
 
 // Ownership, identity and history fields are maintained by the server only.
 const PROTECTED_TICKET_FIELDS = ['_id', 'companyId', 'createdBy', 'ticketNo', 'createdAt', 'timeline', 'reassignmentHistory', 'comments'];
+
+// A ticket is closed only by checking out its Service Visit with Close Ticket
+// (serviceVisitController.checkOut), so every closure has a check-in, a visit report and a product
+// photo. Raising, editing or changing the status of a ticket to Closed is refused with this answer.
+const CLOSE_VIA_SERVICE_VISIT = {
+    code: 'CLOSE_VIA_SERVICE_VISIT',
+    message: 'A ticket can be closed only from its Service Visit: open Service Visits, check in to the visit and check out with Close Ticket.'
+};
 
 /**
  * A complaint is assigned to one engineer at a time. Reads the engineer from a payload's
@@ -788,6 +797,11 @@ exports.updateTicket = async (req, res) => {
 
         // The creator, company, ticket number and history cannot be changed through this API.
         PROTECTED_TICKET_FIELDS.forEach(field => delete ticketBody[field]);
+        // Nor can it close the ticket: that is the Service Visit's, which also sets the closing time.
+        delete ticketBody.closedAt;
+        if (ticketBody.status === 'Closed' && existingTicket.status !== 'Closed') {
+            return res.status(403).json(CLOSE_VIA_SERVICE_VISIT);
+        }
 
         // Branch change: the user needs access to both the current and the new branch.
         const timelineEntries = [];
@@ -1107,6 +1121,12 @@ exports.updateStatus = async (req, res) => {
             }
         }
 
+        // Closed is set only by the Service Visit check-out (Close Ticket).
+        if (status === 'Closed') {
+            if (ticket.status === 'Closed') return res.json(ticket);
+            return res.status(403).json(CLOSE_VIA_SERVICE_VISIT);
+        }
+
         const oldStatus = ticket.status;
         ticket.status = status;
 
@@ -1129,8 +1149,6 @@ exports.updateStatus = async (req, res) => {
             if (typeof isFirstCallResolved !== 'undefined') {
                 ticket.isFirstCallResolved = isFirstCallResolved === true || isFirstCallResolved === 'true';
             }
-        } else if (status === 'Closed') {
-            ticket.closedAt = now;
         }
 
         ticket.timeline.push({
@@ -1282,97 +1300,12 @@ exports.updateTicketLocation = async (req, res) => {
     }
 };
 
-exports.closeTicket = async (req, res) => {
-    try {
-        const { resolutionNotes, isFirstCallResolved, rating, comment, latitude, longitude, address, productImage, customerSignature, expenses } = req.body;
-        const companyId = req.user?.companyId;
-
-        const ticket = await Ticket.findOne({ _id: req.params.id, companyId });
-        if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
-
-        const now = new Date();
-        ticket.status = 'Closed';
-        ticket.closedAt = now;
-        if (!ticket.resolvedAt) {
-            ticket.resolvedAt = now;
-            if (ticket.slaResolutionDue && now > ticket.slaResolutionDue) {
-                ticket.isSlaBreached.resolution = true;
-            }
-        }
-        if (resolutionNotes) {
-            ticket.resolutionNotes = resolutionNotes;
-        }
-
-        const closureExpenses = (Array.isArray(expenses) ? expenses : [])
-            .filter(ex => ex && String(ex.description || '').trim())
-            .map(ex => {
-                const quantity = Number(ex.quantity) || 1;
-                const rate = Number(ex.rate) || 0;
-                return {
-                    description: String(ex.description).trim(),
-                    quantity,
-                    rate,
-                    amount: quantity * rate,
-                    isPartChange: Boolean(ex.isPartChange),
-                    mgr5Id: mongoose.Types.ObjectId.isValid(ex.mgr5Id) ? ex.mgr5Id : null
-                };
-            });
-        ticket.closureExpenses = closureExpenses;
-
-        if (productImage) {
-            ticket.productImage = productImage;
-        }
-        if (customerSignature) {
-            ticket.customerSignature = customerSignature;
-        }
-
-        if (typeof isFirstCallResolved !== 'undefined') {
-            ticket.isFirstCallResolved = Boolean(isFirstCallResolved);
-        }
-
-        if (latitude && longitude) {
-            ticket.location = {
-                latitude: Number(latitude),
-                longitude: Number(longitude),
-                address: address || '',
-                updatedAt: now
-            };
-        }
-
-        if (rating) {
-            ticket.feedback = {
-                rating: Number(rating),
-                comment: comment || '',
-                submittedAt: now
-            };
-        }
-
-        const validUserId = mongoose.Types.ObjectId.isValid(req.user?.id) ? req.user.id : null;
-        const partChanges = closureExpenses.filter(ex => ex.isPartChange || ex.mgr5Id);
-        if (partChanges.length > 0) {
-            const partsSummary = partChanges.map(p => `${p.description} (Qty: ${p.quantity})`).join(', ');
-            ticket.timeline.push({
-                activityType: 'Part Change',
-                description: `Spare Parts Changed at Ticket Closure: ${partsSummary}`,
-                performedBy: validUserId
-            });
-        }
-
-        const desc = `Ticket closed${resolutionNotes ? `: ${resolutionNotes}` : ''}`;
-        ticket.timeline.push({
-            activityType: 'Closed',
-            description: desc,
-            performedBy: validUserId
-        });
-
-        await ticket.save();
-        broadcastCrmUpdate('TICKET', 'UPDATE', ticket);
-        res.json(ticket);
-    } catch (error) {
-        console.error('Close ticket error:', error);
-        res.status(500).json({ message: error.message || 'Error closing ticket' });
-    }
-};
+/**
+ * PATCH /tickets/:id/close, the former Close Ticket button of Ticket Details. Refused: a ticket is
+ * closed only by checking out its Service Visit with Close Ticket. The route stays so an old open
+ * page or a direct call gets this answer instead of a 404.
+ */
+exports.closeTicket = async (req, res) => res.status(403).json(CLOSE_VIA_SERVICE_VISIT);
 
 exports.updateRca = async (req, res) => {
     try {
