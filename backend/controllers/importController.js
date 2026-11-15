@@ -1849,6 +1849,10 @@ const importTickets = async (req, res) => {
                 if (!customerLookup || !issueTitle) {
                     throw new Error('Missing required fields: Customer Code/Name or Issue Title');
                 }
+                // A ticket is closed only from its Service Visit (ticketController CLOSE_VIA_SERVICE_VISIT).
+                if (String(status).toLowerCase() === 'closed') {
+                    throw new Error('A ticket cannot be imported as Closed: tickets are closed only from their Service Visit. Import it as Resolved or Open.');
+                }
 
                 // 1. Resolve Customer
                 const customer = await findCustomerByLookup(customerLookup);

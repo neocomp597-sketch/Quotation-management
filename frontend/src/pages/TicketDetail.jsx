@@ -837,8 +837,10 @@ const TicketDetail = () => {
                                     <option value="In Progress">In Progress</option>
                                     <option value="Pending Customer">Pending Customer</option>
                                     <option value="Resolved">Resolved</option>
-                                    {/* Closed is set by the Service Visit only; shown here for a ticket that is already closed. */}
+                                    {/* Closed is set by the Service Visit only and Escalated by Escalate Ticket; each is shown here
+                                        only for a ticket already in it, so the list shows the real status. */}
                                     {ticket.status === 'Closed' && <option value="Closed" disabled>Closed</option>}
+                                    {ticket.status === 'Escalated' && <option value="Escalated" disabled>Escalated</option>}
                                     <option value="Cancelled">Cancelled</option>
                                 </select>
                             </div>

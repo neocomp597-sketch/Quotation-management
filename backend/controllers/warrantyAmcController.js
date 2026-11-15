@@ -15,6 +15,7 @@ const { customerPostalCodeOf, applyCustomerPostalCode } = require('../utils/cust
 const { loadDivisionSegmentLookup, resolveDivisionSegment } = require('../utils/divisionSegment');
 const { getMgrAccess, describeMgrAccess, accessCondition, mgrAccessCondition, accessAllowsProduct, canSeeProduct, MGR_ACCESS_DENIED } = require('../utils/mgrAccess');
 const { assetSearchConditions } = require('../utils/assetSearch');
+const { ANY_BRANCH, serialBranchScope, inScope } = require('../utils/customerBranchSerials');
 
 // Division / Segment of an Invoice Bulk Upload record, shown as code + description.
 const DIVISION_POPULATE = { path: 'divisionId', select: 'code description status' };
@@ -1386,9 +1387,14 @@ exports.getAssetSummary = async (req, res) => {
         // A serial outside the user's MGR access is "not found" (utils/mgrAccess.js).
         const access = (await mgrAccessCondition(req)) || {};
 
+        // The serials of the selected branch and of its own customers (utils/customerBranchSerials):
+        // a serial of another branch or company is "not found", and the ticket form continues with
+        // manual entry.
+        const scope = await serialBranchScope();
         let asset = null;
         if (assetId && isValidObjectId(assetId)) {
-            asset = await Asset.findOne({ _id: assetId, companyId, ...access })
+            asset = await Asset.findOne(inScope({ _id: assetId, companyId, ...access }, scope))
+                .setOptions(scope.options)
                 .populate({ path: 'customerId', select: 'customerName companyName externalCode gstin billingAddress mobile email', options: { bypassTenant: true } })
                 .populate(productMgrPopulate('basePrice mrp catalogType'))
                 .populate('invoiceId', 'voucherNumber date')
@@ -1398,12 +1404,11 @@ exports.getAssetSummary = async (req, res) => {
         } else if (serialNumber) {
             const cleanSN = String(serialNumber).trim();
             const escapedSN = cleanSN.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-            // Only the serials of the selected branch (tenantPlugin): one of another branch or
-            // company is "not found", and the ticket form continues with manual entry.
             const assetQuery = { serialNumber: { $regex: new RegExp("^" + escapedSN + "$", "i") }, ...access };
             if (companyId) assetQuery.companyId = companyId;
 
-            const matches = await Asset.find(assetQuery)
+            const matches = await Asset.find(inScope(assetQuery, scope))
+            .setOptions(scope.options)
             .populate({ path: 'customerId', select: 'customerName companyName externalCode gstin billingAddress mobile email', options: { bypassTenant: true } })
             .populate(productMgrPopulate('basePrice mrp catalogType'))
             .populate('invoiceId', 'voucherNumber date')
@@ -1497,12 +1502,13 @@ exports.getAssetSummary = async (req, res) => {
 
         let warranty = null;
         if (validCustId && validProdId) {
+            // The serial's own warranty, wherever it was registered (the serial may be of another branch).
             warranty = await Warranty.findOne({
                 customerId: validCustId,
                 productId: validProdId,
                 serialNumber: asset.serialNumber,
                 companyId
-            }).lean();
+            }).setOptions(ANY_BRANCH).lean();
         }
 
         if (!warranty && asset.warrantyEnd) {
@@ -1792,11 +1798,14 @@ exports.searchSerialNumbers = async (req, res) => {
         // Search ALL registered assets in Invoice Bulk Upload for this company (within the
         // user's MGR access, utils/mgrAccess.js)
         const access = (await mgrAccessCondition(req)) || {};
-        const assets = await Asset.find({
+        // The serials of the selected branch and of its own customers (utils/customerBranchSerials).
+        const scope = await serialBranchScope();
+        const assets = await Asset.find(inScope({
             companyId,
             serialNumber: { $regex: escapedQuery, $options: 'i' },
             ...access
-        })
+        }, scope))
+        .setOptions(scope.options)
         .sort({ createdAt: -1, serialNumber: 1 })
         .limit(100)
         .populate({ path: 'customerId', select: 'customerName companyName billingAddress mobile email gstin', options: { bypassTenant: true } })

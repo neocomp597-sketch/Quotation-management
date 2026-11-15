@@ -203,6 +203,17 @@ module.exports = {
         const issues = [];
         const hasIssue = (field) => found.some((issue) => issue.field === field);
 
+        // A ticket is closed only by checking out its Service Visit with Close Ticket, so a row
+        // cannot bring one in as Closed (ticketController CLOSE_VIA_SERVICE_VISIT).
+        if (data.status === 'Closed') {
+            issues.push({
+                field: 'status',
+                code: 'CLOSE_VIA_SERVICE_VISIT',
+                message: 'A ticket cannot be imported as Closed.',
+                hint: 'Tickets are closed only from their Service Visit. Import it as Resolved or Open, or leave Status blank, then close it by checking out its visit with Close Ticket.'
+            });
+        }
+
         if (data.ticketNo && context.ticketNumbers.has(shared.keyOf(data.ticketNo))) {
             issues.push({
                 field: 'ticketNo',

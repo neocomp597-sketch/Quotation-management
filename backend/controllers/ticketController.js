@@ -48,7 +48,8 @@ exports.createTicket = async (req, res) => {
         if (targetAssetId) {
             try {
                 const Asset = require('../models/Asset');
-                const assetObj = await Asset.findById(targetAssetId).lean();
+                // The serial may be another branch's, sold to this branch's customer (Raise Ticket's lookup).
+                const assetObj = await Asset.findById(targetAssetId).setOptions(CROSS_BRANCH).lean();
                 if (assetObj && assetObj.serialNumber) {
                     if (!targetSerialNo) {
                         targetSerialNo = assetObj.serialNumber.trim();
@@ -64,7 +65,7 @@ exports.createTicket = async (req, res) => {
             const Asset = require('../models/Asset');
             let linkedAsset = null;
             if (targetAssetId) {
-                linkedAsset = await Asset.findById(targetAssetId);
+                linkedAsset = await Asset.findById(targetAssetId).setOptions(CROSS_BRANCH);
             } else if (targetSerialNo) {
                 const cleanSN = targetSerialNo.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
                 linkedAsset = await Asset.findOne({
@@ -279,6 +280,19 @@ const getEngineerForUser = async (user) => {
         email: user.email,
         companyId: user.companyId
     }).lean();
+};
+
+/**
+ * Whether the user may check out a service visit, the only way a ticket is closed: admins and
+ * managers, the visit's engineer and the ticket's assigned engineer (engineers are matched to the
+ * login by email, as everywhere in this module).
+ */
+exports.canCheckOutVisit = async (user, visit, ticket) => {
+    if (isAdminOrManagerUser(user)) return true;
+    const engineer = await getEngineerForUser(user);
+    if (!engineer) return false;
+    const engineerId = engineer._id.toString();
+    return [visit?.engineerId, ticket?.assignedEngineerId].some((id) => id && id.toString() === engineerId);
 };
 
 /**

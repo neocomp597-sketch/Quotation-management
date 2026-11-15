@@ -12,7 +12,7 @@ const SerialTransfer = require('../models/SerialTransfer');
 const SerialBranchTransfer = require('../models/SerialBranchTransfer');
 const { MGR_KEYS, formatMgrVal } = require('../utils/productMgr');
 const { formatDate } = require('../utils/dateFormat');
-const { getActiveBranchId } = require('../middlewares/tenantContext');
+const { ANY_BRANCH, serialBranchScope, inScope } = require('../utils/customerBranchSerials');
 const { limitedBranchIds, canMoveFrom, visibleTransfersCondition } = require('../utils/serialBranchAccess');
 const { getMgrAccess, accessCondition, conditionAllowsId, describeMgrAccess, mgrAccessCondition } = require('../utils/mgrAccess');
 const { searchPattern, matchingMasterIds, assetSearchConditions } = require('../utils/assetSearch');
@@ -47,41 +47,6 @@ const toKey = (value) => cleanText(value).toUpperCase();
 const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const httpError = (status, message) => Object.assign(new Error(message), { status });
-
-const activeBranchFilter = () => {
-    const branchId = getActiveBranchId();
-    return branchId && mongoose.Types.ObjectId.isValid(branchId)
-        ? { branchId: new mongoose.Types.ObjectId(branchId) }
-        : null;
-};
-
-// For records already checked to be visible (a serial found through serialBranchScope, its history).
-const ANY_BRANCH = { bypassBranch: true };
-
-/**
- * The serials a branch sees on this screen: the serials it holds (the branch of their Invoice Bulk
- * Upload row), and also the serials whose current customer belongs to it in Customer Master,
- * whichever branch sold them. A sale can be made by any branch; the customer is looked after by
- * their own branch, so an EPC customer's serials show in EPC.
- *
- * `condition` is null when no branch is active, and tenantPlugin's own filter applies as before.
- * Otherwise `condition` replaces the plugin's branch filter (which would hide the serials of other
- * branches), so every Asset query using it must also pass `options`.
- */
-const serialBranchScope = async () => {
-    const branchFilter = activeBranchFilter();
-    if (!branchFilter) return { condition: null, options: {}, branchFilter: null, customerIds: [] };
-    const customers = await Customer.find(branchFilter).select('_id').lean();
-    const customerIds = customers.map((customer) => customer._id);
-    return {
-        condition: customerIds.length ? { $or: [branchFilter, { customerId: { $in: customerIds } }] } : branchFilter,
-        options: ANY_BRANCH,
-        branchFilter,
-        customerIds
-    };
-};
-
-const inScope = (query, scope) => (scope.condition ? { $and: [query, scope.condition] } : query);
 
 /**
  * The same rule for customer history records (SerialTransfer), which carry the branch of their

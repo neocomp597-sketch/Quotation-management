@@ -1055,7 +1055,7 @@ const CSMRcaReport = () => {
                                     value={formData.customerName}
                                     onChange={(e) => handleInputChange('customerName', e.target.value)}
                                     className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none"
-                                    placeholder="e.g. Bajaj Auto Ltd."
+                                    placeholder="e.g. ABC Industries Pvt Ltd"
                                 />
                             </div>
 

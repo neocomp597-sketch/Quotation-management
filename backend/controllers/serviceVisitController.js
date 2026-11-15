@@ -3,7 +3,7 @@ const { formatDateTime } = require('../utils/dateFormat');
 const Ticket = require('../models/Ticket');
 const Counter = require('../models/Counter');
 const AMC = require('../models/AMC');
-const { getTicketMgrCondition } = require('./ticketController');
+const { getTicketMgrCondition, canCheckOutVisit } = require('./ticketController');
 
 // A ticket's customer and serial can belong to another branch than the visit list's.
 const CROSS_BRANCH = { bypassBranch: true };
@@ -248,6 +248,14 @@ exports.checkOut = async (req, res) => {
 
         const visit = await ServiceVisit.findOne({ _id: req.params.id, companyId });
         if (!visit) return res.status(404).json({ message: 'Service visit not found' });
+
+        const visitTicket = await Ticket.findOne({ _id: visit.ticketId, companyId }).select('assignedEngineerId').lean();
+        if (!(await canCheckOutVisit(req.user, visit, visitTicket))) {
+            return res.status(403).json({
+                code: 'CHECKOUT_NOT_ALLOWED',
+                message: 'Only the engineer of this visit or ticket, or a manager, can check out the visit and close the ticket.'
+            });
+        }
 
         // The screen's checks, made here too so a direct call cannot complete a visit (and close its
         // ticket) without a check-in, a visit report and a product photo. Nothing is saved on refusal.

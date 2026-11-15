@@ -925,5 +925,52 @@
     "deployedBy": "Super Admin",
     "deployedAt": "2026-11-15T22:00:00+05:30",
     "isActive": true
+  },
+  {
+    "version": "v6.8.3",
+    "title": "Full Ticket Export, Raise Ticket for Your Customers' Serials & Who Can Close a Visit",
+    "message": "Release Updates (from 15 Nov 2026): Export in the Tickets Register now saves every ticket shown, not only the first 100. Raise Ticket finds the serial numbers of your branch's customers that another branch sold. Only the visit's engineer, the ticket's engineer or a manager can check out a service visit, and tickets can no longer be imported as Closed.",
+    "releaseNotes": [
+      "Tickets Register: Export saves every ticket the register shows, with the same tab, search and filters; before, it stopped at 100 tickets and ignored some filters",
+      "Raise Ticket: a serial number that another branch sold to your branch's customer is now found, as in Serial No Transfer",
+      "Service Visits: check-out, and with it closing a ticket, is for the visit's engineer, the ticket's assigned engineer, or a manager",
+      "Ticket import: a row with Status Closed is refused; tickets are closed only from their service visit",
+      "Ticket Details: an escalated ticket shows Escalated in Update Status instead of Open"
+    ],
+    "detailedChanges": [
+      {
+        "date": "15.11.2026",
+        "module": "CSM Support",
+        "submodule": "Tickets Register: Export Every Ticket",
+        "changes": "Export in the Tickets Register saved at most 100 tickets, and it ignored the tab (My, My Team or All Tickets), the Customer and Ticket Type filters and the filter of a dashboard card. It now saves every ticket the register shows, with the same tab, search and filters, up to 50,000 tickets."
+      },
+      {
+        "date": "15.11.2026",
+        "module": "CSM Support",
+        "submodule": "Raise Ticket: Serial Numbers of Your Customers",
+        "changes": "Since v6.8.1 Serial No Transfer shows a branch the serial numbers of its own customers that another branch sold, but Raise Ticket still said such a serial was not found. Raise Ticket now finds it too, both in the suggestions and when looking it up, fills in its details and links the ticket to it. A serial held by another branch and sold to a customer of another branch is still not found."
+      },
+      {
+        "date": "15.11.2026",
+        "module": "CSM Support",
+        "submodule": "Service Visits: Who Can Check Out",
+        "changes": "Checking out a service visit, which is now the only way to close a ticket, is allowed for the engineer of the visit, the engineer assigned to the ticket, and managers and administrators. Anyone else gets a message saying so and nothing is saved. Engineers still need the Service Visits screen in Authorization, and the engineer is matched to the login by the email in Employee Master."
+      },
+      {
+        "date": "15.11.2026",
+        "module": "CSM Support",
+        "submodule": "Ticket Import: No Closed Tickets",
+        "changes": "A row of the ticket import with Status Closed is now marked as needing attention with the reason, and is not imported: tickets are closed only from their service visit. Import such a ticket as Resolved or Open, or leave Status blank."
+      },
+      {
+        "date": "15.11.2026",
+        "module": "CSM Support",
+        "submodule": "Ticket Details and RCA: Small Fixes",
+        "changes": "Update Status showed Open for an escalated ticket because Escalated was not in the list; it now shows Escalated (set with Escalate Ticket). The example text in the RCA customer name box now shows a made-up company name."
+      }
+    ],
+    "deployedBy": "Super Admin",
+    "deployedAt": "2026-11-15T23:00:00+05:30",
+    "isActive": true
   }
 ]

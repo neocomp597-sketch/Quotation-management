@@ -30,6 +30,9 @@ const statusStyles = {
     'Cancelled': 'bg-rose-50/50 text-rose-400 border-rose-100'
 };
 
+// Export stops after this many pages of 100 tickets (50,000 tickets).
+const EXPORT_MAX_PAGES = 500;
+
 // What the Tickets Register shows of a ticket, in the table and on the phone cards.
 const ticketListInfo = (t) => ({
     isManual: Boolean(t.isManual || t.manualInvoiceNo || (t.description && t.description.includes('--- Uploaded Images ---'))),
@@ -523,41 +526,44 @@ const CSMTickets = () => {
         }
     };
 
+    // The register's tab, search and filters as query parameters, shared by the list and Export.
+    const ticketListParams = () => {
+        const queryParams = {
+            ...viewParams,
+            search,
+            status: filterStatus,
+            priorityId: filterPriority,
+            tab: activeTab
+        };
+        if (filterCustomer) {
+            queryParams.customerId = filterCustomer;
+        }
+        if (searchParams.get('unassigned') === 'true') {
+            queryParams.unassigned = 'true';
+        }
+        if (searchParams.get('slaBreached') === 'true') {
+            queryParams.slaBreached = 'true';
+        }
+        const resolvedOn = searchParams.get('resolvedOn');
+        if (resolvedOn === 'today' || resolvedOn === 'yesterday') {
+            queryParams.resolvedOn = resolvedOn;
+        }
+        const createdOn = searchParams.get('createdOn');
+        if (createdOn === 'today' || createdOn === 'yesterday') {
+            queryParams.createdOn = createdOn;
+        }
+        if (filterInvoiceType === 'manual') {
+            queryParams.isManual = 'true';
+        } else if (filterInvoiceType === 'standard') {
+            queryParams.isManual = 'false';
+        }
+        return queryParams;
+    };
+
     const fetchTickets = async () => {
         setLoading(true);
         try {
-            const queryParams = {
-                ...viewParams,
-                page,
-                limit: 10,
-                search,
-                status: filterStatus,
-                priorityId: filterPriority,
-                tab: activeTab
-            };
-            if (filterCustomer) {
-                queryParams.customerId = filterCustomer;
-            }
-            if (searchParams.get('unassigned') === 'true') {
-                queryParams.unassigned = 'true';
-            }
-            if (searchParams.get('slaBreached') === 'true') {
-                queryParams.slaBreached = 'true';
-            }
-            const resolvedOn = searchParams.get('resolvedOn');
-            if (resolvedOn === 'today' || resolvedOn === 'yesterday') {
-                queryParams.resolvedOn = resolvedOn;
-            }
-            const createdOn = searchParams.get('createdOn');
-            if (createdOn === 'today' || createdOn === 'yesterday') {
-                queryParams.createdOn = createdOn;
-            }
-            if (filterInvoiceType === 'manual') {
-                queryParams.isManual = 'true';
-            } else if (filterInvoiceType === 'standard') {
-                queryParams.isManual = 'false';
-            }
-            const res = await csmService.getTickets(queryParams);
+            const res = await csmService.getTickets({ ...ticketListParams(), page, limit: 10 });
             setTickets(res.data?.data || []);
             setTotalPages(res.data?.pagination?.pages || 1);
         } catch (error) {
@@ -1735,15 +1741,14 @@ const CSMTickets = () => {
     const exportToExcel = async () => {
         setLoading(true);
         try {
-            const res = await csmService.getTickets({
-                ...viewParams,
-                limit: 10000,
-                search,
-                status: filterStatus,
-                priorityId: filterPriority
-            });
-            
-            const exportTickets = res.data?.data || [];
+            // Every ticket the register shows (same tab, search and filters), fetched page by page:
+            // the server sends at most 100 tickets per request.
+            const exportTickets = [];
+            for (let exportPage = 1, pages = 1; exportPage <= pages && exportPage <= EXPORT_MAX_PAGES; exportPage += 1) {
+                const res = await csmService.getTickets({ ...ticketListParams(), page: exportPage, limit: 100 });
+                exportTickets.push(...(res.data?.data || []));
+                pages = res.data?.pagination?.pages || 1;
+            }
             if (!exportTickets.length) {
                 toast.info('No tickets found to export');
                 return;
