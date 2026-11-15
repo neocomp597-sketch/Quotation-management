@@ -929,11 +929,11 @@
   {
     "version": "v6.8.3",
     "title": "Full Ticket Export, Raise Ticket for Your Customers' Serials & Who Can Close a Visit",
-    "message": "Release Updates (from 15 Nov 2026): Export in the Tickets Register now saves every ticket shown, not only the first 100. Raise Ticket finds the serial numbers of your branch's customers that another branch sold. Only the visit's engineer, the ticket's engineer or a manager can check out a service visit, and tickets can no longer be imported as Closed.",
+    "message": "Release Updates (from 15 Nov 2026): Export in the Tickets Register now saves every ticket shown, not only the first 100. Raise Ticket finds the serial numbers of your branch's customers that another branch sold. Any user of the ticket's branch can close it from its service visit, and tickets can no longer be imported as Closed.",
     "releaseNotes": [
       "Tickets Register: Export saves every ticket the register shows, with the same tab, search and filters; before, it stopped at 100 tickets and ignored some filters",
       "Raise Ticket: a serial number that another branch sold to your branch's customer is now found, as in Serial No Transfer",
-      "Service Visits: check-out, and with it closing a ticket, is for the visit's engineer, the ticket's assigned engineer, or a manager",
+      "Service Visits: any user of the ticket's branch, including the person who raised it, can check out the visit and close the ticket",
       "Ticket import: a row with Status Closed is refused; tickets are closed only from their service visit",
       "Ticket Details: an escalated ticket shows Escalated in Update Status instead of Open"
     ],
@@ -954,7 +954,7 @@
         "date": "15.11.2026",
         "module": "CSM Support",
         "submodule": "Service Visits: Who Can Check Out",
-        "changes": "Checking out a service visit, which is now the only way to close a ticket, is allowed for the engineer of the visit, the engineer assigned to the ticket, and managers and administrators. Anyone else gets a message saying so and nothing is saved. Engineers still need the Service Visits screen in Authorization, and the engineer is matched to the login by the email in Employee Master."
+        "changes": "Checking out a service visit is now the only way to close a ticket, and any user who works in the ticket's branch can do it: the person who raised the complaint, the engineer, or a colleague. It is not limited to the engineer of the visit. Users see only the visits of the branch selected at the top of the screen, and need the Service Visits screen in Authorization; the Employee role does not have it by default, so give it to the roles or users who close complaints."
       },
       {
         "date": "15.11.2026",

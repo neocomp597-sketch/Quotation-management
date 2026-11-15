@@ -283,19 +283,6 @@ const getEngineerForUser = async (user) => {
 };
 
 /**
- * Whether the user may check out a service visit, the only way a ticket is closed: admins and
- * managers, the visit's engineer and the ticket's assigned engineer (engineers are matched to the
- * login by email, as everywhere in this module).
- */
-exports.canCheckOutVisit = async (user, visit, ticket) => {
-    if (isAdminOrManagerUser(user)) return true;
-    const engineer = await getEngineerForUser(user);
-    if (!engineer) return false;
-    const engineerId = engineer._id.toString();
-    return [visit?.engineerId, ticket?.assignedEngineerId].some((id) => id && id.toString() === engineerId);
-};
-
-/**
  * Whether the user may open a ticket's details: admins and managers may open any ticket in
  * their company; everyone else only tickets assigned to their engineer record.
  */
