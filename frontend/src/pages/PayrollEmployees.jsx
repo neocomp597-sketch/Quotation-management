@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { payrollService, importService, branchService, territoryService, authService, invalidateApiCache } from '../services/api';
+import { payrollService, importService, branchService, territoryService, authService, invalidateApiCache, serialTransferService } from '../services/api';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 import ImportWizard from '../components/import/ImportWizard';
 import SearchableSelect from '../components/SearchableSelect';
+import EmployeeAssets from '../components/EmployeeAssets';
 import { formatDate } from '../utils/helpers';
 import * as XLSX from 'xlsx';
 import { 
@@ -43,6 +44,8 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
+    // Assign Asset on a new employee: the chosen company assets, assigned right after the save.
+    const [pendingAssets, setPendingAssets] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
     const [modalMode, setModalMode] = useState('add'); // 'add' | 'edit' | 'structure'
     const [selectedEmp, setSelectedEmp] = useState(null);
@@ -271,6 +274,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                 bankName: '', accountNumber: '', ifscCode: ''
             });
             setModalMode('add');
+            setPendingAssets([]);
             setIsModalOpen(true);
         } else if (isEditPage && routeId) {
             setIsModalOpen(true);
@@ -553,12 +557,26 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
         try {
             setIsSaving(true);
             if (modalMode === 'add') {
-                await payrollService.createEmployee(basicForm);
+                const created = await payrollService.createEmployee(basicForm);
                 toast.success('Employee profile created successfully!');
+                // Assign Asset: the chosen items go to the new employee now that the profile exists.
+                const newEmployeeId = created.data?._id || created.data?.employee?._id;
+                if (pendingAssets.length && newEmployeeId) {
+                    try {
+                        const assigned = await serialTransferService.assignEmployeeAssets(newEmployeeId, { assetIds: pendingAssets.map((asset) => asset._id) });
+                        const count = assigned.data?.assigned ?? pendingAssets.length;
+                        toast.success(`${count} ${count === 1 ? 'asset' : 'assets'} assigned to ${basicForm.name}`);
+                    } catch (assignError) {
+                        toast.error(`The profile is saved, but the assets were not assigned: ${assignError.response?.data?.message || assignError.message}. Assign them from Edit.`);
+                    }
+                }
+                setPendingAssets([]);
             } else {
                 await payrollService.updateEmployee(selectedEmp._id, basicForm);
                 toast.success('Employee profile details updated successfully!');
             }
+            // The employee is also a customer (created or updated with it): Customer Master reloads.
+            invalidateApiCache('/customers');
             setShowSaveConfirmModal(false);
             setIsModalOpen(false);
             fetchEmployees();
@@ -1944,6 +1962,15 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                         )}
                                     </div>
 
+                                    {/* Section 5: Assign Asset / Asset Transfer (company items given to the employee) */}
+                                    <EmployeeAssets
+                                        employeeId={modalMode === 'edit' ? selectedEmp?._id : null}
+                                        employeeName={basicForm.name || selectedEmp?.name || ''}
+                                        employees={allEmployees.length ? allEmployees : employees}
+                                        pending={pendingAssets}
+                                        onPendingChange={setPendingAssets}
+                                    />
+
                                     <div className="pt-5 border-t border-slate-100 flex justify-end gap-3">
                                         <button
                                             type="button"
@@ -2143,6 +2170,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                     // New employees get logins and engineer records (cached user and payroll lists).
                     invalidateApiCache('/payroll');
                     invalidateApiCache('/users');
+                    invalidateApiCache('/customers');
                     fetchEmployees();
                 }}
             />

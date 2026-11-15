@@ -36,6 +36,9 @@ const CustomerSchema = new mongoose.Schema({
     segment: { type: String, default: 'Retail' },
     owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true },
+    // The employee this customer stands for (services/employeeCustomerService.js): every employee is
+    // also a customer, kept in step with Employee Master. Null for every other customer.
+    employeeProfileId: { type: mongoose.Schema.Types.ObjectId, ref: 'EmployeeProfile', default: null, index: true },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdAt: { type: Date, default: Date.now },
 });

@@ -321,6 +321,10 @@ exports.createEmployee = async (req, res) => {
         const { syncEmployeeToEngineer } = require('../services/engineerSyncService');
         await syncEmployeeToEngineer(employee);
 
+        // Every employee is also a customer in Customer Master
+        const { syncCustomerForEmployee } = require('../services/employeeCustomerService');
+        await syncCustomerForEmployee(employee);
+
         await writePayrollAudit(req, 'EMPLOYEE_CREATED', `Created employee profile for ${employee.name}`, employee._id, 'EmployeeProfile');
         
         const populatedEmployee = await EmployeeProfile.findById(employee._id)
@@ -453,6 +457,10 @@ exports.updateEmployee = async (req, res) => {
         // Auto-sync details/status to CSM Engineers Master
         const { syncEmployeeToEngineer } = require('../services/engineerSyncService');
         await syncEmployeeToEngineer(employee);
+
+        // ...and the employee's customer in Customer Master (name, mobile, email, status)
+        const { syncCustomerForEmployee } = require('../services/employeeCustomerService');
+        await syncCustomerForEmployee(employee);
 
         await writePayrollAudit(req, 'EMPLOYEE_UPDATED', `Updated details for employee ${employee.name}`, employee._id, 'EmployeeProfile');
         broadcastCrmUpdate('EMPLOYEE', 'UPDATE', employee);
@@ -1493,6 +1501,7 @@ exports.batchAssignBranchAndEmployeeId = async (req, res) => {
             }
             await syncUserForEmployee(emp);
             await syncEmployeeToEngineer(emp);
+            await require('../services/employeeCustomerService').syncCustomerForEmployee(emp);
             updatedEmployees.push(emp);
         }
 

@@ -972,5 +972,77 @@
     "deployedBy": "Super Admin",
     "deployedAt": "2026-11-15T23:00:00+05:30",
     "isActive": true
+  },
+  {
+    "version": "v6.8.4",
+    "title": "Several Branches at Once in Invoice Bulk Upload & Branch Buttons on Serial No Transfer",
+    "message": "Release Updates (from 15 Nov 2026): Invoice Bulk Upload can show several of your branches at once: tick the branch buttons and search them all together. Serial No Transfer now has branch buttons too.",
+    "releaseNotes": [
+      "Invoice Bulk Upload: tick one or more branch buttons, or All branches, to see their serial numbers together, with the branch shown on each row; search, cards and Return History cover all of them",
+      "Serial No Transfer: the branches you work in are shown as buttons above the tabs, your home branch first; pressing one shows that branch's serial numbers"
+    ],
+    "detailedChanges": [
+      {
+        "date": "15.11.2026",
+        "module": "Master Management",
+        "submodule": "Invoice Bulk Upload: Several Branches at Once",
+        "changes": "The branch buttons of Invoice Bulk Upload now choose which branches the screen shows, and several can be ticked together; All branches ticks every branch you work in. The list, the search, the four cards and Return History then cover all the ticked branches, so a serial number can be found without opening each branch in turn, and each row shows its branch. A line under the buttons names the branches shown. The branch at the top of the screen is still your working branch: Add Single Entry and Import save there. View details, Edit and Sales return work on rows of any branch you are given, and the entry stays in its own branch. One branch always stays ticked, and the choice is remembered until you change the branch at the top of the screen. Export starts with the shown branches ticked. Only your own branches can be shown, and MGR Access still applies."
+      },
+      {
+        "date": "15.11.2026",
+        "module": "Master Management",
+        "submodule": "Serial No Transfer: Branch Buttons",
+        "changes": "Like Invoice Bulk Upload, Serial No Transfer now shows a button for each branch you work in, above the Serial No List, Transfer History, Customer Activity Log and Branch Transfer tabs. Your home branch is marked with a house and comes first, and the branch you are working in is highlighted. Pressing another branch makes it your working branch, the same as choosing it at the top of the screen, and every tab then shows that branch. Only the branches given to your login are shown."
+      }
+    ],
+    "deployedBy": "Super Admin",
+    "deployedAt": "2026-11-15T23:30:00+05:30",
+    "isActive": true
+  },
+  {
+    "version": "v6.8.5",
+    "title": "Every Employee Is Also a Customer",
+    "message": "Release Updates (from 15 Nov 2026): Every employee in Employee Master now also appears in Customer Master, with Segment Employee, so company items such as laptops can be given to employees and tickets raised for them. New employees are added automatically.",
+    "releaseNotes": [
+      "Customer Master: every employee is a customer too, with the Employee ID as customer code, mobile, email and home branch, and Segment Employee",
+      "Employee Master: adding an employee, or uploading employees, adds their customer at once; later changes to the name, mobile, email or status follow"
+    ],
+    "detailedChanges": [
+      {
+        "date": "15.11.2026",
+        "module": "Master Management",
+        "submodule": "Employees in Customer Master",
+        "changes": "Each employee now has a customer in Customer Master: the employee's name, the Employee ID as the customer code, mobile, email and home branch, with Segment Employee and status Active. Employees who already existed get theirs when this update is installed; new employees get theirs as soon as they are added or uploaded. When an employee's name, mobile, email or status changes, the customer follows, and a resigned employee's customer becomes Inactive. The customer code and branch are not changed later, because serial numbers and tickets refer to them. If a customer with the same code and name was already there, that customer is used instead of adding a second one; if the Employee ID is already the code of a different customer, the employee's customer is added without a code. Vacant positions get no customer, and deleting an employee does not delete the customer."
+      }
+    ],
+    "deployedBy": "Super Admin",
+    "deployedAt": "2026-11-16T00:00:00+05:30",
+    "isActive": true
+  },
+  {
+    "version": "v6.8.6",
+    "title": "Assign Asset and Asset Transfer in Employee Master",
+    "message": "Release Updates (from 16 Nov 2026): Employee Master has an Assign Asset section to give company items such as laptops to an employee, and Asset Transfer to move an item from one employee to another.",
+    "releaseNotes": [
+      "Employee Master: Assign Asset lets you pick the company items (Invoice Bulk Upload serial numbers) given to an employee, when adding the employee or later",
+      "Employee Master: Asset Transfer moves an item from one employee to another; the item's history keeps both"
+    ],
+    "detailedChanges": [
+      {
+        "date": "16.11.2026",
+        "module": "Employee Master",
+        "submodule": "Assign Asset",
+        "changes": "Add and Edit Employee have a new section 5, Assign Asset. Search the company items of the branch at the top of the screen that are in stock or allocated to nobody, by serial number, Asset No or product, and press Add for each one. On a new employee they are given to the employee when the profile is saved; on an existing employee, press Assign selected. An item in stock becomes Allocated, the employee becomes its holder (shown as its customer in Invoice Bulk Upload and Serial No Transfer), and the change is kept in the item's history like any other customer change. An item that is already with someone else is refused with their name: use Asset Transfer. Edit Employee also lists every item the employee holds now, in any branch."
+      },
+      {
+        "date": "16.11.2026",
+        "module": "Employee Master",
+        "submodule": "Asset Transfer",
+        "changes": "Each item listed under Assets with the employee has a Transfer button. Choose the employee to transfer it to, the date (today or earlier) and optional remarks, and press Transfer Asset. The other employee becomes the holder, the item stays Allocated, and its history keeps both employees with the dates. Assigning and transferring need Modify access to Serial No Transfer in Authorization."
+      }
+    ],
+    "deployedBy": "Super Admin",
+    "deployedAt": "2026-11-16T00:30:00+05:30",
+    "isActive": true
   }
 ]

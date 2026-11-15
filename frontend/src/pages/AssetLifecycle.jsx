@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
@@ -37,6 +37,9 @@ const AssetLifecycle = () => {
     const { serialNumber: rawSerial } = useParams();
     const serialNumber = decodeURIComponent(rawSerial || '');
     const navigate = useNavigate();
+    // ?branch: opened from Invoice Bulk Upload showing several branches, for a row of another branch.
+    const [searchParams] = useSearchParams();
+    const viewBranch = searchParams.get('branch') || '';
 
     const [summary, setSummary] = useState(null);
     const [activity, setActivity] = useState([]);
@@ -49,8 +52,8 @@ const AssetLifecycle = () => {
         setNotFound(false);
         try {
             const [summaryRes, activityRes] = await Promise.all([
-                csmService.getAssetSummary({ serialNumber }),
-                csmService.getAssetActivity(serialNumber)
+                csmService.getAssetSummary({ serialNumber, ...(viewBranch ? { branchIds: viewBranch } : {}) }),
+                csmService.getAssetActivity(serialNumber, viewBranch ? { branchIds: viewBranch } : {})
             ]);
             setSummary(summaryRes.data);
             setActivity(activityRes.data?.activity || []);
@@ -63,7 +66,7 @@ const AssetLifecycle = () => {
         }
     };
 
-    useEffect(() => { load(); }, [serialNumber]); // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => { load(); }, [serialNumber, viewBranch]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const asset = summary?.asset;
     const isCovered = summary?.warranty?.status === 'Active' || Boolean(summary?.amc);

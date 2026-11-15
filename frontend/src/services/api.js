@@ -532,6 +532,11 @@ export const serialTransferService = {
   createBranchTransfer: (data) => api.post("/serial-transfers/branch-transfers", data),
   getTransferBranches: () => api.get("/serial-transfers/branch-transfers/branches"),
   searchBranchSerials: (params = {}) => api.get("/serial-transfers/branch-transfers/serials", { params }),
+  // Employee Master > Assign Asset / Asset Transfer: company items given to employees.
+  employeeAssets: (employeeId) => api.get(`/serial-transfers/employees/${employeeId}/assets`, { cache: false }),
+  assignableAssets: (params = {}) => api.get("/serial-transfers/employees/assignable-assets", { params, cache: false }),
+  assignEmployeeAssets: (employeeId, data) => api.post(`/serial-transfers/employees/${employeeId}/assets`, data),
+  transferEmployeeAsset: (employeeId, assetId, data) => api.post(`/serial-transfers/employees/${employeeId}/assets/${assetId}/transfer`, data),
   getSerialBranchHistory: (assetId) => api.get(`/serial-transfers/branch-transfers/serials/${assetId}`),
 };
 
@@ -1055,10 +1060,10 @@ export const csmService = {
   createSingleAsset: (data) => api.post("/csm/assets/single", data),
   updateAsset: (id, data) => api.put(`/csm/assets/${id}`, data),
   returnAsset: (id, returnReason) => api.post(`/csm/assets/${id}/return`, { returnReason }),
-  getReturnHistory: () => api.get("/csm/assets/return-history"),
+  getReturnHistory: (params = {}) => api.get("/csm/assets/return-history", { params }),
   getUploadHistory: (params = {}) => api.get("/csm/assets/upload-history", { params, cache: false }),
   getAssetSummary: (params = {}) => api.get("/csm/assets/summary", { params }),
-  getAssetActivity: (serialNumber) => api.get("/csm/assets/activity", { params: { serialNumber } }),
+  getAssetActivity: (serialNumber, params = {}) => api.get("/csm/assets/activity", { params: { serialNumber, ...params } }),
   searchSerialNumbers: (q) => api.get("/csm/assets/search-serials", { params: { q } }),
   lookupEntryCustomer: (code) => api.get("/csm/assets/customer-lookup", { params: { code }, cache: false }),
 

@@ -6,7 +6,7 @@ import * as XLSX from 'xlsx';
 import {
     MdSearch, MdTag, MdInfoOutline, MdSync,
     MdLocalOffer, MdPeople, MdReceipt, MdAssignmentTurnedIn,
-    MdFileUpload, MdFileDownload, MdAdd, MdUndo, MdHistory, MdEdit, MdFilterAlt, MdHome
+    MdFileUpload, MdFileDownload, MdAdd, MdUndo, MdHistory, MdEdit, MdFilterAlt
 } from 'react-icons/md';
 import Modal from '../components/Modal';
 import ImportWizard from '../components/import/ImportWizard';
@@ -18,6 +18,7 @@ import DateInput from '../components/DateInput';
 import usePermission from '../hooks/usePermission';
 import { useAuth } from '../context/AuthContext';
 import { MobileCard, MobileCardActions, MobileCardHead, MobileCardList, MobileEmpty, MobileField, MobileFields } from '../components/SerialMobileCards';
+import BranchChips from '../components/BranchChips';
 
 const PAGE_SIZE = 15;
 
@@ -193,18 +194,38 @@ const SerialNoMaster = () => {
     const navigate = useNavigate();
     const { canCreate, canModify } = usePermission('master_serials');
     // View Details and Edit are switches of their own in Authorization; the API checks them too.
-    const { hasAccess, user, activeBranchId, setActiveBranch } = useAuth();
+    const { hasAccess, user, activeBranchId } = useAuth();
+    // The branches shown: the branch buttons choose one or several of the user's branches at a time.
+    // Add Single Entry and Import still save to the working branch at the top of the screen. The
+    // choice is remembered in this browser tab until the working branch is changed at the top.
+    const viewStorageKey = `ibu:viewBranches:${user?._id || user?.id || ''}`;
+    const [myBranches, setMyBranches] = useState([]);
+    const [viewBranchIds, setViewBranchIds] = useState(() => (activeBranchId ? [String(activeBranchId)] : []));
+    const handleBranchesLoaded = (branches) => {
+        setMyBranches(branches);
+        const allowed = new Set(branches.map((branch) => idOf(branch)));
+        let stored = null;
+        try { stored = JSON.parse(sessionStorage.getItem(viewStorageKey) || 'null'); } catch { stored = null; }
+        if (!stored || stored.workingBranchId !== String(activeBranchId || '') || !Array.isArray(stored.ids)) return;
+        const kept = stored.ids.map(String).filter((id) => allowed.has(id));
+        if (kept.length) setViewBranchIds(kept);
+    };
+    const changeViewBranches = (ids) => {
+        setViewBranchIds(ids);
+        setCurrentPage(1);
+        try {
+            sessionStorage.setItem(viewStorageKey, JSON.stringify({ workingBranchId: String(activeBranchId || ''), ids }));
+        } catch { /* storage unavailable: not remembered */ }
+    };
+    const showsOtherBranches = viewBranchIds.length > 1 || (viewBranchIds.length === 1 && viewBranchIds[0] !== String(activeBranchId || ''));
+    // Sent as ?branchIds only when the screen shows more than the working branch.
+    const viewBranchParam = showsOtherBranches ? viewBranchIds.join(',') : undefined;
+    const branchNameOf = (id) => myBranches.find((branch) => idOf(branch) === String(id))?.name || '';
     const canViewDetails = hasAccess('master_serials_view_details');
     // Upload History lists every branch's uploads, so only administrators open it (the API checks too).
     const canSeeUploadHistory = ['admin', 'super_admin', 'superadmin'].includes(String(user?.role || '').toLowerCase());
     const [isUploadHistoryOpen, setIsUploadHistoryOpen] = useState(false);
     const canEdit = hasAccess('master_serials_edit');
-    // The branches this user was given, home branch first. Picking one makes it the working
-    // branch (as the header switcher does), so the list, cards, returns, export and edits all
-    // follow it; the page then reloads in that branch.
-    const [myBranches, setMyBranches] = useState([]);
-    const [primaryBranchId, setPrimaryBranchId] = useState(null);
-    const [switchingBranchId, setSwitchingBranchId] = useState(null);
     const [assets, setAssets] = useState([]);
     const [assetPagination, setAssetPagination] = useState({ page: 1, limit: PAGE_SIZE, total: 0, pages: 1 });
     const [assetSummary, setAssetSummary] = useState({ total: 0, inStock: 0, sold: 0, returned: 0 });
@@ -460,33 +481,6 @@ const SerialNoMaster = () => {
         loadReferenceData();
     }, []);
 
-    useEffect(() => {
-        let cancelled = false;
-        authService.getMyBranches()
-            .then((res) => {
-                if (cancelled) return;
-                setMyBranches(Array.isArray(res.data?.branches) ? res.data.branches : []);
-                setPrimaryBranchId(res.data?.primaryBranchId ? String(res.data.primaryBranchId) : null);
-            })
-            .catch((err) => console.warn('Could not load your branches:', err));
-        return () => { cancelled = true; };
-    }, []);
-
-    const handleBranchChipClick = async (branch) => {
-        const id = idOf(branch);
-        if (!id || id === String(activeBranchId || '') || switchingBranchId) return;
-        setSwitchingBranchId(id);
-        try {
-            // Persisted and checked on the server first; the page then reloads in this branch (see Layout).
-            await setActiveBranch(branch);
-            toast.info(`Showing ${branch.name} branch data`);
-        } catch (err) {
-            toast.error(err.response?.data?.message || `Could not switch to ${branch.name}`);
-        } finally {
-            setSwitchingBranchId(null);
-        }
-    };
-
     const loadReferenceData = async () => {
         const [productsResult, divisionsResult, segmentsResult] = await Promise.allSettled([
             productService.getAll(),
@@ -514,7 +508,8 @@ const SerialNoMaster = () => {
                 page: currentPage,
                 limit: PAGE_SIZE,
                 q: searchQuery.trim() || undefined,
-                status: selectedStatus !== 'ALL' ? selectedStatus : undefined
+                status: selectedStatus !== 'ALL' ? selectedStatus : undefined,
+                branchIds: viewBranchParam
             };
             MGR_FIELDS.forEach(({ key }) => {
                 if (mgrFilters[key] === 'ALL') return;
@@ -541,7 +536,7 @@ const SerialNoMaster = () => {
         } finally {
             if (isLatest()) setLoading(false);
         }
-    }, [currentPage, searchQuery, selectedStatus, mgrFilters, products]);
+    }, [currentPage, searchQuery, selectedStatus, mgrFilters, products, viewBranchParam]);
 
     useEffect(() => {
         if (activeTab !== 'active') return undefined;
@@ -552,15 +547,22 @@ const SerialNoMaster = () => {
     const fetchReturnHistory = async () => {
         setLoadingHistory(true);
         try {
-            const res = await csmService.getReturnHistory();
+            const res = await csmService.getReturnHistory(viewBranchParam ? { branchIds: viewBranchParam } : {});
             setReturnHistory(res.data || []);
         } catch (err) {
             console.error('Error fetching return history:', err);
-            toast.error('Failed to load return history');
+            toast.error(err.response?.data?.message || 'Failed to load return history');
         } finally {
             setLoadingHistory(false);
         }
     };
+
+    // Other branches chosen: Return History is loaded again for them.
+    useEffect(() => {
+        setReturnHistory([]);
+        if (activeTab === 'returns') fetchReturnHistory();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [viewBranchParam]);
 
     const handleTabChange = (tab) => {
         setActiveTab(tab);
@@ -630,7 +632,10 @@ const SerialNoMaster = () => {
                 ...prev,
                 loading: false,
                 branches,
-                selected: branches.some((branch) => idOf(branch) === current) ? [current] : branches.length === 1 ? [idOf(branches[0])] : []
+                // The branches shown on screen, else the working branch.
+                selected: showsOtherBranches && viewBranchIds.some((id) => branches.some((branch) => idOf(branch) === id))
+                    ? viewBranchIds.filter((id) => branches.some((branch) => idOf(branch) === id))
+                    : branches.some((branch) => idOf(branch) === current) ? [current] : branches.length === 1 ? [idOf(branches[0])] : []
             }));
         } catch (err) {
             setExportDialog((prev) => ({ ...prev, loading: false, error: err.response?.data?.message || 'Could not load your branches.' }));
@@ -681,8 +686,10 @@ const SerialNoMaster = () => {
     };
 
     // Asset Lifecycle Detail is a full page with the serial's activity log and exports.
-    const handleViewDetail = (serialNumber) => {
-        navigate(`/serial-no-master/view/${encodeURIComponent(serialNumber)}`);
+    // A row of another shown branch opens with ?branch, so the details page reads that branch.
+    const handleViewDetail = (serialNumber, asset) => {
+        const branch = asset && showsOtherBranches ? idOf(asset.branchId) : '';
+        navigate(`/serial-no-master/view/${encodeURIComponent(serialNumber)}${branch ? `?branch=${branch}` : ''}`);
     };
 
     // Open Sales Return Modal (Requirement #6)
@@ -1313,35 +1320,22 @@ const SerialNoMaster = () => {
                         <span>Return History</span>
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeTab === 'returns' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'}`}>{returnHistory.length}</span>
                     </button>
-                    {myBranches.length > 0 && (
-                        <div className="col-span-2 flex flex-wrap items-center gap-2 sm:ml-4" role="group" aria-label="Branches">
-                            {myBranches.map((branch) => {
-                                const id = idOf(branch);
-                                const isSelected = id === String(activeBranchId || '');
-                                const isPrimary = id === primaryBranchId;
-                                const isSwitching = id === switchingBranchId;
-                                return (
-                                    <button
-                                        key={id}
-                                        type="button"
-                                        onClick={() => handleBranchChipClick(branch)}
-                                        disabled={Boolean(switchingBranchId)}
-                                        aria-pressed={isSelected}
-                                        title={`${isPrimary ? 'Primary branch: ' : ''}${branch.name}${isSelected ? ' (showing)' : ''}`}
-                                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold border transition-all ${
-                                            isSelected
-                                                ? 'bg-teal-50 text-teal-700 border-teal-500 shadow-sm cursor-default'
-                                                : 'bg-white text-slate-700 border-slate-200 shadow-sm hover:border-teal-400 hover:text-teal-700 cursor-pointer'
-                                        } ${isSwitching ? 'opacity-60 animate-pulse' : ''} disabled:cursor-wait`}
-                                    >
-                                        {isPrimary && <MdHome size={15} className="shrink-0" aria-label="Primary branch" />}
-                                        <span>{branch.name}</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    )}
+                    {/* The branches this user was given: tick one or several to show them together (list,
+                        cards, Return History, search). */}
+                    <BranchChips
+                        className="col-span-2 flex flex-wrap items-center gap-2 sm:ml-4"
+                        multiple
+                        selected={viewBranchIds}
+                        onChange={changeViewBranches}
+                        onLoaded={handleBranchesLoaded}
+                    />
                 </div>
+                {showsOtherBranches && (
+                    <p className="text-xs font-semibold text-slate-500">
+                        Showing {viewBranchIds.length === 1 ? 'branch' : `${viewBranchIds.length} branches`}: <span className="font-black text-slate-700">{viewBranchIds.map(branchNameOf).filter(Boolean).join(', ')}</span>.
+                        {' '}Add Single Entry and Import save to <span className="font-black text-slate-700">{branchNameOf(activeBranchId) || 'the branch at the top of the screen'}</span>, the branch at the top of the screen.
+                    </p>
+                )}
 
                 {/* The search keeps a usable width: when long MGR values make the dropdowns too wide, they move to the next row. */}
                 <div className="flex flex-col md:flex-row md:flex-wrap gap-4 items-center">
@@ -1424,6 +1418,7 @@ const SerialNoMaster = () => {
                                         />
                                         <MgrLine record={item} wrap />
                                         <MobileFields>
+                                            {item.branchName && <MobileField label="Branch" wide>{item.branchName}</MobileField>}
                                             <MobileField label="Customer" wide>{item.customerId?.companyName || item.customerId?.customerName || item.customerName || 'Customer'}</MobileField>
                                             <MobileField label="Invoice Number">{item.invoiceNumber || '-'}</MobileField>
                                             <MobileField label="Return Date">{formatDate(item.returnDate || item.createdAt)}</MobileField>
@@ -1451,6 +1446,7 @@ const SerialNoMaster = () => {
                                             <tr key={item._id} className="border-b last:border-0 border-slate-50 hover:bg-slate-50/50 transition-colors">
                                                 <td className="p-4 text-sm font-black text-slate-900 font-mono tracking-wide">
                                                     {item.serialNumber}
+                                                    {item.branchName && <span className="block w-fit mt-1 text-[9px] px-1.5 py-0.5 rounded-full font-black tracking-wide bg-purple-50 text-purple-700 border border-purple-200 font-sans">📍 {item.branchName}</span>}
                                                 </td>
                                                 <td className="p-4">
                                                     <span className="block text-sm font-bold text-slate-800">
@@ -1516,6 +1512,7 @@ const SerialNoMaster = () => {
                                             )}
                                             <MgrLine record={asset} wrap />
                                             <MobileFields>
+                                                {asset.branchName && <MobileField label="Branch" wide>{asset.branchName}</MobileField>}
                                                 <MobileField label="Customer" wide>
                                                     {custDisplay || <span className="text-slate-400 font-normal italic">{noCustomerLabel(asset)}</span>}
                                                     {asset.customerPostalCode && <span className="block text-[10px] text-slate-400 font-bold">Pin: {asset.customerPostalCode}</span>}
@@ -1537,7 +1534,7 @@ const SerialNoMaster = () => {
                                             {(canViewDetails || canEdit || canReturn) && (
                                                 <MobileCardActions className="ibu-card-actions">
                                                     {canViewDetails && (
-                                                        <button type="button" onClick={() => handleViewDetail(asset.serialNumber)} className={`${actionClass} border-slate-200 text-slate-700`}>
+                                                        <button type="button" onClick={() => handleViewDetail(asset.serialNumber, asset)} className={`${actionClass} border-slate-200 text-slate-700`}>
                                                             <MdInfoOutline size={16} /> Details
                                                         </button>
                                                     )}
@@ -1581,6 +1578,7 @@ const SerialNoMaster = () => {
                                                 <tr key={asset._id} className="border-b last:border-0 border-slate-50 hover:bg-slate-50/50 transition-colors">
                                                     <td className="p-4 text-sm font-black text-slate-900 font-mono tracking-wide">
                                                         {asset.serialNumber}
+                                                        {asset.branchName && <span className="block w-fit mt-1 text-[9px] px-1.5 py-0.5 rounded-full font-black tracking-wide bg-purple-50 text-purple-700 border border-purple-200 font-sans">📍 {asset.branchName}</span>}
                                                         {asset.indicatorField && (
                                                             <span className="block text-[9px] font-bold text-primary-600 tracking-wider">
                                                                 Indicator: {asset.indicatorField}
@@ -1649,7 +1647,7 @@ const SerialNoMaster = () => {
                                                                         <button
                                                                             onClick={() => {
                                                                                 setOpenActionMenuAssetId(null);
-                                                                                handleViewDetail(asset.serialNumber);
+                                                                                handleViewDetail(asset.serialNumber, asset);
                                                                             }}
                                                                             className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                                                                         >

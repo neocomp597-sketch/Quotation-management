@@ -1202,6 +1202,7 @@ const Customers = ({ isCreatePage, isEditPage, embedded = false, onSaved, onCanc
                                                     <option value="Wholesale">Wholesale</option>
                                                     <option value="Corporate">Corporate</option>
                                                     <option value="Government">Government</option>
+                                                    <option value="Employee">Employee</option>
                                                 </select>
                                             </div>
                                             <div className="space-y-2">

@@ -13,6 +13,7 @@ import DateInput from '../components/DateInput';
 import usePermission from '../hooks/usePermission';
 import { useAuth } from '../context/AuthContext';
 import { MobileCard, MobileCardActions, MobileCardHead, MobileCardList, MobileEmpty, MobileField, MobileFields } from '../components/SerialMobileCards';
+import BranchChips from '../components/BranchChips';
 
 const PAGE_SIZE = 20;
 const TABS = [
@@ -2020,6 +2021,9 @@ const SerialNoTransfer = () => {
             </div>
 
             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+                {/* The branches this user was given, as in Invoice Bulk Upload: picking one makes it the
+                    working branch, and every tab then shows that branch. */}
+                <BranchChips className="flex flex-wrap items-center gap-2 px-3 sm:px-5 pt-3 sm:pt-5" />
                 <div className="flex gap-1 overflow-x-auto border-b border-slate-100 px-2 sm:px-4 pt-2 sm:pt-4">
                     {TABS.map((item) => (
                         <button

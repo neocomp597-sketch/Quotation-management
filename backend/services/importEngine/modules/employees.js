@@ -391,5 +391,12 @@ module.exports = {
         } catch (error) {
             console.error('Employee import: login sync failed:', error);
         }
+        try {
+            // Every employee is also a customer in Customer Master
+            const { syncCustomersForExistingEmployees } = require('../../employeeCustomerService');
+            await syncCustomersForExistingEmployees(companyId);
+        } catch (error) {
+            console.error('Employee import: customer sync failed:', error);
+        }
     }
 };

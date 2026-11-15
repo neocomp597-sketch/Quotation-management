@@ -511,6 +511,81 @@ const transferMoment = (value) => {
 const startOfDay = (value) => new Date(new Date(value).setHours(0, 0, 0, 0));
 
 /**
+ * Inside `session`'s transaction, makes `customer` the serial's current holder: the invoice row's
+ * customer is saved as the first record if this is the first change, a returned serial's return is
+ * saved, the current record becomes inactive, a new active record is added and the asset moves to
+ * the customer. Used by Transfer / Assign (transferSerial) and by Employee Master's Assign Asset and
+ * Asset Transfer. `sells`: the serial is sold to the customer (status SOLD). `allocate`: an
+ * in-stock serial given to an employee becomes ALLOCATED; any other status is kept.
+ */
+const recordNewHolder = async (asset, customer, { transferDate, sells = false, allocate = false, remarks = '', requestId, user }, session) => {
+    const records = await savedHistory(asset, user, session);
+    let current = records.find((record) => record.isActive) || null;
+    // A returned serial: the return ends the current record and is saved before the new customer.
+    let returned = null;
+    const returning = unrecordedReturn(asset, records);
+    if (returning) {
+        const date = returnDateOf(asset, returning, transferDate);
+        await SerialTransfer.updateOne({ _id: returning._id }, { $set: { isActive: false, endedAt: date } }, { session }).setOptions(ANY_BRANCH);
+        const [saved] = await SerialTransfer.create([{ ...returnRecord(asset, returning, date), ...user }], { session });
+        returned = saved.toObject();
+        current = null;
+    }
+    const previous = current || returned;
+    if (current?.customerId && String(current.customerId) === String(customer._id)) {
+        throw httpError(400, `${customerLabel(customer)} is already the current customer of ${asset.serialNumber}.`);
+    }
+    if (previous && transferDate < startOfDay(previous.transferDate)) {
+        const holder = previous.companyName || previous.customerName || 'previous customer';
+        throw httpError(400, returned
+            ? `Transfer date cannot be before ${formatDate(previous.transferDate)}, when ${holder} returned it.`
+            : `Transfer date cannot be before ${formatDate(previous.transferDate)}, when the current customer (${holder}) received it.`);
+    }
+
+    if (current) {
+        await SerialTransfer.updateOne({ _id: current._id }, { $set: { isActive: false, endedAt: transferDate } }, { session }).setOptions(ANY_BRANCH);
+    }
+    // The invoice flows to the new customer: the previous record's, else the serial's own.
+    const invoice = withInvoice(previous || { entryType: 'Sold' }, asset);
+    const snapshot = customerSnapshot(customer);
+    await SerialTransfer.create([{
+        assetId: asset._id,
+        serialNumber: asset.serialNumber,
+        serialKey: toKey(asset.serialNumber),
+        productId: asset.productId?._id || asset.productId || null,
+        productCode: asset.productCode || '',
+        productName: asset.productName || '',
+        ...snapshot,
+        previousCustomerId: previous?.customerId || null,
+        previousCustomerCode: previous?.customerCode || '',
+        previousCustomerName: previous?.companyName || previous?.customerName || '',
+        entryType: changeType(asset, sells),
+        transferDate,
+        isActive: true,
+        invoiceNumber: invoice.invoiceNumber || '',
+        invoiceDate: invoice.invoiceDate || null,
+        remarks: cleanText(remarks),
+        requestId,
+        ...user,
+        branchId: asset.branchId || previous?.branchId || null
+    }], { session });
+
+    const allocates = allocate && !sells && statusOf(asset) === 'IN_STOCK';
+    await Asset.updateOne({ _id: asset._id }, {
+        $set: {
+            customerId: customer._id,
+            customerCode: snapshot.customerCode,
+            customerNameStr: snapshot.companyName,
+            customerMobile: snapshot.customerMobile,
+            customerPostalCode: snapshot.customerPincode,
+            // Sold by this transfer; a serial with no invoice date was sold on the transfer date.
+            ...(sells ? { status: 'SOLD', ...(invoiceDateOf(asset) ? {} : { saleDate: transferDate }) } : {}),
+            ...(allocates ? { status: 'ALLOCATED' } : {})
+        }
+    }, { session }).setOptions(ANY_BRANCH);
+};
+
+/**
  * Assigns a serial number to another customer. In one transaction: the invoice row's customer is
  * saved as the first record if this is the first change, a returned serial's return is saved, the
  * current record becomes inactive, a new active record is added for the new customer and the
@@ -555,70 +630,9 @@ exports.transferSerial = async (req, res) => {
         const user = { createdBy: req.user?.id || null, createdByName: req.user?.name || '' };
 
         session = await mongoose.startSession();
-        await session.withTransaction(async () => {
-            const records = await savedHistory(asset, user, session);
-            let current = records.find((record) => record.isActive) || null;
-            // A returned serial: the return ends the current record and is saved before the new customer.
-            let returned = null;
-            const returning = unrecordedReturn(asset, records);
-            if (returning) {
-                const date = returnDateOf(asset, returning, transferDate);
-                await SerialTransfer.updateOne({ _id: returning._id }, { $set: { isActive: false, endedAt: date } }, { session }).setOptions(ANY_BRANCH);
-                const [saved] = await SerialTransfer.create([{ ...returnRecord(asset, returning, date), ...user }], { session });
-                returned = saved.toObject();
-                current = null;
-            }
-            const previous = current || returned;
-            if (current?.customerId && String(current.customerId) === String(customer._id)) {
-                throw httpError(400, `${customerLabel(customer)} is already the current customer of ${asset.serialNumber}.`);
-            }
-            if (previous && transferDate < startOfDay(previous.transferDate)) {
-                const holder = previous.companyName || previous.customerName || 'previous customer';
-                throw httpError(400, returned
-                    ? `Transfer date cannot be before ${formatDate(previous.transferDate)}, when ${holder} returned it.`
-                    : `Transfer date cannot be before ${formatDate(previous.transferDate)}, when the current customer (${holder}) received it.`);
-            }
-
-            if (current) {
-                await SerialTransfer.updateOne({ _id: current._id }, { $set: { isActive: false, endedAt: transferDate } }, { session }).setOptions(ANY_BRANCH);
-            }
-            // The invoice flows to the new customer: the previous record's, else the serial's own.
-            const invoice = withInvoice(previous || { entryType: 'Sold' }, asset);
-            const snapshot = customerSnapshot(customer);
-            await SerialTransfer.create([{
-                assetId: asset._id,
-                serialNumber: asset.serialNumber,
-                serialKey: toKey(asset.serialNumber),
-                productId: asset.productId?._id || asset.productId || null,
-                productCode: asset.productCode || '',
-                productName: asset.productName || '',
-                ...snapshot,
-                previousCustomerId: previous?.customerId || null,
-                previousCustomerCode: previous?.customerCode || '',
-                previousCustomerName: previous?.companyName || previous?.customerName || '',
-                entryType: changeType(asset, sells),
-                transferDate,
-                isActive: true,
-                invoiceNumber: invoice.invoiceNumber || '',
-                invoiceDate: invoice.invoiceDate || null,
-                remarks: cleanText(req.body.remarks),
-                requestId,
-                ...user,
-                branchId: asset.branchId || previous?.branchId || null
-            }], { session });
-
-            await Asset.updateOne({ _id: asset._id }, {
-                $set: {
-                    customerId: customer._id,
-                    customerCode: snapshot.customerCode,
-                    customerNameStr: snapshot.companyName,
-                    customerMobile: snapshot.customerMobile,
-                    customerPostalCode: snapshot.customerPincode,
-                    // Sold by this transfer; a serial with no invoice date was sold on the transfer date.
-                    ...(sells ? { status: 'SOLD', ...(invoiceDateOf(asset) ? {} : { saleDate: transferDate }) } : {})
-                }
-            }, { session }).setOptions(ANY_BRANCH);
-        });
+        await session.withTransaction(() => recordNewHolder(asset, customer, {
+            transferDate, sells, remarks: req.body.remarks, requestId, user
+        }, session));
 
         return res.status(201).json(await loadSerial(asset._id));
     } catch (error) {
@@ -1372,5 +1386,206 @@ exports.getSerialBranchHistory = async (req, res) => {
         });
     } catch (error) {
         return sendError(res, error, 'Failed to load the branch history');
+    }
+};
+
+/*
+ * Employee Master > Assign Asset and Asset Transfer: company items (Invoice Bulk Upload serial
+ * numbers such as laptops) given to employees. An employee holds an item through their customer in
+ * Customer Master (services/employeeCustomerService.js), so assigning and transferring are customer
+ * changes recorded by recordNewHolder, with the same history as Serial No Transfer. An in-stock
+ * item becomes Allocated when given to an employee.
+ */
+const MAX_ASSETS_PER_ASSIGNMENT = 50;
+// Items that can be given to an employee: in stock or allocated, and with nobody.
+const ASSIGNABLE_STATUSES = ['IN_STOCK', 'ALLOCATED', null];
+const NOBODY = { $and: [{ $or: [{ customerId: null }, { customerId: { $exists: false } }] }, { customerNameStr: { $in: ['', null] } }] };
+
+// The employee (not a vacant position) and their customer, created if missing.
+const employeeAndCustomer = async (req, employeeId, label = 'employee') => {
+    if (!mongoose.Types.ObjectId.isValid(employeeId)) throw httpError(400, `Select the ${label}.`);
+    const EmployeeProfile = require('../models/EmployeeProfile');
+    const employee = await EmployeeProfile.findOne({ _id: employeeId, companyId: req.user.companyId }).setOptions(ANY_BRANCH).lean();
+    if (!employee || employee.isVacant || employee.status === 'Vacant') throw httpError(404, `The ${label} was not found.`);
+    const { syncCustomerForEmployee } = require('../services/employeeCustomerService');
+    const linked = await syncCustomerForEmployee(employee);
+    if (!linked) throw httpError(500, `Could not prepare ${employee.name} in Customer Master.`);
+    const customer = await Customer.findById(linked._id).select(CUSTOMER_SELECT).setOptions(ANY_BRANCH).lean();
+    return { employee, customer };
+};
+
+const employeeAssetRow = (asset) => ({
+    _id: asset._id,
+    serialNumber: asset.serialNumber,
+    assetNo: asset.assetNo || '',
+    productCode: asset.productId?.productCode || asset.productCode || '',
+    productName: asset.productId?.productName || asset.productName || '',
+    status: statusOf(asset),
+    branchId: idOf(asset.branchId),
+    branchName: branchLabel(asset.branchId),
+    invoiceNumber: asset.invoiceNumber || ''
+});
+
+// The items an employee holds now, in every branch.
+const employeeAssetsOf = async (req, customer) => {
+    const access = await mgrAccessCondition(req);
+    const assets = await Asset.find({ companyId: req.user.companyId, customerId: customer._id, ...access })
+        .setOptions(ANY_BRANCH)
+        .populate(productPopulate)
+        .populate(branchPopulate)
+        .sort({ serialNumber: 1 })
+        .lean();
+    return assets.map(employeeAssetRow);
+};
+
+const employeeSummary = (employee, customer) => ({
+    _id: employee._id,
+    name: employee.name,
+    employeeId: employee.employeeId || '',
+    customerId: customer._id,
+    customerCode: customer.externalCode || ''
+});
+
+/** GET /employees/:employeeId/assets: the items the employee holds now. */
+exports.listEmployeeAssets = async (req, res) => {
+    try {
+        const { employee, customer } = await employeeAndCustomer(req, req.params.employeeId);
+        return res.json({ employee: employeeSummary(employee, customer), data: await employeeAssetsOf(req, customer) });
+    } catch (error) {
+        return sendError(res, error, 'Failed to load the employee\'s assets');
+    }
+};
+
+/**
+ * GET /employees/assignable-assets?search=: items of the working branch that can be given to an
+ * employee (in stock or allocated, with nobody), by serial number, Asset No or product.
+ */
+exports.searchAssignableAssets = async (req, res) => {
+    try {
+        const search = cleanText(req.query.search);
+        const and = [{ companyId: req.user.companyId }, { status: { $in: ASSIGNABLE_STATUSES } }, NOBODY];
+        if (search) {
+            const pattern = searchPattern(search);
+            and.push({ $or: [{ serialNumber: pattern }, { assetNo: pattern }, { productCode: pattern }, { productName: pattern }] });
+        }
+        const access = await mgrAccessCondition(req);
+        if (access) and.push(access);
+        const scope = await serialBranchScope();
+        const query = inScope({ $and: and }, scope);
+        const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
+        const [assets, total] = await Promise.all([
+            Asset.find(query).setOptions(scope.options).populate(productPopulate).populate(branchPopulate)
+                .sort({ createdAt: -1, _id: -1 }).limit(limit).lean(),
+            Asset.countDocuments(query).setOptions(scope.options)
+        ]);
+        return res.json({ data: assets.map(employeeAssetRow), total });
+    } catch (error) {
+        return sendError(res, error, 'Failed to search the assets');
+    }
+};
+
+/**
+ * POST /employees/:employeeId/assets { assetIds, assignDate?, remarks? }: gives the employee these
+ * items, all or none. Each must be in the working branch, in stock or allocated, and with nobody;
+ * an item already with this employee is left as it is, one with someone else is refused (use
+ * Asset Transfer).
+ */
+exports.assignEmployeeAssets = async (req, res) => {
+    let session;
+    try {
+        const assetIds = Array.isArray(req.body.assetIds) ? [...new Set(req.body.assetIds.map(String))] : [];
+        if (!assetIds.length) throw httpError(400, 'Select at least one asset.');
+        if (assetIds.length > MAX_ASSETS_PER_ASSIGNMENT) throw httpError(400, `Assign up to ${MAX_ASSETS_PER_ASSIGNMENT} assets at a time.`);
+        if (!assetIds.every((id) => mongoose.Types.ObjectId.isValid(id))) throw httpError(400, 'Invalid asset.');
+        const transferDate = transferMoment(req.body.assignDate);
+        if (!transferDate) throw httpError(400, 'Assign date is not a valid date.');
+        if (startOfDay(transferDate) > startOfDay(new Date())) throw httpError(400, 'Assign date cannot be in the future.');
+
+        const { employee, customer } = await employeeAndCustomer(req, req.params.employeeId);
+        const access = await mgrAccessCondition(req);
+        const scope = await serialBranchScope();
+        const assets = await Asset.find(inScope({ _id: { $in: assetIds }, companyId: req.user.companyId, ...access }, scope))
+            .setOptions(scope.options)
+            .populate(customerPopulate)
+            .lean();
+        if (assets.length !== assetIds.length) throw httpError(404, 'Some of the selected assets were not found in this branch. Reload and select them again.');
+
+        const mine = (asset) => String(idOf(asset.customerId) || '') === String(customer._id);
+        const withSomeoneElse = assets.filter((asset) => !mine(asset) && (asset.customerId || cleanText(asset.customerNameStr)));
+        if (withSomeoneElse.length) {
+            const first = withSomeoneElse[0];
+            throw httpError(400, `${serialList(withSomeoneElse)} ${withSomeoneElse.length === 1 ? 'is' : 'are'} with ${customerLabel(first.customerId, first.customerNameStr)}${withSomeoneElse.length > 1 ? ' or others' : ''}. Use Asset Transfer to move ${withSomeoneElse.length === 1 ? 'it' : 'them'}.`);
+        }
+        const wrongStatus = assets.filter((asset) => !mine(asset) && !['IN_STOCK', 'ALLOCATED'].includes(statusOf(asset)));
+        if (wrongStatus.length) {
+            throw httpError(400, `${serialList(wrongStatus)} ${wrongStatus.length === 1 ? 'is' : 'are'} ${statusOf(wrongStatus[0])}. Only an in-stock or allocated item can be given to an employee.`);
+        }
+        const toAssign = assets.filter((asset) => !mine(asset));
+        const user = { createdBy: req.user?.id || null, createdByName: req.user?.name || '' };
+        const remarks = cleanText(req.body.remarks) || `Assigned to employee ${employee.name}${employee.employeeId ? ` (${employee.employeeId})` : ''}`;
+        if (toAssign.length) {
+            session = await mongoose.startSession();
+            await session.withTransaction(async () => {
+                for (const asset of toAssign) {
+                    await recordNewHolder(asset, customer, { transferDate, allocate: true, remarks, user }, session);
+                }
+            });
+        }
+        return res.status(201).json({
+            employee: employeeSummary(employee, customer),
+            assigned: toAssign.length,
+            alreadyHeld: assets.length - toAssign.length,
+            data: await employeeAssetsOf(req, customer)
+        });
+    } catch (error) {
+        if (error.code === 11000) return res.status(409).json({ message: 'One of these assets was just changed by someone else. Reload and try again.' });
+        return sendError(res, error, 'Failed to assign the assets');
+    } finally {
+        if (session) await session.endSession();
+    }
+};
+
+/**
+ * POST /employees/:employeeId/assets/:assetId/transfer { toEmployeeId, transferDate?, remarks?,
+ * requestId? }: moves an item the employee holds to another employee, with the history of both.
+ */
+exports.transferEmployeeAsset = async (req, res) => {
+    let session;
+    const requestId = cleanText(req.body.requestId).slice(0, 100) || undefined;
+    try {
+        const { assetId, employeeId } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(assetId)) throw httpError(400, 'Invalid asset.');
+        const transferDate = transferMoment(req.body.transferDate);
+        if (!transferDate) throw httpError(400, 'Transfer date is not a valid date.');
+        if (startOfDay(transferDate) > startOfDay(new Date())) throw httpError(400, 'Transfer date cannot be in the future.');
+        if (String(req.body.toEmployeeId || '') === String(employeeId)) throw httpError(400, 'Select another employee to transfer the asset to.');
+
+        const from = await employeeAndCustomer(req, employeeId);
+        if (requestId && await SerialTransfer.exists({ requestId }).setOptions(ANY_BRANCH)) {
+            return res.json({ employee: employeeSummary(from.employee, from.customer), data: await employeeAssetsOf(req, from.customer) });
+        }
+        const to = await employeeAndCustomer(req, req.body.toEmployeeId, 'employee to transfer to');
+        const access = await mgrAccessCondition(req);
+        const asset = await Asset.findOne({ _id: assetId, companyId: req.user.companyId, customerId: from.customer._id, ...access })
+            .setOptions(ANY_BRANCH)
+            .populate(customerPopulate)
+            .lean();
+        if (!asset) throw httpError(404, `This asset is not with ${from.employee.name} any more. Reload the list.`);
+        if (statusOf(asset) === 'SCRAPPED') throw httpError(400, `${asset.serialNumber} is scrapped and cannot be given to another employee.`);
+
+        const user = { createdBy: req.user?.id || null, createdByName: req.user?.name || '' };
+        const remarks = cleanText(req.body.remarks) || `Transferred from employee ${from.employee.name} to ${to.employee.name}`;
+        session = await mongoose.startSession();
+        await session.withTransaction(() => recordNewHolder(asset, to.customer, { transferDate, allocate: true, remarks, requestId, user }, session));
+        return res.status(201).json({
+            employee: employeeSummary(from.employee, from.customer),
+            transferredTo: employeeSummary(to.employee, to.customer),
+            data: await employeeAssetsOf(req, from.customer)
+        });
+    } catch (error) {
+        if (error.code === 11000) return res.status(409).json({ message: 'This asset was just changed by someone else. Reload and try again.' });
+        return sendError(res, error, 'Failed to transfer the asset');
+    } finally {
+        if (session) await session.endSession();
     }
 };

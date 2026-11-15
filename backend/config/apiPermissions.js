@@ -201,7 +201,10 @@ const API_PERMISSION_RULES = [
     // Invoice Bulk Upload entries are the assets under /api/csm/assets and /api/import/assets
     {
         prefix: '/api/serial-transfers', key: 'master_serial_transfer',
-        routes: { 'POST /serials/:assetId/transfer': 'modify', 'POST /serials/:assetId/past-entry': 'modify', 'POST /branch-transfers': 'modify' }
+        routes: {
+            'POST /serials/:assetId/transfer': 'modify', 'POST /serials/:assetId/past-entry': 'modify', 'POST /branch-transfers': 'modify',
+            'POST /employees/:employeeId/assets': 'modify', 'POST /employees/:employeeId/assets/:assetId/transfer': 'modify'
+        }
     },
 
     // ── Contracts ─────────────────────────────────────────────────────────

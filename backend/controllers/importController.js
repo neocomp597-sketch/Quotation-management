@@ -2717,6 +2717,14 @@ const importEmployees = async (req, res) => {
             console.error('Error auto-syncing users during employee import:', userSyncErr);
         }
 
+        // Every employee is also a customer in Customer Master
+        try {
+            const { syncCustomersForExistingEmployees } = require('../services/employeeCustomerService');
+            await syncCustomersForExistingEmployees(companyId);
+        } catch (customerSyncErr) {
+            console.error('Error creating customers for imported employees:', customerSyncErr);
+        }
+
         res.json({
             message: `Import processed. Created: ${results.created}, Updated: ${results.updated}, Failed: ${results.failed}`,
             results

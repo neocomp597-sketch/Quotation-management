@@ -745,10 +745,11 @@ exports.updateAsset = async (req, res) => {
         }
 
         const asset = await Asset.findOne({ _id: id, companyId })
+            .setOptions(VIEW_BRANCH_OPTIONS)
             .populate({ path: 'productId', select: 'productCode productName', options: { bypassTenant: true } })
             .populate({ path: 'customerId', options: { bypassTenant: true } });
         const mgrAccess = await getMgrAccess(req);
-        if (!asset || !(await accessAllowsProduct(mgrAccess, asset.productId))) {
+        if (!(await entryInMyBranches(req, asset)) || !(await accessAllowsProduct(mgrAccess, asset.productId))) {
             return res.status(404).json({ message: 'Invoice Bulk Upload entry not found' });
         }
 
@@ -909,9 +910,10 @@ exports.returnAsset = async (req, res) => {
 
         // The customer may belong to another branch; load it by id like the other asset reads do.
         const asset = await Asset.findOne({ _id: id, companyId })
+            .setOptions(VIEW_BRANCH_OPTIONS)
             .populate('productId')
             .populate({ path: 'customerId', options: { bypassTenant: true } });
-        if (!asset || !(await canSeeProduct(req, asset.productId))) {
+        if (!(await entryInMyBranches(req, asset)) || !(await canSeeProduct(req, asset.productId))) {
             return res.status(404).json({ message: 'Asset entry not found' });
         }
 
@@ -1043,8 +1045,10 @@ exports.getReturnHistory = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
         const accessFilter = await mgrAccessCondition(req);
+        const viewBranches = await requestedViewBranches(req);
         const historyDocs = await AssetHistory.find({
             companyId,
+            ...(viewBranches ? viewBranchCondition(viewBranches) : {}),
             ...(accessFilter || {}),
             $or: [
                 { transactionType: 'RETURN' },
@@ -1055,11 +1059,13 @@ exports.getReturnHistory = async (req, res) => {
         .populate({ path: 'customerId', select: 'customerName companyName externalCode pincode mobile', options: { bypassTenant: true } })
         .populate(productMgrPopulate())
         .sort({ returnDate: -1, createdAt: -1 })
+        .setOptions(viewBranches ? VIEW_BRANCH_OPTIONS : {})
         .allowDiskUse(true)
         .lean();
 
-        res.json(applyProductMgrsToAll(historyDocs));
+        res.json(applyProductMgrsToAll(historyDocs).map(withBranchNames(viewBranches)));
     } catch (error) {
+        if (error instanceof ExportRequestError) return res.status(error.status).json(error.body);
         console.error('getReturnHistory error:', error);
         res.status(500).json({ message: error.message || 'Error fetching return history' });
     }
@@ -1070,8 +1076,11 @@ exports.getAssets = async (req, res) => {
     try {
         const companyId = req.user?.companyId;
         if (!companyId) return res.status(401).json({ message: 'Authentication required: no company context found.' });
-        const branchId = req.user?.activeBranchId;
+        // ?branchIds shows several of the user's branches at once (the branch buttons); else the active branch.
+        const viewBranches = await requestedViewBranches(req);
+        const branchId = viewBranches ? viewBranchCondition(viewBranches).branchId : req.user?.activeBranchId;
         if (!branchId) return res.status(400).json({ message: 'Select an active branch before viewing invoice bulk upload data.' });
+        const queryOptions = viewBranches ? VIEW_BRANCH_OPTIONS : {};
 
         const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
         const isExport = req.query.export === 'true';
@@ -1103,25 +1112,26 @@ exports.getAssets = async (req, res) => {
         }
 
         const [docs, total, allAssets, inStock, sold, returned] = await Promise.all([
-            Asset.find(filter).select('-serialNumberKey')
+            Asset.find(filter).setOptions(queryOptions).select('-serialNumberKey')
                 .populate({ path: 'customerId', select: 'customerName companyName externalCode billingAddress pincode mobile', options: { bypassTenant: true } })
                 .populate(productMgrPopulate()).populate(DIVISION_POPULATE).populate(SEGMENT_POPULATE)
                 .sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit)
                 .allowDiskUse(true).maxTimeMS(12000).lean(),
-            Asset.countDocuments(filter),
-            Asset.countDocuments(scope),
-            Asset.countDocuments({ ...scope, status: 'IN_STOCK' }),
-            Asset.countDocuments({ ...scope, status: 'SOLD' }),
-            Asset.countDocuments({ ...scope, status: { $in: ['RETURN', 'RETURNED'] } })
+            Asset.countDocuments(filter).setOptions(queryOptions),
+            Asset.countDocuments(scope).setOptions(queryOptions),
+            Asset.countDocuments({ ...scope, status: 'IN_STOCK' }).setOptions(queryOptions),
+            Asset.countDocuments({ ...scope, status: 'SOLD' }).setOptions(queryOptions),
+            Asset.countDocuments({ ...scope, status: { $in: ['RETURN', 'RETURNED'] } }).setOptions(queryOptions)
         ]);
 
         res.json({
-            data: applyProductMgrsToAll(docs).map(applyCustomerPostalCode),
+            data: applyProductMgrsToAll(docs).map(applyCustomerPostalCode).map(withBranchNames(viewBranches)),
             pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
             summary: { total: allAssets, inStock, sold, returned },
             mgrAccess: accessValues
         });
     } catch (error) {
+        if (error instanceof ExportRequestError) return res.status(error.status).json(error.body);
         console.error('getAssets error:', error);
         res.status(500).json({ message: error.message || 'Error fetching assets' });
     }
@@ -1178,7 +1188,7 @@ class ExportRequestError extends Error {
  * before). Accepts `branchIds` repeated, `branchIds[]`, or one comma-separated value; duplicates
  * (in any letter case) count once.
  */
-const requestedExportBranchIds = (query = {}) => {
+const requestedExportBranchIds = (query = {}, purpose = 'export') => {
     const raw = query.branchIds !== undefined ? query.branchIds : query['branchIds[]'];
     if (raw === undefined) return null;
     const values = (Array.isArray(raw) ? raw : [raw])
@@ -1186,7 +1196,7 @@ const requestedExportBranchIds = (query = {}) => {
         .map((value) => value.trim())
         .filter(Boolean);
     if (!values.length) {
-        throw new ExportRequestError(400, { code: 'NO_BRANCH', message: 'Select at least one branch to export.' });
+        throw new ExportRequestError(400, { code: 'NO_BRANCH', message: purpose === 'export' ? 'Select at least one branch to export.' : 'Select at least one branch.' });
     }
     const malformed = values.filter((value) => !/^[a-f\d]{24}$/i.test(value));
     if (malformed.length) {
@@ -1204,7 +1214,7 @@ const requestedExportBranchIds = (query = {}) => {
  * branch switcher: utils/branchScope canUseBranch) and returns their documents in the order asked.
  * One branch outside the user's access refuses the whole export: nothing is left out silently.
  */
-const authorizeExportBranches = async (req, companyId, ids) => {
+const authorizeExportBranches = async (req, companyId, ids, verb = 'exported') => {
     const Branch = require('../models/Branch');
     const { canUseBranch } = require('../utils/branchScope');
     const branches = await Branch.find({ _id: { $in: ids }, companyId })
@@ -1218,11 +1228,40 @@ const authorizeExportBranches = async (req, companyId, ids) => {
         const names = refused.map((id) => byId.get(id)?.name || id);
         throw new ExportRequestError(403, {
             code: 'BRANCH_NOT_ALLOWED',
-            message: `You do not have access to ${refused.length === 1 ? 'branch' : 'branches'} ${names.join(', ')}. Nothing was exported.`,
+            message: `You do not have access to ${refused.length === 1 ? 'branch' : 'branches'} ${names.join(', ')}. Nothing was ${verb}.`,
             branchIds: refused
         });
     }
     return ids.map((id) => byId.get(id));
+};
+
+/**
+ * The branches an Invoice Bulk Upload screen asks to show (?branchIds: the branch buttons, several
+ * at a time), each one a branch this user may use, checked like an export; null when the request
+ * names none, so the active branch applies as before. Queries using it pass VIEW_BRANCH_OPTIONS,
+ * since tenantPlugin would otherwise keep only the active branch.
+ */
+const requestedViewBranches = async (req) => {
+    const ids = requestedExportBranchIds(req.query, 'view');
+    return ids ? authorizeExportBranches(req, req.user?.companyId, ids, 'shown') : null;
+};
+const VIEW_BRANCH_OPTIONS = { bypassBranch: true };
+const viewBranchCondition = (branches) => ({ branchId: { $in: branches.map((branch) => branch._id) } });
+// Each row's branch name, when several branches are shown.
+const withBranchNames = (branches) => {
+    if (!branches) return (row) => row;
+    const names = new Map(branches.map((branch) => [String(branch._id), branch.name || branch.code || '']));
+    return (row) => ({ ...row, branchName: names.get(String(row.branchId?._id || row.branchId)) || '' });
+};
+
+// An entry can be changed from any branch this user may use (the screen can show several branches
+// at once); an entry of another branch is "not found". Entries without a branch stay reachable.
+const entryInMyBranches = async (req, asset) => {
+    if (!asset) return false;
+    const branchId = asset.branchId?._id || asset.branchId;
+    if (!branchId) return true;
+    const { canUseBranch } = require('../utils/branchScope');
+    return canUseBranch(req.user, String(branchId), req.user?.companyId);
 };
 
 // Invoice_Export_USGOAN_EPC_14-11-2026.xlsx; more than three branches: Invoice_Export_5_branches_14-11-2026.xlsx.
@@ -1389,8 +1428,11 @@ exports.getAssetSummary = async (req, res) => {
 
         // The serials of the selected branch and of its own customers (utils/customerBranchSerials):
         // a serial of another branch or company is "not found", and the ticket form continues with
-        // manual entry.
-        const scope = await serialBranchScope();
+        // manual entry. ?branchIds (details of a row of another branch the screen shows): those branches.
+        const viewBranches = await requestedViewBranches(req);
+        const scope = viewBranches
+            ? { condition: viewBranchCondition(viewBranches), options: VIEW_BRANCH_OPTIONS }
+            : await serialBranchScope();
         let asset = null;
         if (assetId && isValidObjectId(assetId)) {
             asset = await Asset.findOne(inScope({ _id: assetId, companyId, ...access }, scope))
@@ -1589,6 +1631,7 @@ exports.getAssetSummary = async (req, res) => {
             }
         });
     } catch (error) {
+        if (error instanceof ExportRequestError) return res.status(error.status).json(error.body);
         console.error('getAssetSummary error:', error);
         res.status(500).json({ message: error.message || 'Error fetching asset summary' });
     }
@@ -1690,14 +1733,17 @@ exports.getAssetActivity = async (req, res) => {
         require('../models/Branch');
         const CROSS_BRANCH = { bypassBranch: true };
         const accessFilter = await mgrAccessCondition(req);
-        const access = accessFilter || {};
+        // ?branchIds: the details of a row of another branch the Invoice Bulk Upload screen shows.
+        const viewBranches = await requestedViewBranches(req);
+        const access = { ...(accessFilter || {}), ...(viewBranches ? viewBranchCondition(viewBranches) : {}) };
+        const viewOptions = viewBranches ? VIEW_BRANCH_OPTIONS : {};
 
         const [assets, history] = await Promise.all([
-            Asset.find({ companyId, serialNumber: snRegex, ...access })
+            Asset.find({ companyId, serialNumber: snRegex, ...access }).setOptions(viewOptions)
                 .select('_id serialNumber status customerId customerCode customerNameStr invoiceNumber saleDate invoiceDate createdAt')
                 .populate({ path: 'customerId', select: 'companyName customerName externalCode', options: { bypassTenant: true } })
                 .lean(),
-            AssetHistory.find({ companyId, serialNumber: snRegex, ...access })
+            AssetHistory.find({ companyId, serialNumber: snRegex, ...access }).setOptions(viewOptions)
                 .populate({ path: 'createdBy', select: 'name email', options: CROSS_BRANCH })
                 .lean()
         ]);
@@ -1777,6 +1823,7 @@ exports.getAssetActivity = async (req, res) => {
         activity.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
         res.json({ serialNumber: cleanSN, activity });
     } catch (error) {
+        if (error instanceof ExportRequestError) return res.status(error.status).json(error.body);
         console.error('getAssetActivity error:', error);
         res.status(500).json({ message: error.message || 'Error fetching serial activity' });
     }

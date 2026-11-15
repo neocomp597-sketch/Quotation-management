@@ -876,6 +876,15 @@ const startBackgroundServices = async () => {
       console.error('[Auto User Sync Startup Error]:', syncErr.message);
   }
 
+  // Every employee is also a customer in Customer Master: creates the missing ones (employees that
+  // existed before this, or were added outside the app) and keeps them in step.
+  try {
+      const { syncCustomersForExistingEmployees } = require("./services/employeeCustomerService");
+      await syncCustomersForExistingEmployees();
+  } catch (customerSyncErr) {
+      console.error('[Employee Customer Sync Startup Error]:', customerSyncErr.message);
+  }
+
   try {
       const { syncUsersForExistingVendors } = require("./services/vendorUserService");
       await syncUsersForExistingVendors();

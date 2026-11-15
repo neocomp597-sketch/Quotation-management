@@ -20,6 +20,12 @@ router.get('/history', serialTransferController.listHistory);
 router.get('/activity', serialTransferController.listActivity);
 router.get('/activity/export', serialTransferController.exportActivity);
 
+// Employee Master > Assign Asset / Asset Transfer (company items given to employees).
+router.get('/employees/assignable-assets', serialTransferController.searchAssignableAssets);
+router.get('/employees/:employeeId/assets', serialTransferController.listEmployeeAssets);
+router.post('/employees/:employeeId/assets', serialTransferController.assignEmployeeAssets);
+router.post('/employees/:employeeId/assets/:assetId/transfer', serialTransferController.transferEmployeeAsset);
+
 // Branch Transfer works across branches; utils/serialBranchAccess.js holds its access rules.
 router.get('/branch-transfers', acrossBranches, serialTransferController.listBranchTransfers);
 router.post('/branch-transfers', acrossBranches, serialTransferController.createBranchTransfer);
