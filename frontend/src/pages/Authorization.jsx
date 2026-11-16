@@ -53,6 +53,7 @@ const Authorization = () => {
     const [resettingRoles, setResettingRoles] = useState({});
     const [statusByRole, setStatusByRole] = useState({});
     const [updatingUserId, setUpdatingUserId] = useState('');
+    const [followingRole, setFollowingRole] = useState('');
     
     // Accordion state
     const [expandedRoles, setExpandedRoles] = useState({});
@@ -368,7 +369,10 @@ const Authorization = () => {
         try {
             const res = await authorizationService.update(roleKey, draft, companyParams());
             await applySavedRole(roleKey, res.data || {});
-            toast.success(`${roleObj.label} permissions saved`);
+            const differing = usersDifferingFromRole(roleKey).length;
+            toast.success(differing
+                ? `${roleObj.label} permissions saved. ${differing === 1 ? '1 user' : `${differing} users`} with this role ${differing === 1 ? 'has' : 'have'} individual permissions and ${differing === 1 ? 'does' : 'do'} not follow it exactly: see the note on the role card.`
+                : `${roleObj.label} permissions saved`);
         } catch (err) {
             setStatusByRole((prev) => ({ ...prev, [roleKey]: 'error' }));
             toast.error(err.response?.data?.message || 'Failed to save permissions');
@@ -432,6 +436,39 @@ const Authorization = () => {
         } finally {
             setUpdatingUserId('');
         }
+    };
+
+    // A user whose permissions this screen may not change: yourself, and for a delegate an administrator.
+    const isUserLocked = (user) => currentUser?.id === user._id || (isDelegate && isAdminLevelRole(user.role));
+    // Users of a role whose individual permissions (Team Users) make their access differ from the
+    // role, so changing the role card does not fully reach them. Shown on the role card, which can
+    // clear them (client, 2026-11-16: "role updated, but the user still shows the earlier access").
+    const usersDifferingFromRole = (roleKey) => users.filter((user) => user.role === roleKey
+        && Object.keys(user.customPermissions || {}).length > 0);
+
+    const handleRoleUsersFollowRole = async (roleKey) => {
+        const roleLabel = roleByKey[roleKey]?.label || roleKey;
+        const resettable = usersDifferingFromRole(roleKey).filter((user) => !isUserLocked(user));
+        if (!resettable.length || followingRole) return;
+        const names = resettable.map((user) => user.name).join(', ');
+        if (!window.confirm(`Remove the individual permissions of ${names}? They will then have exactly the ${roleLabel} role's permissions.`)) return;
+
+        setFollowingRole(roleKey);
+        let done = 0;
+        const failed = [];
+        for (const user of resettable) {
+            try {
+                await userService.updatePermissions(user._id, { customPermissions: {} }, companyParams());
+                done += 1;
+                setUsers((prev) => prev.map((u) => u._id === user._id ? { ...u, customPermissions: {} } : u));
+                discardUserDraft(user._id);
+            } catch (err) {
+                failed.push(`${user.name}: ${err.response?.data?.message || 'not changed'}`);
+            }
+        }
+        setFollowingRole('');
+        if (done) toast.success(`${done === 1 ? '1 user now has' : `${done} users now have`} exactly the ${roleLabel} role's permissions.`);
+        if (failed.length) toast.error(failed.join('; '));
     };
 
     const handleUserRoleChange = async (userId, nextRole) => {
@@ -825,6 +862,31 @@ const Authorization = () => {
                                                 </div>
                                             </div>
 
+                                            {(() => {
+                                                const differing = usersDifferingFromRole(role.role);
+                                                if (!differing.length) return null;
+                                                const resettable = differing.filter((user) => !isUserLocked(user));
+                                                const one = differing.length === 1;
+                                                return (
+                                                    <div className="px-5 py-3 border-b border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                                                        <p className="flex-1 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                                                            {one ? '1 user' : `${differing.length} users`} with this role {one ? 'has' : 'have'} individual permissions (Team Users), so {one ? 'their' : 'their'} access is not exactly this role:{' '}
+                                                            <span className="font-black">{differing.map((user) => user.name).join(', ')}</span>.
+                                                        </p>
+                                                        {resettable.length > 0 && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRoleUsersFollowRole(role.role)}
+                                                                disabled={Boolean(followingRole)}
+                                                                className="shrink-0 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 text-xs font-bold hover:bg-amber-100 dark:hover:bg-amber-900/40 disabled:opacity-50 transition-colors"
+                                                            >
+                                                                {followingRole === role.role ? 'Applying…' : 'Make them follow this role'}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
+
                                             {/* Role Card Body - Collapsible Accordion */}
                                             {isExpanded && (
                                                 <div className="p-6 space-y-4 animate-fade-in">
@@ -1039,8 +1101,11 @@ const Authorization = () => {
                                                                 {isMe && <span className="text-[10px] font-bold bg-primary-100 dark:bg-primary-950 text-primary-700 dark:text-primary-300 px-2 py-0.5 rounded-full">You</span>}
                                                                 {isUserDirty && <span className="text-[10px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full">Unsaved changes</span>}
                                                                 {hasCustomOverrides && (
-                                                                    <span className="text-[10px] font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-full flex items-center gap-1" title="User has custom permission overrides">
-                                                                        <MdTune size={12} /> Custom Perms
+                                                                    <span
+                                                                        className="text-[10px] font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-full flex items-center gap-1"
+                                                                        title={`${Object.keys(user.customPermissions).length} individual permissions on top of the ${userRole?.label || user.role} role, so this user does not have exactly the role. Open the user and press Reset to Role Defaults to give them the role's permissions.`}
+                                                                    >
+                                                                        <MdTune size={12} /> Custom Perms · {Object.keys(user.customPermissions).length}
                                                                     </span>
                                                                 )}
                                                                 {!isBranchUnrestrictedRole(user.role) && userBranchIds(user).length === 0 && (

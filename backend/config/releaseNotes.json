@@ -1078,5 +1078,32 @@
     "deployedBy": "Super Admin",
     "deployedAt": "2026-11-16T01:00:00+05:30",
     "isActive": true
+  },
+  {
+    "version": "v6.8.8",
+    "title": "Authorization: Users Get Exactly Their Role",
+    "message": "Release Updates (16 Nov 2026): A user given a role gets exactly that role's permissions. Each role card now names the users of that role whose individual permissions make their access different, with a button to make them follow the role.",
+    "releaseNotes": [
+      "Authorization: changing a user's role removes their individual permissions, so they get exactly the new role's permissions (the screen asks first)",
+      "Default Role Permissions: each role card names the users of that role who have individual permissions, and Make them follow this role removes them in one click",
+      "Team Users: the Custom Perms badge shows how many individual permissions the user has"
+    ],
+    "detailedChanges": [
+      {
+        "date": "16.11.2026",
+        "module": "Authorization",
+        "submodule": "Changing a User's Role",
+        "changes": "A user's access is their role's permissions plus any individual permissions set for them in Team Users. Changing a user's role in Team Users or Edit User now removes their individual permissions, which were made for the old role, so the user gets exactly the new role's permissions. The screen asks first and says how many are removed. The user's open screens update at once, and the change is written to the audit log."
+      },
+      {
+        "date": "16.11.2026",
+        "module": "Authorization",
+        "submodule": "Users Who Do Not Follow Their Role",
+        "changes": "A user whose role was changed before this kept their earlier individual permissions, so they still saw their earlier screens (for example an IT INFRA user who could still open Customers and Tickets). Each role card in Default Role Permissions now names the users of that role who have individual permissions, so their access is not exactly the role. Press Make them follow this role on the card: after you confirm, their individual permissions are removed and they get exactly the role's permissions, and this is written to the audit log. When a role card is saved, the message also says how many of its users do not follow it exactly. In Team Users, the Custom Perms badge shows how many individual permissions a user has; Reset to Role Defaults in the user's card does the same for one user. You cannot change your own permissions, and a user given Authorization cannot change an administrator's."
+      }
+    ],
+    "deployedBy": "Super Admin",
+    "deployedAt": "2026-11-16T22:15:00+05:30",
+    "isActive": true
   }
 ]
