@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { MdSearch, MdAdd, MdClose, MdSwapHoriz, MdLaptop, MdCheck } from 'react-icons/md';
+import { MdSearch, MdAdd, MdClose, MdSwapHoriz, MdLaptop, MdCheck, MdWarning } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import { serialTransferService } from '../services/api';
+import { serialTransferService, invalidateApiCache } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import Modal from './Modal';
 import SearchableSelect from './SearchableSelect';
@@ -43,6 +43,8 @@ const EmployeeAssets = ({ employeeId = null, employeeName = '', employees = [], 
     const isNew = !employeeId;
 
     const [held, setHeld] = useState([]);
+    const [homeBranch, setHomeBranch] = useState(null); // { _id, name }: the employee's own branch
+    const [movingHome, setMovingHome] = useState(false);
     const [loadingHeld, setLoadingHeld] = useState(false);
     const [search, setSearch] = useState('');
     const [results, setResults] = useState([]);
@@ -62,6 +64,7 @@ const EmployeeAssets = ({ employeeId = null, employeeName = '', employees = [], 
         try {
             const res = await serialTransferService.employeeAssets(employeeId);
             setHeld(res.data?.data || []);
+            setHomeBranch(res.data?.homeBranch || null);
         } catch (err) {
             toast.error(err.response?.data?.message || 'Could not load the employee\'s assets');
         } finally {
@@ -105,6 +108,28 @@ const EmployeeAssets = ({ employeeId = null, employeeName = '', employees = [], 
             toast.error(err.response?.data?.message || 'Could not assign the assets');
         } finally {
             setAssigning(false);
+        }
+    };
+
+    // Items booked in another branch than the employee's own (e.g. moved there before a Branch
+    // Transfer took the assets along): that branch's screens, such as Invoice Bulk Upload, miss them.
+    const away = homeBranch ? held.filter((asset) => asset.branchId && String(asset.branchId) !== String(homeBranch._id)) : [];
+    const moveHome = async () => {
+        if (!away.length || movingHome) return;
+        const what = away.length === 1 ? away[0].serialNumber : `${away.length} assets`;
+        if (!window.confirm(`Move ${what} to ${homeBranch.name}, ${employeeName || 'the employee'}'s branch?\n\nIt is saved as a Branch Transfer in Serial No Transfer.`)) return;
+        setMovingHome(true);
+        try {
+            const res = await serialTransferService.moveEmployeeAssetsHome(employeeId);
+            invalidateApiCache('/serial-transfers');
+            invalidateApiCache('/csm/assets');
+            const notify = res.data?.error ? (text) => toast.warn(text, { autoClose: 10000 }) : toast.success;
+            notify(res.data?.message || `Moved to ${homeBranch.name}`);
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Could not move the assets');
+        } finally {
+            setMovingHome(false);
+            loadHeld();
         }
     };
 
@@ -168,6 +193,25 @@ const EmployeeAssets = ({ employeeId = null, employeeName = '', employees = [], 
                                         </li>
                                     ))}
                                 </ul>
+                            )}
+                            {away.length > 0 && (
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2.5 rounded-xl border border-amber-200 bg-amber-50">
+                                    <p className="flex items-start gap-2 text-xs font-semibold text-amber-800">
+                                        <MdWarning className="shrink-0 mt-0.5" size={16} />
+                                        <span>
+                                            {away.length === 1 ? `${away[0].serialNumber} is` : `${away.length} of these assets are`} in another branch than {homeBranch.name},
+                                            {' '}{employeeName || 'the employee'}&apos;s branch, so {homeBranch.name} (e.g. Invoice Bulk Upload) does not find {away.length === 1 ? 'it' : 'them'}.
+                                        </span>
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={moveHome}
+                                        disabled={movingHome}
+                                        className="shrink-0 inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white font-black uppercase text-[10px] tracking-widest"
+                                    >
+                                        <MdSwapHoriz size={15} /> {movingHome ? 'Moving...' : `Move to ${homeBranch.name}`}
+                                    </button>
+                                </div>
                             )}
                         </div>
                     )}

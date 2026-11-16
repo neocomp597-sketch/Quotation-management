@@ -203,7 +203,8 @@ const API_PERMISSION_RULES = [
         prefix: '/api/serial-transfers', key: 'master_serial_transfer',
         routes: {
             'POST /serials/:assetId/transfer': 'modify', 'POST /serials/:assetId/past-entry': 'modify', 'POST /branch-transfers': 'modify',
-            'POST /employees/:employeeId/assets': 'modify', 'POST /employees/:employeeId/assets/:assetId/transfer': 'modify'
+            'POST /employees/:employeeId/assets': 'modify', 'POST /employees/:employeeId/assets/:assetId/transfer': 'modify',
+            'POST /employees/:employeeId/assets/move-home': 'modify'
         }
     },
 

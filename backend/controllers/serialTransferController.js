@@ -1484,13 +1484,76 @@ const employeeSummary = (employee, customer) => ({
     customerCode: customer.externalCode || ''
 });
 
-/** GET /employees/:employeeId/assets: the items the employee holds now. */
+// The employee's own branch (home branch in Employee Master), or null
+const homeBranchOf = async (req, employee) => {
+    if (!employee.branchId) return null;
+    return Branch.findOne({ _id: employee.branchId, companyId: req.user.companyId })
+        .select('name code status')
+        .setOptions({ bypassTenant: true, bypassBranch: true })
+        .lean();
+};
+
+/**
+ * GET /employees/:employeeId/assets: the items the employee holds now, and the employee's own
+ * branch (the screen offers to move items booked in another branch there).
+ */
 exports.listEmployeeAssets = async (req, res) => {
     try {
         const { employee, customer } = await employeeAndCustomer(req, req.params.employeeId);
-        return res.json({ employee: employeeSummary(employee, customer), data: await employeeAssetsOf(req, customer) });
+        const [data, home] = await Promise.all([employeeAssetsOf(req, customer), homeBranchOf(req, employee)]);
+        return res.json({
+            employee: employeeSummary(employee, customer),
+            homeBranch: home ? { _id: home._id, name: branchLabel(home) } : null,
+            data
+        });
     } catch (error) {
         return sendError(res, error, 'Failed to load the employee\'s assets');
+    }
+};
+
+/**
+ * POST /employees/:employeeId/assets/move-home: every item the employee holds that is booked in
+ * another branch moves to the employee's own branch, one Branch Transfer per branch it leaves
+ * (moveEmployeeHoldings, as an employee's Branch Transfer does). For employees moved before their
+ * assets went along (client, 2026-11-16: Rohit Manoj Dixit was moved to DANI PARK, his laptop
+ * FTR3Y04 stayed in HEAD OFFICE, and DANI PARK's Invoice Bulk Upload could not find it).
+ */
+exports.moveEmployeeAssetsHome = async (req, res) => {
+    try {
+        const { employee, customer } = await employeeAndCustomer(req, req.params.employeeId);
+        const home = await homeBranchOf(req, employee);
+        if (!home) throw httpError(400, `${employee.name} has no branch in Employee Master. Give them one first.`);
+        if (home.status === 'Inactive') throw httpError(400, `${branchLabel(home)} is inactive. Serial numbers cannot be moved into it.`);
+
+        const away = await Asset.find({ companyId: req.user.companyId, customerId: customer._id, branchId: { $nin: [home._id, null] } })
+            .select('branchId')
+            .setOptions(ANY_BRANCH)
+            .lean();
+        if (!away.length) {
+            return res.json({ message: `All of ${employee.name}'s assets are already in ${branchLabel(home)}.`, moved: 0, serials: [], transferNos: [] });
+        }
+        // The Branch Transfer rule: serials leave only branches the user may move them out of
+        const blocked = [...new Set(away.map((asset) => String(asset.branchId)))].filter((id) => !canMoveFrom(req, id));
+        if (blocked.length) {
+            const names = await Branch.find({ _id: { $in: blocked } }).select('name code').setOptions({ bypassTenant: true, bypassBranch: true }).lean();
+            throw httpError(403, `You cannot move serial numbers out of ${names.map(branchLabel).filter(Boolean).join(', ') || 'that branch'}.`);
+        }
+
+        const { moveEmployeeHoldings } = require('./payrollController');
+        const holdings = await moveEmployeeHoldings({
+            req,
+            employee,
+            from: null,
+            to: home,
+            reason: cleanText(req.body?.remarks).slice(0, 500) || `Moved to ${employee.name}'s branch`
+        });
+        const count = holdings.serials.length;
+        if (!count && holdings.error) throw httpError(409, `The assets were not moved: ${holdings.error}`);
+        const message = `${count} asset${count === 1 ? '' : 's'} of ${employee.name} moved to ${branchLabel(home)} (${holdings.transferNo}).`
+            + (holdings.error ? ` Some could not be moved: ${holdings.error}` : '');
+        return res.json({ message, moved: count, serials: holdings.serials, transferNos: holdings.transferNos, error: holdings.error });
+    } catch (error) {
+        return sendError(res, error, 'Failed to move the employee\'s assets');
     }
 };
 
