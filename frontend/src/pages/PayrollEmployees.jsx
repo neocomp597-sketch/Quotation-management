@@ -353,7 +353,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
         const confirmed = window.confirm(
             `Transfer ${selectedEmp.name} to ${target.name}?\n\n`
             + 'The employee keeps the same Employee ID, and their login moves to the new branch. '
-            + `The assets they hold in their current branch move to ${target.name} with them. `
+            + `Every asset they hold moves to ${target.name} with them, whichever branch it is in now. `
             + 'Attendance, payroll, tickets and visits already saved stay with the branch they were saved in.\n\n'
             + 'The transfer is saved on its own: save any other changes on this form first.'
         );
@@ -580,8 +580,15 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                 }
                 setPendingAssets([]);
             } else {
-                await payrollService.updateEmployee(selectedEmp._id, basicForm);
-                toast.success('Employee profile details updated successfully!');
+                const res = await payrollService.updateEmployee(selectedEmp._id, basicForm);
+                // A new home branch takes the employee's assets along (as Branch Transfer does)
+                const moved = res.data?.assetTransfer;
+                if (moved) invalidateApiCache('/serial-transfers');
+                if (moved?.error) {
+                    toast.warn(`Employee profile details updated. ${moved.note}`, { autoClose: 10000 });
+                } else {
+                    toast.success(`Employee profile details updated successfully!${moved?.note ? ` ${moved.note}` : ''}`);
+                }
             }
             // The employee is also a customer (created or updated with it): Customer Master reloads.
             invalidateApiCache('/customers');
@@ -1273,7 +1280,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                         </div>
                                                         <p className="text-[11px] text-slate-500 font-medium">
                                                             The employee will be assigned to the selected branch and keeps the same Employee ID. Their login follows,
-                                                            and so do the assets they hold in their current branch (moved as a Branch Transfer).
+                                                            and so does every asset they hold, from whichever branch it is in (moved as a Branch Transfer).
                                                             Attendance, payroll, tickets and visits already saved keep their branch.
                                                         </p>
                                                     </div>

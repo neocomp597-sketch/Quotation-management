@@ -470,7 +470,9 @@ const OrgChart = () => {
                 customEmployeeId: item.customEmployeeId || undefined
             }));
             const res = await payrollService.batchAssignBranchAndId(payload);
-            toast.success(res.data?.message || 'Branch & Employee IDs updated successfully');
+            // Employees given a new home branch take their assets along: some may not have moved
+            const notify = res.data?.assetErrors?.length ? (text) => toast.warn(text, { autoClose: 10000 }) : toast.success;
+            notify(res.data?.message || 'Branch & Employee IDs updated successfully');
             setIsBatchModalOpen(false);
             fetchData();
         } catch (err) {
