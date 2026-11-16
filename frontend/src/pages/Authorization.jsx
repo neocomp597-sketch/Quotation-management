@@ -439,12 +439,22 @@ const Authorization = () => {
             if (!window.confirm(UNSAVED_CHANGES_MESSAGE)) return;
             discardUserDraft(userId);
         }
+        // A new role brings its own permissions: the user's individual ones are removed (the server does it)
+        const target = users.find((u) => u._id === userId);
+        const individual = Object.keys(target?.customPermissions || {}).length;
+        if (individual && !window.confirm(
+            `${target.name} has ${individual} individual permission${individual === 1 ? '' : 's'}. `
+            + 'With the new role they get that role\'s permissions and the individual ones are removed. Continue?'
+        )) return;
         setUpdatingUserId(userId);
         try {
             const params = selectedCompanyId ? { companyId: selectedCompanyId } : {};
             const res = await userService.updateRole(userId, nextRole, params);
             setUsers((prev) => prev.map((u) => u._id === userId ? { ...u, ...res.data } : u));
-            toast.success('User role updated');
+            const removed = res.data?.removedPermissions || 0;
+            toast.success(removed
+                ? `User role updated. ${removed} individual permission${removed === 1 ? ' was' : 's were'} removed: the user now has the role's permissions.`
+                : 'User role updated');
         } catch (err) {
             toast.error(err.response?.data?.message || 'Update failed');
         } finally {

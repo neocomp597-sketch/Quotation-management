@@ -357,6 +357,54 @@ exports.updateUserProfile = async (req, res) => {
     }
 };
 
+/**
+ * A user given another role starts from that role's permissions. Their individual permissions
+ * (Authorization > Team Users) are stored as differences from the role they had, so they are
+ * removed: kept on top of the new role, they left the user with their old access (client,
+ * 2026-11-16: "role updated, but the user still shows the earlier access"). Changes `user` in
+ * memory; save it, then call afterRoleChange.
+ */
+const applyRoleChange = (user, role, changedBy) => {
+    const previousRole = user.role;
+    const removedPermissions = Object.keys(toPlainObject(user.customPermissions)).length;
+    user.role = role;
+    if (removedPermissions) {
+        user.customPermissions = {};
+        user.customPermissionsUpdatedBy = changedBy;
+        user.customPermissionsUpdatedAt = new Date();
+    }
+    return { previousRole, removedPermissions };
+};
+
+/**
+ * Once a role change is saved: `protect` drops its cached copy of the user (which holds the role
+ * and individual permissions), the user's open screens reload their permissions, and the change
+ * is written to the audit log.
+ */
+const afterRoleChange = async (req, user, { previousRole, removedPermissions }) => {
+    await invalidateAuthUserCache(user._id.toString());
+    try {
+        broadcastCrmUpdate('PERMISSIONS', 'UPDATE', { companyId: String(user.companyId), userId: user._id.toString() });
+    } catch (broadcastError) {
+        console.warn('[role change] Broadcast failed:', broadcastError.message);
+    }
+    try {
+        await AuditLog.create({
+            action: 'USER_ROLE_CHANGED',
+            entityType: 'User',
+            entityId: user._id,
+            userId: req.user.id,
+            userName: req.user.name,
+            oldValue: { role: previousRole, individualPermissions: removedPermissions },
+            newValue: { role: user.role, individualPermissions: 0 },
+            reason: `Role of ${user.name}${removedPermissions ? `; ${removedPermissions} individual permission${removedPermissions === 1 ? '' : 's'} removed` : ''}`,
+            companyId: user.companyId
+        });
+    } catch (auditError) {
+        console.warn('[role change] Audit log failed:', auditError.message);
+    }
+};
+
 exports.updateUserRole = async (req, res) => {
     try {
         const { id } = req.params;
@@ -394,8 +442,9 @@ exports.updateUserRole = async (req, res) => {
             }
         }
 
-        user.role = role;
+        const roleChange = role !== user.role ? applyRoleChange(user, role, req.user.id) : null;
         const updatedUser = await user.save();
+        if (roleChange) await afterRoleChange(req, updatedUser, roleChange);
 
         res.json({
             _id: updatedUser._id,
@@ -404,7 +453,9 @@ exports.updateUserRole = async (req, res) => {
             role: updatedUser.role,
             reportsTo: updatedUser.reportsTo,
             status: updatedUser.status,
-            createdAt: updatedUser.createdAt
+            createdAt: updatedUser.createdAt,
+            customPermissions: toPlainObject(updatedUser.customPermissions),
+            removedPermissions: roleChange?.removedPermissions || 0
         });
     } catch (error) {
         res.status(500).json({ message: 'Failed to update user role', error: error.message });
@@ -457,6 +508,7 @@ exports.updateUser = async (req, res) => {
         }
 
         // Handle role change if provided and different
+        let roleChange = null;
         if (role && role !== user.role) {
             if (req.user.id === id) {
                 return res.status(400).json({ message: 'You cannot change your own role.' });
@@ -481,10 +533,11 @@ exports.updateUser = async (req, res) => {
                 }
             }
 
-            user.role = role;
+            roleChange = applyRoleChange(user, role, req.user.id);
         }
 
         const updatedUser = await user.save();
+        if (roleChange) await afterRoleChange(req, updatedUser, roleChange);
         if (`${updatedUser.name}|${updatedUser.email}` !== previousIdentity) await saveIdentityToEmployee(updatedUser);
         res.json({
             _id: updatedUser._id,
