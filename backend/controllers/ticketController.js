@@ -1345,35 +1345,76 @@ exports.updateRca = async (req, res) => {
 };
 
 const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const TICKET_CUSTOMER_FIELDS = 'externalCode customerName companyName contactPerson gstin billingAddress mobile email';
+const TICKET_CUSTOMER_FIELDS = 'externalCode customerName companyName contactPerson gstin billingAddress mobile email employeeProfileId';
+const TICKET_CUSTOMER_COLLATION = { locale: 'en', strength: 2 };
+const TICKET_CUSTOMER_SORT = { companyName: 1, customerName: 1, _id: 1 };
+// A vacant position is not a person and has no customer.
+const EMPLOYEE_PERSON_FILTER = { isVacant: { $ne: true }, status: { $ne: 'Vacant' } };
 
 /**
- * Customers the Raise Ticket form offers (?search, up to ?limit=50): the Customer Master customers
- * of the branch being worked in, by name. Anyone who may use tickets sees all of them: Customer
- * Master's own list also limits Employee and Sales users to the customers of their territories,
- * which left employees without territories (e.g. Ularia's) with an empty Customer field.
+ * The customers of employees (every employee is also a customer: services/employeeCustomerService.js)
+ * the Raise Ticket form offers. An employee's customer keeps the branch it was created in, so the
+ * branch rule of the other customers missed an employee transferred since, or one working in several
+ * branches. Without a search: the employees of the branch being worked in (home or assigned branch).
+ * With one: any employee of the company, by name, code, mobile or email.
+ */
+const ticketEmployeeCustomers = async ({ companyId, branchId, searchOr, limit }) => {
+    const filter = { employeeProfileId: { $ne: null } };
+    if (companyId) filter.companyId = companyId;
+    if (searchOr) {
+        filter.$or = searchOr;
+    } else if (branchId) {
+        const employeeIds = await EmployeeProfile.find({
+            ...(companyId ? { companyId } : {}),
+            ...EMPLOYEE_PERSON_FILTER,
+            $or: [{ branchId }, { assignedBranches: branchId }]
+        }).setOptions({ bypassBranch: true }).distinct('_id');
+        filter.employeeProfileId = { $in: employeeIds };
+    }
+    return Customer.find(filter)
+        .select(TICKET_CUSTOMER_FIELDS)
+        .collation(TICKET_CUSTOMER_COLLATION)
+        .sort(TICKET_CUSTOMER_SORT)
+        .limit(limit)
+        .setOptions({ bypassBranch: true })
+        .lean();
+};
+
+/**
+ * Customers the Raise Ticket form offers (?search, up to ?limit=50 customers and as many employees):
+ * the Customer Master customers of the branch being worked in, by name, followed by the employees
+ * (see ticketEmployeeCustomers). Anyone who may use tickets sees all of them: Customer Master's own
+ * list also limits Employee and Sales users to the customers of their territories, which left
+ * employees without territories (e.g. Ularia's) with an empty Customer field.
  */
 exports.getTicketCustomerOptions = async (req, res) => {
     try {
         const query = {};
         // Same branch rule as Customer Master: the customers of the selected branch.
-        if (req.user?.activeBranchId) query.branchId = req.user.activeBranchId;
+        const branchId = req.user?.activeBranchId || null;
+        if (branchId) query.branchId = branchId;
         const search = String(req.query.search || '').trim();
+        let searchOr = null;
         if (search) {
             const pattern = new RegExp(escapeRegex(search), 'i');
-            query.$or = [
+            searchOr = [
                 { companyName: pattern }, { customerName: pattern }, { externalCode: pattern },
                 { mobile: pattern }, { gstin: pattern }, { email: pattern }
             ];
+            query.$or = searchOr;
         }
         const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 50));
-        const customers = await Customer.find(query)
-            .select(TICKET_CUSTOMER_FIELDS)
-            .collation({ locale: 'en', strength: 2 })
-            .sort({ companyName: 1, customerName: 1, _id: 1 })
-            .limit(limit)
-            .lean();
-        res.json(customers);
+        const [customers, employeeCustomers] = await Promise.all([
+            Customer.find(query)
+                .select(TICKET_CUSTOMER_FIELDS)
+                .collation(TICKET_CUSTOMER_COLLATION)
+                .sort(TICKET_CUSTOMER_SORT)
+                .limit(limit)
+                .lean(),
+            ticketEmployeeCustomers({ companyId: req.user?.companyId, branchId, searchOr, limit })
+        ]);
+        const listed = new Set(customers.map((customer) => String(customer._id)));
+        res.json([...customers, ...employeeCustomers.filter((customer) => !listed.has(String(customer._id)))]);
     } catch (error) {
         console.error('Get ticket customer options error:', error);
         res.status(500).json({ message: error.message || 'Error fetching customers' });

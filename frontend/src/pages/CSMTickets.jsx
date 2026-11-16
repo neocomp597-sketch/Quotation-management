@@ -79,6 +79,15 @@ const getManualImagesForTicket = (ticket) => {
     return images;
 };
 
+// The Customer field's label. Every employee is also a customer (services/employeeCustomerService.js);
+// the form offers them too, marked as employees.
+const ticketCustomerLabel = (c) => {
+    const name = c.companyName && c.companyName !== c.customerName
+        ? `${c.companyName} (${c.customerName})`
+        : c.companyName || c.customerName;
+    return c.employeeProfileId ? `${name} · Employee` : name;
+};
+
 const CSMTickets = () => {
     const navigate = useNavigate();
     const { user, isAdmin, isSuperAdmin, activeBranch, activeBranchId, setActiveBranch, can } = useAuth();
@@ -2873,15 +2882,13 @@ const CSMTickets = () => {
                             <SearchableSelect
                                 options={customers.map(c => ({
                                     value: c._id,
-                                    label: c.companyName && c.companyName !== c.customerName 
-                                        ? `${c.companyName} (${c.customerName})` 
-                                        : c.companyName || c.customerName
+                                    label: ticketCustomerLabel(c)
                                 }))}
                                 value={formData.customerId}
                                 onChange={handleCustomerChange}
                                 onSearchChange={searchTicketCustomers}
                                 placeholder="Search & Select Customer..."
-                                noResultsText="No customer of this branch matches yet. Keep typing the name, code, mobile or GSTIN."
+                                noResultsText="No customer of this branch or employee matches yet. Keep typing the name, code, mobile, email or GSTIN."
                             />
                             {(() => {
                                 const selectedCust = customers.find(c => c._id === formData.customerId);
@@ -3992,15 +3999,13 @@ const CSMTickets = () => {
                                 <SearchableSelect
                                     options={customers.map(c => ({
                                         value: c._id,
-                                        label: c.companyName && c.companyName !== c.customerName 
-                                            ? `${c.companyName} (${c.customerName})` 
-                                            : c.companyName || c.customerName
+                                        label: ticketCustomerLabel(c)
                                     }))}
                                     value={manualFormData.customerId}
                                     onChange={handleManualCustomerChange}
                                     onSearchChange={searchTicketCustomers}
                                     placeholder="Search & Select Customer..."
-                                    noResultsText="No customer of this branch matches yet. Keep typing the name, code, mobile or GSTIN."
+                                    noResultsText="No customer of this branch or employee matches yet. Keep typing the name, code, mobile, email or GSTIN."
                                 />
                             )}
                         </div>
