@@ -472,13 +472,85 @@ exports.updateEmployee = async (req, res) => {
 };
 
 /**
+ * What an employee's Branch Transfer takes along (client, 2026-11-16: "the assets should be
+ * transferred to that branch along with the employee"). Every employee is also a customer
+ * (services/employeeCustomerService.js), and the company's assets given to them are serial numbers
+ * of that customer:
+ *   - the employee's customer moves to the new branch (recorded as CUSTOMER_BRANCH_TRANSFER);
+ *   - the serial numbers they hold in the branch they leave move to the new branch as one Branch
+ *     Transfer (Serial No Transfer > Branch Transfer, number BT/...), with their history.
+ * Items they hold in other branches they still work in stay there. Never throws: the employee's
+ * transfer is already saved, so a failure is reported in `error` for the screen to show.
+ */
+const moveEmployeeHoldings = async ({ req, employee, from, to, reason }) => {
+    const result = { customerMoved: false, transferNo: null, serials: [], error: null };
+    try {
+        const Customer = require('../models/Customer');
+        const Asset = require('../models/Asset');
+        const AuditLog = require('../models/AuditLog');
+        const { syncCustomerForEmployee } = require('../services/employeeCustomerService');
+        const { moveSerialsToBranch } = require('./serialTransferController');
+        const ANY_BRANCH = { bypassBranch: true };
+        const label = (branch) => branch?.name || branch?.code || 'No branch';
+
+        const customer = await syncCustomerForEmployee(employee);
+        if (!customer) return result;
+
+        if (String(customer.branchId || '') !== String(to._id)) {
+            await Customer.updateOne({ _id: customer._id }, { $set: { branchId: to._id } }).setOptions(ANY_BRANCH);
+            result.customerMoved = true;
+            try {
+                await AuditLog.create({
+                    action: 'CUSTOMER_BRANCH_TRANSFER',
+                    entityType: 'Customer',
+                    entityId: customer._id,
+                    userId: req.user.id,
+                    userName: req.user.name || req.user.email || '',
+                    oldValue: { branchId: customer.branchId || null },
+                    newValue: { branchId: to._id, branchName: label(to) },
+                    reason: `Employee ${employee.name}${employee.employeeId ? ` (${employee.employeeId})` : ''} transferred to ${label(to)}`
+                });
+            } catch (auditError) {
+                console.error('Employee transfer: customer move not recorded in the audit log:', auditError.message);
+            }
+        }
+
+        if (from?._id) {
+            const assets = await Asset.find({ customerId: customer._id, branchId: from._id })
+                .select('serialNumber productId productCode productName status branchId')
+                .setOptions(ANY_BRANCH)
+                .lean();
+            if (assets.length) {
+                result.transferNo = await moveSerialsToBranch({
+                    // The same value as the Branch Transfer tab, so both count one BT sequence
+                    companyId: req.user.companyId,
+                    assets,
+                    from,
+                    to,
+                    reference: `Employee transfer: ${employee.name}${employee.employeeId ? ` (${employee.employeeId})` : ''}`.slice(0, 100),
+                    remarks: String(reason || '').slice(0, 500),
+                    user: req.user
+                });
+                result.serials = assets.map((asset) => asset.serialNumber);
+            }
+        }
+    } catch (error) {
+        console.error('Employee transfer: assets not moved:', error);
+        result.error = error.message || 'unknown error';
+    }
+    return result;
+};
+exports.moveEmployeeHoldings = moveEmployeeHoldings;
+
+/**
  * PUT /payroll/employees/:id/branch - Branch Transfer on Edit Employee.
  *
  * Moves the employee to another branch the signed-in user may use (the same branch rule as the
  * branch switcher: utils/branchScope canUseBranch). The same record is kept: same _id, same Employee
  * ID (the code is never renumbered). The new branch becomes the home branch and takes the old home
  * branch's place among the employee's branches; other branches they were given stay. Their login
- * follows through syncUserForEmployee, as for any edit. Attendance, payroll, payslips, tickets,
+ * follows through syncUserForEmployee, as for any edit, and so do their customer and the assets
+ * they hold in the branch they leave (moveEmployeeHoldings). Attendance, payroll, payslips, tickets,
  * service visits and other saved records keep the branch they were saved with. Every transfer is
  * written to the audit log (old branch, new branch, who, when).
  */
@@ -580,13 +652,30 @@ exports.transferEmployeeBranch = async (req, res) => {
         const { syncEmployeeToEngineer } = require('../services/engineerSyncService');
         await syncEmployeeToEngineer(updated);
 
+        // Their customer and the assets they hold in the branch they leave go with them
+        const holdings = await moveEmployeeHoldings({
+            req,
+            employee: updated,
+            from: fromId ? { _id: new mongoose.Types.ObjectId(fromId), name: source?.name || before.branchName || '' } : null,
+            to: destination,
+            reason
+        });
+        const count = holdings.serials.length;
+        let assetsNote = '';
+        if (holdings.error) {
+            assetsNote = ` Their assets could not be moved (${holdings.error}). Move them in Serial No Transfer > Branch Transfer.`;
+        } else if (count) {
+            assetsNote = ` ${count} asset${count === 1 ? '' : 's'} moved with them (${holdings.transferNo}).`;
+        }
+
         broadcastCrmUpdate('EMPLOYEE', 'UPDATE', updated);
         res.json({
-            message: `${employee.name} was transferred to ${destination.name}.`,
+            message: `${employee.name} was transferred to ${destination.name}.${assetsNote}`,
             employee: updated,
             from: before,
             to: after,
-            login: loginInfo
+            login: loginInfo,
+            assets: { moved: count, serials: holdings.serials, transferNo: holdings.transferNo, customerMoved: holdings.customerMoved, error: holdings.error }
         });
     } catch (error) {
         console.error('Failed to transfer employee branch:', error);

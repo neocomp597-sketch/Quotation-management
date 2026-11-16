@@ -1188,6 +1188,60 @@ exports.searchBranchSerials = async (req, res) => {
 };
 
 /**
+ * Moves serial numbers from branch `from` to branch `to` as one Branch Transfer, in one transaction:
+ * the serials, their transfer history and their asset history take the new branch, and each serial
+ * gets a line in SerialBranchTransfer under one new number (BT/2026-27/0001). `assets` are lean
+ * Asset documents with serialNumber, productId, productCode, productName and status. A serial moves
+ * only if it is still in `from`; otherwise nothing moves (409). Resolves to the transfer number.
+ * Used by the Branch Transfer tab and by an employee's Branch Transfer (their assets go with them).
+ */
+const moveSerialsToBranch = async ({ companyId, assets, from, to, reference = '', remarks = '', user = null, requestId }) => {
+    const assetIds = assets.map((asset) => asset._id);
+    const transferDate = new Date();
+    let transferNo;
+    const session = await mongoose.startSession();
+    try {
+        await session.withTransaction(async () => {
+            transferNo = await nextBranchTransferNo(companyId, transferDate, session);
+            const moved = await Asset.updateMany(
+                { _id: { $in: assetIds }, companyId, branchId: from._id },
+                { $set: { branchId: to._id } },
+                { session }
+            ).setOptions(ANY_BRANCH);
+            if (moved.matchedCount !== assetIds.length) {
+                throw httpError(409, 'Some of these serial numbers were just moved by someone else. Reload and try again.');
+            }
+            await SerialTransfer.updateMany({ assetId: { $in: assetIds } }, { $set: { branchId: to._id } }, { session }).setOptions(ANY_BRANCH);
+            await AssetHistory.updateMany({ assetId: { $in: assetIds } }, { $set: { branchId: to._id } }, { session }).setOptions(ANY_BRANCH);
+            await SerialBranchTransfer.insertMany(assets.map((asset) => ({
+                transferNo,
+                assetId: asset._id,
+                serialNumber: asset.serialNumber,
+                serialKey: toKey(asset.serialNumber),
+                productId: asset.productId || null,
+                productCode: asset.productCode || '',
+                productName: asset.productName || '',
+                status: statusOf(asset),
+                fromBranchId: from._id,
+                fromBranchName: branchLabel(from),
+                toBranchId: to._id,
+                toBranchName: branchLabel(to),
+                transferDate,
+                reference,
+                remarks,
+                createdBy: user?.id || null,
+                createdByName: user?.name || '',
+                requestId
+            })), { session });
+        });
+    } finally {
+        await session.endSession();
+    }
+    return transferNo;
+};
+exports.moveSerialsToBranch = moveSerialsToBranch;
+
+/**
  * Moves the selected serials (body.assetIds) from fromBranchId to toBranchId. Everything is
  * checked first and then saved in one transaction, so either every serial moves or none does.
  * A serial moves only if it is still in the source branch at that moment, so two people moving
@@ -1196,7 +1250,6 @@ exports.searchBranchSerials = async (req, res) => {
  */
 exports.createBranchTransfer = async (req, res) => {
     const requestId = cleanText(req.body.requestId).slice(0, 100) || undefined;
-    let session;
     try {
         const assetIds = Array.isArray(req.body.assetIds) ? req.body.assetIds.map((id) => String(id)) : [];
         if (!assetIds.length) throw httpError(400, 'Select at least one serial number.');
@@ -1238,43 +1291,15 @@ exports.createBranchTransfer = async (req, res) => {
             throw httpError(400, `${serialList(elsewhere)} ${elsewhere.length === 1 ? 'is' : 'are'} not in ${branchLabel(from)}. Only serial numbers of the source branch can be transferred.`);
         }
 
-        const transferDate = new Date();
-        const reference = cleanText(req.body.reference).slice(0, 100);
-        const remarks = cleanText(req.body.remarks).slice(0, 500);
-        let transferNo;
-        session = await mongoose.startSession();
-        await session.withTransaction(async () => {
-            transferNo = await nextBranchTransferNo(companyId, transferDate, session);
-            const moved = await Asset.updateMany(
-                { _id: { $in: assetIds }, companyId, branchId: from._id },
-                { $set: { branchId: to._id } },
-                { session }
-            );
-            if (moved.matchedCount !== assetIds.length) {
-                throw httpError(409, 'Some of these serial numbers were just moved by someone else. Reload and try again.');
-            }
-            await SerialTransfer.updateMany({ assetId: { $in: assetIds } }, { $set: { branchId: to._id } }, { session });
-            await AssetHistory.updateMany({ assetId: { $in: assetIds } }, { $set: { branchId: to._id } }, { session });
-            await SerialBranchTransfer.insertMany(assets.map((asset) => ({
-                transferNo,
-                assetId: asset._id,
-                serialNumber: asset.serialNumber,
-                serialKey: toKey(asset.serialNumber),
-                productId: asset.productId || null,
-                productCode: asset.productCode || '',
-                productName: asset.productName || '',
-                status: statusOf(asset),
-                fromBranchId: from._id,
-                fromBranchName: branchLabel(from),
-                toBranchId: to._id,
-                toBranchName: branchLabel(to),
-                transferDate,
-                reference,
-                remarks,
-                createdBy: req.user?.id || null,
-                createdByName: req.user?.name || '',
-                requestId
-            })), { session });
+        const transferNo = await moveSerialsToBranch({
+            companyId,
+            assets,
+            from,
+            to,
+            reference: cleanText(req.body.reference).slice(0, 100),
+            remarks: cleanText(req.body.remarks).slice(0, 500),
+            user: req.user,
+            requestId
         });
 
         return res.status(201).json(await branchTransferResult({ transferNo }));
@@ -1290,8 +1315,6 @@ exports.createBranchTransfer = async (req, res) => {
         }
         console.error('Serial branch transfer failed:', error);
         return res.status(500).json({ message: `Failed to transfer the serial numbers: ${error.message}` });
-    } finally {
-        if (session) await session.endSession();
     }
 };
 

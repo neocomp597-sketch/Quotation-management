@@ -28,6 +28,8 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
     const [transferBranchOptions, setTransferBranchOptions] = useState([]);
     const [transferBranchId, setTransferBranchId] = useState('');
     const [transferringBranch, setTransferringBranch] = useState(false);
+    // Bumped after a Branch Transfer, which moves the employee's assets too: Assign Asset reloads them
+    const [assetsReloadKey, setAssetsReloadKey] = useState(0);
     const [employees, setEmployees] = useState([]);
     const [allEmployees, setAllEmployees] = useState([]);
     const [branches, setBranches] = useState([]);
@@ -351,6 +353,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
         const confirmed = window.confirm(
             `Transfer ${selectedEmp.name} to ${target.name}?\n\n`
             + 'The employee keeps the same Employee ID, and their login moves to the new branch. '
+            + `The assets they hold in their current branch move to ${target.name} with them. `
             + 'Attendance, payroll, tickets and visits already saved stay with the branch they were saved in.\n\n'
             + 'The transfer is saved on its own: save any other changes on this form first.'
         );
@@ -361,6 +364,11 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
             const emp = res.data?.employee;
             invalidateApiCache('/payroll');
             invalidateApiCache('/users');
+            invalidateApiCache('/serial-transfers');
+            invalidateApiCache('/customers');
+            // The employee moved, but their assets could not: a warning that says why and what to do
+            const notify = res.data?.assets?.error ? (text) => toast.warn(text, { autoClose: 10000 }) : toast.success;
+            setAssetsReloadKey((key) => key + 1);
             setTransferBranchId('');
             const stillHere = !activeBranchId || (emp?.assignedBranches || []).some((b) => String(b?._id || b) === String(activeBranchId));
             if (emp && stillHere) {
@@ -370,11 +378,11 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                     branchId: emp.branchId?._id || emp.branchId || '',
                     assignedBranches: (emp.assignedBranches || []).map((b) => b?._id || b).filter(Boolean)
                 }));
-                toast.success(res.data?.message || `Transferred to ${target.name}.`);
+                notify(res.data?.message || `Transferred to ${target.name}.`);
                 fetchEmployees();
             } else {
                 // The employee has left the branch being worked in, so they leave this list too.
-                toast.success(`${res.data?.message || `Transferred to ${target.name}.`} Select ${target.name} at the top to see them.`);
+                notify(`${res.data?.message || `Transferred to ${target.name}.`} Select ${target.name} at the top to see them.`);
                 setIsModalOpen(false);
                 fetchEmployees();
                 navigate('/payroll/employees');
@@ -1264,7 +1272,8 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                             </button>
                                                         </div>
                                                         <p className="text-[11px] text-slate-500 font-medium">
-                                                            The employee will be assigned to the selected branch and keeps the same Employee ID. Their login follows.
+                                                            The employee will be assigned to the selected branch and keeps the same Employee ID. Their login follows,
+                                                            and so do the assets they hold in their current branch (moved as a Branch Transfer).
                                                             Attendance, payroll, tickets and visits already saved keep their branch.
                                                         </p>
                                                     </div>
@@ -1969,6 +1978,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                         employees={allEmployees.length ? allEmployees : employees}
                                         pending={pendingAssets}
                                         onPendingChange={setPendingAssets}
+                                        reloadKey={assetsReloadKey}
                                     />
 
                                     <div className="pt-5 border-t border-slate-100 flex justify-end gap-3">

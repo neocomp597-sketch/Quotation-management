@@ -36,7 +36,8 @@ const AssetLine = ({ asset }) => (
  * page assigns them right after the employee is saved. Existing employee: the items they hold are
  * listed with Transfer, and chosen items are assigned with "Assign selected".
  */
-const EmployeeAssets = ({ employeeId = null, employeeName = '', employees = [], pending = [], onPendingChange }) => {
+// reloadKey: changing it reloads the items held (e.g. after a Branch Transfer moved them)
+const EmployeeAssets = ({ employeeId = null, employeeName = '', employees = [], pending = [], onPendingChange, reloadKey = 0 }) => {
     const { can } = useAuth();
     const allowed = can('master_serial_transfer', 'modify');
     const isNew = !employeeId;
@@ -67,7 +68,7 @@ const EmployeeAssets = ({ employeeId = null, employeeName = '', employees = [], 
             setLoadingHeld(false);
         }
     }, [employeeId, allowed]);
-    useEffect(() => { loadHeld(); }, [loadHeld]);
+    useEffect(() => { loadHeld(); }, [loadHeld, reloadKey]);
 
     // Items that can be given: searched as typed (in stock or allocated to nobody, in the working branch).
     useEffect(() => {
