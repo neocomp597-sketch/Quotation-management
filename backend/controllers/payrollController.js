@@ -251,9 +251,23 @@ const sameEmployeeMessage = ({ employee, field }) => {
         : `${who} is already on the Employees screen with mobile ${employee.mobile}. Open that profile instead of adding the person again.`;
 };
 
+// Salary is payroll: only an administrator sets it (PUT /employees/:id/structure). Adding and
+// editing employees follows Authorization > Employees & Master, so other users' saves leave it out.
+const isPayrollAdmin = (user) => {
+    const { isSuperAdminRole } = require('../middlewares/authMiddleware');
+    return user?.role === 'admin' || isSuperAdminRole(user?.role);
+};
+const PAYROLL_ONLY_FIELDS = ['salaryStructure'];
+const withoutPayrollFields = (req, data) => {
+    if (!isPayrollAdmin(req.user)) PAYROLL_ONLY_FIELDS.forEach((field) => { delete data[field]; });
+    return data;
+};
+
 exports.createEmployee = async (req, res) => {
     try {
-        const employeeData = { ...req.body };
+        const employeeData = withoutPayrollFields(req, { ...req.body });
+        // Anyone but an administrator adds employees to their own company
+        if (req.user?.companyId && !isPayrollAdmin(req.user)) employeeData.companyId = req.user.companyId;
         if (!employeeData.companyId && req.user?.companyId) {
             employeeData.companyId = req.user.companyId;
         }
@@ -342,7 +356,7 @@ exports.createEmployee = async (req, res) => {
 
 exports.updateEmployee = async (req, res) => {
     try {
-        const updateData = { ...req.body };
+        const updateData = withoutPayrollFields(req, { ...req.body });
         delete updateData.employeeId;
         // Never moved to another company or record through Edit.
         delete updateData.companyId;

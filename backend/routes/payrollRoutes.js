@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const payrollController = require('../controllers/payrollController');
 const { protect } = require('../middlewares/authMiddleware');
+const { requirePermission } = require('../middlewares/permissionMiddleware');
 const PayrollEmployeeSummary = require('../models/PayrollEmployeeSummary');
 
 // Middleware: Enforce admin role for general payroll management actions
@@ -43,7 +44,10 @@ router.use(protect);
 
 // ─── EMPLOYEE PROFILES ─────────────────────────────────────────
 router.get('/employees', payrollController.getEmployees);
-router.post('/employees', checkAdmin, payrollController.createEmployee);
+// Employee Master (add, open, edit, delete) follows Authorization > Employees & Master
+// (payroll_employees): `protect` checks Create / Modify / Delete for every request
+// (config/apiPermissions.js). Salary stays with administrators (PUT /employees/:id/structure).
+router.post('/employees', payrollController.createEmployee);
 router.post('/employees/sync-users', checkAdmin, payrollController.syncEmployeeUsers);
 router.post('/employees/batch-assign-branch-id', checkAdmin, payrollController.batchAssignBranchAndEmployeeId);
 router.post('/employees/vacant-position', checkAdmin, payrollController.createVacantPosition);
@@ -52,9 +56,9 @@ router.put('/employees/:id/kra', payrollController.updateEmployeeKra);
 router.put('/employees/:id/structure', checkAdmin, payrollController.updateEmployeeStructure);
 // Branch Transfer on Edit Employee: same rule as editing an employee (admin, plus payroll_employees Modify).
 router.put('/employees/:id/branch', checkAdmin, payrollController.transferEmployeeBranch);
-router.get('/employees/:id', checkAdmin, payrollController.getEmployee);
-router.put('/employees/:id', checkAdmin, payrollController.updateEmployee);
-router.delete('/employees/:id', checkAdmin, payrollController.deleteEmployee);
+router.get('/employees/:id', requirePermission('payroll_employees', 'view'), payrollController.getEmployee);
+router.put('/employees/:id', payrollController.updateEmployee);
+router.delete('/employees/:id', payrollController.deleteEmployee);
 
 // ─── EMPLOYEE MY PAYSLIPS (Authenticated users) ────────────────────────────
 router.get('/my-payslips', payrollController.getMyPayslips);

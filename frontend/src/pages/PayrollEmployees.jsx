@@ -25,6 +25,8 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
     // Branch Transfer (Edit Employee): the branches this user may use, and the one picked.
     // Same rule as editing an employee on the server: administrators only.
     const canTransferBranch = (isAdmin || isSuperAdmin) && canModify;
+    // Salary structure is payroll: administrators only, as on the server
+    const canSetSalary = (isAdmin || isSuperAdmin) && canModify;
     const [transferBranchOptions, setTransferBranchOptions] = useState([]);
     const [transferBranchId, setTransferBranchId] = useState('');
     const [transferringBranch, setTransferringBranch] = useState(false);
@@ -921,7 +923,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
 
                                 {/* Actions */}
                                 <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                                    {canModify && (
+                                    {canSetSalary && (
                                     <button
                                         type="button"
                                         onClick={() => handleOpenStructure(emp)}
@@ -1085,7 +1087,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center justify-center gap-2">
-                                                    {canModify && (
+                                                    {canSetSalary && (
                                                     <button
                                                         onClick={() => handleOpenStructure(emp)}
                                                         title="Configure Base Structure"
