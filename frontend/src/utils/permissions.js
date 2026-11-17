@@ -41,6 +41,9 @@ export const permissionAllows = (permissions = {}, key, action = 'view', permiss
 // them; until the user is saved again they take that switch's values (as on the server).
 const SPLIT_PERMISSION_SOURCES = {
     master_serial_transfer: 'master_serials',
+    // Department and Designation Master followed Employees until 2026-11-17
+    master_departments: 'payroll_employees',
+    master_designations: 'payroll_employees',
 };
 
 /** `saved` with the old switch's values copied to each split-out screen that has none of its own. */

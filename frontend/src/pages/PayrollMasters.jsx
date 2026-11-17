@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { payrollService, salespersonService } from '../services/api';
 import Modal from '../components/Modal';
@@ -119,12 +119,19 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
     const navigate = useNavigate();
     const { id: routeId } = useParams();
     const location = useLocation();
-    const { can } = useAuth();
-    const { canCreate, canModify, canDelete } = usePermission('payroll_employees');
+    const { can, hasAccess } = useAuth();
+    // Department Master and Designation Master have their own switches in Authorization (client,
+    // 2026-11-17); the page shows the tabs the user may open.
+    const allowedTabIds = useMemo(() => ['departments', 'designations']
+        .filter((id) => hasAccess(id === 'departments' ? 'master_departments' : 'master_designations')), [hasAccess]);
     const queryParams = new URLSearchParams(location.search);
-    const initialTab = queryParams.get('tab') || 'departments';
+    const requestedTab = queryParams.get('tab') || 'departments';
+    const initialTab = allowedTabIds.includes(requestedTab) ? requestedTab : (allowedTabIds[0] || 'departments');
 
     const [activeTab, setActiveTab] = useState(initialTab);
+    const { canCreate, canModify, canDelete } = usePermission(activeTab === 'designations' ? 'master_designations' : 'master_departments');
+    // Adding people to a department or taking them out edits their employee record: Employees access.
+    const employeeAccess = usePermission('payroll_employees');
     const [deptSubTab, setDeptSubTab] = useState('overview'); // 'overview', 'master', 'column', 'list'
 
     const [loading, setLoading] = useState(false);
@@ -153,10 +160,10 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
 
     useEffect(() => {
         const tab = new URLSearchParams(location.search).get('tab');
-        if (tab && (tab === 'departments' || tab === 'designations')) {
+        if (tab && (tab === 'departments' || tab === 'designations') && allowedTabIds.includes(tab)) {
             setActiveTab(tab);
         }
-    }, [location.search]);
+    }, [location.search, allowedTabIds]);
     
     // Department / Designation modal
     const [showModal, setShowModal] = useState(false);
@@ -174,7 +181,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
     const tabs = [
         { id: 'departments', label: 'Departments', icon: <IconCategory size={20} /> },
         { id: 'designations', label: 'Designations', icon: <IconAssignment size={20} /> }
-    ];
+    ].filter((tab) => allowedTabIds.includes(tab.id));
 
     const fetchItems = async () => {
         setLoading(true);
@@ -406,21 +413,23 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                 toast.success('Department created successfully');
             }
 
-            // Sync employee assignments
-            const prevAssignedEmps = employees.filter(e => normalizeDept(e.department) === normalizeDept(deptName));
-            
-            // Unassign unchecked employees
-            for (const emp of prevAssignedEmps) {
-                if (!masterForm.assignedEmpIds.includes(emp._id)) {
-                    await payrollService.updateEmployee(emp._id, { ...emp, department: '' });
-                }
-            }
+            // Sync employee assignments (they edit employees: Employees Modify)
+            if (employeeAccess.canModify) {
+                const prevAssignedEmps = employees.filter(e => normalizeDept(e.department) === normalizeDept(deptName));
 
-            // Assign checked employees
-            for (const empId of masterForm.assignedEmpIds) {
-                const emp = employees.find(e => e._id === empId);
-                if (emp && normalizeDept(emp.department) !== normalizeDept(deptName)) {
-                    await payrollService.updateEmployee(empId, { ...emp, department: deptName });
+                // Unassign unchecked employees
+                for (const emp of prevAssignedEmps) {
+                    if (!masterForm.assignedEmpIds.includes(emp._id)) {
+                        await payrollService.updateEmployee(emp._id, { ...emp, department: '' });
+                    }
+                }
+
+                // Assign checked employees
+                for (const empId of masterForm.assignedEmpIds) {
+                    const emp = employees.find(e => e._id === empId);
+                    if (emp && normalizeDept(emp.department) !== normalizeDept(deptName)) {
+                        await payrollService.updateEmployee(empId, { ...emp, department: deptName });
+                    }
                 }
             }
 
@@ -474,7 +483,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
 
     const handleOpenAssignModal = (deptName) => {
         setAssignDeptName(deptName);
-        setAssignPersonType(canCreate ? 'new' : 'existing');
+        setAssignPersonType(employeeAccess.canCreate ? 'new' : 'existing');
         setNewPersonName('');
         setSelectedPersonId('');
         setShowAssignModal(true);
@@ -1137,7 +1146,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                                                             </div>
                                                         </div>
 
-                                                        {(canCreate || canModify) && (
+                                                        {canModify && (employeeAccess.canCreate || employeeAccess.canModify) && (
                                                         <button
                                                             onClick={() => handleOpenAssignModal(dept.name)}
                                                             className="flex items-center justify-center gap-1.5 w-full py-2 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
@@ -1173,7 +1182,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                                                                         {person.name}
                                                                     </span>
                                                                 </div>
-                                                                {!person.isSample && (person.source === 'salesperson' ? can('admin_salespersons', 'modify') : canModify) && (
+                                                                {!person.isSample && (person.source === 'salesperson' ? can('admin_salespersons', 'modify') : employeeAccess.canModify) && (
                                                                     <button
                                                                         onClick={() => handleUnassignPerson(person, dept.name)}
                                                                         className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
@@ -1397,7 +1406,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                             Assignment Type
                         </label>
                         <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl border border-slate-200">
-                            {canCreate && (
+                            {employeeAccess.canCreate && (
                             <button
                                 type="button"
                                 onClick={() => setAssignPersonType('new')}
@@ -1410,7 +1419,7 @@ const PayrollMasters = ({ isCreatePage, isEditPage }) => {
                                 + Add New Person
                             </button>
                             )}
-                            {canModify && (
+                            {employeeAccess.canModify && (
                             <button
                                 type="button"
                                 onClick={() => setAssignPersonType('existing')}

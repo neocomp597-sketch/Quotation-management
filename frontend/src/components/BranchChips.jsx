@@ -14,7 +14,8 @@ const chipClass = (isSelected, isBusy) => `flex items-center gap-1.5 px-4 py-2 r
 
 /**
  * The branches this user was given, home branch first, as buttons (Invoice Bulk Upload, Serial No
- * Transfer). Shows nothing until the branches are loaded, or when the user has none.
+ * Transfer); every branch for a user who may use every branch, such as the super admin. Shows
+ * nothing until the branches are loaded, or when the user has none.
  *
  * Default: picking a branch makes it the working branch, as the header switcher does; it is checked
  * and saved on the server, and the page then reloads in that branch (see Layout).

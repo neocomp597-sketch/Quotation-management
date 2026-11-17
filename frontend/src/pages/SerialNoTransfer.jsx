@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { MdSearch, MdSwapHoriz, MdVisibility, MdArrowBack, MdPersonAdd, MdHistory, MdCheckCircle, MdFileDownload, MdAdd, MdClose, MdArrowForward, MdStore, MdExpandMore } from 'react-icons/md';
+import { MdSearch, MdSwapHoriz, MdVisibility, MdArrowBack, MdPersonAdd, MdHistory, MdCheckCircle, MdFileDownload, MdAdd, MdClose, MdArrowForward, MdStore, MdExpandMore, MdFilterList } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { serialTransferService, customerService, csmService, mgrService } from '../services/api';
 import AssetActivityLog from '../components/AssetActivityLog';
@@ -274,6 +274,40 @@ const DateRangeFilter = ({ range, field, onChange }) => {
     );
 };
 
+// The filters beside a tab's search fold away behind a Filters button (client, 2026-11-17: they took
+// too much room). Folded at first; open or folded is remembered in this browser for every tab.
+const FILTERS_OPEN_KEY = 'serialTransfer.filtersOpen';
+const useFiltersOpen = () => {
+    const [open, setOpen] = useState(() => {
+        try { return localStorage.getItem(FILTERS_OPEN_KEY) === '1'; } catch { return false; }
+    });
+    const toggle = () => {
+        const next = !open;
+        setOpen(next);
+        try { localStorage.setItem(FILTERS_OPEN_KEY, next ? '1' : '0'); } catch { /* not remembered */ }
+    };
+    return [open, toggle];
+};
+
+// `active`: how many of the folded filters are in use, shown on the button so none is forgotten.
+const FiltersButton = ({ open, onToggle, active }) => (
+    <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        title={open ? 'Hide the filters' : 'Show the filters'}
+        className={`flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border text-xs font-black uppercase tracking-widest transition-all ${open || active ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'}`}
+    >
+        <MdFilterList size={18} />
+        Filters
+        {active > 0 && (
+            <span className="min-w-5 h-5 px-1.5 rounded-full bg-primary-600 text-white text-[10px] leading-5 text-center tracking-normal">{active}</span>
+        )}
+        <MdExpandMore size={18} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+    </button>
+);
+const datesInUse = (range) => (range.fromDate || range.toDate ? 1 : 0);
+
 // Total Count of a list: every record matching its search and filters (the server's count), apart
 // from the rows on this page, as on Invoice Bulk Upload.
 const TotalCountBar = ({ pagination, shown, noun, filtered }) => {
@@ -314,6 +348,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
     const offset = (pagination.page - 1) * pagination.limit;
     // The row whose Download Customer Activity Log dialog is open.
     const [downloadFor, setDownloadFor] = useState(null);
+    const [filtersOpen, toggleFilters] = useFiltersOpen();
 
     return (
         <>
@@ -335,15 +370,21 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                     <option value="product">Product</option>
                     <option value="customer">Customer</option>
                 </select>
-                <StatusFilter value={status} onChange={(value) => { setStatus(value); setPage(1); }} />
-                <select value={ownership} onChange={(e) => { setOwnership(e.target.value); setPage(1); }} aria-label="Filter by customer transfers" className={selectClass}>
-                    <option value="">All customers</option>
-                    <option value="Sold">With original customer</option>
-                    <option value="Transferred">Transferred / assigned to a new customer</option>
-                </select>
-                <MgrFilter level={1} value={mgr1} onChange={(value) => { setMgr1(value); setPage(1); }} />
-                <MgrFilter level={4} value={mgr4} onChange={(value) => { setMgr4(value); setPage(1); }} />
-                <DateRangeFilter range={range} field="Invoice Date" onChange={() => setPage(1)} />
+                <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[status, ownership, mgr1, mgr4].filter(Boolean).length + datesInUse(range)} />
+                {filtersOpen && (
+                    <>
+                        <StatusFilter value={status} onChange={(value) => { setStatus(value); setPage(1); }} />
+                        <select value={ownership} onChange={(e) => { setOwnership(e.target.value); setPage(1); }} aria-label="Filter by customer transfers" className={selectClass}>
+                            <option value="">All customers</option>
+                            <option value="Sold">With original customer</option>
+                            <option value="Transferred">Transferred / assigned to a new customer</option>
+                        </select>
+                        <MgrFilter level={1} value={mgr1} onChange={(value) => { setMgr1(value); setPage(1); }} />
+                        <MgrFilter level={4} value={mgr4} onChange={(value) => { setMgr4(value); setPage(1); }} />
+                        <DateRangeFilter range={range} field="Invoice Date" onChange={() => setPage(1)} />
+                    </>
+                )}
+                {!filtersOpen && range.invalid && <p className="w-full text-xs font-semibold text-rose-600">From Date cannot be later than To Date.</p>}
             </div>
             <div className="p-3 md:p-6">
                 <MgrAccessNotice mgrAccess={mgrAccess} noun="serial numbers" />
@@ -365,7 +406,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                                     <MobileFields>
                                         <MobileField label="Branch">{row.branchName || '-'}</MobileField>
                                         <MobileField label="Asset No">{row.assetNo || '-'}</MobileField>
-                                        <MobileField label="Current Customer" wide>
+                                        <MobileField label="Current User" wide>
                                             {row.customerName || '-'}
                                             {row.customerCode && <span className="block text-xs text-slate-500">{row.customerCode}</span>}
                                         </MobileField>
@@ -398,7 +439,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                             <table className="serial-list-compact w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50">
-                                        {['Sr No', 'Serial No', 'Asset No', 'Product', 'Branch', 'Current Customer', 'Invoice Number', 'Invoice Date'].map((label) => (
+                                        {['Sr No', 'Serial No', 'Asset No', 'Product', 'Branch', 'Current User', 'Invoice Number', 'Invoice Date'].map((label) => (
                                             <th key={label} className={thClass}>{label}</th>
                                         ))}
                                         <th className={`${thClass} text-right`}>Action</th>
@@ -463,6 +504,7 @@ const HistoryTab = ({ onOpen }) => {
     const [mgr1, setMgr1] = useStoredState('history.mgr1', '');
     const [mgr4, setMgr4] = useStoredState('history.mgr4', '');
     const range = useDateRange('history');
+    const [filtersOpen, toggleFilters] = useFiltersOpen();
     const debouncedSearch = useDebounced(search.trim());
 
     const viewBranches = useViewBranches();
@@ -488,18 +530,24 @@ const HistoryTab = ({ onOpen }) => {
                         className={`${inputClass} pl-11`}
                     />
                 </div>
-                <select value={entryType} onChange={(e) => { setEntryType(e.target.value); setPage(1); }} className={selectClass}>
-                    <option value="">All entries</option>
-                    {ENTRY_OPTIONS.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
-                </select>
-                <select value={flag} onChange={(e) => { setFlag(e.target.value); setPage(1); }} className={selectClass}>
-                    <option value="">Active and inactive</option>
-                    <option value="Active">Active (current customer)</option>
-                    <option value="Inactive">Inactive (previous customers)</option>
-                </select>
-                <MgrFilter level={1} value={mgr1} onChange={(value) => { setMgr1(value); setPage(1); }} />
-                <MgrFilter level={4} value={mgr4} onChange={(value) => { setMgr4(value); setPage(1); }} />
-                <DateRangeFilter range={range} field="Transfer Date" onChange={() => setPage(1)} />
+                <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[entryType, flag, mgr1, mgr4].filter(Boolean).length + datesInUse(range)} />
+                {filtersOpen && (
+                    <>
+                        <select value={entryType} onChange={(e) => { setEntryType(e.target.value); setPage(1); }} className={selectClass}>
+                            <option value="">All entries</option>
+                            {ENTRY_OPTIONS.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
+                        </select>
+                        <select value={flag} onChange={(e) => { setFlag(e.target.value); setPage(1); }} className={selectClass}>
+                            <option value="">Active and inactive</option>
+                            <option value="Active">Active (current customer)</option>
+                            <option value="Inactive">Inactive (previous customers)</option>
+                        </select>
+                        <MgrFilter level={1} value={mgr1} onChange={(value) => { setMgr1(value); setPage(1); }} />
+                        <MgrFilter level={4} value={mgr4} onChange={(value) => { setMgr4(value); setPage(1); }} />
+                        <DateRangeFilter range={range} field="Transfer Date" onChange={() => setPage(1)} />
+                    </>
+                )}
+                {!filtersOpen && range.invalid && <p className="w-full text-xs font-semibold text-rose-600">From Date cannot be later than To Date.</p>}
             </div>
             <div className="p-3 md:p-6">
                 {loading ? <Spinner /> : (
@@ -703,6 +751,7 @@ const ActivityTab = ({ onOpen, assetId }) => {
     const [mgr1, setMgr1] = useStoredState(`${prefix}.mgr1`, '');
     const [mgr4, setMgr4] = useStoredState(`${prefix}.mgr4`, '');
     const range = useDateRange(prefix);
+    const [filtersOpen, toggleFilters] = useFiltersOpen();
     const debouncedSearch = useDebounced(search.trim());
     const [downloading, setDownloading] = useState(false);
 
@@ -775,9 +824,15 @@ const ActivityTab = ({ onOpen, assetId }) => {
                                 className={`${inputClass} pl-11`}
                             />
                         </div>
-                        <MgrFilter level={1} value={mgr1} onChange={(value) => { setMgr1(value); setPage(1); }} />
-                        <MgrFilter level={4} value={mgr4} onChange={(value) => { setMgr4(value); setPage(1); }} />
-                        <DateRangeFilter range={range} field="Customer Since" onChange={() => setPage(1)} />
+                        <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[mgr1, mgr4].filter(Boolean).length + datesInUse(range)} />
+                        {filtersOpen && (
+                            <>
+                                <MgrFilter level={1} value={mgr1} onChange={(value) => { setMgr1(value); setPage(1); }} />
+                                <MgrFilter level={4} value={mgr4} onChange={(value) => { setMgr4(value); setPage(1); }} />
+                                <DateRangeFilter range={range} field="Customer Since" onChange={() => setPage(1)} />
+                            </>
+                        )}
+                        {!filtersOpen && range.invalid && <p className="w-full text-xs font-semibold text-rose-600">From Date cannot be later than To Date.</p>}
                     </div>
                 )}
             </div>
@@ -1093,7 +1148,7 @@ export const SerialNoDetails = ({ transfer = false }) => {
                                 <InfoRow label="Status"><StatusBadge status={data.asset.status} /></InfoRow>
                                 <InfoRow label="Branch">{data.asset.branchName || '-'}</InfoRow>
                                 {returnedBy ? (
-                                    <InfoRow label="Current Customer">
+                                    <InfoRow label="Current User">
                                         None (returned)
                                         <span className="block text-xs font-medium text-slate-500">
                                             Returned by {returnedBy.companyName || returnedBy.customerName || '-'}
@@ -1101,7 +1156,7 @@ export const SerialNoDetails = ({ transfer = false }) => {
                                         </span>
                                     </InfoRow>
                                 ) : (
-                                    <InfoRow label="Current Customer">
+                                    <InfoRow label="Current User">
                                         {current?.companyName || data.asset.customerName || '-'}
                                         <span className="block text-xs font-medium text-slate-500">
                                             {[current?.customerCode || data.asset.customerCode, current?.customerMobile, current?.customerCity, current && `Since ${formatDate(current.transferDate)}`].filter(Boolean).join(' · ')}
@@ -1299,7 +1354,7 @@ const TransferForm = ({ mode = 'transfer', data, currentSince, onCancel, onSaved
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <InfoRow label="Serial Number">{data.asset.serialNumber}</InfoRow>
                 <InfoRow label="Product">{data.asset.productCode}{data.asset.productName ? ` · ${data.asset.productName}` : ''}</InfoRow>
-                <InfoRow label={past ? (pendingReturn ? 'Returned By' : 'Current Customer') : 'Previous Customer'}>
+                <InfoRow label={past ? (pendingReturn ? 'Returned By' : 'Current User') : 'Previous User'}>
                     {data.asset.customerName || '-'}{data.asset.customerCode ? ` (${data.asset.customerCode})` : ''}
                 </InfoRow>
                 {!past && (
@@ -1566,6 +1621,7 @@ const BranchTransferTab = () => {
     const [status, setStatus] = useStoredState('branch.status', '');
     const [page, setPage] = useStoredState('branch.page', 1);
     const range = useDateRange('branch');
+    const [filtersOpen, toggleFilters] = useFiltersOpen();
     const debouncedSearch = useDebounced(search.trim());
     const [creating, setCreating] = useState(false);
     const [details, setDetails] = useState(null);
@@ -1607,6 +1663,7 @@ const BranchTransferTab = () => {
                             className={`${inputClass} pl-11`}
                         />
                     </div>
+                    <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[fromBranchId, toBranchId, status].filter(Boolean).length + datesInUse(range)} />
                     {canModify && (
                         <button
                             type="button"
@@ -1619,12 +1676,15 @@ const BranchTransferTab = () => {
                         </button>
                     )}
                 </div>
-                <div className="serial-filter-bar flex flex-wrap items-end gap-3">
-                    {branchSelect(fromBranchId, setFromBranchId, 'All source branches', 'Filter by source branch')}
-                    {branchSelect(toBranchId, setToBranchId, 'All destination branches', 'Filter by destination branch')}
-                    <StatusFilter value={status} onChange={(value) => { setStatus(value); setPage(1); }} />
-                    <DateRangeFilter range={range} field="Transfer Date" onChange={() => setPage(1)} />
-                </div>
+                {filtersOpen && (
+                    <div className="serial-filter-bar flex flex-wrap items-end gap-3">
+                        {branchSelect(fromBranchId, setFromBranchId, 'All source branches', 'Filter by source branch')}
+                        {branchSelect(toBranchId, setToBranchId, 'All destination branches', 'Filter by destination branch')}
+                        <StatusFilter value={status} onChange={(value) => { setStatus(value); setPage(1); }} />
+                        <DateRangeFilter range={range} field="Transfer Date" onChange={() => setPage(1)} />
+                    </div>
+                )}
+                {!filtersOpen && range.invalid && <p className="text-xs font-semibold text-rose-600">From Date cannot be later than To Date.</p>}
             </div>
             <div className="p-3 md:p-6">
                 <BranchTransferList

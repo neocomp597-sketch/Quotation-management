@@ -44,7 +44,7 @@ router.use(protect);
 
 // ─── EMPLOYEE PROFILES ─────────────────────────────────────────
 router.get('/employees', payrollController.getEmployees);
-// Employee Master (add, open, edit, delete) follows Authorization > Employees & Master
+// Employee Master (add, open, edit, delete) follows Authorization > Master > Employees
 // (payroll_employees): `protect` checks Create / Modify / Delete for every request
 // (config/apiPermissions.js). Salary stays with administrators (PUT /employees/:id/structure).
 router.post('/employees', payrollController.createEmployee);
@@ -98,15 +98,17 @@ router.get('/reports', checkAdmin, payrollController.getReports);
 router.get('/audit-logs', checkAdmin, payrollController.getAuditLogs);
 
 // ─── DEPARTMENTS ────────────────────────────────────────────────────────────
+// Department and Designation Master: protect checks their Create / Modify / Delete switches in
+// Authorization (config/apiPermissions.js), so a role given them can use them (2026-11-17).
 router.get('/departments', payrollController.getDepartments);
-router.post('/departments', checkAdmin, payrollController.createDepartment);
-router.put('/departments/:id', checkAdmin, payrollController.updateDepartment);
-router.delete('/departments/:id', checkAdmin, payrollController.deleteDepartment);
+router.post('/departments', payrollController.createDepartment);
+router.put('/departments/:id', payrollController.updateDepartment);
+router.delete('/departments/:id', payrollController.deleteDepartment);
 
 // ─── DESIGNATIONS ───────────────────────────────────────────────────────────
 router.get('/designations', payrollController.getDesignations);
-router.post('/designations', checkAdmin, payrollController.createDesignation);
-router.put('/designations/:id', checkAdmin, payrollController.updateDesignation);
-router.delete('/designations/:id', checkAdmin, payrollController.deleteDesignation);
+router.post('/designations', payrollController.createDesignation);
+router.put('/designations/:id', payrollController.updateDesignation);
+router.delete('/designations/:id', payrollController.deleteDesignation);
 
 module.exports = router;

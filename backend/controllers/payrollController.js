@@ -252,12 +252,23 @@ const sameEmployeeMessage = ({ employee, field }) => {
 };
 
 // Salary is payroll: only an administrator sets it (PUT /employees/:id/structure). Adding and
-// editing employees follows Authorization > Employees & Master, so other users' saves leave it out.
+// editing employees follows Authorization > Master > Employees, so other users' saves leave it out.
 const isPayrollAdmin = (user) => {
     const { isSuperAdminRole } = require('../middlewares/authMiddleware');
     return user?.role === 'admin' || isSuperAdminRole(user?.role);
 };
 const PAYROLL_ONLY_FIELDS = ['salaryStructure'];
+
+// Department and Designation Master follow Authorization (2026-11-17): anyone but an
+// administrator works in their own company, whatever company the request names.
+const masterCompanyId = async (req) => (!isPayrollAdmin(req.user) && req.user?.companyId
+    ? String(req.user.companyId)
+    : getEffectiveCompanyId(req));
+// The fields a department or designation save may set: never its company or id.
+const masterFields = (body = {}) => {
+    const { companyId, _id, __v, createdAt, updatedAt, ...fields } = body || {};
+    return fields;
+};
 const withoutPayrollFields = (req, data) => {
     if (!isPayrollAdmin(req.user)) PAYROLL_ONLY_FIELDS.forEach((field) => { delete data[field]; });
     return data;
@@ -1358,11 +1369,11 @@ exports.getDepartments = async (req, res) => {
 
 exports.createDepartment = async (req, res) => {
     try {
-        const companyId = await getEffectiveCompanyId(req);
+        const companyId = await masterCompanyId(req);
         if (req.body.code && req.body.code.trim()) {
             const existingCode = await Department.findOne({
                 ...(companyId ? { companyId } : {}),
-                code: { $regex: new RegExp(`^${req.body.code.trim()}$`, 'i') }
+                code: { $regex: new RegExp(`^${escapeRegex(req.body.code.trim())}$`, 'i') }
             }).lean();
             if (existingCode) {
                 return res.status(400).json({ message: 'Department with this code already exists' });
@@ -1370,12 +1381,12 @@ exports.createDepartment = async (req, res) => {
         }
         const existing = await Department.findOne({
             ...(companyId ? { companyId } : {}),
-            name: { $regex: new RegExp(`^${req.body.name.trim()}$`, 'i') }
+            name: { $regex: new RegExp(`^${escapeRegex(req.body.name.trim())}$`, 'i') }
         }).lean();
         if (existing) {
             return res.status(400).json({ message: 'Department with this name already exists' });
         }
-        const dept = await Department.create({ ...req.body, companyId });
+        const dept = await Department.create({ ...masterFields(req.body), companyId });
         broadcastCrmUpdate('DEPARTMENT', 'CREATE', dept);
         res.status(201).json(dept);
     } catch (error) {
@@ -1385,12 +1396,12 @@ exports.createDepartment = async (req, res) => {
 
 exports.updateDepartment = async (req, res) => {
     try {
-        const companyId = await getEffectiveCompanyId(req);
+        const companyId = await masterCompanyId(req);
         if (req.body.code && req.body.code.trim()) {
             const existingCode = await Department.findOne({
                 ...(companyId ? { companyId } : {}),
                 _id: { $ne: req.params.id },
-                code: { $regex: new RegExp(`^${req.body.code.trim()}$`, 'i') }
+                code: { $regex: new RegExp(`^${escapeRegex(req.body.code.trim())}$`, 'i') }
             }).lean();
             if (existingCode) {
                 return res.status(400).json({ message: 'Another department with this code already exists' });
@@ -1400,13 +1411,13 @@ exports.updateDepartment = async (req, res) => {
             const existing = await Department.findOne({
                 ...(companyId ? { companyId } : {}),
                 _id: { $ne: req.params.id },
-                name: { $regex: new RegExp(`^${req.body.name.trim()}$`, 'i') }
+                name: { $regex: new RegExp(`^${escapeRegex(req.body.name.trim())}$`, 'i') }
             }).lean();
             if (existing) {
                 return res.status(400).json({ message: 'Another department with this name already exists' });
             }
         }
-        const dept = await Department.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true });
+        const dept = await Department.findByIdAndUpdate(req.params.id, { $set: masterFields(req.body) }, { new: true });
         broadcastCrmUpdate('DEPARTMENT', 'UPDATE', dept);
         res.json(dept);
     } catch (error) {
@@ -1416,7 +1427,7 @@ exports.updateDepartment = async (req, res) => {
 
 exports.deleteDepartment = async (req, res) => {
     try {
-        const companyId = await getEffectiveCompanyId(req);
+        const companyId = await masterCompanyId(req);
         const dept = await Department.findById(req.params.id);
         if (!dept) {
             return res.status(404).json({ message: 'Department not found' });
@@ -1440,7 +1451,7 @@ exports.deleteDepartment = async (req, res) => {
 
 exports.getDesignations = async (req, res) => {
     try {
-        const companyId = await getEffectiveCompanyId(req);
+        const companyId = await masterCompanyId(req);
         if (!companyId) {
             return res.status(400).json({ message: 'Company context missing' });
         }
@@ -1469,11 +1480,11 @@ exports.getDesignations = async (req, res) => {
 
 exports.createDesignation = async (req, res) => {
     try {
-        const companyId = await getEffectiveCompanyId(req);
+        const companyId = await masterCompanyId(req);
         if (req.body.code && req.body.code.trim()) {
             const existingCode = await Designation.findOne({
                 ...(companyId ? { companyId } : {}),
-                code: { $regex: new RegExp(`^${req.body.code.trim()}$`, 'i') }
+                code: { $regex: new RegExp(`^${escapeRegex(req.body.code.trim())}$`, 'i') }
             }).lean();
             if (existingCode) {
                 return res.status(400).json({ message: 'Designation with this code already exists' });
@@ -1481,12 +1492,12 @@ exports.createDesignation = async (req, res) => {
         }
         const existing = await Designation.findOne({
             ...(companyId ? { companyId } : {}),
-            name: { $regex: new RegExp(`^${req.body.name.trim()}$`, 'i') }
+            name: { $regex: new RegExp(`^${escapeRegex(req.body.name.trim())}$`, 'i') }
         }).lean();
         if (existing) {
             return res.status(400).json({ message: 'Designation with this name already exists' });
         }
-        const des = await Designation.create({ ...req.body, companyId });
+        const des = await Designation.create({ ...masterFields(req.body), companyId });
         res.status(201).json(des);
     } catch (error) {
         res.status(500).json({ message: 'Failed to create designation', error: error.message });
@@ -1495,12 +1506,12 @@ exports.createDesignation = async (req, res) => {
 
 exports.updateDesignation = async (req, res) => {
     try {
-        const companyId = await getEffectiveCompanyId(req);
+        const companyId = await masterCompanyId(req);
         if (req.body.code && req.body.code.trim()) {
             const existingCode = await Designation.findOne({
                 ...(companyId ? { companyId } : {}),
                 _id: { $ne: req.params.id },
-                code: { $regex: new RegExp(`^${req.body.code.trim()}$`, 'i') }
+                code: { $regex: new RegExp(`^${escapeRegex(req.body.code.trim())}$`, 'i') }
             }).lean();
             if (existingCode) {
                 return res.status(400).json({ message: 'Another designation with this code already exists' });
@@ -1510,13 +1521,13 @@ exports.updateDesignation = async (req, res) => {
             const existing = await Designation.findOne({
                 ...(companyId ? { companyId } : {}),
                 _id: { $ne: req.params.id },
-                name: { $regex: new RegExp(`^${req.body.name.trim()}$`, 'i') }
+                name: { $regex: new RegExp(`^${escapeRegex(req.body.name.trim())}$`, 'i') }
             }).lean();
             if (existing) {
                 return res.status(400).json({ message: 'Another designation with this name already exists' });
             }
         }
-        const des = await Designation.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true });
+        const des = await Designation.findByIdAndUpdate(req.params.id, { $set: masterFields(req.body) }, { new: true });
         res.json(des);
     } catch (error) {
         res.status(500).json({ message: 'Failed to update designation', error: error.message });

@@ -1105,5 +1105,52 @@
     "deployedBy": "Super Admin",
     "deployedAt": "2026-11-16T22:15:00+05:30",
     "isActive": true
+  },
+  {
+    "version": "v6.8.9",
+    "title": "Department and Designation Master in Authorization; Customer Search While Typing",
+    "message": "Release Updates (17 Nov 2026): Department Master and Designation Master have their own switches in Authorization. Customer search finds a name as you type it. Serial No Transfer says Current User, and the super admin's branch buttons list every branch. Serial No Transfer's filters fold away behind a Filters button.",
+    "releaseNotes": [
+      "Authorization: Department Master and Designation Master are listed under Master, each with View, Create, Modify and Delete",
+      "Customer search (Invoice Bulk Upload and every customer box): finds a customer while you type, words in any order, ignoring - and /",
+      "Serial No Transfer: the Current Customer column is now Current User",
+      "Invoice Bulk Upload and Serial No Transfer: the super admin's branch buttons list every branch, with All branches",
+      "Serial No Transfer: the filters fold away behind a Filters button, which shows how many are in use"
+    ],
+    "detailedChanges": [
+      {
+        "date": "17.11.2026",
+        "module": "Authorization",
+        "submodule": "Department Master and Designation Master",
+        "changes": "In Default Role Permissions and Team Users, Master now lists Department Master and Designation Master, each with View, Create, Modify and Delete. Until now both followed Employees & Master, which is now called Employees. Every role and user keeps the access they had: until a role is saved again, the two masters take its Employees switches. Department and Designation Master open for every role given them (adding, editing and deleting no longer need the Admin role), and the menu and the Department Management page show only the ones the user has. Adding people to a department or removing them also needs Employees Modify, as it changes their employee record. The department and designation lists stay readable by everyone for the Employee form."
+      },
+      {
+        "date": "17.11.2026",
+        "module": "Master Management",
+        "submodule": "Customer Search While Typing",
+        "changes": "Searching for a customer (Customer Name in Invoice Bulk Upload's Add Single Entry, and every other customer box and Customer Master) now finds a name while you type it: each word typed may be anywhere in the name, code, contact person, GSTIN, mobile or email, in any order, and - / . and spaces are ignored. For example E waste or ewaste finds E-waste/ Scrap, and Pradip Mandal finds Pradip Kumar Mandal. The closest names are listed first. Employees are found the same way, as each employee is a customer."
+      },
+      {
+        "date": "17.11.2026",
+        "module": "Master Management",
+        "submodule": "Serial No Transfer: Current User",
+        "changes": "The Current Customer column of the Serial No List, on phones and on a serial number's page, is now called Current User, as the holder is often an employee. In the transfer box the earlier holder is shown as Previous User."
+      },
+      {
+        "date": "17.11.2026",
+        "module": "Master Management",
+        "submodule": "Branch Buttons for the Super Admin",
+        "changes": "On Invoice Bulk Upload and Serial No Transfer, a user who may use every branch, such as the super admin or an administrator, now gets a button for every branch (home branch first) and All branches, to see several branches together. Other users still get the branches given to them."
+      },
+      {
+        "date": "17.11.2026",
+        "module": "Master Management",
+        "submodule": "Serial No Transfer: Filters Button",
+        "changes": "On every tab of Serial No Transfer, only the search (and All fields on the Serial No List) stays in view; the other filters (statuses, customers, MGR 1, MGR 4, entries, branches and the dates) open and close with the Filters button beside the search, so the list starts higher on the screen. The button shows how many filters are in use, so a filter left on is not forgotten while they are hidden. Open or closed is remembered in the browser for every tab."
+      }
+    ],
+    "deployedBy": "Super Admin",
+    "deployedAt": "2026-11-17T20:00:00+05:30",
+    "isActive": true
   }
 ]

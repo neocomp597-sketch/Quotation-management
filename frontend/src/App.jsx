@@ -373,8 +373,8 @@ function App() {
             <Route path="/payroll/employees/edit/:id" element={<PermissionRoute permissionKey="payroll_employees" action="modify"><Layout><PayrollEmployees isEditPage={true} /></Layout></PermissionRoute>} />
             <Route path="/payroll/org-chart" element={<PermissionRoute permissionKey="payroll_org_chart"><Layout><OrgChart /></Layout></PermissionRoute>} />
             <Route path="/org-chart" element={<PermissionRoute permissionKey="payroll_org_chart"><Layout><OrgChart /></Layout></PermissionRoute>} />
-            <Route path="/payroll/masters" element={<PermissionRoute permissionKey="payroll_employees"><Layout><PayrollMasters /></Layout></PermissionRoute>} />
-            <Route path="/payroll/masters/new" element={<PermissionRoute permissionKey="payroll_employees" action="create"><Layout><PayrollMasters isCreatePage={true} /></Layout></PermissionRoute>} />
+            <Route path="/payroll/masters" element={<PermissionRoute permissionKey={['master_departments', 'master_designations']}><Layout><PayrollMasters /></Layout></PermissionRoute>} />
+            <Route path="/payroll/masters/new" element={<PermissionRoute permissionKey={['master_departments', 'master_designations']} action="create"><Layout><PayrollMasters isCreatePage={true} /></Layout></PermissionRoute>} />
 
             {/* CSM Routes */}
             <Route path="/csm/dashboard" element={<PermissionRoute permissionKey="csm_dashboard"><Layout><CSMDashboard /></Layout></PermissionRoute>} />

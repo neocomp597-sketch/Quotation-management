@@ -14,6 +14,8 @@ const MENU_GROUPS = [
         children: [
             { key: 'master_customers', label: 'Customers', description: 'Customer master records' },
             { key: 'payroll_employees', label: 'Employees', description: 'Employee directory and profile management' },
+            { key: 'master_departments', label: 'Department Master', description: 'Departments and the people in each' },
+            { key: 'master_designations', label: 'Designation Master', description: 'Designations (job titles) used in Employee Master' },
             { key: 'payroll_org_chart', label: 'Org Chart', description: 'Direct reporting org chart access' },
             { key: 'payroll_org_chart_full', label: 'Org Chart (Full Company)', description: 'Full company org chart access' },
             { key: 'master_vendors', label: 'Vendors', description: 'Vendor master records' },
@@ -410,7 +412,10 @@ const getLockedViewKeys = (role) => ROLE_LOCKED_VIEW_KEYS[role] || [];
 // used to cover them. Until a role or user is saved again, the screen takes every value saved
 // for the old switch (View and each action), so nobody gains or loses access.
 const SPLIT_PERMISSION_SOURCES = {
-    master_serial_transfer: 'master_serials'
+    master_serial_transfer: 'master_serials',
+    // Department and Designation Master followed Employees until 2026-11-17
+    master_departments: 'payroll_employees',
+    master_designations: 'payroll_employees'
 };
 
 /** `saved` with the old switch's values copied to each split-out screen that has none of its own. */

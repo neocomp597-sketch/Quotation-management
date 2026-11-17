@@ -149,7 +149,10 @@ const listOwnBranches = async (user, companyId) => {
         .filter((id) => !selectable || selectable.includes(id));
 
     let branches;
-    if (ownIds.length === 0) {
+    // A user who may use every branch (an administrator) gets every branch, home first: the
+    // branch buttons of Invoice Bulk Upload and Serial No Transfer then offer all of them
+    // (client, 2026-11-17, for the super admin).
+    if (ownIds.length === 0 || selectable === null) {
         branches = await listSelectableBranches(user, companyId);
     } else {
         const query = { _id: { $in: ownIds } };

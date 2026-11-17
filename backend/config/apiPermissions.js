@@ -112,8 +112,10 @@ const API_PERMISSION_RULES = [
             'PUT /:id/kra': SKIP
         }
     },
-    { prefix: '/api/payroll/departments', key: 'payroll_employees', openRead: true },
-    { prefix: '/api/payroll/designations', key: 'payroll_employees', openRead: true },
+    // Their own switches since 2026-11-17 (they followed Employees before); the lists stay
+    // readable by everyone for the Employee form's dropdowns.
+    { prefix: '/api/payroll/departments', key: 'master_departments', openRead: true },
+    { prefix: '/api/payroll/designations', key: 'master_designations', openRead: true },
     {
         prefix: '/api/csm/masters', key: 'csm_masters', openRead: true,
         // Default masters are seeded on first use by any screen

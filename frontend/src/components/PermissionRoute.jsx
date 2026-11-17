@@ -65,7 +65,9 @@ const PermissionRoute = ({ permissionKey, action, adminOnly, superAdminOnly, chi
         return <Navigate to={fallback} replace />;
     }
 
-    if (permissionKey && !hasAccess(permissionKey)) {
+    // permissionKey may list several screens: any one of them opens the page.
+    const keys = Array.isArray(permissionKey) ? permissionKey : [permissionKey];
+    if (permissionKey && !keys.some((key) => hasAccess(key))) {
         const fallback = getFallbackRoute(permissions, user);
         if (fallback === location.pathname) {
             return <div className="p-10 text-center text-slate-500 font-bold">Access Denied</div>;
@@ -73,7 +75,7 @@ const PermissionRoute = ({ permissionKey, action, adminOnly, superAdminOnly, chi
         return <Navigate to={fallback} replace />;
     }
 
-    if (permissionKey && action && !can(permissionKey, action)) {
+    if (permissionKey && action && !keys.some((key) => can(key, action))) {
         // children is the page inside <Layout>; keep the layout, replace the page
         return React.isValidElement(children)
             ? React.cloneElement(children, undefined, <ActionDenied action={action} />)

@@ -57,6 +57,51 @@ const getUniqueCustomerName = async (customerName, excludeId) => {
     return `${baseName}-${Date.now().toString(36).toUpperCase()}`;
 };
 
+// Customer search (every customer picker and Customer Master): each word typed must appear in the
+// name, code, contact person, GSTIN, mobile or email, in any order, ignoring - / . and spaces; the
+// name written without its separators matches too. "E waste" and "ewaste" find "E-waste/ Scrap",
+// "Pradip Mandal" finds "Pradip Kumar Mandal" (client, 2026-11-17: a name showed only when pasted
+// exactly as saved).
+const CUSTOMER_SEARCH_FIELDS = ['customerName', 'companyName', 'externalCode', 'contactPerson', 'gstin', 'mobile', 'email'];
+const searchWords = (search) => String(search || '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean).slice(0, 8);
+const compactNamePattern = (search) => {
+    const letters = [...String(search || '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')];
+    if (letters.length < 3 || letters.length > 40) return null;
+    return new RegExp(letters.map(escapeRegex).join('[^\\p{L}\\p{N}]*'), 'iu');
+};
+const customerSearchCondition = (search) => {
+    const words = searchWords(search);
+    const anyField = (regex) => ({ $or: CUSTOMER_SEARCH_FIELDS.map((field) => ({ [field]: regex })) });
+    const alternatives = words.length
+        ? [{ $and: words.map((word) => anyField(new RegExp(escapeRegex(word), 'i'))) }]
+        : [anyField(new RegExp(escapeRegex(search), 'i'))];
+    const compact = compactNamePattern(search);
+    if (compact) alternatives.push({ customerName: compact }, { companyName: compact });
+    return alternatives.length === 1 ? alternatives[0] : { $or: alternatives };
+};
+
+// How close a customer is to the search, for the short lists of pickers: 0 the same name, 1 the
+// name starts with it, 2 every word starts a word of the name, 3 the name contains it, 4 other.
+const plainName = (value) => String(value || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+const searchRank = (customer, search) => {
+    const typed = plainName(search);
+    const typedCompact = typed.replace(/ /g, '');
+    const words = typed.split(' ').filter(Boolean);
+    return Math.min(...[customer.companyName, customer.customerName, customer.externalCode].map((value) => {
+        const name = plainName(value);
+        if (!name || !typed) return 5;
+        const compact = name.replace(/ /g, '');
+        if (name === typed || compact === typedCompact) return 0;
+        if (name.startsWith(typed) || compact.startsWith(typedCompact)) return 1;
+        const parts = name.split(' ');
+        if (words.every((word) => parts.some((part) => part.startsWith(word)))) return 2;
+        if (name.includes(typed) || compact.includes(typedCompact)) return 3;
+        return 4;
+    }));
+};
+const RANKED_SEARCH_MAX_LIMIT = 20;
+const RANKED_SEARCH_POOL = 200;
+
 const buildCustomerQuery = async (req) => {
     const query = {};
     // Customers belong to the selected branch; shared Product and MGR masters are unaffected.
@@ -70,24 +115,12 @@ const buildCustomerQuery = async (req) => {
 
     const search = String(req.query.search || '').trim();
     if (search) {
-        const regex = new RegExp(escapeRegex(search), 'i');
-        const searchOr = [
-            { customerName: regex },
-            { companyName: regex },
-            { externalCode: regex },
-            { contactPerson: regex },
-            { gstin: regex },
-            { mobile: regex },
-            { email: regex },
-        ];
+        const condition = customerSearchCondition(search);
         if (query.$or) {
-            query.$and = [
-                { $or: query.$or },
-                { $or: searchOr }
-            ];
+            query.$and = [{ $or: query.$or }, condition];
             delete query.$or;
         } else {
-            query.$or = searchOr;
+            query.$and = [condition];
         }
     }
 
@@ -234,17 +267,26 @@ const getAllCustomers = async (req, res) => {
         }
 
         const { page, limit, skip } = getPagination(req.query);
-        const [customers, total] = await Promise.all([
+        // A picker's short first page of a search lists the closest names first
+        const search = String(req.query.search || '').trim();
+        const ranked = Boolean(search) && page === 1 && limit <= RANKED_SEARCH_MAX_LIMIT;
+        const [found, total] = await Promise.all([
             Customer.find(query)
                 // shippingAddress is for the Customer Master export, which reads these pages
                 .select('externalCode customerName companyName contactPerson gstin billingAddress shippingAddress mobile email logoUrl defaultDiscount territory branchId createdAt')
                 .populate('territory', 'name type')
                 .sort({ createdAt: -1 })
-                .skip(skip)
-                .limit(limit)
+                .skip(ranked ? 0 : skip)
+                .limit(ranked ? RANKED_SEARCH_POOL : limit)
                 .lean(),
             Customer.countDocuments(query),
         ]);
+        const customers = ranked
+            ? found.map((customer, index) => ({ customer, index, rank: searchRank(customer, search) }))
+                .sort((a, b) => a.rank - b.rank || a.index - b.index)
+                .slice(0, limit)
+                .map((row) => row.customer)
+            : found;
 
         const response = {
             data: customers,
