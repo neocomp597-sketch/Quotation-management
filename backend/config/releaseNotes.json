@@ -1152,5 +1152,38 @@
     "deployedBy": "Super Admin",
     "deployedAt": "2026-11-17T20:00:00+05:30",
     "isActive": true
+  },
+  {
+    "version": "v6.8.10",
+    "title": "Type and Details of Complaint on Tickets; Employee Details in Current User",
+    "message": "Release Updates (18 Nov 2026): Raising a ticket now offers Type of Complaint and Details of Complaint, managed in CSM Config. Serial No Transfer shows an employee as External Employee ID and Name, with the email below.",
+    "releaseNotes": [
+      "Raise Ticket and Manual Register: Type of Complaint, and Details of Complaint showing only the details of the chosen type",
+      "CSM Config: new Complaint Types tab to add, edit and upload the two lists from Excel",
+      "Serial No Transfer: Current User shows an employee as External Employee ID - Name, with the email on the second line"
+    ],
+    "detailedChanges": [
+      {
+        "date": "18.11.2026",
+        "module": "CSM Support",
+        "submodule": "Raise Ticket: Type and Details of Complaint",
+        "changes": "The Raise Support Ticket and Manual Register forms have two new dropdowns. Type of Complaint lists the active types; Details of Complaint then lists only the details of the chosen type, and changing the type clears the detail. Both can be searched and both are optional. The selection is saved with the ticket, shown on the ticket's page, included in the Tickets Register Excel export and found by the register's search. A ticket keeps what was selected even if the list changes later."
+      },
+      {
+        "date": "18.11.2026",
+        "module": "CSM Support",
+        "submodule": "CSM Config: Complaint Types",
+        "changes": "A new Complaint Types tab in CSM Config holds the Type of Complaint list and the Details of Complaint under each type. Add and edit them on the screen, one detail per line, or download the template and upload an Excel file with the columns Type of Complaint and Details of Complaint. A blank type continues the type in the row above. Uploading adds what is new and leaves existing entries as they are, so a file can be uploaded again safely. An Inactive type is no longer offered on new tickets."
+      },
+      {
+        "date": "18.11.2026",
+        "module": "Master Management",
+        "submodule": "Serial No Transfer: Current User",
+        "changes": "When the current holder of a serial number is an employee, the Serial No List and the serial's page show the External Employee ID and name on the first line and the email on the second, in place of the employee code. Without an External Employee ID the first line is the name alone. Real customers still show their name and code. The list can also be searched by External Employee ID and email. A customer saved from Invoice Bulk Upload with an employee's email as its name is now treated as that employee: it is joined to the employee's customer when the system starts, and its items show in the employee's Assign Asset section."
+      }
+    ],
+    "deployedBy": "Super Admin",
+    "deployedAt": "2026-11-18T20:00:00+05:30",
+    "isActive": true
   }
 ]

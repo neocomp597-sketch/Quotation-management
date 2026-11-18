@@ -56,6 +56,10 @@ const TicketSchema = new mongoose.Schema({
     mgr4Category: { type: String, default: '' },
     problemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Problem' },
     problemName: { type: String, default: '' },
+    // CSM Config > Complaint Types. The texts are the ticket's own copy.
+    complaintTypeId: { type: mongoose.Schema.Types.ObjectId, ref: 'ComplaintType', default: null },
+    complaintType: { type: String, default: '' },
+    complaintDetail: { type: String, default: '' },
     typeId: { type: mongoose.Schema.Types.ObjectId, ref: 'TicketType' },
     priorityId: { type: mongoose.Schema.Types.ObjectId, ref: 'Priority', required: true },
     pincode: { type: String, required: true },

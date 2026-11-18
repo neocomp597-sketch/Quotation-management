@@ -5,9 +5,10 @@ import { toast } from 'react-toastify';
 import { 
     MdCategory, MdSettings, MdPriorityHigh, 
     MdAssignmentTurnedIn, MdPeople, MdAdd, 
-    MdDelete, MdEdit, MdCloudDownload, MdBuild, MdArrowBack
+    MdDelete, MdEdit, MdCloudDownload, MdBuild, MdArrowBack, MdReportProblem
 } from 'react-icons/md';
 import Modal from '../components/Modal';
+import ComplaintTypesMaster from '../components/ComplaintTypesMaster';
 import SearchableSelect from '../components/SearchableSelect';
 import { useAuth } from '../context/AuthContext';
 import usePermission from '../hooks/usePermission';
@@ -56,6 +57,7 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
     const tabs = [
         { id: 'categories', label: 'Categories', icon: <MdCategory size={20} /> },
         { id: 'types', label: 'Ticket Types', icon: <MdSettings size={20} /> },
+        { id: 'complaintTypes', label: 'Complaint Types', icon: <MdReportProblem size={20} /> },
         { id: 'priorities', label: 'Priorities', icon: <MdPriorityHigh size={20} /> },
         { id: 'sources', label: 'Ticket Sources', icon: <MdAssignmentTurnedIn size={20} /> },
         { id: 'designations', label: 'Designations', icon: <MdPeople size={20} /> },
@@ -82,6 +84,12 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
     };
 
     const fetchItems = async () => {
+        // Complaint Types has its own list (components/ComplaintTypesMaster)
+        if (activeTab === 'complaintTypes') {
+            setItems([]);
+            setLoading(false);
+            return;
+        }
         setLoading(true);
         try {
             let res;
@@ -314,7 +322,7 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
                         <MdCloudDownload size={18} />
                         Seed Defaults
                     </button>
-                    {activeTab !== 'engineers' && canCreate && (
+                    {activeTab !== 'engineers' && activeTab !== 'complaintTypes' && canCreate && (
                         <button
                             onClick={() => handleOpenModal()}
                             className="flex items-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-lg shadow-primary-600/20 active:scale-95"
@@ -378,7 +386,7 @@ const CSMMasters = ({ isCreatePage, isEditPage }) => {
                         )}
                     </div>
                 )}
-                {loading ? (
+                {activeTab === 'complaintTypes' ? <ComplaintTypesMaster /> : loading ? (
                     <div className="flex flex-col items-center justify-center py-16 space-y-3">
                         <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
                         <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Loading Items...</p>

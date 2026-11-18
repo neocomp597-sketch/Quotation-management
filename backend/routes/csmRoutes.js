@@ -10,6 +10,7 @@ const fieldAttendanceController = require('../controllers/fieldAttendanceControl
 const warrantyAmcController = require('../controllers/warrantyAmcController');
 const kbController = require('../controllers/kbController');
 const csmMasterController = require('../controllers/csmMasterController');
+const complaintTypeController = require('../controllers/complaintTypeController');
 const customerContactController = require('../controllers/customerContactController');
 const rcaReportController = require('../controllers/rcaReportController');
 
@@ -127,6 +128,13 @@ router.post('/masters/problems', protect, csmMasterController.problems.create);
 router.get('/masters/problems', protect, csmMasterController.problems.getAll);
 router.put('/masters/problems/:id', protect, csmMasterController.problems.update);
 router.delete('/masters/problems/:id', protect, csmMasterController.problems.delete);
+
+// Type of Complaint / Details of Complaint (permissions: csm_masters, lists open to the ticket forms)
+router.get('/masters/complaint-types', protect, complaintTypeController.getAll);
+router.post('/masters/complaint-types/bulk', protect, complaintTypeController.bulkAdd);
+router.post('/masters/complaint-types', protect, complaintTypeController.create);
+router.put('/masters/complaint-types/:id', protect, complaintTypeController.update);
+router.delete('/masters/complaint-types/:id', protect, complaintTypeController.remove);
 
 // SLA Policies
 router.post('/masters/sla-policies', protect, csmMasterController.slaPolicies.create);

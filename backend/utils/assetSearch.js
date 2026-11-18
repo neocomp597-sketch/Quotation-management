@@ -1,4 +1,5 @@
 const Customer = require('../models/Customer');
+const EmployeeProfile = require('../models/EmployeeProfile');
 const Product = require('../models/Product');
 
 /**
@@ -18,10 +19,17 @@ const searchPattern = (text) => new RegExp(
     'i'
 );
 
-/** The customers and products whose name or code matches `pattern`. */
+/**
+ * The customers and products whose name or code matches `pattern`. An employee's customer also
+ * matches on the External Employee ID and email, which Serial No Transfer shows for them.
+ */
 const matchingMasterIds = async (companyId, pattern) => {
+    const employeeIds = await EmployeeProfile.find({ companyId, $or: [{ externalEmployeeCode: pattern }, { email: pattern }] }).distinct('_id');
     const [customerIds, productIds] = await Promise.all([
-        Customer.find({ companyId, $or: [{ companyName: pattern }, { customerName: pattern }, { externalCode: pattern }] }).distinct('_id'),
+        Customer.find({
+            companyId,
+            $or: [{ companyName: pattern }, { customerName: pattern }, { externalCode: pattern }, { employeeProfileId: { $in: employeeIds } }]
+        }).distinct('_id'),
         Product.find({ companyId, $or: [{ productName: pattern }, { productCode: pattern }] }).distinct('_id')
     ]);
     return { customerIds, productIds };

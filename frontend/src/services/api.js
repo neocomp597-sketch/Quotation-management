@@ -1087,6 +1087,12 @@ export const csmService = {
   updateProblem: (id, data) => api.put(`/csm/masters/problems/${id}`, data),
   deleteProblem: (id) => api.delete(`/csm/masters/problems/${id}`),
 
+  getComplaintTypes: () => api.get("/csm/masters/complaint-types", { cache: false }),
+  createComplaintType: (data) => api.post("/csm/masters/complaint-types", data),
+  updateComplaintType: (id, data) => api.put(`/csm/masters/complaint-types/${id}`, data),
+  deleteComplaintType: (id) => api.delete(`/csm/masters/complaint-types/${id}`),
+  uploadComplaintTypes: (rows) => api.post("/csm/masters/complaint-types/bulk", { rows }),
+
   getSources: () => api.get("/csm/masters/sources"),
   createSource: (data) => api.post("/csm/masters/sources", data),
   updateSource: (id, data) => api.put(`/csm/masters/sources/${id}`, data),

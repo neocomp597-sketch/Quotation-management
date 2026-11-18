@@ -88,6 +88,36 @@ const ticketCustomerLabel = (c) => {
     return c.employeeProfileId ? `${name} · Employee` : name;
 };
 
+// Type of Complaint and, for the chosen type, its Details of Complaint (CSM Config > Complaint Types).
+const ComplaintFields = ({ types, typeId, detail, onChange, labelClass, firstClassName = '' }) => {
+    const activeTypes = types.filter((type) => type.status !== 'Inactive');
+    const selectedType = activeTypes.find((type) => type._id === typeId);
+    return (
+        <>
+            <div className={firstClassName}>
+                <label className={labelClass}>Type of Complaint</label>
+                <SearchableSelect
+                    options={activeTypes.map((type) => ({ value: type._id, label: type.name, id: type._id }))}
+                    value={typeId || ''}
+                    onChange={(value) => onChange({ complaintTypeId: value, complaintDetail: value === typeId ? detail : '' })}
+                    placeholder="Select Type of Complaint"
+                    noResultsText="No complaint types. Add them in CSM Config."
+                />
+            </div>
+            <div>
+                <label className={labelClass}>Details of Complaint</label>
+                <SearchableSelect
+                    options={(selectedType?.details || []).map((value) => ({ value, label: value, id: value }))}
+                    value={detail || ''}
+                    onChange={(value) => onChange({ complaintDetail: value })}
+                    placeholder={typeId ? 'Select Details of Complaint' : 'Select Type of Complaint first'}
+                    noResultsText={typeId ? 'No details listed for this type' : 'Select Type of Complaint first'}
+                />
+            </div>
+        </>
+    );
+};
+
 const CSMTickets = () => {
     const navigate = useNavigate();
     const { user, isAdmin, isSuperAdmin, activeBranch, activeBranchId, setActiveBranch, can } = useAuth();
@@ -177,6 +207,7 @@ const CSMTickets = () => {
     const [invoices, setInvoices] = useState([]);
     const [sources, setSources] = useState([]);
     const [designations, setDesignations] = useState([]);
+    const [complaintTypes, setComplaintTypes] = useState([]);
     const [customerContacts, setCustomerContacts] = useState([]);
     const [assets, setAssets] = useState([]);
     const [assetSummary, setAssetSummary] = useState(null);
@@ -210,6 +241,8 @@ const CSMTickets = () => {
         priority: 'Medium',
         category: 'Repair',
         type: 'Service',
+        complaintTypeId: '',
+        complaintDetail: '',
         issueTitle: '',
         description: ''
     });
@@ -282,6 +315,8 @@ const CSMTickets = () => {
         productId: '',
         assetId: '',
         invoiceId: '',
+        complaintTypeId: '',
+        complaintDetail: '',
         issueTitle: '',
         description: '',
         source: 'Web Portal',
@@ -646,7 +681,7 @@ const CSMTickets = () => {
 
     const loadCreationData = async () => {
         try {
-            const [custRes, priRes, catRes, typRes, prodRes, srcRes, desRes, assetRes, probRes] = await Promise.allSettled([
+            const [custRes, priRes, catRes, typRes, prodRes, srcRes, desRes, assetRes, probRes, complaintRes] = await Promise.allSettled([
                 csmService.getTicketCustomerOptions(),
                 csmService.getPriorities(),
                 csmService.getCategories(),
@@ -655,7 +690,8 @@ const CSMTickets = () => {
                 csmService.getSources(),
                 csmService.getDesignations(),
                 csmService.getAssets(),
-                csmService.getProblems({ mgr4Category: formData.mgr4Category || '' })
+                csmService.getProblems({ mgr4Category: formData.mgr4Category || '' }),
+                csmService.getComplaintTypes()
             ]);
 
             const valueOf = (result) => result.status === 'fulfilled' ? result.value : null;
@@ -686,6 +722,7 @@ const CSMTickets = () => {
             setDesignations(extractArray(designationsRes));
             setAssets(extractArray(assetsRes));
             setProblems(extractArray(problemsRes));
+            setComplaintTypes(extractArray(valueOf(complaintRes)));
 
             const failed = [custRes, priRes, catRes, typRes, prodRes, srcRes, desRes, assetRes].some(result => result.status === 'rejected');
             if (failed) {
@@ -1423,6 +1460,8 @@ const CSMTickets = () => {
                 productId,
                 assetId,
                 issueTitle: manualFormData.issueTitle,
+                complaintTypeId: manualFormData.complaintTypeId || null,
+                complaintDetail: manualFormData.complaintDetail || '',
                 description,
                 invoiceId: null,
                 isManual: true,
@@ -1468,6 +1507,8 @@ const CSMTickets = () => {
                 priority: 'Medium',
                 category: 'Repair',
                 type: 'Service',
+                complaintTypeId: '',
+                complaintDetail: '',
                 issueTitle: '',
                 description: ''
             });
@@ -1777,6 +1818,8 @@ const CSMTickets = () => {
                 'Serial No': t.assetId?.serialNumber || t.serialNumber || '',
                 'MGR4 Category': t.mgr4Category || '',
                 'Problem Name': t.problemName || '',
+                'Type of Complaint': t.complaintType || '',
+                'Details of Complaint': t.complaintDetail || '',
                 'Subject': t.issueTitle || '',
                 'Description': t.description || '',
                 'Priority': t.priorityId?.name || '',
@@ -2357,6 +2400,8 @@ const CSMTickets = () => {
                                     productId: '',
                                     assetId: '',
                                     invoiceId: '',
+                                    complaintTypeId: '',
+                                    complaintDetail: '',
                                     issueTitle: '',
                                     description: '',
                                     source: 'Web Portal',
@@ -3248,6 +3293,15 @@ const CSMTickets = () => {
                                 <span>Resolution: {selectedPriorityInfo.resolutionSlaHours} hrs</span>
                             </div>
                         )}
+
+                        <ComplaintFields
+                            types={complaintTypes}
+                            typeId={formData.complaintTypeId}
+                            detail={formData.complaintDetail}
+                            onChange={(changes) => setFormData((prev) => ({ ...prev, ...changes }))}
+                            labelClass="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1"
+                            firstClassName="lg:col-start-1"
+                        />
 
                         <div className="md:col-span-2">
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Subject *</label>
@@ -4161,6 +4215,15 @@ const CSMTickets = () => {
                                 onAddOption={can('csm_masters', 'create') ? handleAddPriorityDropdown : undefined}
                             />
                         </div>
+
+                        <ComplaintFields
+                            types={complaintTypes}
+                            typeId={manualFormData.complaintTypeId}
+                            detail={manualFormData.complaintDetail}
+                            onChange={(changes) => setManualFormData((prev) => ({ ...prev, ...changes }))}
+                            labelClass="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5"
+                            firstClassName="lg:col-start-1"
+                        />
 
                         {/* Subject */}
                         <div className="md:col-span-2 lg:col-span-3">

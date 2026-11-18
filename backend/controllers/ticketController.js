@@ -5,6 +5,7 @@ const Priority = require('../models/Priority');
 const Customer = require('../models/Customer');
 const User = require('../models/User');
 const CustomerContact = require('../models/CustomerContact');
+const ComplaintType = require('../models/ComplaintType');
 const { broadcastCrmUpdate } = require('../config/socket');
 const { mgrAccessCondition, mgr1FilterCondition } = require('../utils/mgrAccess');
 
@@ -22,6 +23,44 @@ const generateTicketNumber = async (companyId) => {
     );
     const seqStr = counter.seq.toString().padStart(4, '0');
     return `${prefix}-${year}-${seqStr}`;
+};
+
+/**
+ * Type of Complaint and Details of Complaint of a ticket being saved (both optional): the type must
+ * be an active entry of CSM Config > Complaint Types and the detail one of that type's. What the
+ * ticket already has stays valid even if the list has changed since. Sets the ticket's fields in
+ * `ticketBody`; returns a message when the choice is not valid.
+ */
+const applyComplaintFields = async (ticketBody, companyId, existing = null) => {
+    const typeGiven = ticketBody.complaintTypeId !== undefined;
+    const detailGiven = ticketBody.complaintDetail !== undefined;
+    delete ticketBody.complaintType;
+    if (!typeGiven && !detailGiven) return null;
+
+    const same = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+    const typeId = String((typeGiven ? ticketBody.complaintTypeId : existing?.complaintTypeId) || '').trim();
+    const detail = String((detailGiven ? ticketBody.complaintDetail : existing?.complaintDetail) || '').trim().replace(/\s+/g, ' ');
+    if (!typeId) {
+        if (detailGiven && detail) return 'Select the Type of Complaint first.';
+        Object.assign(ticketBody, { complaintTypeId: null, complaintType: '', complaintDetail: '' });
+        return null;
+    }
+
+    const keepsType = Boolean(existing?.complaintTypeId) && String(existing.complaintTypeId) === typeId;
+    const keepsDetail = keepsType && same(detail, existing.complaintDetail);
+    const type = mongoose.Types.ObjectId.isValid(typeId)
+        ? await ComplaintType.findOne({ _id: typeId, companyId }).select('name details status').lean()
+        : null;
+    if (!type || (type.status !== 'Active' && !keepsType)) {
+        if (!keepsType || !keepsDetail) return 'Select a Type of Complaint from the list.';
+        delete ticketBody.complaintTypeId;
+        delete ticketBody.complaintDetail;
+        return null;
+    }
+    const listed = (type.details || []).find((value) => same(value, detail));
+    if (detail && !listed && !keepsDetail) return `Select Details of Complaint from the list for ${type.name}.`;
+    Object.assign(ticketBody, { complaintTypeId: type._id, complaintType: type.name, complaintDetail: listed || detail });
+    return null;
 };
 
 exports.createTicket = async (req, res) => {
@@ -130,6 +169,9 @@ exports.createTicket = async (req, res) => {
                 ticketBody[field] = null;
             }
         }
+
+        const complaintError = await applyComplaintFields(ticketBody, companyId);
+        if (complaintError) return res.status(400).json({ message: complaintError });
 
         // Validate pincode is present and not empty
         if (!ticketBody.pincode || !String(ticketBody.pincode).trim()) {
@@ -649,6 +691,8 @@ exports.getTickets = async (req, res) => {
                     // Subject
                     { issueTitle: regex },
                     { problemName: regex },
+                    { complaintType: regex },
+                    { complaintDetail: regex },
                     // Customer & contact
                     { contactName: regex },
                     { contactPhone: regex },
@@ -849,6 +893,9 @@ exports.updateTicket = async (req, res) => {
                 ticketBody[field] = null;
             }
         }
+
+        const complaintError = await applyComplaintFields(ticketBody, companyId, existingTicket);
+        if (complaintError) return res.status(400).json({ message: complaintError });
 
         // Contact person is optional: a selected contact refreshes the stored details,
         // clearing it removes them.

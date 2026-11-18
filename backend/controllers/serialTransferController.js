@@ -14,6 +14,7 @@ const { MGR_KEYS, formatMgrVal } = require('../utils/productMgr');
 const { formatDate } = require('../utils/dateFormat');
 const { ANY_BRANCH, serialBranchScope, myBranchesScope, inScope } = require('../utils/customerBranchSerials');
 const { requestedViewBranches } = require('../utils/viewBranches');
+const { employeeHolderLabels } = require('../services/employeeCustomerService');
 
 // The branches a list shows: ?branchIds (several at once, checked against the user's branches),
 // else the active branch.
@@ -175,7 +176,7 @@ const getPagination = (query) => {
     return { page, limit, skip: (page - 1) * limit };
 };
 
-const CUSTOMER_SELECT = 'customerName companyName externalCode mobile gstin billingAddress';
+const CUSTOMER_SELECT = 'customerName companyName externalCode mobile gstin billingAddress employeeProfileId';
 const customerPopulate = { path: 'customerId', select: CUSTOMER_SELECT, options: { bypassTenant: true } };
 const productPopulate = { path: 'productId', select: 'productCode productName', options: { bypassTenant: true } };
 
@@ -370,6 +371,7 @@ exports.listSerials = async (req, res) => {
             Asset.countDocuments(scopedQuery).setOptions(scope.options)
         ]);
 
+        const holders = await employeeHolderLabels(assets.map((asset) => asset.customerId?.employeeProfileId));
         const data = assets.map((asset) => ({
             _id: asset._id,
             serialNumber: asset.serialNumber,
@@ -379,6 +381,8 @@ exports.listSerials = async (req, res) => {
             customerId: asset.customerId?._id || null,
             customerCode: cleanText(asset.customerId?.externalCode) || asset.customerCode,
             customerName: customerLabel(asset.customerId, asset.customerNameStr),
+            // Set when the holder is an employee: External Employee ID, name and email.
+            currentUser: holders.get(String(asset.customerId?.employeeProfileId)) || null,
             // A serial that is not sold has a sale date only if its invoice gave one.
             saleDate: asset.status === 'SOLD' ? saleDateOf(asset) : asset.saleDate || asset.invoiceDate || null,
             invoiceNumber: asset.invoiceNumber,
@@ -418,6 +422,7 @@ const loadSerial = async (assetId, access = null, scope = null) => {
         ];
     }
 
+    const holders = await employeeHolderLabels([asset.customerId?.employeeProfileId]);
     return {
         asset: {
             _id: asset._id,
@@ -433,7 +438,8 @@ const loadSerial = async (assetId, access = null, scope = null) => {
             saleDate: saleDateOf(asset),
             customerId: asset.customerId?._id || null,
             customerCode: cleanText(asset.customerId?.externalCode) || asset.customerCode,
-            customerName: customerLabel(asset.customerId, asset.customerNameStr)
+            customerName: customerLabel(asset.customerId, asset.customerNameStr),
+            currentUser: holders.get(String(asset.customerId?.employeeProfileId)) || null
         },
         history
     };

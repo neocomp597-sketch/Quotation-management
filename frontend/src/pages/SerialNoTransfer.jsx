@@ -327,6 +327,18 @@ const TotalCountBar = ({ pagination, shown, noun, filtered }) => {
     );
 };
 
+// Who holds a serial: an employee as "<External Employee ID> - Name" over their email, anyone else
+// as the customer's name over its code.
+const CurrentUser = ({ row, nameClassName }) => {
+    const below = row.currentUser ? row.currentUser.subtitle : row.customerCode;
+    return (
+        <>
+            <span className={nameClassName}>{row.currentUser?.title || row.customerName || '-'}</span>
+            {below && <span className="block text-xs text-slate-500 break-words">{below}</span>}
+        </>
+    );
+};
+
 const SerialListTab = ({ onOpen, onTransfer }) => {
     const { canModify } = usePermission('master_serial_transfer');
     const [search, setSearch] = useStoredState('list.search', '');
@@ -407,8 +419,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                                         <MobileField label="Branch">{row.branchName || '-'}</MobileField>
                                         <MobileField label="Asset No">{row.assetNo || '-'}</MobileField>
                                         <MobileField label="Current User" wide>
-                                            {row.customerName || '-'}
-                                            {row.customerCode && <span className="block text-xs text-slate-500">{row.customerCode}</span>}
+                                            <CurrentUser row={row} />
                                         </MobileField>
                                         <MobileField label="Invoice Number">{row.invoiceNumber || '-'}</MobileField>
                                         <MobileField label="Invoice Date">{formatDate(row.saleDate)}</MobileField>
@@ -457,8 +468,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                                             </td>
                                             <td className="p-4 font-bold text-slate-700 whitespace-nowrap">{row.branchName || '-'}</td>
                                             <td className="p-4">
-                                                <span className="font-bold text-slate-700">{row.customerName || '-'}</span>
-                                                {row.customerCode && <span className="block text-xs text-slate-500">{row.customerCode}</span>}
+                                                <CurrentUser row={row} nameClassName="font-bold text-slate-700" />
                                             </td>
                                             <td className="p-4 text-slate-600 whitespace-nowrap">{row.invoiceNumber || '-'}</td>
                                             <td className="p-4 text-slate-500 whitespace-nowrap">{formatDate(row.saleDate)}</td>
@@ -1157,9 +1167,9 @@ export const SerialNoDetails = ({ transfer = false }) => {
                                     </InfoRow>
                                 ) : (
                                     <InfoRow label="Current User">
-                                        {current?.companyName || data.asset.customerName || '-'}
+                                        {data.asset.currentUser?.title || current?.companyName || data.asset.customerName || '-'}
                                         <span className="block text-xs font-medium text-slate-500">
-                                            {[current?.customerCode || data.asset.customerCode, current?.customerMobile, current?.customerCity, current && `Since ${formatDate(current.transferDate)}`].filter(Boolean).join(' · ')}
+                                            {[data.asset.currentUser ? data.asset.currentUser.subtitle : (current?.customerCode || data.asset.customerCode), current?.customerMobile, current?.customerCity, current && `Since ${formatDate(current.transferDate)}`].filter(Boolean).join(' · ')}
                                         </span>
                                     </InfoRow>
                                 )}

@@ -646,6 +646,19 @@ const TicketDetail = () => {
                                 </div>
                             </div>
 
+                            {ticket.complaintType && (
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="min-w-0">
+                                        <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Type of Complaint</span>
+                                        <span className="block break-words">{ticket.complaintType}</span>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Details of Complaint</span>
+                                        <span className="block break-words">{ticket.complaintDetail || '-'}</span>
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
                                 <div>
                                     <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Invoice No</span>

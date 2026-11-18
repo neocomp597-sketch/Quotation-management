@@ -61,6 +61,9 @@ const namePattern = (name) => {
     return new RegExp(`^\\s*${escapeRegex(tokens[0])}\\b.*\\b${escapeRegex(tokens[tokens.length - 1])}\\.?\\s*$`, 'i');
 };
 const customerNamed = (customer, name) => namesMatch(customer.companyName, name) || namesMatch(customer.customerName, name);
+// Invoice Bulk Upload sheets sometimes have the employee's email in the customer name column.
+const customerNamedByEmail = (customer, email) => Boolean(clean(email))
+    && (sameText(customer.companyName, email) || sameText(customer.customerName, email));
 const employeeCodes = (employee) => [...new Set([employee.employeeId, employee.externalEmployeeCode].map(clean).filter(Boolean))];
 const codePatterns = (codes) => codes.map((code) => new RegExp(`^\\s*${escapeRegex(code)}\\s*$`, 'i'));
 
@@ -87,12 +90,16 @@ const findSamePersonCustomers = async (employee, excludeId = null) => {
     const codes = employeeCodes(employee);
     if (codes.length) {
         const byCode = await Customer.find({ companyId, employeeProfileId: null, externalCode: { $in: codePatterns(codes) } }).setOptions(ANY_BRANCH);
-        byCode.filter((customer) => customerNamed(customer, employee.name) || (clean(employee.email) && sameText(customer.email, employee.email))).forEach(add);
+        byCode.filter((customer) => customerNamed(customer, employee.name) || customerNamedByEmail(customer, employee.email)
+            || (clean(employee.email) && sameText(customer.email, employee.email))).forEach(add);
     }
     const email = clean(employee.email);
     if (email) {
-        const byEmail = await Customer.find({ companyId, employeeProfileId: null, email: new RegExp(`^${escapeRegex(email)}$`, 'i') }).setOptions(ANY_BRANCH).limit(5);
-        byEmail.filter((customer) => customerNamed(customer, employee.name) && !clean(customer.gstin)).forEach(add);
+        const emailPattern = new RegExp(`^\\s*${escapeRegex(email)}\\s*$`, 'i');
+        const byEmail = await Customer.find({
+            companyId, employeeProfileId: null, $or: [{ email: emailPattern }, { companyName: emailPattern }, { customerName: emailPattern }]
+        }).setOptions(ANY_BRANCH).limit(5);
+        byEmail.filter((customer) => (customerNamed(customer, employee.name) || customerNamedByEmail(customer, email)) && !clean(customer.gstin)).forEach(add);
     }
     if (!found.size) {
         // By name alone only when exactly one customer has it and no other employee has it too.
@@ -300,14 +307,35 @@ const customerForEmployeeMatch = async ({ companyId, code = '', name = '' }) => 
     if (cleanCode) or.push({ employeeId: codePatterns([cleanCode])[0] }, { externalEmployeeCode: codePatterns([cleanCode])[0] });
     const pattern = cleanName ? namePattern(cleanName) : null;
     if (pattern) or.push({ name: pattern });
+    if (cleanName.includes('@')) or.push({ email: new RegExp(`^\\s*${escapeRegex(cleanName)}\\s*$`, 'i') });
     const candidates = await EmployeeProfile.find({ companyId, ...PERSON_FILTER, $or: or }).select(EMPLOYEE_SELECT).setOptions(ANY_BRANCH).lean();
-    const byCode = cleanCode ? candidates.filter((e) => employeeCodes(e).some((c) => sameText(c, cleanCode)) && (!cleanName || namesMatch(e.name, cleanName))) : [];
-    const byName = cleanName ? candidates.filter((e) => namesMatch(e.name, cleanName)) : [];
+    const isNamed = (e) => namesMatch(e.name, cleanName) || sameText(e.email, cleanName);
+    const byCode = cleanCode ? candidates.filter((e) => employeeCodes(e).some((c) => sameText(c, cleanCode)) && (!cleanName || isNamed(e))) : [];
+    const byName = cleanName ? candidates.filter(isNamed) : [];
     const match = byCode.length === 1 ? byCode[0] : (!byCode.length && byName.length === 1 ? byName[0] : null);
     return match ? syncCustomerForEmployee(match) : null;
 };
 
+/**
+ * How employees are shown as the Current User of a serial, by employee id: `title` is
+ * "<External Employee ID> - <Name>" (the name alone without an external ID), `subtitle` the email.
+ */
+const employeeHolderLabels = async (employeeIds) => {
+    const ids = [...new Set(employeeIds.filter(Boolean).map(String))];
+    if (!ids.length) return new Map();
+    const employees = await EmployeeProfile.find({ _id: { $in: ids } }).select('name email externalEmployeeCode').setOptions(ANY_BRANCH).lean();
+    return new Map(employees.map((employee) => {
+        const name = clean(employee.name);
+        const email = clean(employee.email);
+        return [String(employee._id), {
+            title: [clean(employee.externalEmployeeCode), name].filter(Boolean).join(' - '),
+            subtitle: sameText(email, name) ? '' : email
+        }];
+    }));
+};
+
 module.exports = {
+    employeeHolderLabels,
     syncCustomerForEmployee,
     syncCustomersForExistingEmployees,
     customerForEmployeeMatch,
