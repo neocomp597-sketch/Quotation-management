@@ -102,6 +102,7 @@ const ComplaintFields = ({ types, typeId, detail, onChange, labelClass, firstCla
                     onChange={(value) => onChange({ complaintTypeId: value, complaintDetail: value === typeId ? detail : '' })}
                     placeholder="Select Type of Complaint"
                     noResultsText="No complaint types. Add them in CSM Config."
+                    wrapText
                 />
             </div>
             <div>
@@ -112,6 +113,7 @@ const ComplaintFields = ({ types, typeId, detail, onChange, labelClass, firstCla
                     onChange={(value) => onChange({ complaintDetail: value })}
                     placeholder={typeId ? 'Select Details of Complaint' : 'Select Type of Complaint first'}
                     noResultsText={typeId ? 'No details listed for this type' : 'Select Type of Complaint first'}
+                    wrapText
                 />
             </div>
         </>

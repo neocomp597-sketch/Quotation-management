@@ -15,6 +15,7 @@ const SearchableSelect = ({
     onEditOption, // Callback: async (option) => { ... }
     onDeleteOption, // Callback: async (option) => { ... }
     onSearchChange, // Optional: (text) => void, to load matching options from the server as the user types
+    wrapText = false, // Show long labels in full on several lines instead of cutting them off
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState('');
@@ -103,7 +104,7 @@ const SearchableSelect = ({
                 onClick={() => setIsOpen(!isOpen)}
                 className={inputClass || defaultInputClass}
             >
-                <span className={`${selectedLabel ? 'text-slate-900' : 'text-slate-400 font-normal'} min-w-0 flex-1 truncate`}>
+                <span className={`${selectedLabel ? 'text-slate-900' : 'text-slate-400 font-normal'} min-w-0 flex-1 ${wrapText ? 'whitespace-normal break-words' : 'truncate'}`}>
                     {selectedLabel || placeholder}
                 </span>
                 <MdKeyboardArrowDown 
@@ -178,7 +179,7 @@ const SearchableSelect = ({
                                                 <button
                                                     type="button"
                                                     onClick={() => handleSelect(option)}
-                                                    className={`flex-1 text-left px-3 py-2 text-xs font-semibold truncate ${
+                                                    className={`flex-1 min-w-0 text-left px-3 py-2 text-xs font-semibold ${wrapText ? 'whitespace-normal break-words' : 'truncate'} ${
                                                         isSelected ? 'text-white' : 'text-slate-600 hover:text-slate-800'
                                                     }`}
                                                 >

@@ -1167,7 +1167,7 @@
         "date": "18.11.2026",
         "module": "CSM Support",
         "submodule": "Raise Ticket: Type and Details of Complaint",
-        "changes": "The Raise Support Ticket and Manual Register forms have two new dropdowns. Type of Complaint lists the active types; Details of Complaint then lists only the details of the chosen type, and changing the type clears the detail. Both can be searched and both are optional. The selection is saved with the ticket, shown on the ticket's page, included in the Tickets Register Excel export and found by the register's search. A ticket keeps what was selected even if the list changes later."
+        "changes": "The Raise Support Ticket and Manual Register forms have two new dropdowns. Type of Complaint lists the active types; Details of Complaint then lists only the details of the chosen type, and changing the type clears the detail. Both can be searched, long entries are shown in full, and both are optional. The selection is saved with the ticket, shown on the ticket's page, included in the Tickets Register Excel export and found by the register's search. A ticket keeps what was selected even if the list changes later."
       },
       {
         "date": "18.11.2026",
