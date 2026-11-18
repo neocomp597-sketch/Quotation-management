@@ -1,42 +1,140 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import * as XLSX from 'xlsx';
 import { toast } from 'react-toastify';
-import { MdAdd, MdCloudUpload, MdDelete, MdEdit, MdExpandMore, MdFileDownload, MdSearch } from 'react-icons/md';
+import { MdAdd, MdCheck, MdClose, MdDelete, MdEdit, MdExpandMore, MdSearch } from 'react-icons/md';
 import Modal from './Modal';
 import { csmService } from '../services/api';
 import usePermission from '../hooks/usePermission';
 
-const TYPE_HEADERS = ['type of complaint', 'complaint type', 'type'];
-const DETAIL_HEADERS = ['details of complaint', 'detail of complaint', 'complaint details', 'complaint detail', 'details', 'detail'];
-const EMPTY_FORM = { name: '', detailsText: '', status: 'Active' };
+const EMPTY_FORM = { name: '', status: 'Active' };
 
 const fieldClass = 'w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500';
 const labelClass = 'block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1';
 const outlineButton = 'flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-black uppercase text-[10px] tracking-widest transition-all disabled:opacity-50';
+const primaryButton = 'flex shrink-0 items-center justify-center gap-2 px-5 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all disabled:opacity-50';
+const iconButton = 'rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-primary-600';
+const messageOf = (err, fallback) => err.response?.data?.message || fallback;
 
-/** Rows of { type, detail } from an uploaded sheet; a blank type continues the type above it. */
-const readComplaintRows = async (file) => {
-    const workbook = XLSX.read(await file.arrayBuffer());
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const records = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-    if (!records.length) return [];
-    const headers = Object.keys(records[0]);
-    const find = (names) => headers.find((header) => names.includes(header.trim().toLowerCase()));
-    const typeHeader = find(TYPE_HEADERS);
-    const detailHeader = find(DETAIL_HEADERS);
-    if (!typeHeader) throw new Error('The file needs a "Type of Complaint" column. Download the template to see the format.');
-    let currentType = '';
-    return records.reduce((rows, record) => {
-        currentType = String(record[typeHeader] ?? '').trim() || currentType;
-        const detail = detailHeader ? String(record[detailHeader] ?? '').trim() : '';
-        if (currentType && (detail || String(record[typeHeader] ?? '').trim())) rows.push({ type: currentType, detail });
-        return rows;
-    }, []);
+/**
+ * The Details of Complaint of one type: listed in order, each edited or deleted on its own, and a
+ * box to add the next one. The box stays ready after each detail, so many can be added in a row.
+ */
+const TypeDetails = ({ type, focusOnOpen, canCreate, canModify, canDelete, onChanged }) => {
+    const [text, setText] = useState('');
+    const [adding, setAdding] = useState(false);
+    const [editing, setEditing] = useState(null); // { from, to }
+    const [saving, setSaving] = useState(false);
+    const addInput = useRef(null);
+    const details = type.details || [];
+
+    useEffect(() => {
+        if (focusOnOpen) addInput.current?.focus();
+    }, [focusOnOpen]);
+
+    const add = async (event) => {
+        event.preventDefault();
+        if (!text.trim() || adding) return;
+        setAdding(true);
+        try {
+            await csmService.addComplaintDetail(type._id, text);
+            setText('');
+            await onChanged();
+        } catch (err) {
+            toast.error(messageOf(err, 'Failed to add the detail'));
+        } finally {
+            setAdding(false);
+            addInput.current?.focus();
+        }
+    };
+
+    const saveEdit = async (event) => {
+        event.preventDefault();
+        if (!editing.to.trim() || saving) return;
+        setSaving(true);
+        try {
+            await csmService.updateComplaintDetail(type._id, editing.from, editing.to);
+            setEditing(null);
+            await onChanged();
+        } catch (err) {
+            toast.error(messageOf(err, 'Failed to save the detail'));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const remove = async (detail) => {
+        if (!window.confirm(`Delete this detail?\n\n${detail}\n\nTickets already raised keep what was selected.`)) return;
+        try {
+            await csmService.deleteComplaintDetail(type._id, detail);
+            await onChanged();
+        } catch (err) {
+            toast.error(messageOf(err, 'Failed to delete the detail'));
+        }
+    };
+
+    return (
+        <div className="space-y-3 border-t border-slate-100 bg-slate-50/60 px-3 py-3 sm:px-4 sm:pl-10">
+            <p className={labelClass.replace(' mb-1', '')}>Details of Complaint</p>
+            {details.length ? (
+                <ol className="space-y-1">
+                    {details.map((detail, index) => (
+                        <li key={detail} className="rounded-xl border border-slate-100 bg-white">
+                            {editing?.from === detail ? (
+                                <form onSubmit={saveEdit} className="flex items-center gap-1 p-1">
+                                    <input
+                                        autoFocus
+                                        aria-label="Edit detail"
+                                        value={editing.to}
+                                        maxLength={200}
+                                        onChange={(e) => setEditing({ ...editing, to: e.target.value })}
+                                        onKeyDown={(e) => { if (e.key === 'Escape') setEditing(null); }}
+                                        className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    />
+                                    <button type="submit" disabled={saving} title="Save" aria-label="Save detail" className={iconButton}><MdCheck size={18} /></button>
+                                    <button type="button" title="Cancel" aria-label="Cancel" onClick={() => setEditing(null)} className={iconButton}><MdClose size={18} /></button>
+                                </form>
+                            ) : (
+                                <div className="flex items-center gap-1 py-1 pl-3 pr-1">
+                                    <span className="w-6 shrink-0 text-xs font-bold text-slate-400">{index + 1}.</span>
+                                    <span className="min-w-0 flex-1 break-words text-sm text-slate-700">{detail}</span>
+                                    {canModify && (
+                                        <button type="button" title="Edit detail" aria-label={`Edit detail ${detail}`} onClick={() => setEditing({ from: detail, to: detail })} className={iconButton}>
+                                            <MdEdit size={16} />
+                                        </button>
+                                    )}
+                                    {canDelete && (
+                                        <button type="button" title="Delete detail" aria-label={`Delete detail ${detail}`} onClick={() => remove(detail)} className="rounded-lg p-2 text-slate-500 hover:bg-rose-50 hover:text-rose-600">
+                                            <MdDelete size={16} />
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </li>
+                    ))}
+                </ol>
+            ) : <p className="text-sm text-slate-400">No details yet.</p>}
+            {canCreate && (
+                <form onSubmit={add} className="flex flex-col gap-2 sm:flex-row">
+                    <input
+                        ref={addInput}
+                        value={text}
+                        maxLength={200}
+                        onChange={(e) => setText(e.target.value)}
+                        placeholder="Type a detail and press Enter"
+                        aria-label={`Add a detail to ${type.name}`}
+                        className={`${fieldClass} bg-white`}
+                    />
+                    <button type="submit" disabled={adding || !text.trim()} className={primaryButton}>
+                        <MdAdd size={16} /> {adding ? 'Adding…' : 'Add Detail'}
+                    </button>
+                </form>
+            )}
+        </div>
+    );
 };
 
 /**
  * CSM Config > Complaint Types: the Type of Complaint list and the Details of Complaint under each
- * type, which the ticket forms offer as two linked dropdowns.
+ * type, which the ticket forms offer as two linked dropdowns. Added one at a time.
  */
 const ComplaintTypesMaster = () => {
     const { canCreate, canModify, canDelete } = usePermission('csm_masters');
@@ -44,17 +142,16 @@ const ComplaintTypesMaster = () => {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [openIds, setOpenIds] = useState({});
-    const [form, setForm] = useState(null); // null: closed; { id?, name, detailsText, status }
+    const [focusId, setFocusId] = useState(null);
+    const [form, setForm] = useState(null); // null: closed; { id?, name, status }
     const [saving, setSaving] = useState(false);
-    const [uploading, setUploading] = useState(false);
-    const fileInput = useRef(null);
 
     const load = async () => {
         try {
             const res = await csmService.getComplaintTypes();
             setTypes(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to load complaint types');
+            toast.error(messageOf(err, 'Failed to load complaint types'));
         } finally {
             setLoading(false);
         }
@@ -75,16 +172,24 @@ const ComplaintTypesMaster = () => {
             toast.error('Type of Complaint is required');
             return;
         }
-        const payload = { name: form.name, status: form.status, details: form.detailsText.split('\n') };
+        const payload = { name: form.name, status: form.status };
         setSaving(true);
         try {
-            if (form.id) await csmService.updateComplaintType(form.id, payload);
-            else await csmService.createComplaintType(payload);
-            toast.success(form.id ? 'Complaint type saved' : 'Complaint type added');
+            if (form.id) {
+                await csmService.updateComplaintType(form.id, payload);
+                toast.success('Complaint type saved');
+            } else {
+                const { data } = await csmService.createComplaintType(payload);
+                toast.success('Type added. Now add its details.');
+                // Opens the new type, ready for its first detail.
+                setSearch('');
+                setOpenIds((prev) => ({ ...prev, [data._id]: true }));
+                setFocusId(data._id);
+            }
             setForm(null);
             await load();
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to save the complaint type');
+            toast.error(messageOf(err, 'Failed to save the complaint type'));
         } finally {
             setSaving(false);
         }
@@ -97,35 +202,7 @@ const ComplaintTypesMaster = () => {
             toast.success('Complaint type deleted');
             await load();
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to delete the complaint type');
-        }
-    };
-
-    const downloadTemplate = () => {
-        const sheet = XLSX.utils.aoa_to_sheet([['Type of Complaint', 'Details of Complaint']]);
-        sheet['!cols'] = [{ wch: 36 }, { wch: 48 }];
-        const book = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(book, sheet, 'Complaint Types');
-        XLSX.writeFile(book, 'Complaint_Types_Template.xlsx');
-    };
-
-    const upload = async (event) => {
-        const file = event.target.files?.[0];
-        event.target.value = '';
-        if (!file) return;
-        setUploading(true);
-        try {
-            const rows = await readComplaintRows(file);
-            if (!rows.length) throw new Error('The file has no complaint types.');
-            const typeCount = new Set(rows.map((row) => row.type.toLowerCase())).size;
-            if (!window.confirm(`Add ${typeCount} type${typeCount === 1 ? '' : 's'} of complaint from ${file.name}? Entries already in the list are kept as they are.`)) return;
-            const { data } = await csmService.uploadComplaintTypes(rows);
-            toast.success(`${data.typesAdded} type${data.typesAdded === 1 ? '' : 's'} and ${data.detailsAdded} detail${data.detailsAdded === 1 ? '' : 's'} added`);
-            await load();
-        } catch (err) {
-            toast.error(err.response?.data?.message || err.message || 'Failed to upload the file');
-        } finally {
-            setUploading(false);
+            toast.error(messageOf(err, 'Failed to delete the complaint type'));
         }
     };
 
@@ -146,22 +223,9 @@ const ComplaintTypesMaster = () => {
                     {types.length} type{types.length === 1 ? '' : 's'} · {detailCount} detail{detailCount === 1 ? '' : 's'}
                 </p>
                 {canCreate && (
-                    <div className="grid grid-cols-1 sm:flex gap-2">
-                        <button type="button" onClick={downloadTemplate} className={outlineButton}>
-                            <MdFileDownload size={16} /> Template
-                        </button>
-                        <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading} className={outlineButton}>
-                            <MdCloudUpload size={16} /> {uploading ? 'Uploading…' : 'Upload Excel'}
-                        </button>
-                        <input ref={fileInput} type="file" accept=".xlsx,.xls,.csv" onChange={upload} className="hidden" aria-label="Upload complaint types" />
-                        <button
-                            type="button"
-                            onClick={() => setForm(EMPTY_FORM)}
-                            className="flex items-center justify-center gap-2 px-5 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all"
-                        >
-                            <MdAdd size={16} /> Add Type
-                        </button>
-                    </div>
+                    <button type="button" onClick={() => setForm(EMPTY_FORM)} className={primaryButton}>
+                        <MdAdd size={16} /> Add Type
+                    </button>
                 )}
             </div>
 
@@ -170,10 +234,10 @@ const ComplaintTypesMaster = () => {
             ) : !shown.length ? (
                 <div className="py-12 text-center">
                     <p className="font-bold text-slate-500">{types.length ? 'No complaint types match the search.' : 'No complaint types yet.'}</p>
-                    {!types.length && <p className="mt-1 text-sm text-slate-400">Upload the list from Excel or add them one by one. They then appear on the Raise Ticket form.</p>}
+                    {!types.length && <p className="mt-1 text-sm text-slate-400">Press Add Type, then add its details one by one. They appear on the Raise Ticket form.</p>}
                 </div>
             ) : (
-                <div className="divide-y divide-slate-100 rounded-2xl border border-slate-100">
+                <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-100">
                     {shown.map((type) => {
                         const open = Boolean(openIds[type._id]);
                         const details = type.details || [];
@@ -194,28 +258,29 @@ const ComplaintTypesMaster = () => {
                                     {canModify && (
                                         <button
                                             type="button"
-                                            title="Edit"
+                                            title="Edit type"
                                             aria-label={`Edit ${type.name}`}
-                                            onClick={() => setForm({ id: type._id, name: type.name, detailsText: details.join('\n'), status: type.status || 'Active' })}
-                                            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-primary-600"
+                                            onClick={() => setForm({ id: type._id, name: type.name, status: type.status || 'Active' })}
+                                            className={iconButton}
                                         >
                                             <MdEdit size={18} />
                                         </button>
                                     )}
                                     {canDelete && (
-                                        <button type="button" title="Delete" aria-label={`Delete ${type.name}`} onClick={() => remove(type)} className="rounded-lg p-2 text-slate-500 hover:bg-rose-50 hover:text-rose-600">
+                                        <button type="button" title="Delete type" aria-label={`Delete ${type.name}`} onClick={() => remove(type)} className="rounded-lg p-2 text-slate-500 hover:bg-rose-50 hover:text-rose-600">
                                             <MdDelete size={18} />
                                         </button>
                                     )}
                                 </div>
                                 {open && (
-                                    <div className="px-4 pb-4 pl-10">
-                                        {details.length ? (
-                                            <ul className="list-disc space-y-1 pl-4 text-sm text-slate-600">
-                                                {details.map((detail) => <li key={detail} className="break-words">{detail}</li>)}
-                                            </ul>
-                                        ) : <p className="text-sm text-slate-400">No details added.</p>}
-                                    </div>
+                                    <TypeDetails
+                                        type={type}
+                                        focusOnOpen={focusId === type._id}
+                                        canCreate={canCreate}
+                                        canModify={canModify}
+                                        canDelete={canDelete}
+                                        onChanged={load}
+                                    />
                                 )}
                             </div>
                         );
@@ -228,11 +293,8 @@ const ComplaintTypesMaster = () => {
                     <form onSubmit={save} className="space-y-4">
                         <div>
                             <label htmlFor="complaintTypeName" className={labelClass}>Type of Complaint *</label>
-                            <input id="complaintTypeName" type="text" required maxLength={200} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={fieldClass} />
-                        </div>
-                        <div>
-                            <label htmlFor="complaintTypeDetails" className={labelClass}>Details of Complaint (one per line)</label>
-                            <textarea id="complaintTypeDetails" rows={8} value={form.detailsText} onChange={(e) => setForm({ ...form, detailsText: e.target.value })} className={fieldClass} />
+                            <input id="complaintTypeName" type="text" required autoFocus maxLength={200} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={fieldClass} />
+                            {!form.id && <p className="mt-1 text-xs text-slate-400">After saving, add its details one by one.</p>}
                         </div>
                         <div>
                             <label htmlFor="complaintTypeStatus" className={labelClass}>Status</label>
@@ -243,9 +305,7 @@ const ComplaintTypesMaster = () => {
                         </div>
                         <div className="flex justify-end gap-2">
                             <button type="button" onClick={() => setForm(null)} className={outlineButton}>Cancel</button>
-                            <button type="submit" disabled={saving} className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl disabled:opacity-50">
-                                {saving ? 'Saving…' : 'Save'}
-                            </button>
+                            <button type="submit" disabled={saving} className={primaryButton}>{saving ? 'Saving…' : 'Save'}</button>
                         </div>
                     </form>
                 )}

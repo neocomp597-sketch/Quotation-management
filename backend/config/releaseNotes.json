@@ -1185,5 +1185,26 @@
     "deployedBy": "Super Admin",
     "deployedAt": "2026-11-18T20:00:00+05:30",
     "isActive": true
+  },
+  {
+    "version": "v6.8.11",
+    "title": "Complaint Types: Details Added One by One",
+    "message": "Release Updates (18 Nov 2026): In CSM Config, each Type of Complaint and its Details of Complaint are now added one at a time. The Excel upload has been removed.",
+    "releaseNotes": [
+      "CSM Config > Complaint Types: add a type, then add as many details under it as needed, one at a time",
+      "Each detail can be edited or deleted on its own",
+      "The Excel upload and template have been removed from Complaint Types"
+    ],
+    "detailedChanges": [
+      {
+        "date": "18.11.2026",
+        "module": "CSM Support",
+        "submodule": "CSM Config: Complaint Types",
+        "changes": "Press Add Type and enter the Type of Complaint. It opens with an Add Detail box: type a detail and press Enter or Add Detail, and the box is ready for the next one, so a type can have as many details as needed. To add more later, click the type to open it. Each detail has its own Edit and Delete, and the same detail cannot be listed twice under one type. Tickets already raised keep what was selected. The Excel upload and template have been removed from this tab."
+      }
+    ],
+    "deployedBy": "Super Admin",
+    "deployedAt": "2026-11-18T21:30:00+05:30",
+    "isActive": true
   }
 ]

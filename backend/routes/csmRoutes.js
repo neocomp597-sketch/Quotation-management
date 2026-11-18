@@ -131,10 +131,12 @@ router.delete('/masters/problems/:id', protect, csmMasterController.problems.del
 
 // Type of Complaint / Details of Complaint (permissions: csm_masters, lists open to the ticket forms)
 router.get('/masters/complaint-types', protect, complaintTypeController.getAll);
-router.post('/masters/complaint-types/bulk', protect, complaintTypeController.bulkAdd);
 router.post('/masters/complaint-types', protect, complaintTypeController.create);
 router.put('/masters/complaint-types/:id', protect, complaintTypeController.update);
 router.delete('/masters/complaint-types/:id', protect, complaintTypeController.remove);
+router.post('/masters/complaint-types/:id/details', protect, complaintTypeController.addDetail);
+router.put('/masters/complaint-types/:id/details', protect, complaintTypeController.updateDetail);
+router.delete('/masters/complaint-types/:id/details', protect, complaintTypeController.removeDetail);
 
 // SLA Policies
 router.post('/masters/sla-policies', protect, csmMasterController.slaPolicies.create);
