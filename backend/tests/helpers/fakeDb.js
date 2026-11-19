@@ -6,18 +6,30 @@ const mongoose = require('mongoose');
 const install = (resolve) => {
     const executed = [];
     const realExec = mongoose.Query.prototype.exec;
+    const realAggregateExec = mongoose.Aggregate.prototype.exec;
     mongoose.Query.prototype.exec = async function fakeExec() {
         executed.push(this);
         const result = await resolve(this);
         if (result instanceof Error) throw result;
         return result;
     };
+    // Aggregations are recorded as { model, op: 'aggregate', pipeline, options }.
+    mongoose.Aggregate.prototype.exec = async function fakeAggregateExec() {
+        const query = { model: this._model, op: 'aggregate', pipeline: this.pipeline(), options: this.options };
+        executed.push(query);
+        const result = await resolve(query);
+        if (result instanceof Error) throw result;
+        return result;
+    };
     return {
         executed,
-        /** The recorded queries of one model, optionally of one operation (find, updateMany, ...). */
+        /** The recorded queries of one model, optionally of one operation (find, updateMany, aggregate, ...). */
         queries: (modelName, op) => executed.filter((q) => q.model.modelName === modelName && (!op || q.op === op)),
         reset: () => { executed.length = 0; },
-        restore: () => { mongoose.Query.prototype.exec = realExec; }
+        restore: () => {
+            mongoose.Query.prototype.exec = realExec;
+            mongoose.Aggregate.prototype.exec = realAggregateExec;
+        }
     };
 };
 

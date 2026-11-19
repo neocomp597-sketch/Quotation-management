@@ -6,7 +6,8 @@ import * as XLSX from 'xlsx';
 import {
     MdSearch, MdTag, MdInfoOutline, MdSync,
     MdLocalOffer, MdPeople, MdReceipt, MdAssignmentTurnedIn,
-    MdFileUpload, MdFileDownload, MdAdd, MdUndo, MdHistory, MdEdit, MdFilterAlt
+    MdFileUpload, MdFileDownload, MdAdd, MdUndo, MdHistory, MdEdit, MdFilterAlt,
+    MdFilterList, MdExpandMore
 } from 'react-icons/md';
 import Modal from '../components/Modal';
 import ImportWizard from '../components/import/ImportWizard';
@@ -190,6 +191,8 @@ const AssetStatusBadge = ({ status }) => (
     </span>
 );
 
+const IBU_FILTERS_OPEN_KEY = 'ibu.filtersOpen';
+
 const SerialNoMaster = () => {
     const navigate = useNavigate();
     const { canCreate, canModify } = usePermission('master_serials');
@@ -209,6 +212,27 @@ const SerialNoMaster = () => {
         if (!stored || stored.workingBranchId !== String(activeBranchId || '') || !Array.isArray(stored.ids)) return;
         const kept = stored.ids.map(String).filter((id) => allowed.has(id));
         if (kept.length) setViewBranchIds(kept);
+    };
+    // The branch buttons are inside the Filters fold, which may be closed: the user's branches (and
+    // the branches kept in this tab) are loaded here, not by the buttons.
+    useEffect(() => {
+        let cancelled = false;
+        authService.getMyBranches()
+            .then((res) => { if (!cancelled) handleBranchesLoaded(Array.isArray(res.data?.branches) ? res.data.branches : []); })
+            .catch((err) => console.warn('Could not load your branches:', err));
+        return () => { cancelled = true; };
+        // Once per screen, as the branch buttons load them.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    // The branch buttons, status and MGR filters fold away behind a Filters button (client,
+    // 2026-11-19, as on Serial No Transfer). Folded at first; open or folded is remembered in this browser.
+    const [filtersOpen, setFiltersOpen] = useState(() => {
+        try { return localStorage.getItem(IBU_FILTERS_OPEN_KEY) === '1'; } catch { return false; }
+    });
+    const toggleFilters = () => {
+        const next = !filtersOpen;
+        setFiltersOpen(next);
+        try { localStorage.setItem(IBU_FILTERS_OPEN_KEY, next ? '1' : '0'); } catch { /* not remembered */ }
     };
     const changeViewBranches = (ids) => {
         setViewBranchIds(ids);
@@ -858,6 +882,11 @@ const SerialNoMaster = () => {
     const pageTo = paginatedAssets.length ? pageFrom + paginatedAssets.length - 1 : 0;
     const filtersApplied = Boolean(searchQuery.trim())
         || (activeTab === 'active' && (selectedStatus !== 'ALL' || Object.values(mgrFilters).some((value) => value !== 'ALL')));
+    // How many of the folded filters are in use, on the Filters button so none is forgotten: other
+    // branches than the working one, and (Active Inventory) the status and each MGR.
+    const filtersInUse = (showsOtherBranches ? 1 : 0) + (activeTab === 'active'
+        ? (selectedStatus !== 'ALL' ? 1 : 0) + Object.values(mgrFilters).filter((value) => value !== 'ALL').length
+        : 0);
 
     useEffect(() => {
         setCurrentPage(1);
@@ -1320,15 +1349,6 @@ const SerialNoMaster = () => {
                         <span>Return History</span>
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeTab === 'returns' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'}`}>{returnHistory.length}</span>
                     </button>
-                    {/* The branches this user was given: tick one or several to show them together (list,
-                        cards, Return History, search). */}
-                    <BranchChips
-                        className="col-span-2 flex flex-wrap items-center gap-2 sm:ml-4"
-                        multiple
-                        selected={viewBranchIds}
-                        onChange={changeViewBranches}
-                        onLoaded={handleBranchesLoaded}
-                    />
                 </div>
                 {showsOtherBranches && (
                     <p className="text-xs font-semibold text-slate-500">
@@ -1337,9 +1357,9 @@ const SerialNoMaster = () => {
                     </p>
                 )}
 
-                {/* The search keeps a usable width: when long MGR values make the dropdowns too wide, they move to the next row. */}
-                <div className="flex flex-col md:flex-row md:flex-wrap gap-4 items-center">
-                    <div className="flex-1 w-full md:min-w-[16rem] relative group">
+                {/* The search, and the Filters button that opens the branch buttons, status and MGR filters. */}
+                <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+                    <div className="flex-1 w-full min-w-0 relative group">
                         <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-teal-600 transition-colors" size={20} />
                         <input
                             type="text"
@@ -1349,37 +1369,64 @@ const SerialNoMaster = () => {
                             className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500/20 focus:bg-white focus:border-teal-500 transition-all outline-none text-sm font-semibold text-slate-900 placeholder:text-slate-400"
                         />
                     </div>
-                    {activeTab === 'active' && (
-                        <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 w-full md:w-auto">
-                            <select
-                                value={selectedStatus}
-                                onChange={(e) => setSelectedStatus(e.target.value)}
-                                className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
-                            >
-                                <option value="ALL">All Statuses</option>
-                                <option value="IN_STOCK">In Stock</option>
-                                <option value="SOLD">Sold</option>
-                                <option value="ALLOCATED">Allocated</option>
-                                <option value="RETURN">Returned</option>
-                                <option value="SCRAPPED">Scrapped</option>
-                            </select>
-                            {MGR_FIELDS.map(({ key, label }) => (
-                                <select
-                                    key={key}
-                                    value={mgrFilters[key]}
-                                    onChange={(e) => setMgrFilters((prev) => ({ ...prev, [key]: e.target.value }))}
-                                    aria-label={`Filter by ${label}`}
-                                    className={`px-4 py-3 border rounded-2xl outline-none text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all max-w-[200px] truncate ${mgrFilters[key] === 'ALL' ? 'bg-slate-50 border-slate-200' : 'bg-teal-50 border-teal-300'}`}
-                                >
-                                    <option value="ALL">All {label}</option>
-                                    {mgrOptions[key].map((value) => (
-                                        <option key={value} value={value}>{value}</option>
-                                    ))}
-                                </select>
-                            ))}
-                        </div>
-                    )}
+                    <button
+                        type="button"
+                        onClick={toggleFilters}
+                        aria-expanded={filtersOpen}
+                        title={filtersOpen ? 'Hide the filters' : 'Show the branches and filters'}
+                        className={`w-full md:w-auto flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${filtersOpen || filtersInUse ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'}`}
+                    >
+                        <MdFilterList size={18} />
+                        Filters
+                        {filtersInUse > 0 && (
+                            <span className="min-w-5 h-5 px-1.5 rounded-full bg-primary-600 text-white text-[10px] leading-5 text-center tracking-normal">{filtersInUse}</span>
+                        )}
+                        <MdExpandMore size={18} className={`transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
+                    </button>
                 </div>
+
+                {filtersOpen && (
+                    <div className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-3">
+                        {/* The branches this user was given: tick one or several to show them together (list,
+                            cards, Return History, search). */}
+                        <BranchChips
+                            className="flex flex-wrap items-center gap-2"
+                            multiple
+                            selected={viewBranchIds}
+                            onChange={changeViewBranches}
+                        />
+                        {activeTab === 'active' && (
+                            <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 w-full">
+                                <select
+                                    value={selectedStatus}
+                                    onChange={(e) => setSelectedStatus(e.target.value)}
+                                    className="px-4 py-3 bg-white border border-slate-200 rounded-2xl outline-none text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
+                                >
+                                    <option value="ALL">All Statuses</option>
+                                    <option value="IN_STOCK">In Stock</option>
+                                    <option value="SOLD">Sold</option>
+                                    <option value="ALLOCATED">Allocated</option>
+                                    <option value="RETURN">Returned</option>
+                                    <option value="SCRAPPED">Scrapped</option>
+                                </select>
+                                {MGR_FIELDS.map(({ key, label }) => (
+                                    <select
+                                        key={key}
+                                        value={mgrFilters[key]}
+                                        onChange={(e) => setMgrFilters((prev) => ({ ...prev, [key]: e.target.value }))}
+                                        aria-label={`Filter by ${label}`}
+                                        className={`px-4 py-3 border rounded-2xl outline-none text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all max-w-[200px] truncate ${mgrFilters[key] === 'ALL' ? 'bg-white border-slate-200' : 'bg-teal-50 border-teal-300'}`}
+                                    >
+                                        <option value="ALL">All {label}</option>
+                                        {mgrOptions[key].map((value) => (
+                                            <option key={value} value={value}>{value}</option>
+                                        ))}
+                                    </select>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-2xl border border-primary-100 bg-primary-50/60 px-4 py-3">
                     <p className="text-sm font-bold text-slate-700">

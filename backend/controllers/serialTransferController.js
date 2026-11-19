@@ -321,6 +321,33 @@ const ownershipFilter = async (ownership) => {
 };
 
 /**
+ * Serial No List's User count: the different current users of the serials matching `filter`, as
+ * the Current User column shows them: the linked customer (an employee holds through theirs), else
+ * the customer name saved on the serial (older imports and Add Single Entry kept a name that was not
+ * in Customer Master). Serials with nobody are not a user.
+ *
+ * Re-checked 2026-11-19 (client: "this count seems to be wrong"): the first version counted
+ * Asset.distinct('customerId'), which missed every name-only holder, and distinct goes around
+ * tenantPlugin (no company filter). An aggregation gets the company (and, without `options`, the
+ * branch) from the plugin; its $match is cast here, as aggregation does not cast.
+ */
+const countCurrentUsers = async (filter, options = {}) => {
+    const [row] = await Asset.aggregate([
+        { $match: Asset.find().cast(Asset, filter) },
+        {
+            $group: {
+                _id: {
+                    $ifNull: ['$customerId', { $toLower: { $trim: { input: { $ifNull: ['$customerNameStr', ''] } } } }]
+                }
+            }
+        },
+        { $match: { _id: { $nin: [null, ''] } } },
+        { $count: 'count' }
+    ]).option(options);
+    return row?.count || 0;
+};
+
+/**
  * Serial No List: every Invoice Bulk Upload serial, of every status, with its current branch and
  * current customer (?status filters by status). A branch sees the serials it holds and the serials
  * of its own customers sold by another branch (serialBranchScope).
@@ -371,8 +398,8 @@ exports.listSerials = async (req, res) => {
             Asset.countDocuments(scopedQuery).setOptions(scope.options),
             // User count (client, 2026-11-19): the different current users (customers and employees)
             // holding the serials that match, beside the Asset count
-            Asset.distinct('customerId', scopedQuery).setOptions(scope.options)
-        ]).then(([found, count, holderIds]) => [found, count, holderIds.filter(Boolean).length]);
+            countCurrentUsers(scopedQuery, scope.options)
+        ]);
 
         const holders = await employeeHolderLabels(assets.map((asset) => asset.customerId?.employeeProfileId));
         const data = assets.map((asset) => ({
@@ -1697,5 +1724,154 @@ exports.transferEmployeeAsset = async (req, res) => {
         return sendError(res, error, 'Failed to transfer the asset');
     } finally {
         if (session) await session.endSession();
+    }
+};
+
+const LOG_TITLES = {
+    Sold: 'Sold to',
+    Allocated: 'Allocated to',
+    Assigned: 'Assigned to',
+    Transferred: 'Transferred to',
+    Returned: 'Returned by',
+    'Past Entry': 'Past entry:'
+};
+// When a customer record took effect, for placing it among the branch moves: the date it names for
+// the first customer and past entries, else the moment it was saved (a move is saved at once too).
+const loggedAt = (record) => (['Sold', 'Allocated', 'Past Entry'].includes(record.entryType) || !record.createdAt
+    ? record.transferDate
+    : record.createdAt);
+
+/**
+ * GET /employees/:employeeId/assets/:assetId/log: the Asset Log of an item the employee holds or
+ * held (client, 2026-11-19: "the asset was provided to him from another branch", and moving it to
+ * his own branch must show too). One line per event, oldest first: the item added in Invoice Bulk
+ * Upload, each customer or employee who received it (with the branch it was in at that moment),
+ * and each branch move (Branch Transfer, an employee's Branch Transfer, Move to <branch>).
+ *
+ * A branch move also re-books the item's customer records under the new branch
+ * (moveSerialsToBranch), so the branch of each record is worked out from the moves instead.
+ */
+exports.employeeAssetLog = async (req, res) => {
+    try {
+        const { assetId } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(assetId)) throw httpError(400, 'Invalid asset.');
+        const { employee, customer } = await employeeAndCustomer(req, req.params.employeeId);
+        const access = await mgrAccessCondition(req);
+        const asset = await Asset.findOne({ _id: assetId, companyId: req.user.companyId, ...access })
+            .setOptions(ANY_BRANCH)
+            .populate(customerPopulate)
+            .populate(productPopulate)
+            .populate(branchPopulate)
+            .lean();
+        if (!asset) throw httpError(404, 'Asset not found.');
+
+        const [saved, moves, home] = await Promise.all([
+            historyOf(asset._id),
+            SerialBranchTransfer.find({ assetId: asset._id }).setOptions(ANY_BRANCH).sort({ transferDate: 1, _id: 1 }).lean(),
+            homeBranchOf(req, employee)
+        ]);
+        const isEmployee = (id) => String(idOf(id) || '') === String(customer._id);
+        if (!isEmployee(asset.customerId) && !saved.some((record) => isEmployee(record.customerId))) {
+            throw httpError(404, `${asset.serialNumber} was never with ${employee.name}.`);
+        }
+        // Nothing saved yet: the invoice row's customer, as the serial's details show it.
+        const records = saved.length || !hasSaleCustomer(asset)
+            ? saved.map((record) => withInvoice(record, asset))
+            : [{ ...saleRecord(asset), _id: null, pending: true }];
+
+        // Employees among the holders show as "<External Employee ID> - Name".
+        const holderIds = [...new Set(records.map((record) => record.customerId).filter(Boolean).map(String))];
+        const holderCustomers = holderIds.length
+            ? await Customer.find({ _id: { $in: holderIds } }).select('employeeProfileId').setOptions(ANY_BRANCH).lean()
+            : [];
+        const employeeOf = new Map(holderCustomers.filter((row) => row.employeeProfileId).map((row) => [String(row._id), String(row.employeeProfileId)]));
+        const labels = await employeeHolderLabels([...employeeOf.values()]);
+        const holderOf = (record) => {
+            const label = labels.get(employeeOf.get(String(record.customerId || '')));
+            if (label) return { ...label, employee: true };
+            const name = cleanText(record.companyName) || cleanText(record.customerName) || 'Unknown customer';
+            return { title: [cleanText(record.customerCode), name].filter(Boolean).join(' - '), subtitle: '', employee: false };
+        };
+
+        // The branch the item was in at a moment: where it started, then each move up to then.
+        const start = moves.length
+            ? { id: idOf(moves[0].fromBranchId), name: moves[0].fromBranchName }
+            : { id: idOf(asset.branchId), name: branchLabel(asset.branchId) };
+        const branchAt = (when) => {
+            let branch = start;
+            for (const move of moves) {
+                if (new Date(move.transferDate) > new Date(when)) break;
+                branch = { id: idOf(move.toBranchId), name: move.toBranchName };
+            }
+            return branch;
+        };
+        const homeId = home ? String(home._id) : '';
+
+        const events = [];
+        if (asset.createdAt) {
+            events.push({
+                kind: 'added',
+                // Always the first line, also when the invoice it was sold on is older than the upload.
+                at: new Date(0),
+                date: asset.createdAt,
+                title: 'Added in Invoice Bulk Upload',
+                branchName: start.name || '',
+                invoiceNumber: asset.invoiceNumber || ''
+            });
+        }
+        records.forEach((record) => {
+            const at = loggedAt(record);
+            const branch = branchAt(at);
+            const holder = holderOf(record);
+            const toThisEmployee = isEmployee(record.customerId) && record.entryType !== 'Returned';
+            events.push({
+                kind: 'holder',
+                at,
+                date: record.transferDate,
+                entryType: record.entryType,
+                title: `${LOG_TITLES[record.entryType] || record.entryType} ${holder.title}`,
+                holder,
+                current: Boolean(record.isActive),
+                pending: Boolean(record.pending),
+                branchName: branch.name || '',
+                // Given to this employee while the item was in another branch than theirs.
+                fromOtherBranch: Boolean(toThisEmployee && homeId && branch.id && String(branch.id) !== homeId),
+                invoiceNumber: record.invoiceNumber || '',
+                remarks: record.remarks || '',
+                by: record.createdByName || ''
+            });
+        });
+        moves.forEach((move) => {
+            events.push({
+                kind: 'branch',
+                at: move.transferDate,
+                date: move.transferDate,
+                title: `Moved from ${move.fromBranchName || 'another branch'} to ${move.toBranchName || 'another branch'}`,
+                fromBranchName: move.fromBranchName || '',
+                branchName: move.toBranchName || '',
+                // Brought to this employee's own branch.
+                toHomeBranch: Boolean(homeId && String(idOf(move.toBranchId)) === homeId),
+                transferNo: move.transferNo || '',
+                reference: move.reference || '',
+                remarks: move.remarks || '',
+                by: move.createdByName || ''
+            });
+        });
+        const order = { added: 0, holder: 1, branch: 2 };
+        events.sort((a, b) => (new Date(a.at) - new Date(b.at)) || (order[a.kind] - order[b.kind]));
+
+        return res.json({
+            asset: {
+                ...employeeAssetRow(asset),
+                // Booked in another branch than the employee's own: Move to <branch> fixes it.
+                awayFromHome: Boolean(homeId && idOf(asset.branchId) && String(idOf(asset.branchId)) !== homeId),
+                withEmployee: isEmployee(asset.customerId)
+            },
+            employee: employeeSummary(employee, customer),
+            homeBranch: home ? { _id: home._id, name: branchLabel(home) } : null,
+            events: events.map(({ at: _at, ...event }) => event)
+        });
+    } catch (error) {
+        return sendError(res, error, 'Failed to load the asset log');
     }
 };

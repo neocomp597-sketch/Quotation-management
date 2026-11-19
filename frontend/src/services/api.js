@@ -538,6 +538,7 @@ export const serialTransferService = {
   assignEmployeeAssets: (employeeId, data) => api.post(`/serial-transfers/employees/${employeeId}/assets`, data),
   transferEmployeeAsset: (employeeId, assetId, data) => api.post(`/serial-transfers/employees/${employeeId}/assets/${assetId}/transfer`, data),
   moveEmployeeAssetsHome: (employeeId) => api.post(`/serial-transfers/employees/${employeeId}/assets/move-home`, {}),
+  employeeAssetLog: (employeeId, assetId) => api.get(`/serial-transfers/employees/${employeeId}/assets/${assetId}/log`, { cache: false }),
   getSerialBranchHistory: (assetId) => api.get(`/serial-transfers/branch-transfers/serials/${assetId}`),
 };
 

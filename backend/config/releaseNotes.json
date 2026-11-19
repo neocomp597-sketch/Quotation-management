@@ -1206,5 +1206,40 @@
     "deployedBy": "Super Admin",
     "deployedAt": "2026-11-18T21:30:00+05:30",
     "isActive": true
+  },
+  {
+    "version": "v6.8.12",
+    "title": "Asset Log in Employee Master, Folded Filters on Invoice Bulk Upload, Correct User Count",
+    "message": "Release Updates (19 Nov 2026): Each asset in Employee Master has a Log showing where it came from and every move. The branch buttons and filters of Invoice Bulk Upload fold away behind a Filters button. Serial No Transfer shows an Asset count and a corrected User count.",
+    "releaseNotes": [
+      "Employee Master > Assign Asset: a Log button on each asset shows its whole story, including the branch it was given from",
+      "Moving an employee's assets to their own branch is shown in the Asset Log",
+      "Invoice Bulk Upload: the branch buttons, status and MGR filters are inside a Filters button",
+      "Serial No Transfer: branch buttons inside Filters, and Asset count and User count above the list",
+      "User count now also counts customers saved on a serial by name only"
+    ],
+    "detailedChanges": [
+      {
+        "date": "19.11.2026",
+        "module": "Master Management",
+        "submodule": "Employee Master: Asset Log",
+        "changes": "Each asset listed under Assign Asset on an employee's page has a Log button. It opens the asset's history, oldest first: when it was added in Invoice Bulk Upload and in which branch, each person it was given to or transferred to, with the branch the asset was in at that moment, and each branch move with its Branch Transfer number, remarks and who did it. When the asset was given from another branch than the employee's own, that line is marked in amber. When the asset is later moved to the employee's branch with Move to <branch> (or moves with the employee's Branch Transfer), the move is added to the log and marked as the employee's own branch. The log can still be opened by the earlier holder after the asset is transferred to someone else."
+      },
+      {
+        "date": "19.11.2026",
+        "module": "Master Management",
+        "submodule": "Invoice Bulk Upload: Filters",
+        "changes": "The branch buttons, the status dropdown and the MGR 1 to MGR 5 dropdowns are now inside a Filters button next to the search, so the list starts higher on the screen, especially on phones. The button shows how many filters are in use, so a filter is not forgotten while the fold is closed. Open or closed is remembered in the browser. The chosen branches are still kept while you work in the same tab. Total Count stays visible under the search."
+      },
+      {
+        "date": "19.11.2026",
+        "module": "Master Management",
+        "submodule": "Serial No Transfer: Branches in Filters, Asset Count and User Count",
+        "changes": "The branch buttons of Serial No List, Transfer History and Customer Activity Log are inside the Filters fold, and the page description and the \"Showing branches\" sentence were removed. Serial No List shows Asset count (the serial numbers matching the search and filters) and User count (the different current users of those serial numbers). The User count was re-checked: it now counts every current user the list shows, also customers that older uploads and single entries saved on the serial by name only, without a Customer Master record (the first version skipped them). The same name written with different capitals or spaces counts once. Serial numbers with nobody are not counted."
+      }
+    ],
+    "deployedBy": "Super Admin",
+    "deployedAt": "2026-11-19T18:00:00+05:30",
+    "isActive": true
   }
 ]

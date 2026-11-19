@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { MdSearch, MdAdd, MdClose, MdSwapHoriz, MdLaptop, MdCheck, MdWarning } from 'react-icons/md';
+import { MdSearch, MdAdd, MdClose, MdSwapHoriz, MdLaptop, MdCheck, MdWarning, MdHistory, MdInventory2, MdPerson, MdHome } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { serialTransferService, invalidateApiCache } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import Modal from './Modal';
 import SearchableSelect from './SearchableSelect';
 import DateInput from './DateInput';
+import { formatDate, formatDateTime } from '../utils/helpers';
 
 const today = () => new Date().toISOString().slice(0, 10);
 const newRequestId = () => `emp-asset-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -25,6 +26,121 @@ const AssetLine = ({ asset }) => (
         </p>
     </div>
 );
+
+const LOG_ICONS = { added: MdInventory2, holder: MdPerson, branch: MdSwapHoriz };
+
+/**
+ * Asset Log of one item (client, 2026-11-19): added in Invoice Bulk Upload, each person it was
+ * given to with the branch it was in then (flagged when that was not the employee's own branch),
+ * and each branch move, such as Move to <branch>. Oldest first.
+ */
+const AssetLogModal = ({ employeeId, asset, onClose }) => {
+    const [log, setLog] = useState(null);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        let cancelled = false;
+        serialTransferService.employeeAssetLog(employeeId, asset._id)
+            .then((res) => { if (!cancelled) setLog(res.data); })
+            .catch((err) => { if (!cancelled) setError(err.response?.data?.message || 'Could not load the asset log.'); });
+        return () => { cancelled = true; };
+    }, [employeeId, asset._id]);
+
+    const home = log?.homeBranch?.name;
+    const employeeName = log?.employee?.name || 'the employee';
+
+    return (
+        <Modal
+            isOpen
+            onClose={onClose}
+            title="Asset Log"
+            maxWidth="max-w-2xl"
+            footer={(
+                <div className="flex justify-end w-full">
+                    <button type="button" onClick={onClose} className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs uppercase">Close</button>
+                </div>
+            )}
+        >
+            <div className="space-y-4">
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
+                    <AssetLine asset={log?.asset || asset} />
+                    {log && (
+                        <p className="text-xs text-slate-500">
+                            Now in <span className="font-bold text-slate-700">{log.asset.branchName || 'no branch'}</span>
+                            {home ? <> · {employeeName}&apos;s branch: <span className="font-bold text-slate-700">{home}</span></> : null}
+                        </p>
+                    )}
+                    {log?.asset?.awayFromHome && (
+                        <p className="flex items-start gap-1.5 text-xs font-semibold text-amber-700">
+                            <MdWarning className="shrink-0 mt-0.5" size={14} />
+                            Not in {home} yet. Use &quot;Move to {home}&quot; on the employee&apos;s page; the move is added to this log.
+                        </p>
+                    )}
+                </div>
+
+                {error && <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{error}</p>}
+                {!log && !error && <p className="text-xs text-slate-400">Loading...</p>}
+
+                {log && (
+                    <ol className="relative space-y-3">
+                        {log.events.map((event, index) => {
+                            const Icon = LOG_ICONS[event.kind] || MdHistory;
+                            const flagged = event.fromOtherBranch;
+                            const reachedHome = event.toHomeBranch;
+                            return (
+                                <li key={index} className="flex gap-3">
+                                    <div className="flex flex-col items-center">
+                                        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${flagged ? 'border-amber-300 bg-amber-50 text-amber-700' : reachedHome ? 'border-teal-300 bg-teal-50 text-teal-700' : 'border-slate-200 bg-white text-slate-500'}`}>
+                                            <Icon size={16} />
+                                        </span>
+                                        {index < log.events.length - 1 && <span className="mt-1 w-px flex-1 bg-slate-200" />}
+                                    </div>
+                                    <div className="min-w-0 flex-1 pb-1">
+                                        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                                            <p className="text-sm font-black text-slate-800">
+                                                {event.title}
+                                                {event.current && <span className="ml-2 align-middle inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border bg-teal-50 text-teal-700 border-teal-200">Current</span>}
+                                            </p>
+                                            <p className="text-xs font-bold text-slate-500 whitespace-nowrap">
+                                                {event.kind === 'holder' ? formatDate(event.date) : formatDateTime(event.date)}
+                                            </p>
+                                        </div>
+                                        {event.holder?.subtitle && <p className="text-xs text-slate-500 break-all">{event.holder.subtitle}</p>}
+                                        {event.kind !== 'branch' && event.branchName && (
+                                            <p className="text-xs text-slate-600">
+                                                {event.kind === 'added' ? 'Branch' : 'Asset was in'}: <span className="font-bold">{event.branchName}</span>
+                                            </p>
+                                        )}
+                                        {flagged && (
+                                            <p className="mt-1 inline-flex items-start gap-1.5 rounded-lg bg-amber-50 border border-amber-200 px-2 py-1 text-xs font-semibold text-amber-800">
+                                                <MdWarning className="shrink-0 mt-0.5" size={14} />
+                                                Given from {event.branchName}, another branch than {home}, {employeeName}&apos;s branch.
+                                            </p>
+                                        )}
+                                        {reachedHome && (
+                                            <p className="mt-1 inline-flex items-start gap-1.5 rounded-lg bg-teal-50 border border-teal-200 px-2 py-1 text-xs font-semibold text-teal-800">
+                                                <MdHome className="shrink-0 mt-0.5" size={14} />
+                                                Now in {employeeName}&apos;s own branch.
+                                            </p>
+                                        )}
+                                        <p className="text-xs text-slate-500">
+                                            {[
+                                                event.transferNo && `Branch Transfer ${event.transferNo}`,
+                                                event.invoiceNumber && event.kind !== 'branch' && `Invoice ${event.invoiceNumber}`,
+                                                event.remarks,
+                                                event.by && `by ${event.by}`
+                                            ].filter(Boolean).join(' · ')}
+                                        </p>
+                                    </div>
+                                </li>
+                            );
+                        })}
+                    </ol>
+                )}
+            </div>
+        </Modal>
+    );
+};
 
 /**
  * Employee Master, section "Assign Asset": company items (Invoice Bulk Upload serial numbers such
@@ -54,6 +170,7 @@ const EmployeeAssets = ({ employeeId = null, employeeName = '', employees = [], 
     const [transfer, setTransfer] = useState(null); // { asset, toEmployeeId, date, remarks, requestId }
     const [savingTransfer, setSavingTransfer] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
+    const [logFor, setLogFor] = useState(null); // the item whose Asset Log is open
 
     const picked = isNew ? pending : chosen;
     const setPicked = isNew ? (onPendingChange || (() => {})) : setChosen;
@@ -178,10 +295,18 @@ const EmployeeAssets = ({ employeeId = null, employeeName = '', employees = [], 
                             ) : (
                                 <ul className="divide-y divide-slate-100 border border-slate-100 rounded-xl">
                                     {held.map((asset) => (
-                                        <li key={asset._id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                                        <li key={asset._id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 px-3 py-2.5">
                                             <AssetLine asset={asset} />
                                             <div className="flex items-center gap-2 shrink-0">
                                                 <StatusChip status={asset.status} />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setLogFor(asset)}
+                                                    aria-label={`Asset Log of ${asset.serialNumber}`}
+                                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-black uppercase text-[10px] tracking-widest"
+                                                >
+                                                    <MdHistory size={15} /> Log
+                                                </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => openTransfer(asset)}
@@ -286,6 +411,8 @@ const EmployeeAssets = ({ employeeId = null, employeeName = '', employees = [], 
                     )}
                 </>
             )}
+
+            {logFor && <AssetLogModal employeeId={employeeId} asset={logFor} onClose={() => setLogFor(null)} />}
 
             {transfer && (
                 <Modal

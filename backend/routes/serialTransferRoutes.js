@@ -25,6 +25,7 @@ router.get('/employees/assignable-assets', serialTransferController.searchAssign
 router.get('/employees/:employeeId/assets', serialTransferController.listEmployeeAssets);
 router.post('/employees/:employeeId/assets', serialTransferController.assignEmployeeAssets);
 router.post('/employees/:employeeId/assets/:assetId/transfer', serialTransferController.transferEmployeeAsset);
+router.get('/employees/:employeeId/assets/:assetId/log', serialTransferController.employeeAssetLog);
 router.post('/employees/:employeeId/assets/move-home', acrossBranches, serialTransferController.moveEmployeeAssetsHome);
 
 // Branch Transfer works across branches; utils/serialBranchAccess.js holds its access rules.
