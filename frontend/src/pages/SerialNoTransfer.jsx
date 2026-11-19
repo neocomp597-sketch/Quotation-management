@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { MdSearch, MdSwapHoriz, MdVisibility, MdArrowBack, MdPersonAdd, MdHistory, MdCheckCircle, MdFileDownload, MdAdd, MdClose, MdArrowForward, MdStore, MdExpandMore, MdFilterList } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import { serialTransferService, customerService, csmService, mgrService } from '../services/api';
+import { serialTransferService, customerService, csmService, mgrService, authService } from '../services/api';
 import AssetActivityLog from '../components/AssetActivityLog';
 import MgrAccessNotice from '../components/MgrAccessNotice';
 import PaginationControls from '../components/PaginationControls';
@@ -131,6 +131,21 @@ const EMPTY_PAGINATION = { page: 1, limit: PAGE_SIZE, total: 0, pages: 1 };
 // undefined when only the working branch is shown. Branch Transfer and one serial's page ignore it.
 const ViewBranchesContext = createContext(undefined);
 const useViewBranches = () => useContext(ViewBranchesContext);
+// The branch buttons that choose them ({ selected, onChange }), shown inside each tab's Filters
+// (client, 2026-11-19: off the screen, into the Filters fold).
+const ViewBranchPickerContext = createContext(null);
+const ViewBranchFilter = () => {
+    const picker = useContext(ViewBranchPickerContext);
+    if (!picker) return null;
+    return (
+        <BranchChips
+            className="serial-filter-wide w-full flex flex-wrap items-center gap-2"
+            multiple
+            selected={picker.selected}
+            onChange={picker.onChange}
+        />
+    );
+};
 // Back to page 1 when the shown branches change (not on the first render, so a page kept while
 // visiting a serial is restored).
 const useFirstPageOnChange = (value, setPage) => {
@@ -313,6 +328,21 @@ const datesInUse = (range) => (range.fromDate || range.toDate ? 1 : 0);
 const TotalCountBar = ({ pagination, shown, noun, filtered }) => {
     const from = shown ? (pagination.page - 1) * pagination.limit + 1 : 0;
     const to = shown ? from + shown - 1 : 0;
+    // Serial No List (client, 2026-11-19): Asset count and User count, the different current users
+    // of those serials, both for the search and filters in use.
+    if (pagination.userCount !== undefined) {
+        const figure = (label, value) => (
+            <p className="text-sm font-bold text-slate-700">
+                {label}:{' '}<span className="text-lg font-black text-primary-700">{(value || 0).toLocaleString('en-IN')}</span>
+            </p>
+        );
+        return (
+            <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-2xl border border-primary-100 bg-primary-50/60 px-4 py-3">
+                {figure('Asset count', pagination.total)}
+                {figure('User count', pagination.userCount)}
+            </div>
+        );
+    }
     return (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-2xl border border-primary-100 bg-primary-50/60 px-4 py-3">
             <p className="text-sm font-bold text-slate-700">
@@ -382,9 +412,10 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                     <option value="product">Product</option>
                     <option value="customer">Customer</option>
                 </select>
-                <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[status, ownership, mgr1, mgr4].filter(Boolean).length + datesInUse(range)} />
+                <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[viewBranches, status, ownership, mgr1, mgr4].filter(Boolean).length + datesInUse(range)} />
                 {filtersOpen && (
                     <>
+                        <ViewBranchFilter />
                         <StatusFilter value={status} onChange={(value) => { setStatus(value); setPage(1); }} />
                         <select value={ownership} onChange={(e) => { setOwnership(e.target.value); setPage(1); }} aria-label="Filter by customer transfers" className={selectClass}>
                             <option value="">All customers</option>
@@ -540,9 +571,10 @@ const HistoryTab = ({ onOpen }) => {
                         className={`${inputClass} pl-11`}
                     />
                 </div>
-                <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[entryType, flag, mgr1, mgr4].filter(Boolean).length + datesInUse(range)} />
+                <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[viewBranches, entryType, flag, mgr1, mgr4].filter(Boolean).length + datesInUse(range)} />
                 {filtersOpen && (
                     <>
+                        <ViewBranchFilter />
                         <select value={entryType} onChange={(e) => { setEntryType(e.target.value); setPage(1); }} className={selectClass}>
                             <option value="">All entries</option>
                             {ENTRY_OPTIONS.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
@@ -834,9 +866,10 @@ const ActivityTab = ({ onOpen, assetId }) => {
                                 className={`${inputClass} pl-11`}
                             />
                         </div>
-                        <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[mgr1, mgr4].filter(Boolean).length + datesInUse(range)} />
+                        <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[viewBranches, mgr1, mgr4].filter(Boolean).length + datesInUse(range)} />
                         {filtersOpen && (
                             <>
+                                <ViewBranchFilter />
                                 <MgrFilter level={1} value={mgr1} onChange={(value) => { setMgr1(value); setPage(1); }} />
                                 <MgrFilter level={4} value={mgr4} onChange={(value) => { setMgr4(value); setPage(1); }} />
                                 <DateRangeFilter range={range} field="Customer Since" onChange={() => setPage(1)} />
@@ -2103,10 +2136,8 @@ const SerialNoTransfer = () => {
     // The branches shown, as in Invoice Bulk Upload: one or several of the user's branches; kept in
     // this browser tab until the working branch is changed at the top of the screen.
     const viewStorageKey = `snt:viewBranches:${user?._id || user?.id || ''}`;
-    const [myBranches, setMyBranches] = useState([]);
     const [viewBranchIds, setViewBranchIds] = useState(() => (activeBranchId ? [String(activeBranchId)] : []));
     const handleBranchesLoaded = (branches) => {
-        setMyBranches(branches);
         const allowed = new Set(branches.map((branch) => String(branch?._id || branch)));
         let stored = null;
         try { stored = JSON.parse(sessionStorage.getItem(viewStorageKey) || 'null'); } catch { stored = null; }
@@ -2120,9 +2151,20 @@ const SerialNoTransfer = () => {
             sessionStorage.setItem(viewStorageKey, JSON.stringify({ workingBranchId: String(activeBranchId || ''), ids }));
         } catch { /* storage unavailable: not remembered */ }
     };
+    // The branches kept in this tab are restored once the user's branches are known (the branch
+    // buttons are inside the Filters fold, which may be closed).
+    useEffect(() => {
+        let cancelled = false;
+        authService.getMyBranches()
+            .then((res) => { if (!cancelled) handleBranchesLoaded(Array.isArray(res.data?.branches) ? res.data.branches : []); })
+            .catch((err) => console.warn('Could not load your branches:', err));
+        return () => { cancelled = true; };
+        // Once per screen, as the branch buttons load them.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
     const showsOtherBranches = viewBranchIds.length > 1 || (viewBranchIds.length === 1 && viewBranchIds[0] !== String(activeBranchId || ''));
     const viewBranchParam = showsOtherBranches ? viewBranchIds.join(',') : undefined;
-    const branchNameOf = (id) => myBranches.find((branch) => String(branch?._id || branch) === String(id))?.name || '';
+    const branchPicker = { selected: viewBranchIds, onChange: changeViewBranches };
     const [searchParams, setSearchParams] = useSearchParams();
     const tab = TABS.some((item) => item.key === searchParams.get('tab')) ? searchParams.get('tab') : 'serials';
     const navigate = useNavigate();
@@ -2130,27 +2172,11 @@ const SerialNoTransfer = () => {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Serial No Transfer</h1>
-                <p className="text-sm sm:text-base text-slate-500 font-medium">Every Invoice Bulk Upload serial number with its branch and customer. Move any serial to another customer or to another branch.</p>
-            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Serial No Transfer</h1>
 
             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                {/* The branches this user was given, as in Invoice Bulk Upload: tick one or several to show
-                    them together in Serial No List, Transfer History and Customer Activity Log. */}
-                <BranchChips
-                    className="flex flex-wrap items-center gap-2 px-3 sm:px-5 pt-3 sm:pt-5"
-                    multiple
-                    selected={viewBranchIds}
-                    onChange={changeViewBranches}
-                    onLoaded={handleBranchesLoaded}
-                />
-                {showsOtherBranches && tab !== 'branch' && (
-                    <p className="px-3 sm:px-5 pt-2 text-xs font-semibold text-slate-500">
-                        Showing {viewBranchIds.length === 1 ? 'branch' : `${viewBranchIds.length} branches`}: <span className="font-black text-slate-700">{viewBranchIds.map(branchNameOf).filter(Boolean).join(', ')}</span>.
-                        {' '}The Branch column shows where each serial number is.
-                    </p>
-                )}
+                {/* The branches shown (as in Invoice Bulk Upload: one or several of the user's branches
+                    together) are chosen inside each tab's Filters (ViewBranchFilter). */}
                 <div className="flex gap-1 overflow-x-auto border-b border-slate-100 px-2 sm:px-4 pt-2 sm:pt-4">
                     {TABS.map((item) => (
                         <button
@@ -2164,12 +2190,14 @@ const SerialNoTransfer = () => {
                     ))}
                 </div>
                 <ViewBranchesContext.Provider value={viewBranchParam}>
+                <ViewBranchPickerContext.Provider value={branchPicker}>
                 {tab === 'serials' && (
                     <SerialListTab onOpen={openSerial} onTransfer={(assetId, mode) => navigate(`/serial-no-transfer/${assetId}/transfer${mode === 'assign' ? '?mode=assign' : ''}`)} />
                 )}
                 {tab === 'history' && <HistoryTab onOpen={openSerial} />}
                 {tab === 'activity' && <ActivityTab onOpen={openSerial} />}
                 {tab === 'branch' && <BranchTransferTab />}
+                </ViewBranchPickerContext.Provider>
                 </ViewBranchesContext.Provider>
             </div>
         </div>

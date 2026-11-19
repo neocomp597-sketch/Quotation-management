@@ -357,7 +357,7 @@ exports.listSerials = async (req, res) => {
         const scope = await listScope(req);
         const scopedQuery = inScope(query, scope);
 
-        const [assets, total] = await Promise.all([
+        const [assets, total, userCount] = await Promise.all([
             Asset.find(scopedQuery)
                 .setOptions(scope.options)
                 .select('serialNumber assetNo productId productCode productName status branchId customerId customerCode customerNameStr saleDate invoiceDate invoiceNumber createdAt')
@@ -368,8 +368,11 @@ exports.listSerials = async (req, res) => {
                 .skip(skip)
                 .limit(limit)
                 .lean(),
-            Asset.countDocuments(scopedQuery).setOptions(scope.options)
-        ]);
+            Asset.countDocuments(scopedQuery).setOptions(scope.options),
+            // User count (client, 2026-11-19): the different current users (customers and employees)
+            // holding the serials that match, beside the Asset count
+            Asset.distinct('customerId', scopedQuery).setOptions(scope.options)
+        ]).then(([found, count, holderIds]) => [found, count, holderIds.filter(Boolean).length]);
 
         const holders = await employeeHolderLabels(assets.map((asset) => asset.customerId?.employeeProfileId));
         const data = assets.map((asset) => ({
@@ -393,7 +396,7 @@ exports.listSerials = async (req, res) => {
 
         return res.json({
             data,
-            pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
+            pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)), userCount },
             // What the user is limited to, for the screen's notice; null when not limited.
             mgrAccess: await describeMgrAccess(mgrAccess)
         });
