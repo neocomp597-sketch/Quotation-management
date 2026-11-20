@@ -160,7 +160,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
             
             const [res, allRes] = await Promise.all([
                 payrollService.getEmployees(params),
-                payrollService.getEmployees({})
+                payrollService.getEmployees({ allBranches: true })
             ]);
             setEmployees(res.data || []);
             setAllEmployees(allRes.data || []);
@@ -324,7 +324,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
             if (found) {
                 populateForm(found);
             } else {
-                payrollService.getEmployees({ limit: 1000 }).then(res => {
+                payrollService.getEmployees({ limit: 1000, allBranches: true }).then(res => {
                     const list = res.data || [];
                     const item = list.find(e => e._id === routeId);
                     if (item) populateForm(item);
@@ -755,7 +755,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                     <MdSearch className="absolute left-3.5 top-3.5 text-slate-400" size={20} />
                     <input
                         type="text"
-                        placeholder="Search employee by name..."
+                        placeholder="Search employee by name or email..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition-all font-medium text-slate-700 text-sm"
@@ -814,7 +814,7 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                 </div>
             ) : employees.length === 0 ? (
                 <div className="p-16 text-center text-slate-400 font-bold bg-white rounded-3xl border border-slate-100">
-                    No employee salary profiles found matching filter query.
+                    No employee profiles found matching filter query.
                 </div>
             ) : viewMode === 'card' ? (
                 /* CARD VIEW GRID */
@@ -1414,11 +1414,14 @@ const PayrollEmployees = ({ isCreatePage, isEditPage }) => {
                                                 <label className={labelClass}>Reporting To</label>
                                                 <SearchableSelect
                                                     options={(allEmployees.length ? allEmployees : employees)
-                                                        .filter(emp => (emp.status === 'Active' || !emp.status) && String(emp._id) !== String(selectedEmp?._id))
-                                                        .map(emp => ({
-                                                            value: emp._id,
-                                                            label: `${emp.name}${emp.designation ? ` (${emp.designation})` : ''}${emp.employeeId ? ` - ID: ${emp.employeeId}` : ''}`
-                                                        }))
+                                                        .filter(emp => (emp.status === 'Active' || !emp.status || String(emp._id) === String(basicForm.reportingTo)) && String(emp._id) !== String(selectedEmp?._id))
+                                                        .map(emp => {
+                                                            const bName = emp.branchId?.name || (Array.isArray(emp.assignedBranches) && emp.assignedBranches[0]?.name) || '';
+                                                            return {
+                                                                value: emp._id,
+                                                                label: `${emp.name}${emp.designation ? ` (${emp.designation})` : ''}${emp.employeeId ? ` - ID: ${emp.employeeId}` : ''}${bName ? ` - ${bName}` : ''}`
+                                                            };
+                                                        })
                                                     }
                                                     value={basicForm.reportingTo || ''}
                                                     onChange={(val) => setBasicForm({ ...basicForm, reportingTo: val })}

@@ -12,6 +12,7 @@ const canViewSerialTransfers = requirePermission('master_serial_transfer');
 router.use(protect, canViewSerialTransfers);
 
 router.get('/serials', serialTransferController.listSerials);
+router.get('/serials/export', serialTransferController.exportSerials);
 router.get('/serials/:assetId', serialTransferController.getSerial);
 router.put('/serials/:assetId/asset-no', serialTransferController.updateAssetNo);
 router.post('/serials/:assetId/transfer', serialTransferController.transferSerial);

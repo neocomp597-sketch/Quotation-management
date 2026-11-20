@@ -519,6 +519,7 @@ export const bomService = {
 // Serial No Transfer: customer-wise ownership history of sold serial numbers.
 export const serialTransferService = {
   listSerials: (params = {}) => api.get("/serial-transfers/serials", { params }),
+  exportSerials: (params = {}) => api.get("/serial-transfers/serials/export", { params, responseType: "blob" }),
   getSerial: (assetId) => api.get(`/serial-transfers/serials/${assetId}`),
   updateAssetNo: (assetId, assetNo) => api.put(`/serial-transfers/serials/${assetId}/asset-no`, { assetNo }),
   transfer: (assetId, data) => api.post(`/serial-transfers/serials/${assetId}/transfer`, data),

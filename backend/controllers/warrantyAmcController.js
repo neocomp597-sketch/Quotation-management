@@ -1279,8 +1279,21 @@ const exportFileName = (branches, now = new Date()) => {
     return `Invoice_Export_${label}_${date}.xlsx`;
 };
 
+const resolveProductDescription = (product, fallbackDesc = '') => {
+    const pDesc = String(product?.description || '').trim();
+    if (pDesc) return pDesc;
+    const pName = String(product?.productName || '').trim();
+    const pCode = String(product?.productCode || '').trim();
+    if (pName && (!pCode || pName.toLowerCase() !== pCode.toLowerCase())) {
+        return pName;
+    }
+    const fallback = String(fallbackDesc || '').trim();
+    if (fallback) return fallback;
+    return pName || pCode || '';
+};
+
 const assetExportRow = (asset, branchNames) => {
-    const prodName = asset.productId?.productName || asset.productName || '';
+    const prodName = resolveProductDescription(asset.productId, asset.productName);
     const prodCode = asset.productId?.productCode || asset.productCode || '';
     // Blank when the entry has no customer, so the file can be filled in and uploaded again
     // without creating a customer named after a placeholder.

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { MdSearch, MdSwapHoriz, MdVisibility, MdArrowBack, MdPersonAdd, MdHistory, MdCheckCircle, MdFileDownload, MdAdd, MdClose, MdArrowForward, MdStore, MdExpandMore, MdFilterList } from 'react-icons/md';
+import { MdSearch, MdSwapHoriz, MdVisibility, MdArrowBack, MdPersonAdd, MdHistory, MdCheckCircle, MdFileDownload, MdAdd, MdClose, MdArrowForward, MdStore, MdExpandMore, MdFilterList, MdSync } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { serialTransferService, customerService, csmService, mgrService, authService } from '../services/api';
 import AssetActivityLog from '../components/AssetActivityLog';
@@ -369,6 +369,43 @@ const CurrentUser = ({ row, nameClassName }) => {
     );
 };
 
+const idOf = (value) => {
+    if (!value) return '';
+    return typeof value === 'object' ? String(value._id || value.id || '') : String(value);
+};
+
+const branchExportFileName = (branches, now = new Date()) => {
+    const ist = new Date(now.getTime() + 330 * 60000);
+    const date = [ist.getUTCDate(), ist.getUTCMonth() + 1].map((part) => String(part).padStart(2, '0')).join('-') + `-${ist.getUTCFullYear()}`;
+    const safe = (text) => String(text || '').trim().replace(/[^A-Za-z0-9-]+/g, '_').replace(/^_+|_+$/g, '') || 'Branch';
+    const label = branches.length > 3 ? `${branches.length}_branches` : branches.map((branch) => safe(branch.name || branch.code)).join('_');
+    return `Serial_No_Transfer_${label}_${date}.xlsx`;
+};
+
+const saveBlob = (blob, fileName) => {
+    const url = window.URL.createObjectURL(new Blob([blob]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+};
+
+const downloadErrorMessage = async (err, fallback) => {
+    try {
+        if (err.response?.data instanceof Blob) {
+            const text = await err.response.data.text();
+            const parsed = JSON.parse(text);
+            return parsed.message || fallback;
+        }
+        return err.response?.data?.message || fallback;
+    } catch {
+        return fallback;
+    }
+};
+
 const SerialListTab = ({ onOpen, onTransfer }) => {
     const { canModify } = usePermission('master_serial_transfer');
     const [search, setSearch] = useStoredState('list.search', '');
@@ -376,21 +413,87 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
     const [status, setStatus] = useStoredState('list.assetStatus', '');
     const [ownership, setOwnership] = useStoredState('list.ownership', '');
     const [page, setPage] = useStoredState('list.page', 1);
-    const [mgr1, setMgr1] = useStoredState('list.mgr1', '');
-    const [mgr4, setMgr4] = useStoredState('list.mgr4', '');
     const range = useDateRange('list');
     const debouncedSearch = useDebounced(search.trim());
+
+    // Export dialog state
+    const [isExporting, setIsExporting] = useState(false);
+    const [exportDialog, setExportDialog] = useState({ open: false, loading: false, error: '', branches: [], selected: [], activeBranchId: '' });
 
     const viewBranches = useViewBranches();
     useFirstPageOnChange(viewBranches, setPage);
     const { rows, pagination, loading, mgrAccess } = useList(serialTransferService.listSerials, {
         page, limit: PAGE_SIZE, search: debouncedSearch || undefined, field: field || undefined, status: status || undefined,
-        ownership: ownership || undefined, mgr1: mgr1 || undefined, mgr4: mgr4 || undefined, ...range.params, branchIds: viewBranches,
+        ownership: ownership || undefined, ...range.params, branchIds: viewBranches,
     }, !range.invalid);
     const offset = (pagination.page - 1) * pagination.limit;
     // The row whose Download Customer Activity Log dialog is open.
     const [downloadFor, setDownloadFor] = useState(null);
     const [filtersOpen, toggleFilters] = useFiltersOpen();
+
+    const openExportDialog = async () => {
+        if (isExporting) return;
+        setExportDialog({ open: true, loading: true, error: '', branches: [], selected: [], activeBranchId: '' });
+        try {
+            const res = await serialTransferService.getTransferBranches();
+            const branches = res.data?.branches || [];
+            const current = String(res.data?.activeBranchId || '');
+            setExportDialog((prev) => ({
+                ...prev,
+                loading: false,
+                branches,
+                activeBranchId: current,
+                selected: branches.some((branch) => idOf(branch) === current)
+                    ? [current]
+                    : branches.length === 1 ? [idOf(branches[0])] : []
+            }));
+        } catch (err) {
+            setExportDialog((prev) => ({ ...prev, loading: false, error: err.response?.data?.message || 'Could not load your branches.' }));
+        }
+    };
+
+    const toggleExportBranch = (id) => setExportDialog((prev) => ({
+        ...prev,
+        selected: prev.selected.includes(id) ? prev.selected.filter((v) => v !== id) : [...prev.selected, id]
+    }));
+
+    const toggleAllExportBranches = () => setExportDialog((prev) => ({
+        ...prev,
+        selected: prev.selected.length === prev.branches.length ? [] : prev.branches.map(idOf)
+    }));
+
+    const runBranchExport = async () => {
+        if (isExporting || !exportDialog.selected.length) return;
+        setIsExporting(true);
+        try {
+            const chosen = exportDialog.branches.filter((branch) => exportDialog.selected.includes(idOf(branch)));
+            const params = {
+                branchIds: chosen.map(idOf).join(','),
+                search: search.trim() || undefined,
+                field: field || undefined,
+                status: status || undefined,
+                ownership: ownership || undefined,
+                ...range.params
+            };
+            const response = await serialTransferService.exportSerials(params);
+            const total = Number(response.headers?.['x-total-count']);
+            const userCount = Number(response.headers?.['x-user-count']);
+            saveBlob(response.data, branchExportFileName(chosen));
+            setExportDialog((prev) => ({ ...prev, open: false }));
+            if (total === 0) {
+                toast.info('No entries match: the file holds the summary and column headings only.');
+            } else {
+                toast.success(Number.isFinite(total)
+                    ? `Exported ${total.toLocaleString('en-IN')} serial numbers (${Number.isFinite(userCount) ? userCount.toLocaleString('en-IN') : 0} users) from ${chosen.length === 1 ? chosen[0].name : `${chosen.length} branches`}`
+                    : 'Export ready');
+            }
+        } catch (err) {
+            console.error('Export error:', err);
+            toast.error(await downloadErrorMessage(err, 'Failed to export records'));
+        } finally {
+            setIsExporting(false);
+        }
+    };
 
     return (
         <>
@@ -412,7 +515,17 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                     <option value="product">Product</option>
                     <option value="customer">Customer</option>
                 </select>
-                <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[viewBranches, status, ownership, mgr1, mgr4].filter(Boolean).length + datesInUse(range)} />
+                <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[viewBranches, status, ownership].filter(Boolean).length + datesInUse(range)} />
+                <button
+                    type="button"
+                    onClick={openExportDialog}
+                    disabled={isExporting}
+                    title="Export to Excel"
+                    aria-label="Export to Excel"
+                    className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-teal-600 transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
+                >
+                    {isExporting ? <MdSync className="animate-spin text-teal-600" size={18} /> : <MdFileDownload size={18} />}
+                </button>
                 {filtersOpen && (
                     <>
                         <ViewBranchFilter />
@@ -422,8 +535,6 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                             <option value="Sold">With original customer</option>
                             <option value="Transferred">Transferred / assigned to a new customer</option>
                         </select>
-                        <MgrFilter level={1} value={mgr1} onChange={(value) => { setMgr1(value); setPage(1); }} />
-                        <MgrFilter level={4} value={mgr4} onChange={(value) => { setMgr4(value); setPage(1); }} />
                         <DateRangeFilter range={range} field="Invoice Date" onChange={() => setPage(1)} />
                     </>
                 )}
@@ -437,14 +548,14 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                             pagination={pagination}
                             shown={rows.length}
                             noun="serial numbers"
-                            filtered={Boolean(debouncedSearch || status || ownership || mgr1 || mgr4 || range.fromDate || range.toDate)}
+                            filtered={Boolean(debouncedSearch || status || ownership || range.fromDate || range.toDate)}
                         />
                         <MobileCardList>
                             {rows.map((row, index) => (
                                 <MobileCard key={row._id} onClick={() => onOpen(row._id)}>
                                     <MobileCardHead
                                         title={<><span className="text-slate-400 font-bold">{offset + index + 1}.</span> {row.serialNumber}</>}
-                                        subtitle={[row.productCode, row.productName].filter(Boolean).join(' · ')}
+                                        subtitle={[row.productCode, row.productDescription || row.productName].filter(Boolean).join(' · ')}
                                     />
                                     <MobileFields>
                                         <MobileField label="Branch">{row.branchName || '-'}</MobileField>
@@ -495,7 +606,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                                             <td className="p-4 text-slate-600 whitespace-nowrap">{row.assetNo || '-'}</td>
                                             <td className="p-4 text-slate-600">
                                                 <span className="font-bold text-slate-700">{row.productCode}</span>
-                                                {row.productName && <span className="block text-xs text-slate-500">{row.productName}</span>}
+                                                {(row.productDescription || row.productName) && <span className="block text-xs text-slate-500">{row.productDescription || row.productName}</span>}
                                             </td>
                                             <td className="p-4 font-bold text-slate-700 whitespace-nowrap">{row.branchName || '-'}</td>
                                             <td className="p-4">
@@ -533,6 +644,108 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                     </>
                 )}
             </div>
+
+            {/* Multiple Data Export Modal */}
+            <Modal
+                isOpen={exportDialog.open}
+                onClose={() => { if (!isExporting) setExportDialog((prev) => ({ ...prev, open: false })); }}
+                title="Export Serial Numbers"
+                maxWidth="max-w-lg"
+            >
+                <div className="space-y-4">
+                    <p className="text-sm font-semibold text-slate-600">
+                        Select one or more branches. They go into one Excel file, with Asset Count and User Count included.
+                        Only branches your account can access are shown.
+                    </p>
+
+                    {exportDialog.loading && (
+                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-500 py-6 justify-center">
+                            <MdSync className="animate-spin" size={18} /> Loading your branches...
+                        </div>
+                    )}
+                    {!exportDialog.loading && exportDialog.error && (
+                        <p className="text-sm font-semibold text-rose-700 bg-rose-50 border border-rose-100 rounded-2xl px-4 py-3">{exportDialog.error}</p>
+                    )}
+                    {!exportDialog.loading && !exportDialog.error && exportDialog.branches.length === 0 && (
+                        <p className="text-sm font-semibold text-slate-600 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3">No branch is assigned to your account, so there is nothing to export.</p>
+                    )}
+
+                    {!exportDialog.loading && exportDialog.branches.length > 0 && (
+                        <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                            {exportDialog.branches.length > 1 && (
+                                <label className="flex items-center gap-3 px-4 py-3 bg-slate-50 border-b border-slate-200 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        className="h-4 w-4 accent-teal-600 cursor-pointer"
+                                        checked={exportDialog.selected.length === exportDialog.branches.length}
+                                        ref={(el) => {
+                                            if (el) el.indeterminate = exportDialog.selected.length > 0 && exportDialog.selected.length < exportDialog.branches.length;
+                                        }}
+                                        onChange={toggleAllExportBranches}
+                                        disabled={isExporting}
+                                    />
+                                    <span className="text-xs font-black uppercase tracking-widest text-slate-700">Select all</span>
+                                </label>
+                            )}
+                            <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
+                                {exportDialog.branches.map((branch) => {
+                                    const id = idOf(branch);
+                                    const isCurrent = id === String(exportDialog.activeBranchId || '');
+                                    return (
+                                        <label key={id} className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-teal-50/50 select-none">
+                                            <input
+                                                type="checkbox"
+                                                className="h-4 w-4 accent-teal-600 cursor-pointer"
+                                                checked={exportDialog.selected.includes(id)}
+                                                onChange={() => toggleExportBranch(id)}
+                                                disabled={isExporting}
+                                            />
+                                            <span className="flex-1 min-w-0 text-sm font-bold text-slate-800 truncate">{branch.name}</span>
+                                            {branch.code && branch.code !== branch.name && (
+                                                <span className="text-[10px] font-black text-slate-400 uppercase">{branch.code}</span>
+                                            )}
+                                            {isCurrent && (
+                                                <span className="text-[9px] font-black uppercase tracking-wider text-teal-700 bg-teal-50 border border-teal-200 rounded-full px-2 py-0.5">On screen</span>
+                                            )}
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {!exportDialog.loading && exportDialog.branches.length > 0 && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-slate-500">
+                            <span>
+                                <span className="font-black text-slate-800">{exportDialog.selected.length}</span> of {exportDialog.branches.length} {exportDialog.branches.length === 1 ? 'branch' : 'branches'} selected · Excel (.xlsx)
+                            </span>
+                            {(search.trim() || status || ownership || range.fromDate || range.toDate) && (
+                                <span className="text-amber-700">Your search and filters on screen apply to every branch.</span>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-3 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={() => setExportDialog((prev) => ({ ...prev, open: false }))}
+                            disabled={isExporting}
+                            className="px-6 py-3 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 rounded-2xl font-bold uppercase text-xs cursor-pointer"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={runBranchExport}
+                            disabled={isExporting || exportDialog.loading || exportDialog.selected.length === 0}
+                            className="flex items-center justify-center gap-2 px-8 py-3 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-black uppercase text-xs tracking-wider shadow-lg shadow-teal-600/20 active:scale-95 cursor-pointer"
+                        >
+                            {isExporting ? <MdSync className="animate-spin" size={16} /> : <MdFileDownload size={16} />}
+                            {isExporting ? 'Exporting...' : exportDialog.selected.length > 1 ? `Export ${exportDialog.selected.length} branches` : 'Export'}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </>
     );
 };
@@ -542,8 +755,6 @@ const HistoryTab = ({ onOpen }) => {
     const [flag, setFlag] = useStoredState('history.flag', '');
     const [entryType, setEntryType] = useStoredState('history.entryType', '');
     const [page, setPage] = useStoredState('history.page', 1);
-    const [mgr1, setMgr1] = useStoredState('history.mgr1', '');
-    const [mgr4, setMgr4] = useStoredState('history.mgr4', '');
     const range = useDateRange('history');
     const [filtersOpen, toggleFilters] = useFiltersOpen();
     const debouncedSearch = useDebounced(search.trim());
@@ -551,11 +762,11 @@ const HistoryTab = ({ onOpen }) => {
     const viewBranches = useViewBranches();
     useFirstPageOnChange(viewBranches, setPage);
     const { rows, pagination, loading } = useList(serialTransferService.listHistory, {
-        page, limit: PAGE_SIZE, search: debouncedSearch || undefined, flag: flag || undefined, entryType: entryType || undefined, mgr1: mgr1 || undefined, mgr4: mgr4 || undefined, ...range.params, branchIds: viewBranches,
+        page, limit: PAGE_SIZE, search: debouncedSearch || undefined, flag: flag || undefined, entryType: entryType || undefined, ...range.params, branchIds: viewBranches,
     }, !range.invalid);
 
     const emptyText = range.invalid ? 'Correct the date range to see results.'
-        : debouncedSearch || flag || entryType || mgr1 || mgr4 || range.fromDate || range.toDate ? 'No history records match.'
+        : debouncedSearch || flag || entryType || range.fromDate || range.toDate ? 'No history records match.'
             : 'No transfers recorded yet. Transfer a serial number from the Serial No List.';
 
     return (
@@ -571,7 +782,7 @@ const HistoryTab = ({ onOpen }) => {
                         className={`${inputClass} pl-11`}
                     />
                 </div>
-                <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[viewBranches, entryType, flag, mgr1, mgr4].filter(Boolean).length + datesInUse(range)} />
+                <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[viewBranches, entryType, flag].filter(Boolean).length + datesInUse(range)} />
                 {filtersOpen && (
                     <>
                         <ViewBranchFilter />
@@ -584,8 +795,6 @@ const HistoryTab = ({ onOpen }) => {
                             <option value="Active">Active (current customer)</option>
                             <option value="Inactive">Inactive (previous customers)</option>
                         </select>
-                        <MgrFilter level={1} value={mgr1} onChange={(value) => { setMgr1(value); setPage(1); }} />
-                        <MgrFilter level={4} value={mgr4} onChange={(value) => { setMgr4(value); setPage(1); }} />
                         <DateRangeFilter range={range} field="Transfer Date" onChange={() => setPage(1)} />
                     </>
                 )}
@@ -598,14 +807,14 @@ const HistoryTab = ({ onOpen }) => {
                             pagination={pagination}
                             shown={rows.length}
                             noun="history records"
-                            filtered={Boolean(debouncedSearch || flag || entryType || mgr1 || mgr4 || range.fromDate || range.toDate)}
+                            filtered={Boolean(debouncedSearch || flag || entryType || range.fromDate || range.toDate)}
                         />
                         <MobileCardList>
                             {rows.map((entry) => (
                                 <MobileCard key={entry._id} onClick={() => onOpen(entry.assetId)}>
                                     <MobileCardHead
                                         title={entry.serialNumber}
-                                        subtitle={[entry.productCode, entry.productName].filter(Boolean).join(' · ')}
+                                        subtitle={[entry.productCode, entry.productDescription || entry.productName].filter(Boolean).join(' · ')}
                                         aside={<TypeBadge type={entry.entryType} />}
                                     />
                                     <MobileFields>
@@ -636,7 +845,7 @@ const HistoryTab = ({ onOpen }) => {
                                             <td className="p-4 font-bold text-slate-800 whitespace-nowrap">{entry.serialNumber}</td>
                                             <td className="p-4 text-slate-600">
                                                 <span className="font-bold text-slate-700">{entry.productCode}</span>
-                                                {entry.productName && <span className="block text-xs text-slate-500">{entry.productName}</span>}
+                                                {(entry.productDescription || entry.productName) && <span className="block text-xs text-slate-500">{entry.productDescription || entry.productName}</span>}
                                             </td>
                                             <td className="p-4"><CustomerCell entry={entry} /></td>
                                             <td className="p-4"><FlagBadge active={entry.isActive} /></td>
@@ -669,17 +878,6 @@ const OWNERSHIP_OPTIONS = [
     { value: 'Active', label: 'Active Customer Log', hint: 'Current customer of each serial number' },
     { value: 'Inactive', label: 'Inactive Customer Log', hint: 'Earlier customers, before a transfer' },
 ];
-
-const saveBlob = (blob, fileName) => {
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-};
 
 // A failed blob request carries its JSON error message inside the blob.
 const blobErrorMessage = async (err, fallback) => {
@@ -790,8 +988,6 @@ const ActivityTab = ({ onOpen, assetId }) => {
     const [ownership, setOwnership] = useStoredState(`${prefix}.ownership`, 'Active');
     const [search, setSearch] = useStoredState(`${prefix}.search`, '');
     const [page, setPage] = useStoredState(`${prefix}.page`, 1);
-    const [mgr1, setMgr1] = useStoredState(`${prefix}.mgr1`, '');
-    const [mgr4, setMgr4] = useStoredState(`${prefix}.mgr4`, '');
     const range = useDateRange(prefix);
     const [filtersOpen, toggleFilters] = useFiltersOpen();
     const debouncedSearch = useDebounced(search.trim());
@@ -801,14 +997,14 @@ const ActivityTab = ({ onOpen, assetId }) => {
     useFirstPageOnChange(viewBranches, setPage);
     const filters = assetId
         ? { ownership, assetId }
-        : { ownership, search: debouncedSearch || undefined, mgr1: mgr1 || undefined, mgr4: mgr4 || undefined, ...range.params, branchIds: viewBranches };
+        : { ownership, search: debouncedSearch || undefined, ...range.params, branchIds: viewBranches };
     const { rows, pagination, loading } = useList(serialTransferService.listActivity, { ...filters, page, limit: PAGE_SIZE }, !range.invalid);
     const offset = (pagination.page - 1) * pagination.limit;
     const inactive = ownership === 'Inactive';
     const emptyText = assetId
         ? (inactive ? 'This serial number has never been transferred, so it has no inactive (earlier) customers to download.' : 'No current customer found for this serial number.')
         : range.invalid ? 'Correct the date range to see results.'
-            : inactive && !debouncedSearch && !mgr1 && !mgr4 && !range.fromDate && !range.toDate ? 'No earlier customers yet. A customer becomes inactive when the serial is transferred.'
+            : inactive && !debouncedSearch && !range.fromDate && !range.toDate ? 'No earlier customers yet. A customer becomes inactive when the serial is transferred.'
                 : 'No customer records match.';
 
     const download = async () => {
@@ -866,12 +1062,10 @@ const ActivityTab = ({ onOpen, assetId }) => {
                                 className={`${inputClass} pl-11`}
                             />
                         </div>
-                        <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[viewBranches, mgr1, mgr4].filter(Boolean).length + datesInUse(range)} />
+                        <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[viewBranches].filter(Boolean).length + datesInUse(range)} />
                         {filtersOpen && (
                             <>
                                 <ViewBranchFilter />
-                                <MgrFilter level={1} value={mgr1} onChange={(value) => { setMgr1(value); setPage(1); }} />
-                                <MgrFilter level={4} value={mgr4} onChange={(value) => { setMgr4(value); setPage(1); }} />
                                 <DateRangeFilter range={range} field="Customer Since" onChange={() => setPage(1)} />
                             </>
                         )}
@@ -890,7 +1084,7 @@ const ActivityTab = ({ onOpen, assetId }) => {
                                 <MobileCard key={row._id} onClick={onOpen ? () => onOpen(row.assetId) : undefined}>
                                     <MobileCardHead
                                         title={<><span className="text-slate-400 font-bold">{offset + index + 1}.</span> {row.serialNumber}</>}
-                                        subtitle={[row.productCode, row.productName].filter(Boolean).join(' · ')}
+                                        subtitle={[row.productCode, row.productDescription || row.productName].filter(Boolean).join(' · ')}
                                         aside={<FlagBadge active={row.ownership === 'Active'} />}
                                     />
                                     {row.mgr1 && <p className="mt-1 text-[10px] font-semibold text-emerald-600">{[row.mgr1, row.mgr2, row.mgr3, row.mgr4, row.mgr5].filter(Boolean).join(' · ')}</p>}
@@ -929,7 +1123,7 @@ const ActivityTab = ({ onOpen, assetId }) => {
                                             <td className="p-4 font-bold text-slate-800 whitespace-nowrap">{row.serialNumber}</td>
                                             <td className="p-4 text-slate-600 min-w-[14rem]">
                                                 <span className="font-bold text-slate-700">{row.productCode}</span>
-                                                {row.productName && <span className="block text-xs text-slate-500">{row.productName}</span>}
+                                                {(row.productDescription || row.productName) && <span className="block text-xs text-slate-500">{row.productDescription || row.productName}</span>}
                                                 {row.mgr1 && <span className="block text-[10px] font-semibold text-emerald-600">{[row.mgr1, row.mgr2, row.mgr3, row.mgr4, row.mgr5].filter(Boolean).join(' · ')}</span>}
                                             </td>
                                             <td className="p-4">

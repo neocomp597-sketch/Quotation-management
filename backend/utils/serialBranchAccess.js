@@ -20,9 +20,10 @@ const isBranchLevel = () => String(process.env.SERIAL_BRANCH_TRANSFER_ACCESS || 
 
 /** Branch ids the request is limited to, or null for every branch of the company. */
 const limitedBranchIds = (req) => {
-    if (!isBranchLevel()) return null;
-    if (req.user?.activeBranchId) return [String(req.user.activeBranchId)];
-    const ids = getSelectableBranchIds(req.user);
+    if (isBranchLevel()) {
+        if (req.user?.activeBranchId) return [String(req.user.activeBranchId)];
+    }
+    const ids = req.user?.allowedBranchIds !== undefined ? req.user?.allowedBranchIds : getSelectableBranchIds(req.user);
     return ids ? ids.map(String) : null;
 };
 

@@ -28,7 +28,7 @@ const formatMgrVal = (mgr) => {
 // `extraSelect` adds product fields beyond name/code (e.g. 'basePrice mrp').
 const productMgrPopulate = (extraSelect = '') => ({
     path: 'productId',
-    select: ['productName productCode', extraSelect, MGR_KEYS.join(' ')].filter(Boolean).join(' '),
+    select: ['productName productCode description', extraSelect, MGR_KEYS.join(' ')].filter(Boolean).join(' '),
     options: { bypassTenant: true },
     populate: MGR_KEYS.map((key) => ({ path: key, select: 'code description', options: { bypassTenant: true } }))
 });
@@ -36,11 +36,25 @@ const productMgrPopulate = (extraSelect = '') => ({
 const isPopulatedProduct = (product) =>
     Boolean(product) && typeof product === 'object' && !(product instanceof mongoose.Types.ObjectId);
 
+const resolveProductDescription = (product, fallbackDesc = '') => {
+    const pDesc = String(product?.description || '').trim();
+    if (pDesc) return pDesc;
+    const pName = String(product?.productName || '').trim();
+    const pCode = String(product?.productCode || '').trim();
+    if (pName && (!pCode || pName.toLowerCase() !== pCode.toLowerCase())) {
+        return pName;
+    }
+    const fallback = String(fallbackDesc || '').trim();
+    if (fallback) return fallback;
+    return pName || pCode || '';
+};
+
 /**
  * Overwrite a lean asset/history document's mgr1..mgr5 with the live values
  * from its populated product. A product with no MGR assigned yields ''.
  * Only when the product itself cannot be resolved (deleted product) does the
  * legacy value stored on the document remain.
+ * Also resolves product description with Priority 1: Product Master, Priority 2: Uploaded.
  */
 const applyProductMgrs = (doc) => {
     if (!doc || typeof doc !== 'object') return doc;
@@ -48,6 +62,11 @@ const applyProductMgrs = (doc) => {
     if (!isPopulatedProduct(product)) return doc;
     for (const key of MGR_KEYS) {
         doc[key] = formatMgrVal(product[key]);
+    }
+    const resolvedDesc = resolveProductDescription(product, doc.productName);
+    if (resolvedDesc) {
+        doc.productDescription = resolvedDesc;
+        doc.productName = resolvedDesc;
     }
     return doc;
 };
