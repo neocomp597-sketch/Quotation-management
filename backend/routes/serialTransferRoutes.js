@@ -15,6 +15,7 @@ router.get('/serials', serialTransferController.listSerials);
 router.get('/serials/export', serialTransferController.exportSerials);
 router.get('/serials/:assetId', serialTransferController.getSerial);
 router.put('/serials/:assetId/asset-no', serialTransferController.updateAssetNo);
+router.put('/serials/:assetId/warranty-end', serialTransferController.updateWarrantyEnd);
 router.post('/serials/:assetId/transfer', serialTransferController.transferSerial);
 router.post('/serials/:assetId/past-entry', serialTransferController.addPastEntry);
 router.get('/history', serialTransferController.listHistory);

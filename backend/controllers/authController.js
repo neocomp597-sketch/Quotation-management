@@ -359,8 +359,27 @@ exports.login = async (req, res) => {
         const { email, password } = req.body;
         const normalizedEmail = email ? String(email).trim().toLowerCase() : '';
 
-        const user = await User.findOne({ email: { $regex: new RegExp("^" + normalizedEmail.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$", "i") } })
+        let user = await User.findOne({ email: { $regex: new RegExp("^" + normalizedEmail.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$", "i") } })
             .populate(BRANCH_POPULATE);
+
+        // Fallback: Check if an active EmployeeProfile matches this email and points to a linked User
+        if ((!user || !user.employeeProfileId) && normalizedEmail) {
+            const EmployeeProfile = require('../models/EmployeeProfile');
+            const employee = await EmployeeProfile.findOne({
+                email: { $regex: new RegExp("^" + normalizedEmail.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$", "i") },
+                status: 'Active'
+            }).setOptions({ bypassTenant: true, bypassBranch: true }).lean();
+            if (employee) {
+                const linkedUser = await User.findOne({ employeeProfileId: employee._id }).populate(BRANCH_POPULATE);
+                if (linkedUser) {
+                    user = linkedUser;
+                    if (user.email !== normalizedEmail) {
+                        user.email = normalizedEmail;
+                        await user.save().catch(() => {});
+                    }
+                }
+            }
+        }
         if (!user) {
             return res.status(400).json({ message: 'Invalid credentials' });
         }

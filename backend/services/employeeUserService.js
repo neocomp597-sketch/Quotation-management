@@ -74,9 +74,14 @@ const syncUserForEmployee = async (employeeOrId) => {
         }
 
         if (existingUser) {
-            const emailHolder = emailStr && emailStr !== emailOf(existingUser.email)
-                ? await User.findOne({ _id: { $ne: existingUser._id }, email: exactEmail(emailStr) }).select('_id').lean()
+            let emailHolder = emailStr && emailStr !== emailOf(existingUser.email)
+                ? await User.findOne({ _id: { $ne: existingUser._id }, email: exactEmail(emailStr) })
                 : null;
+            if (emailHolder && (!emailHolder.employeeProfileId || String(emailHolder.companyId) !== String(companyId))) {
+                emailHolder.email = `archive_${Date.now()}_${emailHolder.email}`;
+                await emailHolder.save();
+                emailHolder = null;
+            }
             existingUser.set(identityChanges(existingUser, employee, () => Boolean(emailHolder)));
             existingUser.branchId = finalBranchId;
             existingUser.assignedBranches = rawAssignedBranches;
