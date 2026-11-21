@@ -36,19 +36,16 @@ exports.createVisit = async (req, res) => {
             return res.status(404).json({ message: 'Ticket not found' });
         }
 
-        // Only one active service visit allowed per customer
-        const customerTickets = await Ticket.find({ customerId: ticket.customerId, companyId }).select('_id').lean();
-        const ticketIds = customerTickets.map(t => t._id);
-
+        // Only one active service visit allowed per ticket
         const activeVisit = await ServiceVisit.findOne({
-            ticketId: { $in: ticketIds },
+            ticketId: ticket._id,
             status: { $in: ['Scheduled', 'In Transit', 'Started'] },
             companyId
         }).lean();
 
         if (activeVisit) {
             return res.status(400).json({ 
-                message: 'A service visit is already scheduled for this customer. Please use the Reschedule option instead of creating a new service visit.' 
+                message: 'A service visit is already scheduled for this ticket. Please use the Reschedule option instead of creating a new service visit.' 
             });
         }
 
@@ -128,9 +125,14 @@ exports.getVisits = async (req, res) => {
         }
 
         // A visit lives in its ticket's branch: the list holds the visits of the branch selected
-        // in the header (tenantPlugin). An older visit with no branch still shows its ticket.
-        const visits = await ServiceVisit.find(filter)
-            .select(VISIT_LIST_EXCLUDE)
+        // in the header (tenantPlugin). When querying visits for a specific ticket, bypass branch
+        // scoping so the ticket's complete visit history is always visible.
+        const visitQuery = ServiceVisit.find(filter)
+            .select(VISIT_LIST_EXCLUDE);
+        if (req.query.ticketId) {
+            visitQuery.setOptions({ bypassBranch: true });
+        }
+        const visits = await visitQuery
             .populate({
                 path: 'ticketId',
                 select: 'ticketNo issueTitle customerId status invoiceId manualInvoiceNo assetId pincode',
@@ -372,21 +374,17 @@ exports.rescheduleVisit = async (req, res) => {
         const isReopen = ['Completed', 'Cancelled'].includes(visit.status);
 
         if (isReopen) {
-            // Re-opening makes this visit active again: keep the one-active-visit-per-customer rule
-            const visitTicket = await Ticket.findOne({ _id: visit.ticketId, companyId }).select('customerId').lean();
-            if (visitTicket) {
-                const customerTickets = await Ticket.find({ customerId: visitTicket.customerId, companyId }).select('_id').lean();
-                const otherActiveVisit = await ServiceVisit.findOne({
-                    _id: { $ne: visit._id },
-                    ticketId: { $in: customerTickets.map(t => t._id) },
-                    status: { $in: ['Scheduled', 'In Transit', 'Started'] },
-                    companyId
-                }).select('visitNo').lean();
-                if (otherActiveVisit) {
-                    return res.status(400).json({
-                        message: `Another service visit (${otherActiveVisit.visitNo}) is already active for this customer. Please reschedule that visit instead.`
-                    });
-                }
+            // Re-opening makes this visit active again: keep the one-active-visit-per-ticket rule
+            const otherActiveVisit = await ServiceVisit.findOne({
+                _id: { $ne: visit._id },
+                ticketId: visit.ticketId,
+                status: { $in: ['Scheduled', 'In Transit', 'Started'] },
+                companyId
+            }).select('visitNo').lean();
+            if (otherActiveVisit) {
+                return res.status(400).json({
+                    message: `Another service visit (${otherActiveVisit.visitNo}) is already active for this ticket. Please reschedule that visit instead.`
+                });
             }
 
             // Preserve the completed visit's report, photo, signature and expenses before resetting it
