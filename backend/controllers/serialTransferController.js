@@ -2125,55 +2125,8 @@ exports.exportSerials = async (req, res) => {
         headerRow.font = { bold: true, size: 11 };
         headerRow.commit();
 
-        const cursor = Asset.find(scopedQuery)
-            .setOptions(scope.options)
-            .select('serialNumber assetNo productId productCode productName status branchId customerId customerCode customerNameStr saleDate invoiceDate invoiceNumber warrantyEnd remark remarks mgr1 mgr2 mgr3 mgr4 mgr5 createdAt')
-            .populate(customerPopulate)
-            .populate(productMgrPopulate())
-            .sort({ saleDate: -1, createdAt: -1 })
-            .allowDiskUse(true)
-            .lean()
-            .cursor({ batchSize: 500 });
-
-        let batch = [];
-        for await (const asset of cursor) {
-            batch.push(asset);
-            if (batch.length >= 250) {
-                const holders = await employeeHolderLabels(batch.map((a) => a.customerId?.employeeProfileId));
-                for (const item of batch) {
-                    const itemWithMgrs = applyProductMgrs(item);
-                    const productDesc = item.productId?.description || itemWithMgrs.productDescription || '';
-                    const holder = holders.get(String(item.customerId?.employeeProfileId));
-                    const invDate = invoiceDateOf(item);
-                    const emailId = holder?.email || holder?.subtitle || (item.customerId?.email) || '';
-                    const name = holder?.name || customerLabel(item.customerId, item.customerNameStr);
-                    const custCode = holder?.externalCode || cleanText(item.customerId?.externalCode) || item.customerCode || '';
-
-                    const row = sheet.addRow([
-                        branchNames.get(String(item.branchId)) || '',
-                        item.serialNumber || '',
-                        item.assetNo || '',
-                        item.productId?.productCode || item.productCode || '',
-                        productDesc,
-                        emailId,
-                        name,
-                        custCode,
-                        item.invoiceNumber || '',
-                        formatDDMMYYYY(invDate),
-                        formatDDMMYYYY(item.warrantyEnd),
-                        item.remark || item.remarks || '',
-                        itemWithMgrs.mgr1 || '',
-                        itemWithMgrs.mgr2 || '',
-                        itemWithMgrs.mgr3 || '',
-                        itemWithMgrs.mgr4 || '',
-                        itemWithMgrs.mgr5 || ''
-                    ]);
-                    row.commit();
-                }
-                batch = [];
-            }
-        }
-        if (batch.length > 0) {
+        const EXPORT_BATCH_SIZE = 500;
+        const writeBatch = async (batch) => {
             const holders = await employeeHolderLabels(batch.map((a) => a.customerId?.employeeProfileId));
             for (const item of batch) {
                 const itemWithMgrs = applyProductMgrs(item);
@@ -2205,7 +2158,24 @@ exports.exportSerials = async (req, res) => {
                 ]);
                 row.commit();
             }
-            batch = [];
+        };
+
+        // Use bounded, ordinary find queries for each page. Query cursors can stop early when
+        // populated references are involved, leaving a valid workbook with its summary and
+        // headers but none of the matching assets. The export is capped above, so paging keeps
+        // memory bounded while ensuring every counted asset is fetched and written.
+        for (let skip = 0; skip < total; skip += EXPORT_BATCH_SIZE) {
+            const batch = await Asset.find(scopedQuery)
+                .setOptions(scope.options)
+                .select('serialNumber assetNo productId productCode productName status branchId customerId customerCode customerNameStr saleDate invoiceDate invoiceNumber warrantyEnd remark remarks mgr1 mgr2 mgr3 mgr4 mgr5 createdAt')
+                .populate(customerPopulate)
+                .populate(productMgrPopulate())
+                .sort({ saleDate: -1, createdAt: -1, _id: 1 })
+                .skip(skip)
+                .limit(EXPORT_BATCH_SIZE)
+                .lean();
+            if (!batch.length) break;
+            await writeBatch(batch);
         }
 
         sheet.commit();
