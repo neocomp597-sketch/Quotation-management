@@ -522,6 +522,7 @@ export const serialTransferService = {
   exportSerials: (params = {}) => api.get("/serial-transfers/serials/export", { params, responseType: "blob" }),
   getSerial: (assetId) => api.get(`/serial-transfers/serials/${assetId}`),
   updateAssetNo: (assetId, assetNo) => api.put(`/serial-transfers/serials/${assetId}/asset-no`, { assetNo }),
+  updateWarrantyEnd: (assetId, warrantyEnd) => api.put(`/serial-transfers/serials/${assetId}/warranty-end`, { warrantyEnd }),
   transfer: (assetId, data) => api.post(`/serial-transfers/serials/${assetId}/transfer`, data),
   // An earlier customer recorded afterwards; stays inactive.
   addPastEntry: (assetId, data) => api.post(`/serial-transfers/serials/${assetId}/past-entry`, data),

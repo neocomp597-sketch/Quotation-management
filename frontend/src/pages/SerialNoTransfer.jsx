@@ -1175,6 +1175,88 @@ const InfoRow = ({ label, children }) => (
     </div>
 );
 
+const formatDDMMYYYY = (date, fallback = '-') => {
+    if (!date) return fallback;
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return fallback;
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}.${mm}.${yyyy}`;
+};
+
+// The serial's Warranty End Date, editable with a date picker; format displayed is dd.mm.yyyy.
+const WarrantyEndRow = ({ assetId, value, canEdit, onSaved }) => {
+    const toIso = (v) => {
+        if (!v) return '';
+        const d = new Date(v);
+        return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+    };
+
+    const [draft, setDraft] = useState(toIso(value));
+    const [saving, setSaving] = useState(false);
+    useEffect(() => { setDraft(toIso(value)); }, [value]);
+
+    if (!canEdit) {
+        return <InfoRow label="Warranty End Date">{formatDDMMYYYY(value)}</InfoRow>;
+    }
+
+    const changed = draft !== toIso(value);
+    const save = async () => {
+        if (!changed || saving) return;
+        setSaving(true);
+        try {
+            const res = await serialTransferService.updateWarrantyEnd(assetId, draft || null);
+            onSaved(res.data);
+            toast.success('Warranty End Date saved');
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to save Warranty End Date');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2">
+            <label htmlFor="serial-warranty-end" className="shrink-0 whitespace-nowrap text-[10px] font-black uppercase tracking-widest text-slate-400">Warranty End Date</label>
+            <div className="min-w-[8rem] flex-1 flex items-center gap-2">
+                <input
+                    id="serial-warranty-end"
+                    type="date"
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-bold text-slate-800 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
+                />
+                {draft && (
+                    <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+                        ({formatDDMMYYYY(draft)})
+                    </span>
+                )}
+            </div>
+            {changed && (
+                <div className="flex gap-2">
+                    <button
+                        type="button"
+                        onClick={save}
+                        disabled={saving}
+                        className="rounded-xl bg-primary-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white hover:bg-primary-700 disabled:opacity-60 transition-all"
+                    >
+                        {saving ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setDraft(toIso(value))}
+                        disabled={saving}
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 transition-all"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+};
+
 // The serial's Asset No, typed straight in the row: free text, not checked; blank clears it.
 const AssetNoRow = ({ assetId, value, canEdit, onSaved }) => {
     const [draft, setDraft] = useState(value);
@@ -1382,8 +1464,20 @@ export const SerialNoDetails = ({ transfer = false }) => {
                             <div className="grid grid-cols-1 gap-3 p-4 md:p-6 md:grid-cols-2">
                                 <InfoRow label="Serial Number">{data.asset.serialNumber}</InfoRow>
                                 <InfoRow label="Product">{data.asset.productCode}{data.asset.productName ? ` · ${data.asset.productName}` : ''}</InfoRow>
-                                <InfoRow label="Status"><StatusBadge status={data.asset.status} /></InfoRow>
+                                <InfoRow label="Invoice Date">{formatDDMMYYYY(data.asset.invoiceDate)}</InfoRow>
+                                <WarrantyEndRow
+                                    assetId={assetId}
+                                    value={data.asset.warrantyEnd}
+                                    canEdit={canModify}
+                                    onSaved={(updated) => setResult({ id: assetId, data: updated, error: '' })}
+                                />
                                 <InfoRow label="Branch">{data.asset.branchName || '-'}</InfoRow>
+                                <AssetNoRow
+                                    assetId={assetId}
+                                    value={data.asset.assetNo || ''}
+                                    canEdit={canModify}
+                                    onSaved={(updated) => setResult({ id: assetId, data: updated, error: '' })}
+                                />
                                 {returnedBy ? (
                                     <InfoRow label="Current User">
                                         None (returned)
@@ -1400,12 +1494,6 @@ export const SerialNoDetails = ({ transfer = false }) => {
                                         </span>
                                     </InfoRow>
                                 )}
-                                <AssetNoRow
-                                    assetId={assetId}
-                                    value={data.asset.assetNo || ''}
-                                    canEdit={canModify}
-                                    onSaved={(updated) => setResult({ id: assetId, data: updated, error: '' })}
-                                />
                                 {!canTakeCustomer(status) && (
                                     <p className="md:col-span-2 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
                                         This serial number is scrapped. Its customer history is kept, but it cannot be assigned or transferred to a customer.

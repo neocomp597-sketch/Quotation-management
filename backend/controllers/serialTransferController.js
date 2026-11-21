@@ -10,7 +10,7 @@ const Product = require('../models/Product');
 require('../models/MGR'); // populated through Product mgr1..mgr5
 const SerialTransfer = require('../models/SerialTransfer');
 const SerialBranchTransfer = require('../models/SerialBranchTransfer');
-const { MGR_KEYS, formatMgrVal } = require('../utils/productMgr');
+const { MGR_KEYS, formatMgrVal, productMgrPopulate, applyProductMgrs } = require('../utils/productMgr');
 const { formatDate } = require('../utils/dateFormat');
 const { ANY_BRANCH, serialBranchScope, myBranchesScope, inScope } = require('../utils/customerBranchSerials');
 const { requestedViewBranches } = require('../utils/viewBranches');
@@ -490,6 +490,7 @@ const loadSerial = async (assetId, access = null, scope = null) => {
             invoiceNumber: asset.invoiceNumber,
             invoiceDate: invoiceDateOf(asset),
             saleDate: saleDateOf(asset),
+            warrantyEnd: asset.warrantyEnd || null,
             customerId: asset.customerId?._id || null,
             customerCode: cleanText(asset.customerId?.externalCode) || asset.customerCode,
             customerName: customerLabel(asset.customerId, asset.customerNameStr),
@@ -564,6 +565,51 @@ exports.updateAssetNo = async (req, res) => {
         return res.json(await loadSerial(assetId, access, scope));
     } catch (error) {
         return res.status(500).json({ message: 'Failed to save the Asset No', error: error.message });
+    }
+};
+
+/** Saves the serial's Warranty End Date: parsed as Date, or null to clear. */
+exports.updateWarrantyEnd = async (req, res) => {
+    try {
+        const { assetId } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(assetId)) {
+            return res.status(400).json({ message: 'Invalid serial record' });
+        }
+        const access = await mgrAccessCondition(req);
+        const { warrantyEnd } = req.body;
+        const parsedDate = warrantyEnd ? new Date(warrantyEnd) : null;
+        if (warrantyEnd && isNaN(parsedDate.getTime())) {
+            return res.status(400).json({ message: 'Invalid Warranty End Date' });
+        }
+        const scope = await myBranchesScope(req);
+        const previous = await Asset.findOneAndUpdate(
+            inScope({ _id: assetId, ...access }, scope),
+            { $set: { warrantyEnd: parsedDate } }
+        )
+            .setOptions(scope.options)
+            .select('warrantyEnd serialNumber companyId')
+            .lean();
+        if (!previous) return res.status(404).json({ message: 'Serial number not found' });
+
+        try {
+            await AuditLog.create({
+                action: 'WARRANTY_END_UPDATED',
+                entityType: 'Asset',
+                entityId: previous._id,
+                userId: req.user.id,
+                userName: req.user.name,
+                oldValue: { warrantyEnd: previous.warrantyEnd || null },
+                newValue: { warrantyEnd: parsedDate },
+                reason: `Warranty End Date of serial ${previous.serialNumber}`,
+                companyId: previous.companyId
+            });
+        } catch (auditError) {
+            console.error('Warranty End audit log error:', auditError);
+        }
+
+        return res.json(await loadSerial(assetId, access, scope));
+    } catch (error) {
+        return res.status(500).json({ message: 'Failed to save Warranty End Date', error: error.message });
     }
 };
 
@@ -2014,6 +2060,16 @@ exports.exportSerials = async (req, res) => {
         res.setHeader('x-user-count', String(userCount));
         res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, x-total-count, x-user-count');
 
+        const formatDDMMYYYY = (date) => {
+            if (!date) return '';
+            const d = new Date(date);
+            if (isNaN(d.getTime())) return '';
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            return `${dd}.${mm}.${yyyy}`;
+        };
+
         const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ stream: res, useStyles: true });
         const sheet = workbook.addWorksheet('Serial Numbers');
         sheet.columns = [
@@ -2022,13 +2078,18 @@ exports.exportSerials = async (req, res) => {
             { width: 18 }, // Asset No
             { width: 22 }, // Product Code
             { width: 35 }, // Product Description
-            { width: 15 }, // Status
-            { width: 32 }, // Current User
-            { width: 32 }, // Customer Name
+            { width: 30 }, // eMail id
+            { width: 25 }, // Name
             { width: 20 }, // Customer Code
             { width: 22 }, // Invoice Number
             { width: 16 }, // Invoice Date
-            { width: 16 }  // Sale Date
+            { width: 18 }, // Warranty End Date
+            { width: 25 }, // Remark
+            { width: 15 }, // MGR 1
+            { width: 15 }, // MGR 2
+            { width: 15 }, // MGR 3
+            { width: 15 }, // MGR 4
+            { width: 15 }  // MGR 5
         ];
 
         // Row 1: Summary Counts
@@ -2048,22 +2109,27 @@ exports.exportSerials = async (req, res) => {
             'Asset No',
             'Product Code',
             'Product Description',
-            'Status',
-            'Current User',
-            'Customer Name',
+            'eMail id',
+            'Name',
             'Customer Code',
             'Invoice Number',
             'Invoice Date',
-            'Sale Date'
+            'Warranty End Date',
+            'Remark',
+            'MGR 1',
+            'MGR 2',
+            'MGR 3',
+            'MGR 4',
+            'MGR 5'
         ];
         headerRow.font = { bold: true, size: 11 };
         headerRow.commit();
 
         const cursor = Asset.find(scopedQuery)
             .setOptions(scope.options)
-            .select('serialNumber assetNo productId productCode productName status branchId customerId customerCode customerNameStr saleDate invoiceDate invoiceNumber createdAt')
+            .select('serialNumber assetNo productId productCode productName status branchId customerId customerCode customerNameStr saleDate invoiceDate invoiceNumber warrantyEnd remark remarks mgr1 mgr2 mgr3 mgr4 mgr5 createdAt')
             .populate(customerPopulate)
-            .populate(productPopulate)
+            .populate(productMgrPopulate())
             .sort({ saleDate: -1, createdAt: -1 })
             .allowDiskUse(true)
             .lean()
@@ -2075,23 +2141,32 @@ exports.exportSerials = async (req, res) => {
             if (batch.length >= 250) {
                 const holders = await employeeHolderLabels(batch.map((a) => a.customerId?.employeeProfileId));
                 for (const item of batch) {
-                    const productDesc = resolveProductDescription(item.productId, item.productName);
+                    const itemWithMgrs = applyProductMgrs(item);
+                    const productDesc = item.productId?.description || itemWithMgrs.productDescription || '';
                     const holder = holders.get(String(item.customerId?.employeeProfileId));
-                    const sDate = item.status === 'SOLD' ? saleDateOf(item) : item.saleDate || item.invoiceDate || null;
                     const invDate = invoiceDateOf(item);
+                    const emailId = holder?.email || holder?.subtitle || (item.customerId?.email) || '';
+                    const name = holder?.name || customerLabel(item.customerId, item.customerNameStr);
+                    const custCode = holder?.externalCode || cleanText(item.customerId?.externalCode) || item.customerCode || '';
+
                     const row = sheet.addRow([
                         branchNames.get(String(item.branchId)) || '',
                         item.serialNumber || '',
                         item.assetNo || '',
                         item.productId?.productCode || item.productCode || '',
                         productDesc,
-                        statusOf(item),
-                        holder || '',
-                        customerLabel(item.customerId, item.customerNameStr),
-                        cleanText(item.customerId?.externalCode) || item.customerCode || '',
+                        emailId,
+                        name,
+                        custCode,
                         item.invoiceNumber || '',
-                        invDate ? formatDate(invDate, '') : '',
-                        sDate ? formatDate(sDate, '') : ''
+                        formatDDMMYYYY(invDate),
+                        formatDDMMYYYY(item.warrantyEnd),
+                        item.remark || item.remarks || '',
+                        itemWithMgrs.mgr1 || '',
+                        itemWithMgrs.mgr2 || '',
+                        itemWithMgrs.mgr3 || '',
+                        itemWithMgrs.mgr4 || '',
+                        itemWithMgrs.mgr5 || ''
                     ]);
                     row.commit();
                 }
@@ -2101,23 +2176,32 @@ exports.exportSerials = async (req, res) => {
         if (batch.length > 0) {
             const holders = await employeeHolderLabels(batch.map((a) => a.customerId?.employeeProfileId));
             for (const item of batch) {
-                const productDesc = resolveProductDescription(item.productId, item.productName);
+                const itemWithMgrs = applyProductMgrs(item);
+                const productDesc = item.productId?.description || itemWithMgrs.productDescription || '';
                 const holder = holders.get(String(item.customerId?.employeeProfileId));
-                const sDate = item.status === 'SOLD' ? saleDateOf(item) : item.saleDate || item.invoiceDate || null;
                 const invDate = invoiceDateOf(item);
+                const emailId = holder?.email || holder?.subtitle || (item.customerId?.email) || '';
+                const name = holder?.name || customerLabel(item.customerId, item.customerNameStr);
+                const custCode = holder?.externalCode || cleanText(item.customerId?.externalCode) || item.customerCode || '';
+
                 const row = sheet.addRow([
                     branchNames.get(String(item.branchId)) || '',
                     item.serialNumber || '',
                     item.assetNo || '',
                     item.productId?.productCode || item.productCode || '',
                     productDesc,
-                    statusOf(item),
-                    holder || '',
-                    customerLabel(item.customerId, item.customerNameStr),
-                    cleanText(item.customerId?.externalCode) || item.customerCode || '',
+                    emailId,
+                    name,
+                    custCode,
                     item.invoiceNumber || '',
-                    invDate ? formatDate(invDate, '') : '',
-                    sDate ? formatDate(sDate, '') : ''
+                    formatDDMMYYYY(invDate),
+                    formatDDMMYYYY(item.warrantyEnd),
+                    item.remark || item.remarks || '',
+                    itemWithMgrs.mgr1 || '',
+                    itemWithMgrs.mgr2 || '',
+                    itemWithMgrs.mgr3 || '',
+                    itemWithMgrs.mgr4 || '',
+                    itemWithMgrs.mgr5 || ''
                 ]);
                 row.commit();
             }
