@@ -682,9 +682,11 @@ exports.forgotPassword = async (req, res) => {
             name: user.name,
             subject: 'Reset your password - ARCRM',
             company_name: 'ARCRM',
+            otp: resetToken.slice(0, 6).toUpperCase(),
             variables: {
                 company_name: 'ARCRM',
                 name: user.name,
+                otp: resetToken.slice(0, 6).toUpperCase(),
                 link: resetUrl,
                 reset_link: resetUrl,
                 reset_url: resetUrl
