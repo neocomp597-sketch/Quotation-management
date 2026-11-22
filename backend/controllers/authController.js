@@ -676,10 +676,20 @@ exports.forgotPassword = async (req, res) => {
         }
         const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
 
-        // Send Email via Nodemailer SMTP
+        // Send Email via configured provider (MSG91 / SMTP)
         const emailResult = await sendEmail({
             to: user.email,
+            name: user.name,
             subject: 'Reset your password - ARCRM',
+            company_name: 'ARCRM',
+            variables: {
+                company_name: 'ARCRM',
+                name: user.name,
+                link: resetUrl,
+                reset_link: resetUrl,
+                reset_url: resetUrl
+            },
+            template_id: process.env.MSG91_RESET_TEMPLATE_ID || 'password_reset',
             html: `
                 <!DOCTYPE html>
                 <html lang="en">
