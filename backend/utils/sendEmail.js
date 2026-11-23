@@ -136,146 +136,47 @@ const sendMsg91Email = async ({
 const sendSmtpEmail = async ({ to, subject, html, text }) => {
     const envUser = (process.env.SMTP_USER || process.env.EMAIL_USER || '').trim();
     const envPass = (process.env.SMTP_PASS || process.env.EMAIL_PASS || '').trim();
-
-    const user = (!envUser || envUser.includes('your-email')) ? 'rrtechgrove@gmail.com' : envUser;
-    const rawPass = (!envPass || envPass.includes('your-email')) ? 'vmueoxdfdbjiqzmh' : envPass;
-    const pass = rawPass.replace(/\s+/g, '');
     const host = process.env.SMTP_HOST || process.env.EMAIL_HOST || 'smtp.gmail.com';
     const port = parseInt(process.env.SMTP_PORT || process.env.EMAIL_PORT || '587', 10);
-    const from = process.env.SMTP_FROM || process.env.EMAIL_FROM || `"ARCRM Support" <${user}>`;
+    const from = process.env.SMTP_FROM || process.env.EMAIL_FROM || (envUser ? `"ARCRM Support" <${envUser}>` : '');
     const secure = process.env.SMTP_SECURE === 'true' || port === 465;
 
-    console.log(`[Email Service] Initiating SMTP send to: ${to} | Sender: ${user} | Host: ${host}:${port}`);
-
-    if (nodemailer && host && user && pass) {
-        const isGmail = (host && host.includes('gmail')) || user.endsWith('@gmail.com');
-
-        let transporter;
-        if (isGmail) {
-            transporter = nodemailer.createTransport({
-                host: 'smtp.gmail.com',
-                port: 465,
-                secure: true,
-                auth: {
-                    user,
-                    pass
-                },
-                tls: {
-                    rejectUnauthorized: false
-                }
-            });
-        } else {
-            transporter = nodemailer.createTransport({
-                host,
-                port,
-                secure,
-                auth: {
-                    user,
-                    pass
-                },
-                tls: {
-                    rejectUnauthorized: false
-                }
-            });
-        }
-        console.error(`[Email Service] Email to ${to} not sent: ${reason}.`);
-        return { success: false, error: `Email is not set up on the server (${reason}). Add the MSG91 SMTP settings.` };
+    if (!nodemailer) {
+        return { success: false, provider: 'smtp', error: 'Nodemailer is not installed on the server.' };
+    }
+    if (!envUser || !envPass) {
+        return { success: false, provider: 'smtp', error: 'SMTP_USER and SMTP_PASS are not configured.' };
+    }
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+        return { success: false, provider: 'smtp', error: 'SMTP_PORT must be a valid port number.' };
     }
 
-<<<<<<< HEAD
-    const { host, port, user, pass, from, secure } = settings;
-    console.log(`[Email Service] Sending email to ${to} via ${host}:${port}`);
+    const isGmail = host.includes('gmail') || envUser.endsWith('@gmail.com');
+    const smtpHost = isGmail ? 'smtp.gmail.com' : host;
+    const smtpPort = isGmail ? 465 : port;
     const transporter = nodemailer.createTransport({
-        host,
-        port,
-        secure,
-        auth: { user, pass },
-        // A reset request should not wait minutes for an unreachable server
-        connectionTimeout: 15000,
-        greetingTimeout: 10000,
-        socketTimeout: 20000
+        host: smtpHost,
+        port: smtpPort,
+        secure: isGmail || secure,
+        auth: { user: envUser, pass: envPass.replace(/\s+/g, '') }
     });
+
+    console.log(`[Email Service] Initiating SMTP send to: ${to} | Sender: ${envUser} | Host: ${smtpHost}:${smtpPort}`);
 
     try {
         const info = await transporter.sendMail({
             from,
             to,
             subject,
-            text: text || String(html || '').replace(/<[^>]*>?/gm, ''),
+            text: text || (html ? html.replace(/<[^>]*>?/gm, '') : ''),
             html
         });
-        console.log(`[Email Service] Email sent. MessageId: ${info.messageId}`);
-        return { success: true, messageId: info.messageId };
+
+        console.log(`[Email Service] Email sent successfully via Nodemailer! MessageId: ${info.messageId}`);
+        return { success: true, provider: 'smtp', messageId: info.messageId };
     } catch (error) {
-        console.error(`[Email Service] Sending via ${host}:${port} failed:`, error.message);
-        const authFailed = error.code === 'EAUTH' || /\b535\b|\b534\b|Invalid login|authentication/i.test(error.message || '');
-        return {
-            success: false,
-            error: authFailed
-                ? 'The SMTP login was refused. Check SMTP_USER and SMTP_PASS against MSG91 > Email > Domains > SMTP.'
-                : error.message
-        };
-    }
-};
-
-module.exports = sendEmail;
-module.exports.settingsFromEnv = settingsFromEnv;
-=======
-        try {
-            const info = await transporter.sendMail({
-                from,
-                to,
-                subject,
-                text: text || (html ? html.replace(/<[^>]*>?/gm, '') : ''),
-                html
-            });
-
-            console.log(`[Email Service] Email sent successfully via Nodemailer! MessageId: ${info.messageId}`);
-            return { success: true, provider: 'smtp', messageId: info.messageId };
-        } catch (error) {
-            console.error(`[Email Service] Primary transport error (${isGmail ? 'Gmail Service' : 'SMTP'}):`, error.message);
-
-            let isGmailAuthError = error.message && (error.message.includes('534') || error.message.includes('Invalid login') || error.message.includes('WebLoginRequired'));
-
-            if (isGmail && !isGmailAuthError) {
-                try {
-                    console.log(`[Email Service] Attempting Gmail fallback on port 465 SSL...`);
-                    const fallbackTransporter = nodemailer.createTransport({
-                        host: 'smtp.gmail.com',
-                        port: 465,
-                        secure: true,
-                        auth: { user, pass },
-                        tls: { rejectUnauthorized: false }
-                    });
-
-                    const info = await fallbackTransporter.sendMail({
-                        from,
-                        to,
-                        subject,
-                        text: text || (html ? html.replace(/<[^>]*>?/gm, '') : ''),
-                        html
-                    });
-
-                    console.log(`[Email Service] Email sent successfully via Gmail SSL fallback! MessageId: ${info.messageId}`);
-                    return { success: true, provider: 'smtp', messageId: info.messageId };
-                } catch (fallbackError) {
-                    console.error(`[Email Service] Gmail SSL fallback failed:`, fallbackError.message);
-                }
-            }
-
-            if (isGmailAuthError) {
-                return {
-                    success: false,
-                    provider: 'smtp',
-                    error: `Gmail SMTP authentication failed (534 5.7.9). Please update SMTP_PASS in backend/.env with a valid 16-character App Password generated from https://myaccount.google.com/apppasswords`
-                };
-            }
-
-            return { success: false, provider: 'smtp', error: error.message };
-        }
-    } else {
-        console.warn(`[Email Service] SMTP configuration missing (SMTP_HOST/USER/PASS not set). Email simulated for ${to}.`);
-        return { success: true, provider: 'smtp', simulated: true };
+        console.error(`[Email Service] SMTP transport error:`, error.message);
+        return { success: false, provider: 'smtp', error: error.message };
     }
 };
 
@@ -356,4 +257,3 @@ module.exports = sendEmail;
 module.exports.sendEmail = sendEmail;
 module.exports.sendMsg91Email = sendMsg91Email;
 module.exports.sendSmtpEmail = sendSmtpEmail;
->>>>>>> e506ae7dcc14e6492070fae72351856dbe64b689

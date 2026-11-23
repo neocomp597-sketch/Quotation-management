@@ -192,8 +192,6 @@ const AssetStatusBadge = ({ status }) => (
     </span>
 );
 
-const IBU_FILTERS_OPEN_KEY = 'ibu.filtersOpen';
-
 const SerialNoMaster = () => {
     const navigate = useNavigate();
     const { canCreate, canModify } = usePermission('master_serials');
@@ -225,16 +223,6 @@ const SerialNoMaster = () => {
         // Once per screen, as the branch buttons load them.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-    // The branch buttons, status and MGR filters fold away behind a Filters button (client,
-    // 2026-11-19, as on Serial No Transfer). Folded at first; open or folded is remembered in this browser.
-    const [filtersOpen, setFiltersOpen] = useState(() => {
-        try { return localStorage.getItem(IBU_FILTERS_OPEN_KEY) === '1'; } catch { return false; }
-    });
-    const toggleFilters = () => {
-        const next = !filtersOpen;
-        setFiltersOpen(next);
-        try { localStorage.setItem(IBU_FILTERS_OPEN_KEY, next ? '1' : '0'); } catch { /* not remembered */ }
-    };
     const changeViewBranches = (ids) => {
         setViewBranchIds(ids);
         setCurrentPage(1);
@@ -257,8 +245,7 @@ const SerialNoMaster = () => {
         // Once per screen, as the branch buttons load them.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-    // Branch buttons, status and MGR 1-5 fold away behind a Filters button (client, 2026-11-19, as
-    // on Serial No Transfer).
+    // Branch buttons, status and MGR 1-5 fold away behind a Filters button.
     const [filtersOpen, toggleFilters] = useFiltersOpen('ibu.filtersOpen');
     const canViewDetails = hasAccess('master_serials_view_details');
     // Upload History lists every branch's uploads, so only administrators open it (the API checks too).
@@ -1306,8 +1293,8 @@ const SerialNoMaster = () => {
                             <button
                                 onClick={() => handleTabChange('active')}
                                 className={`flex items-center justify-center gap-2 px-3 sm:px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${activeTab === 'active'
-                                        ? 'bg-teal-600 text-white shadow-lg shadow-teal-600/20 scale-100'
-                                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/60'
+                                    ? 'bg-teal-600 text-white shadow-lg shadow-teal-600/20 scale-100'
+                                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/60'
                                     }`}
                             >
                                 <span>Active Inventory</span>
@@ -1316,8 +1303,8 @@ const SerialNoMaster = () => {
                             <button
                                 onClick={() => handleTabChange('returns')}
                                 className={`flex items-center justify-center gap-2 px-3 sm:px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${activeTab === 'returns'
-                                        ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20 scale-100'
-                                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/60'
+                                    ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20 scale-100'
+                                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/60'
                                     }`}
                             >
                                 <span>Return History</span>
@@ -1343,440 +1330,436 @@ const SerialNoMaster = () => {
                                     className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500/20 focus:bg-white focus:border-teal-500 transition-all outline-none text-sm font-semibold text-slate-900 placeholder:text-slate-400"
                                 />
                             </div>
-<<<<<<< HEAD
-    <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={foldedFiltersInUse} className="shrink-0" />
-=======
-                    <button
-                        type="button"
-                        onClick={toggleFilters}
-                        aria-expanded={filtersOpen}
-                        title={filtersOpen ? 'Hide the filters' : 'Show the branches and filters'}
-                        className={`w-full md:w-auto flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${filtersOpen || filtersInUse ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'}`}
-                    >
-                        <MdFilterList size={18} />
-                        Filters
-                        {filtersInUse > 0 && (
-                            <span className="min-w-5 h-5 px-1.5 rounded-full bg-primary-600 text-white text-[10px] leading-5 text-center tracking-normal">{filtersInUse}</span>
-                        )}
-                        <MdExpandMore size={18} className={`transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
-                    </button>
->>>>>>> e506ae7dcc14e6492070fae72351856dbe64b689
-                </div >
-    { filtersOpen && (
-        <div className="space-y-3">
-            {/* The branches this user was given: tick one or several to show them together (list,
+                            <button
+                                type="button"
+                                onClick={toggleFilters}
+                                aria-expanded={filtersOpen}
+                                title={filtersOpen ? 'Hide the filters' : 'Show the branches and filters'}
+                                className={`w-full md:w-auto flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${filtersOpen || filtersInUse ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'}`}
+                            >
+                                <MdFilterList size={18} />
+                                Filters
+                                {filtersInUse > 0 && (
+                                    <span className="min-w-5 h-5 px-1.5 rounded-full bg-primary-600 text-white text-[10px] leading-5 text-center tracking-normal">{filtersInUse}</span>
+                                )}
+                                <MdExpandMore size={18} className={`transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                        </div >
+                        {filtersOpen && (
+                            <div className="space-y-3">
+                                {/* The branches this user was given: tick one or several to show them together (list,
                             cards, Return History, search). */}
-            <BranchChips
-                className="flex flex-wrap items-center gap-2"
-                multiple
-                selected={viewBranchIds}
-                onChange={changeViewBranches}
-            />
-            {activeTab === 'active' && (
-                <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 w-full">
-                    <select
-                        value={selectedStatus}
-                        onChange={(e) => setSelectedStatus(e.target.value)}
-                        className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
-                    >
-                        <option value="ALL">All Statuses</option>
-                        <option value="IN_STOCK">In Stock</option>
-                        <option value="SOLD">Sold</option>
-                        <option value="ALLOCATED">Allocated</option>
-                        <option value="RETURN">Returned</option>
-                        <option value="SCRAPPED">Scrapped</option>
-                    </select>
-                    {MGR_FIELDS.map(({ key, label }) => (
-                        <select
-                            key={key}
-                            value={mgrFilters[key]}
-                            onChange={(e) => setMgrFilters((prev) => ({ ...prev, [key]: e.target.value }))}
-                            aria-label={`Filter by ${label}`}
-                            className={`px-4 py-3 border rounded-2xl outline-none text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all max-w-[200px] truncate ${mgrFilters[key] === 'ALL' ? 'bg-slate-50 border-slate-200' : 'bg-teal-50 border-teal-300'}`}
-                        >
-                            <option value="ALL">All {label}</option>
-                            {mgrOptions[key].map((value) => (
-                                <option key={value} value={value}>{value}</option>
-                            ))}
-                        </select>
-                    ))}
-                </div>
-            )}
-        </div>
-    )}
-
-{
-    filtersOpen && (
-        <div className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-3">
-            {/* The branches this user was given: tick one or several to show them together (list,
-                            cards, Return History, search). */}
-            <BranchChips
-                className="flex flex-wrap items-center gap-2"
-                multiple
-                selected={viewBranchIds}
-                onChange={changeViewBranches}
-            />
-            {activeTab === 'active' && (
-                <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 w-full">
-                    <select
-                        value={selectedStatus}
-                        onChange={(e) => setSelectedStatus(e.target.value)}
-                        className="px-4 py-3 bg-white border border-slate-200 rounded-2xl outline-none text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
-                    >
-                        <option value="ALL">All Statuses</option>
-                        <option value="IN_STOCK">In Stock</option>
-                        <option value="SOLD">Sold</option>
-                        <option value="ALLOCATED">Allocated</option>
-                        <option value="RETURN">Returned</option>
-                        <option value="SCRAPPED">Scrapped</option>
-                    </select>
-                    {MGR_FIELDS.map(({ key, label }) => (
-                        <select
-                            key={key}
-                            value={mgrFilters[key]}
-                            onChange={(e) => setMgrFilters((prev) => ({ ...prev, [key]: e.target.value }))}
-                            aria-label={`Filter by ${label}`}
-                            className={`px-4 py-3 border rounded-2xl outline-none text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all max-w-[200px] truncate ${mgrFilters[key] === 'ALL' ? 'bg-white border-slate-200' : 'bg-teal-50 border-teal-300'}`}
-                        >
-                            <option value="ALL">All {label}</option>
-                            {mgrOptions[key].map((value) => (
-                                <option key={value} value={value}>{value}</option>
-                            ))}
-                        </select>
-                    ))}
-                </div>
-            )}
-        </div>
-    )
-}
-
-<div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-2xl border border-primary-100 bg-primary-50/60 px-4 py-3">
-    <p className="text-sm font-bold text-slate-700">
-        Total Count:{' '}
-        <span className="text-lg font-black text-primary-700">
-            {loading || (activeTab === 'returns' && loadingHistory) ? '…' : matchingTotal.toLocaleString('en-IN')}
-        </span>{' '}
-        <span className="text-xs font-semibold text-slate-500">
-            {activeTab === 'returns' ? 'return records' : 'serial numbers'}{filtersApplied ? ' matching the search and filters' : ''}
-        </span>
-    </p>
-    <p className="text-xs font-bold text-slate-500">
-        {pageTo ? `Showing ${pageFrom.toLocaleString('en-IN')}–${pageTo.toLocaleString('en-IN')} on this page` : 'No records on this page'}
-    </p>
-</div>
-            </div >
-
-    {/* List Table (Requirement #16) */ }
-    < div ref = { listTopRef } className = "ibu-list-panel bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden" >
-        <div className="ibu-list-body p-3 md:p-6">
-            {loading || (activeTab === 'returns' && loadingHistory) ? (
-                <div className="py-20 text-center text-slate-400 font-medium">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary-500 border-t-transparent mb-4"></div>
-                    <p className="text-xs uppercase font-black tracking-widest">Loading records...</p>
-                </div>
-            ) : activeTab === 'returns' ? (
-                /* RETURN HISTORY TABLE (Requirement #9) */
-                <>
-                    <MobileCardList>
-                        {paginatedAssets.map(item => (
-                            <MobileCard key={item._id}>
-                                <MobileCardHead
-                                    title={<span className="font-mono tracking-wide">{item.serialNumber}</span>}
-                                    subtitle={productLine(item)}
-                                    aside={<AssetStatusBadge status="RETURN" />}
+                                <BranchChips
+                                    className="flex flex-wrap items-center gap-2"
+                                    multiple
+                                    selected={viewBranchIds}
+                                    onChange={changeViewBranches}
                                 />
-                                <MgrLine record={item} wrap />
-                                <MobileFields>
-                                    {item.branchName && <MobileField label="Branch" wide>{item.branchName}</MobileField>}
-                                    <MobileField label="Customer" wide>{item.customerId?.companyName || item.customerId?.customerName || item.customerName || 'Customer'}</MobileField>
-                                    <MobileField label="Invoice Number">{item.invoiceNumber || '-'}</MobileField>
-                                    <MobileField label="Return Date">{formatDate(item.returnDate || item.createdAt)}</MobileField>
-                                    <MobileField label="Return Reason" wide>{item.returnReason || 'Product Fault / Return'}</MobileField>
-                                </MobileFields>
-                            </MobileCard>
-                        ))}
-                        {filteredReturns.length === 0 && <MobileEmpty>No returned product history records found.</MobileEmpty>}
-                    </MobileCardList>
-                    <div className="serial-desktop-table overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-slate-50 rounded-xl text-xs font-black text-slate-400 uppercase tracking-widest">
-                                    <th className="p-4 first:rounded-l-xl">Serial No</th>
-                                    <th className="p-4">Product Details</th>
-                                    <th className="p-4">Customer</th>
-                                    <th className="p-4">Invoice</th>
-                                    <th className="p-4">Return Date</th>
-                                    <th className="p-4">Return Reason</th>
-                                    <th className="p-4 text-right last:rounded-r-xl">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {paginatedAssets.map(item => (
-                                    <tr key={item._id} className="border-b last:border-0 border-slate-50 hover:bg-slate-50/50 transition-colors">
-                                        <td className="p-4 text-sm font-black text-slate-900 font-mono tracking-wide">
-                                            {item.serialNumber}
-                                            {item.branchName && <span className="block w-fit mt-1 text-[9px] px-1.5 py-0.5 rounded-full font-black tracking-wide bg-purple-50 text-purple-700 border border-purple-200 font-sans">📍 {item.branchName}</span>}
-                                        </td>
-                                        <td className="p-4">
-                                            <span className="block text-sm font-bold text-slate-800">
-                                                {item.productId?.productName || item.productName || 'N/A'}
-                                            </span>
-                                            <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
-                                                {item.productId?.productCode || item.productCode || 'N/A'}
-                                            </span>
-                                            <MgrLine record={item} />
-                                        </td>
-                                        <td className="p-4 text-sm font-semibold text-slate-700">
-                                            {item.customerId?.companyName || item.customerId?.customerName || item.customerName || 'Customer'}
-                                        </td>
-                                        <td className="p-4 text-sm font-bold text-slate-800">
-                                            {item.invoiceNumber ? (
-                                                <span className="font-mono bg-slate-100 px-2 py-1 rounded border border-slate-200 text-xs">{item.invoiceNumber}</span>
-                                            ) : '-'}
-                                        </td>
-                                        <td className="p-4 text-sm font-medium text-slate-600">
-                                            {formatDate(item.returnDate || item.createdAt)}
-                                        </td>
-                                        <td className="p-4 text-sm text-slate-700 max-w-xs font-semibold">
-                                            <div className="p-2 bg-amber-50/60 border border-amber-100 rounded-xl text-amber-900 text-xs">
-                                                {item.returnReason || 'Product Fault / Return'}
-                                            </div>
-                                        </td>
-                                        <td className="p-4 text-right">
-                                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border bg-amber-50 text-amber-600 border-amber-200">
-                                                RETURN
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {filteredReturns.length === 0 && (
-                                    <tr>
-                                        <td colSpan={7} className="p-12 text-center text-slate-400 text-sm font-medium">
-                                            No returned product history records found.
-                                        </td>
-                                    </tr>
+                                {activeTab === 'active' && (
+                                    <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 w-full">
+                                        <select
+                                            value={selectedStatus}
+                                            onChange={(e) => setSelectedStatus(e.target.value)}
+                                            className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
+                                        >
+                                            <option value="ALL">All Statuses</option>
+                                            <option value="IN_STOCK">In Stock</option>
+                                            <option value="SOLD">Sold</option>
+                                            <option value="ALLOCATED">Allocated</option>
+                                            <option value="RETURN">Returned</option>
+                                            <option value="SCRAPPED">Scrapped</option>
+                                        </select>
+                                        {MGR_FIELDS.map(({ key, label }) => (
+                                            <select
+                                                key={key}
+                                                value={mgrFilters[key]}
+                                                onChange={(e) => setMgrFilters((prev) => ({ ...prev, [key]: e.target.value }))}
+                                                aria-label={`Filter by ${label}`}
+                                                className={`px-4 py-3 border rounded-2xl outline-none text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all max-w-[200px] truncate ${mgrFilters[key] === 'ALL' ? 'bg-slate-50 border-slate-200' : 'bg-teal-50 border-teal-300'}`}
+                                            >
+                                                <option value="ALL">All {label}</option>
+                                                {mgrOptions[key].map((value) => (
+                                                    <option key={value} value={value}>{value}</option>
+                                                ))}
+                                            </select>
+                                        ))}
+                                    </div>
                                 )}
-                            </tbody>
-                        </table>
-                    </div>
-                    <PaginationControls pagination={{ page: currentPage, limit: PAGE_SIZE, total: filteredReturns.length, pages: totalPages }} onPageChange={changePage} className="ibu-pager" />
-                </>
-            ) : (
-                /* ACTIVE INVENTORY TABLE (Requirement #16) */
-                <>
-                    <MobileCardList>
-                        {paginatedAssets.map(asset => {
-                            const custDisplay = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || (asset.customerId ? 'Customer' : '');
-                            const canReturn = asset.status === 'SOLD' && canModify;
-                            const actionClass = 'inline-flex items-center gap-1 px-3 py-2 rounded-xl border bg-white font-black uppercase text-[10px] tracking-widest';
-                            return (
-                                <MobileCard key={asset._id}>
-                                    <MobileCardHead
-                                        title={<span className="font-mono tracking-wide">{asset.serialNumber}</span>}
-                                        subtitle={productLine(asset)}
-                                        aside={<AssetStatusBadge status={asset.status} />}
+                            </div>
+                        )}
+
+                        {
+                            filtersOpen && (
+                                <div className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-3">
+                                    {/* The branches this user was given: tick one or several to show them together (list,
+                            cards, Return History, search). */}
+                                    <BranchChips
+                                        className="flex flex-wrap items-center gap-2"
+                                        multiple
+                                        selected={viewBranchIds}
+                                        onChange={changeViewBranches}
                                     />
-                                    {asset.indicatorField && (
-                                        <span className="block mt-1 text-[10px] font-bold text-primary-600 tracking-wider">Indicator: {asset.indicatorField}</span>
+                                    {activeTab === 'active' && (
+                                        <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 w-full">
+                                            <select
+                                                value={selectedStatus}
+                                                onChange={(e) => setSelectedStatus(e.target.value)}
+                                                className="px-4 py-3 bg-white border border-slate-200 rounded-2xl outline-none text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
+                                            >
+                                                <option value="ALL">All Statuses</option>
+                                                <option value="IN_STOCK">In Stock</option>
+                                                <option value="SOLD">Sold</option>
+                                                <option value="ALLOCATED">Allocated</option>
+                                                <option value="RETURN">Returned</option>
+                                                <option value="SCRAPPED">Scrapped</option>
+                                            </select>
+                                            {MGR_FIELDS.map(({ key, label }) => (
+                                                <select
+                                                    key={key}
+                                                    value={mgrFilters[key]}
+                                                    onChange={(e) => setMgrFilters((prev) => ({ ...prev, [key]: e.target.value }))}
+                                                    aria-label={`Filter by ${label}`}
+                                                    className={`px-4 py-3 border rounded-2xl outline-none text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all max-w-[200px] truncate ${mgrFilters[key] === 'ALL' ? 'bg-white border-slate-200' : 'bg-teal-50 border-teal-300'}`}
+                                                >
+                                                    <option value="ALL">All {label}</option>
+                                                    {mgrOptions[key].map((value) => (
+                                                        <option key={value} value={value}>{value}</option>
+                                                    ))}
+                                                </select>
+                                            ))}
+                                        </div>
                                     )}
-                                    <MgrLine record={asset} wrap />
-                                    <MobileFields>
-                                        {asset.branchName && <MobileField label="Branch" wide>{asset.branchName}</MobileField>}
-                                        <MobileField label="Customer" wide>
-                                            {custDisplay || <span className="text-slate-400 font-normal italic">{noCustomerLabel(asset)}</span>}
-                                            {asset.customerPostalCode && <span className="block text-[10px] text-slate-400 font-bold">Pin: {asset.customerPostalCode}</span>}
-                                        </MobileField>
-                                        <MobileField label="Invoice Number">
-                                            {asset.invoiceNumber || '-'}
-                                            {(asset.projectCode || asset.projectName) && (
-                                                <span className="block text-[10px] text-slate-400 font-bold">Project: {[asset.projectCode, asset.projectName].filter(Boolean).join(' - ')}</span>
-                                            )}
-                                        </MobileField>
-                                        <MobileField label="Invoice Date">{asset.saleDate || asset.invoiceDate ? formatDate(asset.saleDate || asset.invoiceDate) : '-'}</MobileField>
-                                        <MobileField label="Location" wide>
-                                            {asset.location || '-'}
-                                            {(asset.divisionId?.code || asset.segmentId?.code) && (
-                                                <span className="block text-[10px] text-slate-400 font-bold">{[asset.divisionId?.code, asset.segmentId?.code].filter(Boolean).join(' / ')}</span>
-                                            )}
-                                        </MobileField>
-                                    </MobileFields>
-                                    {(canViewDetails || canEdit || canReturn) && (
-                                        <MobileCardActions className="ibu-card-actions">
-                                            {canViewDetails && (
-                                                <button type="button" onClick={() => handleViewDetail(asset.serialNumber, asset)} className={`${actionClass} border-slate-200 text-slate-700`}>
-                                                    <MdInfoOutline size={16} /> Details
-                                                </button>
-                                            )}
-                                            {canEdit && (
-                                                <button type="button" onClick={() => openEditEntry(asset)} className={`${actionClass} border-primary-200 text-primary-700`}>
-                                                    <MdEdit size={16} /> Edit
-                                                </button>
-                                            )}
-                                            {canReturn && (
-                                                <button type="button" onClick={() => handleOpenReturnModal(asset)} className={`${actionClass} border-amber-200 text-amber-700`}>
-                                                    <MdUndo size={16} /> Return
-                                                </button>
-                                            )}
-                                        </MobileCardActions>
-                                    )}
-                                </MobileCard>
-                            );
-                        })}
-                        {filteredAssets.length === 0 && <MobileEmpty>No serial number assets found matching filters.</MobileEmpty>}
-                    </MobileCardList>
-                    <div className="serial-desktop-table overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-slate-50 rounded-xl text-xs font-black text-slate-400 uppercase tracking-widest">
-                                    <th className="p-4 first:rounded-l-xl">Serial Number</th>
-                                    <th className="p-4">Product Details</th>
-                                    <th className="p-4">Status</th>
-                                    <th className="p-4">Customer</th>
-                                    <th className="p-4">Invoice Number</th>
-                                    <th className="p-4">Invoice Date</th>
-                                    <th className="p-4">Location</th>
-                                    <th className="p-4 text-right last:rounded-r-xl">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {paginatedAssets.map(asset => {
-                                    const custDisplay = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || (asset.customerId ? 'Customer' : '');
-                                    const canReturn = asset.status === 'SOLD' && canModify;
-                                    const hasActions = canViewDetails || canEdit || canReturn;
-                                    return (
-                                        <tr key={asset._id} className="border-b last:border-0 border-slate-50 hover:bg-slate-50/50 transition-colors">
-                                            <td className="p-4 text-sm font-black text-slate-900 font-mono tracking-wide">
-                                                {asset.serialNumber}
-                                                {asset.branchName && <span className="block w-fit mt-1 text-[9px] px-1.5 py-0.5 rounded-full font-black tracking-wide bg-purple-50 text-purple-700 border border-purple-200 font-sans">📍 {asset.branchName}</span>}
-                                                {asset.indicatorField && (
-                                                    <span className="block text-[9px] font-bold text-primary-600 tracking-wider">
-                                                        Indicator: {asset.indicatorField}
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td className="p-4">
-                                                <span className="block text-sm font-bold text-slate-800">{asset.productId?.productName || asset.productName || 'N/A'}</span>
-                                                <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{asset.productId?.productCode || asset.productCode || 'N/A'}</span>
-                                                <MgrLine record={asset} />
-                                            </td>
-                                            <td className="p-4">
-                                                <AssetStatusBadge status={asset.status} />
-                                            </td>
-                                            <td className="p-4 text-sm font-semibold text-slate-700">
-                                                {custDisplay ? (
-                                                    <span>{custDisplay}</span>
-                                                ) : (
-                                                    <span className="text-slate-400 font-normal italic">{noCustomerLabel(asset)}</span>
-                                                )}
-                                                {asset.customerPostalCode && (
-                                                    <span className="block text-[10px] text-slate-400 font-bold">Pin: {asset.customerPostalCode}</span>
-                                                )}
-                                            </td>
-                                            <td className="p-4 text-sm font-bold text-slate-800">
-                                                {asset.invoiceNumber ? (
-                                                    <span className="font-mono bg-slate-100 px-2 py-1 rounded border border-slate-200 text-xs">{asset.invoiceNumber}</span>
-                                                ) : <span className="text-slate-300 font-normal">-</span>}
-                                                {(asset.projectCode || asset.projectName) && (
-                                                    <span className="block text-[10px] text-slate-400 font-bold mt-1">
-                                                        Project: {[asset.projectCode, asset.projectName].filter(Boolean).join(' - ')}
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td className="p-4 text-sm font-medium text-slate-600">
-                                                {asset.saleDate || asset.invoiceDate
-                                                    ? formatDate(asset.saleDate || asset.invoiceDate)
-                                                    : <span className="text-slate-300 font-normal">-</span>
-                                                }
-                                            </td>
-                                            <td className="p-4 text-xs font-semibold text-slate-600">
-                                                {asset.location || '-'}
-                                                {(asset.divisionId?.code || asset.segmentId?.code) && (
-                                                    <span className="block text-[10px] text-slate-400 font-bold mt-1">
-                                                        {[asset.divisionId?.code, asset.segmentId?.code].filter(Boolean).join(' / ')}
-                                                    </span>
-                                                )}
-                                            </td>
-                                            {/* Actions are grouped under the row's information control; each one
-                                                        shows only with its permission (View Details, Edit, Modify). */}
-                                            <td className="p-4 text-right">
-                                                {hasActions ? (
-                                                    <div className="relative inline-flex justify-end">
-                                                        <button
-                                                            onClick={() => setOpenActionMenuAssetId(current => current === asset._id ? null : asset._id)}
-                                                            className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
-                                                            title="View details and actions"
-                                                            aria-label={`Open actions for ${asset.serialNumber}`}
-                                                            aria-expanded={openActionMenuAssetId === asset._id}
-                                                        >
-                                                            <MdInfoOutline size={18} />
-                                                        </button>
-                                                        {openActionMenuAssetId === asset._id && (
-                                                            <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 text-left shadow-lg">
-                                                                {canViewDetails && (
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setOpenActionMenuAssetId(null);
-                                                                            handleViewDetail(asset.serialNumber, asset);
-                                                                        }}
-                                                                        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                                                                    >
-                                                                        <MdInfoOutline size={16} />
-                                                                        View details
-                                                                    </button>
-                                                                )}
-                                                                {canEdit && (
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setOpenActionMenuAssetId(null);
-                                                                            openEditEntry(asset);
-                                                                        }}
-                                                                        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-primary-700 hover:bg-primary-50"
-                                                                    >
-                                                                        <MdEdit size={16} />
-                                                                        Edit
-                                                                    </button>
-                                                                )}
-                                                                {canReturn && (
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setOpenActionMenuAssetId(null);
-                                                                            handleOpenReturnModal(asset);
-                                                                        }}
-                                                                        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50"
-                                                                    >
-                                                                        <MdUndo size={16} />
-                                                                        Sales return
-                                                                    </button>
-                                                                )}
+                                </div>
+                            )
+                        }
+
+                        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-2xl border border-primary-100 bg-primary-50/60 px-4 py-3">
+                            <p className="text-sm font-bold text-slate-700">
+                                Total Count:{' '}
+                                <span className="text-lg font-black text-primary-700">
+                                    {loading || (activeTab === 'returns' && loadingHistory) ? '…' : matchingTotal.toLocaleString('en-IN')}
+                                </span>{' '}
+                                <span className="text-xs font-semibold text-slate-500">
+                                    {activeTab === 'returns' ? 'return records' : 'serial numbers'}{filtersApplied ? ' matching the search and filters' : ''}
+                                </span>
+                            </p>
+                            <p className="text-xs font-bold text-slate-500">
+                                {pageTo ? `Showing ${pageFrom.toLocaleString('en-IN')}–${pageTo.toLocaleString('en-IN')} on this page` : 'No records on this page'}
+                            </p>
+                        </div>
+                    </div >
+
+                    {/* List Table (Requirement #16) */}
+                    < div ref={listTopRef} className="ibu-list-panel bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden" >
+                        <div className="ibu-list-body p-3 md:p-6">
+                            {loading || (activeTab === 'returns' && loadingHistory) ? (
+                                <div className="py-20 text-center text-slate-400 font-medium">
+                                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary-500 border-t-transparent mb-4"></div>
+                                    <p className="text-xs uppercase font-black tracking-widest">Loading records...</p>
+                                </div>
+                            ) : activeTab === 'returns' ? (
+                                /* RETURN HISTORY TABLE (Requirement #9) */
+                                <>
+                                    <MobileCardList>
+                                        {paginatedAssets.map(item => (
+                                            <MobileCard key={item._id}>
+                                                <MobileCardHead
+                                                    title={<span className="font-mono tracking-wide">{item.serialNumber}</span>}
+                                                    subtitle={productLine(item)}
+                                                    aside={<AssetStatusBadge status="RETURN" />}
+                                                />
+                                                <MgrLine record={item} wrap />
+                                                <MobileFields>
+                                                    {item.branchName && <MobileField label="Branch" wide>{item.branchName}</MobileField>}
+                                                    <MobileField label="Customer" wide>{item.customerId?.companyName || item.customerId?.customerName || item.customerName || 'Customer'}</MobileField>
+                                                    <MobileField label="Invoice Number">{item.invoiceNumber || '-'}</MobileField>
+                                                    <MobileField label="Return Date">{formatDate(item.returnDate || item.createdAt)}</MobileField>
+                                                    <MobileField label="Return Reason" wide>{item.returnReason || 'Product Fault / Return'}</MobileField>
+                                                </MobileFields>
+                                            </MobileCard>
+                                        ))}
+                                        {filteredReturns.length === 0 && <MobileEmpty>No returned product history records found.</MobileEmpty>}
+                                    </MobileCardList>
+                                    <div className="serial-desktop-table overflow-x-auto">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-50 rounded-xl text-xs font-black text-slate-400 uppercase tracking-widest">
+                                                    <th className="p-4 first:rounded-l-xl">Serial No</th>
+                                                    <th className="p-4">Product Details</th>
+                                                    <th className="p-4">Customer</th>
+                                                    <th className="p-4">Invoice</th>
+                                                    <th className="p-4">Return Date</th>
+                                                    <th className="p-4">Return Reason</th>
+                                                    <th className="p-4 text-right last:rounded-r-xl">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {paginatedAssets.map(item => (
+                                                    <tr key={item._id} className="border-b last:border-0 border-slate-50 hover:bg-slate-50/50 transition-colors">
+                                                        <td className="p-4 text-sm font-black text-slate-900 font-mono tracking-wide">
+                                                            {item.serialNumber}
+                                                            {item.branchName && <span className="block w-fit mt-1 text-[9px] px-1.5 py-0.5 rounded-full font-black tracking-wide bg-purple-50 text-purple-700 border border-purple-200 font-sans">📍 {item.branchName}</span>}
+                                                        </td>
+                                                        <td className="p-4">
+                                                            <span className="block text-sm font-bold text-slate-800">
+                                                                {item.productId?.productName || item.productName || 'N/A'}
+                                                            </span>
+                                                            <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+                                                                {item.productId?.productCode || item.productCode || 'N/A'}
+                                                            </span>
+                                                            <MgrLine record={item} />
+                                                        </td>
+                                                        <td className="p-4 text-sm font-semibold text-slate-700">
+                                                            {item.customerId?.companyName || item.customerId?.customerName || item.customerName || 'Customer'}
+                                                        </td>
+                                                        <td className="p-4 text-sm font-bold text-slate-800">
+                                                            {item.invoiceNumber ? (
+                                                                <span className="font-mono bg-slate-100 px-2 py-1 rounded border border-slate-200 text-xs">{item.invoiceNumber}</span>
+                                                            ) : '-'}
+                                                        </td>
+                                                        <td className="p-4 text-sm font-medium text-slate-600">
+                                                            {formatDate(item.returnDate || item.createdAt)}
+                                                        </td>
+                                                        <td className="p-4 text-sm text-slate-700 max-w-xs font-semibold">
+                                                            <div className="p-2 bg-amber-50/60 border border-amber-100 rounded-xl text-amber-900 text-xs">
+                                                                {item.returnReason || 'Product Fault / Return'}
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-slate-300">-</span>
+                                                        </td>
+                                                        <td className="p-4 text-right">
+                                                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border bg-amber-50 text-amber-600 border-amber-200">
+                                                                RETURN
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                {filteredReturns.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan={7} className="p-12 text-center text-slate-400 text-sm font-medium">
+                                                            No returned product history records found.
+                                                        </td>
+                                                    </tr>
                                                 )}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                                {filteredAssets.length === 0 && (
-                                    <tr>
-                                        <td colSpan={8} className="p-12 text-center text-slate-400 text-sm font-medium">
-                                            No serial number assets found matching filters.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                    <PaginationControls pagination={assetPagination} onPageChange={changePage} className="ibu-pager" />
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <PaginationControls pagination={{ page: currentPage, limit: PAGE_SIZE, total: filteredReturns.length, pages: totalPages }} onPageChange={changePage} className="ibu-pager" />
+                                </>
+                            ) : (
+                                /* ACTIVE INVENTORY TABLE (Requirement #16) */
+                                <>
+                                    <MobileCardList>
+                                        {paginatedAssets.map(asset => {
+                                            const custDisplay = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || (asset.customerId ? 'Customer' : '');
+                                            const canReturn = asset.status === 'SOLD' && canModify;
+                                            const actionClass = 'inline-flex items-center gap-1 px-3 py-2 rounded-xl border bg-white font-black uppercase text-[10px] tracking-widest';
+                                            return (
+                                                <MobileCard key={asset._id}>
+                                                    <MobileCardHead
+                                                        title={<span className="font-mono tracking-wide">{asset.serialNumber}</span>}
+                                                        subtitle={productLine(asset)}
+                                                        aside={<AssetStatusBadge status={asset.status} />}
+                                                    />
+                                                    {asset.indicatorField && (
+                                                        <span className="block mt-1 text-[10px] font-bold text-primary-600 tracking-wider">Indicator: {asset.indicatorField}</span>
+                                                    )}
+                                                    <MgrLine record={asset} wrap />
+                                                    <MobileFields>
+                                                        {asset.branchName && <MobileField label="Branch" wide>{asset.branchName}</MobileField>}
+                                                        <MobileField label="Customer" wide>
+                                                            {custDisplay || <span className="text-slate-400 font-normal italic">{noCustomerLabel(asset)}</span>}
+                                                            {asset.customerPostalCode && <span className="block text-[10px] text-slate-400 font-bold">Pin: {asset.customerPostalCode}</span>}
+                                                        </MobileField>
+                                                        <MobileField label="Invoice Number">
+                                                            {asset.invoiceNumber || '-'}
+                                                            {(asset.projectCode || asset.projectName) && (
+                                                                <span className="block text-[10px] text-slate-400 font-bold">Project: {[asset.projectCode, asset.projectName].filter(Boolean).join(' - ')}</span>
+                                                            )}
+                                                        </MobileField>
+                                                        <MobileField label="Invoice Date">{asset.saleDate || asset.invoiceDate ? formatDate(asset.saleDate || asset.invoiceDate) : '-'}</MobileField>
+                                                        <MobileField label="Location" wide>
+                                                            {asset.location || '-'}
+                                                            {(asset.divisionId?.code || asset.segmentId?.code) && (
+                                                                <span className="block text-[10px] text-slate-400 font-bold">{[asset.divisionId?.code, asset.segmentId?.code].filter(Boolean).join(' / ')}</span>
+                                                            )}
+                                                        </MobileField>
+                                                    </MobileFields>
+                                                    {(canViewDetails || canEdit || canReturn) && (
+                                                        <MobileCardActions className="ibu-card-actions">
+                                                            {canViewDetails && (
+                                                                <button type="button" onClick={() => handleViewDetail(asset.serialNumber, asset)} className={`${actionClass} border-slate-200 text-slate-700`}>
+                                                                    <MdInfoOutline size={16} /> Details
+                                                                </button>
+                                                            )}
+                                                            {canEdit && (
+                                                                <button type="button" onClick={() => openEditEntry(asset)} className={`${actionClass} border-primary-200 text-primary-700`}>
+                                                                    <MdEdit size={16} /> Edit
+                                                                </button>
+                                                            )}
+                                                            {canReturn && (
+                                                                <button type="button" onClick={() => handleOpenReturnModal(asset)} className={`${actionClass} border-amber-200 text-amber-700`}>
+                                                                    <MdUndo size={16} /> Return
+                                                                </button>
+                                                            )}
+                                                        </MobileCardActions>
+                                                    )}
+                                                </MobileCard>
+                                            );
+                                        })}
+                                        {filteredAssets.length === 0 && <MobileEmpty>No serial number assets found matching filters.</MobileEmpty>}
+                                    </MobileCardList>
+                                    <div className="serial-desktop-table overflow-x-auto">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-50 rounded-xl text-xs font-black text-slate-400 uppercase tracking-widest">
+                                                    <th className="p-4 first:rounded-l-xl">Serial Number</th>
+                                                    <th className="p-4">Product Details</th>
+                                                    <th className="p-4">Status</th>
+                                                    <th className="p-4">Customer</th>
+                                                    <th className="p-4">Invoice Number</th>
+                                                    <th className="p-4">Invoice Date</th>
+                                                    <th className="p-4">Location</th>
+                                                    <th className="p-4 text-right last:rounded-r-xl">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {paginatedAssets.map(asset => {
+                                                    const custDisplay = asset.customerId?.companyName || asset.customerId?.customerName || asset.customerNameStr || (asset.customerId ? 'Customer' : '');
+                                                    const canReturn = asset.status === 'SOLD' && canModify;
+                                                    const hasActions = canViewDetails || canEdit || canReturn;
+                                                    return (
+                                                        <tr key={asset._id} className="border-b last:border-0 border-slate-50 hover:bg-slate-50/50 transition-colors">
+                                                            <td className="p-4 text-sm font-black text-slate-900 font-mono tracking-wide">
+                                                                {asset.serialNumber}
+                                                                {asset.branchName && <span className="block w-fit mt-1 text-[9px] px-1.5 py-0.5 rounded-full font-black tracking-wide bg-purple-50 text-purple-700 border border-purple-200 font-sans">📍 {asset.branchName}</span>}
+                                                                {asset.indicatorField && (
+                                                                    <span className="block text-[9px] font-bold text-primary-600 tracking-wider">
+                                                                        Indicator: {asset.indicatorField}
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                            <td className="p-4">
+                                                                <span className="block text-sm font-bold text-slate-800">{asset.productId?.productName || asset.productName || 'N/A'}</span>
+                                                                <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{asset.productId?.productCode || asset.productCode || 'N/A'}</span>
+                                                                <MgrLine record={asset} />
+                                                            </td>
+                                                            <td className="p-4">
+                                                                <AssetStatusBadge status={asset.status} />
+                                                            </td>
+                                                            <td className="p-4 text-sm font-semibold text-slate-700">
+                                                                {custDisplay ? (
+                                                                    <span>{custDisplay}</span>
+                                                                ) : (
+                                                                    <span className="text-slate-400 font-normal italic">{noCustomerLabel(asset)}</span>
+                                                                )}
+                                                                {asset.customerPostalCode && (
+                                                                    <span className="block text-[10px] text-slate-400 font-bold">Pin: {asset.customerPostalCode}</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="p-4 text-sm font-bold text-slate-800">
+                                                                {asset.invoiceNumber ? (
+                                                                    <span className="font-mono bg-slate-100 px-2 py-1 rounded border border-slate-200 text-xs">{asset.invoiceNumber}</span>
+                                                                ) : <span className="text-slate-300 font-normal">-</span>}
+                                                                {(asset.projectCode || asset.projectName) && (
+                                                                    <span className="block text-[10px] text-slate-400 font-bold mt-1">
+                                                                        Project: {[asset.projectCode, asset.projectName].filter(Boolean).join(' - ')}
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                            <td className="p-4 text-sm font-medium text-slate-600">
+                                                                {asset.saleDate || asset.invoiceDate
+                                                                    ? formatDate(asset.saleDate || asset.invoiceDate)
+                                                                    : <span className="text-slate-300 font-normal">-</span>
+                                                                }
+                                                            </td>
+                                                            <td className="p-4 text-xs font-semibold text-slate-600">
+                                                                {asset.location || '-'}
+                                                                {(asset.divisionId?.code || asset.segmentId?.code) && (
+                                                                    <span className="block text-[10px] text-slate-400 font-bold mt-1">
+                                                                        {[asset.divisionId?.code, asset.segmentId?.code].filter(Boolean).join(' / ')}
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                            {/* Actions are grouped under the row's information control; each one
+                                                        shows only with its permission (View Details, Edit, Modify). */}
+                                                            <td className="p-4 text-right">
+                                                                {hasActions ? (
+                                                                    <div className="relative inline-flex justify-end">
+                                                                        <button
+                                                                            onClick={() => setOpenActionMenuAssetId(current => current === asset._id ? null : asset._id)}
+                                                                            className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                                                                            title="View details and actions"
+                                                                            aria-label={`Open actions for ${asset.serialNumber}`}
+                                                                            aria-expanded={openActionMenuAssetId === asset._id}
+                                                                        >
+                                                                            <MdInfoOutline size={18} />
+                                                                        </button>
+                                                                        {openActionMenuAssetId === asset._id && (
+                                                                            <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 text-left shadow-lg">
+                                                                                {canViewDetails && (
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            setOpenActionMenuAssetId(null);
+                                                                                            handleViewDetail(asset.serialNumber, asset);
+                                                                                        }}
+                                                                                        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                                                                    >
+                                                                                        <MdInfoOutline size={16} />
+                                                                                        View details
+                                                                                    </button>
+                                                                                )}
+                                                                                {canEdit && (
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            setOpenActionMenuAssetId(null);
+                                                                                            openEditEntry(asset);
+                                                                                        }}
+                                                                                        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-primary-700 hover:bg-primary-50"
+                                                                                    >
+                                                                                        <MdEdit size={16} />
+                                                                                        Edit
+                                                                                    </button>
+                                                                                )}
+                                                                                {canReturn && (
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            setOpenActionMenuAssetId(null);
+                                                                                            handleOpenReturnModal(asset);
+                                                                                        }}
+                                                                                        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50"
+                                                                                    >
+                                                                                        <MdUndo size={16} />
+                                                                                        Sales return
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-slate-300">-</span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                                {filteredAssets.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan={8} className="p-12 text-center text-slate-400 text-sm font-medium">
+                                                            No serial number assets found matching filters.
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <PaginationControls pagination={assetPagination} onPageChange={changePage} className="ibu-pager" />
+                                </>
+                            )}
+                        </div>
+                    </div >
                 </>
-            )}
-        </div>
-            </div >
-            </>
             )}
 
-{/* --- SALES RETURN FORM MODAL (Requirement #6) --- */ }
+            {/* --- SALES RETURN FORM MODAL (Requirement #6) --- */}
             <Modal
                 isOpen={exportDialog.open}
                 onClose={() => { if (!isExporting) setExportDialog((prev) => ({ ...prev, open: false })); }}
@@ -1940,27 +1923,27 @@ const SerialNoMaster = () => {
                 )}
             </Modal>
 
-{/* Import Modal */ }
-<ImportWizard
-    isOpen={isImportModalOpen}
-    onClose={() => setIsImportModalOpen(false)}
-    title="Import Invoice Bulk Upload Records"
-    module="assets"
-    templateName="assets_import_template.xlsx"
-    onDownloadTemplate={importService.getAssetTemplate}
-    onImported={() => {
-        // The upload can add products and customers that other screens list.
-        invalidateApiCache('/products');
-        invalidateApiCache('/customers');
-        fetchData();
-    }}
-/>
+            {/* Import Modal */}
+            <ImportWizard
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                title="Import Invoice Bulk Upload Records"
+                module="assets"
+                templateName="assets_import_template.xlsx"
+                onDownloadTemplate={importService.getAssetTemplate}
+                onImported={() => {
+                    // The upload can add products and customers that other screens list.
+                    invalidateApiCache('/products');
+                    invalidateApiCache('/customers');
+                    fetchData();
+                }}
+            />
 
-{
-    canSeeUploadHistory && (
-        <IbuUploadHistory isOpen={isUploadHistoryOpen} onClose={() => setIsUploadHistoryOpen(false)} />
-    )
-}
+            {
+                canSeeUploadHistory && (
+                    <IbuUploadHistory isOpen={isUploadHistoryOpen} onClose={() => setIsUploadHistoryOpen(false)} />
+                )
+            }
         </div >
     );
 };
