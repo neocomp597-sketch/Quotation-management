@@ -920,6 +920,13 @@ html, body {
    being cut off, a card's buttons share one row, and the pager is thumb-sized.
    ========================================================================== */
 .ibu-access-toggle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  margin-top: 0.125rem;
+}
+
+.ibu-access-values:not(.is-open) {
   display: none;
 }
 
@@ -930,14 +937,7 @@ html, body {
   }
 
   .ibu-access-toggle {
-    display: inline-flex;
-    align-items: center;
     min-height: 2.25rem;
-    margin-top: 0.125rem;
-  }
-
-  .ibu-access-values:not(.is-open) {
-    display: none;
   }
 
   /* As specific as the theme rules for .bg-white (html:not(.dark) / html.dark), which come earlier. */

@@ -321,6 +321,23 @@ const ownershipFilter = async (ownership) => {
 };
 
 /**
+ * User count of the Serial No List (client, 2026-11-19): the different current users (customers and
+ * employees) holding the serials that match `filter`, beside the Asset count. An aggregation, which
+ * tenantPlugin limits to the company and branches exactly as it does the Asset count's
+ * countDocuments; Model.distinct skips the plugin, so with no working branch it counted the holders
+ * of every company. Mongoose does not cast a pipeline, so the filter is cast first.
+ */
+const countHolders = async (filter, options) => {
+    const [row] = await Asset.aggregate([
+        { $match: Asset.find(filter).cast(Asset) },
+        { $group: { _id: '$customerId' } },
+        { $match: { _id: { $ne: null } } },
+        { $count: 'users' }
+    ]).option(options);
+    return row?.users || 0;
+};
+
+/**
  * Serial No List: every Invoice Bulk Upload serial, of every status, with its current branch and
  * current customer (?status filters by status). A branch sees the serials it holds and the serials
  * of its own customers sold by another branch (serialBranchScope).
@@ -369,10 +386,8 @@ exports.listSerials = async (req, res) => {
                 .limit(limit)
                 .lean(),
             Asset.countDocuments(scopedQuery).setOptions(scope.options),
-            // User count (client, 2026-11-19): the different current users (customers and employees)
-            // holding the serials that match, beside the Asset count
-            Asset.distinct('customerId', scopedQuery).setOptions(scope.options)
-        ]).then(([found, count, holderIds]) => [found, count, holderIds.filter(Boolean).length]);
+            countHolders(scopedQuery, scope.options)
+        ]);
 
         const holders = await employeeHolderLabels(assets.map((asset) => asset.customerId?.employeeProfileId));
         const data = assets.map((asset) => ({

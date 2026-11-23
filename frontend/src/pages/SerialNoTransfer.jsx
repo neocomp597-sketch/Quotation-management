@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { MdSearch, MdSwapHoriz, MdVisibility, MdArrowBack, MdPersonAdd, MdHistory, MdCheckCircle, MdFileDownload, MdAdd, MdClose, MdArrowForward, MdStore, MdExpandMore, MdFilterList } from 'react-icons/md';
+import { MdSearch, MdSwapHoriz, MdVisibility, MdArrowBack, MdPersonAdd, MdHistory, MdCheckCircle, MdFileDownload, MdAdd, MdClose, MdArrowForward, MdStore, MdExpandMore } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import { serialTransferService, customerService, csmService, mgrService, authService } from '../services/api';
 import AssetActivityLog from '../components/AssetActivityLog';
@@ -14,6 +14,7 @@ import usePermission from '../hooks/usePermission';
 import { useAuth } from '../context/AuthContext';
 import { MobileCard, MobileCardActions, MobileCardHead, MobileCardList, MobileEmpty, MobileField, MobileFields } from '../components/SerialMobileCards';
 import BranchChips from '../components/BranchChips';
+import { FiltersButton, useFiltersOpen as useFiltersOpenAt } from '../components/FiltersFold';
 
 const PAGE_SIZE = 20;
 const TABS = [
@@ -290,37 +291,8 @@ const DateRangeFilter = ({ range, field, onChange }) => {
 };
 
 // The filters beside a tab's search fold away behind a Filters button (client, 2026-11-17: they took
-// too much room). Folded at first; open or folded is remembered in this browser for every tab.
-const FILTERS_OPEN_KEY = 'serialTransfer.filtersOpen';
-const useFiltersOpen = () => {
-    const [open, setOpen] = useState(() => {
-        try { return localStorage.getItem(FILTERS_OPEN_KEY) === '1'; } catch { return false; }
-    });
-    const toggle = () => {
-        const next = !open;
-        setOpen(next);
-        try { localStorage.setItem(FILTERS_OPEN_KEY, next ? '1' : '0'); } catch { /* not remembered */ }
-    };
-    return [open, toggle];
-};
-
-// `active`: how many of the folded filters are in use, shown on the button so none is forgotten.
-const FiltersButton = ({ open, onToggle, active }) => (
-    <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        title={open ? 'Hide the filters' : 'Show the filters'}
-        className={`flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border text-xs font-black uppercase tracking-widest transition-all ${open || active ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'}`}
-    >
-        <MdFilterList size={18} />
-        Filters
-        {active > 0 && (
-            <span className="min-w-5 h-5 px-1.5 rounded-full bg-primary-600 text-white text-[10px] leading-5 text-center tracking-normal">{active}</span>
-        )}
-        <MdExpandMore size={18} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
-    </button>
-);
+// too much room); open or folded is remembered in this browser for every tab.
+const useFiltersOpen = () => useFiltersOpenAt('serialTransfer.filtersOpen');
 const datesInUse = (range) => (range.fromDate || range.toDate ? 1 : 0);
 
 // Total Count of a list: every record matching its search and filters (the server's count), apart

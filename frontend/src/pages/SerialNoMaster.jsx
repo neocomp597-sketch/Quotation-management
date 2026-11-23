@@ -19,6 +19,7 @@ import usePermission from '../hooks/usePermission';
 import { useAuth } from '../context/AuthContext';
 import { MobileCard, MobileCardActions, MobileCardHead, MobileCardList, MobileEmpty, MobileField, MobileFields } from '../components/SerialMobileCards';
 import BranchChips from '../components/BranchChips';
+import { FiltersButton, useFiltersOpen } from '../components/FiltersFold';
 
 const PAGE_SIZE = 15;
 
@@ -221,6 +222,20 @@ const SerialNoMaster = () => {
     // Sent as ?branchIds only when the screen shows more than the working branch.
     const viewBranchParam = showsOtherBranches ? viewBranchIds.join(',') : undefined;
     const branchNameOf = (id) => myBranches.find((branch) => idOf(branch) === String(id))?.name || '';
+    // The branch buttons are inside the Filters fold, which may be closed: the user's branches are
+    // loaded here so the branches kept in this tab are restored and named either way.
+    useEffect(() => {
+        let cancelled = false;
+        authService.getMyBranches()
+            .then((res) => { if (!cancelled) handleBranchesLoaded(Array.isArray(res.data?.branches) ? res.data.branches : []); })
+            .catch((err) => console.warn('Could not load your branches:', err));
+        return () => { cancelled = true; };
+        // Once per screen, as the branch buttons load them.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    // Branch buttons, status and MGR 1-5 fold away behind a Filters button (client, 2026-11-19, as
+    // on Serial No Transfer).
+    const [filtersOpen, toggleFilters] = useFiltersOpen('ibu.filtersOpen');
     const canViewDetails = hasAccess('master_serials_view_details');
     // Upload History lists every branch's uploads, so only administrators open it (the API checks too).
     const canSeeUploadHistory = ['admin', 'super_admin', 'superadmin'].includes(String(user?.role || '').toLowerCase());
@@ -858,6 +873,9 @@ const SerialNoMaster = () => {
     const pageTo = paginatedAssets.length ? pageFrom + paginatedAssets.length - 1 : 0;
     const filtersApplied = Boolean(searchQuery.trim())
         || (activeTab === 'active' && (selectedStatus !== 'ALL' || Object.values(mgrFilters).some((value) => value !== 'ALL')));
+    // Folded filters in use, on the Filters button: other branches shown, and (Active Inventory) status and each MGR.
+    const foldedFiltersInUse = (showsOtherBranches ? 1 : 0)
+        + (activeTab === 'active' ? (selectedStatus !== 'ALL' ? 1 : 0) + Object.values(mgrFilters).filter((value) => value !== 'ALL').length : 0);
 
     useEffect(() => {
         setCurrentPage(1);
@@ -1320,15 +1338,6 @@ const SerialNoMaster = () => {
                         <span>Return History</span>
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeTab === 'returns' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'}`}>{returnHistory.length}</span>
                     </button>
-                    {/* The branches this user was given: tick one or several to show them together (list,
-                        cards, Return History, search). */}
-                    <BranchChips
-                        className="col-span-2 flex flex-wrap items-center gap-2 sm:ml-4"
-                        multiple
-                        selected={viewBranchIds}
-                        onChange={changeViewBranches}
-                        onLoaded={handleBranchesLoaded}
-                    />
                 </div>
                 {showsOtherBranches && (
                     <p className="text-xs font-semibold text-slate-500">
@@ -1337,9 +1346,9 @@ const SerialNoMaster = () => {
                     </p>
                 )}
 
-                {/* The search keeps a usable width: when long MGR values make the dropdowns too wide, they move to the next row. */}
-                <div className="flex flex-col md:flex-row md:flex-wrap gap-4 items-center">
-                    <div className="flex-1 w-full md:min-w-[16rem] relative group">
+                {/* Search, with the other filters folded behind the Filters button beside it. */}
+                <div className="flex items-center gap-3">
+                    <div className="flex-1 min-w-0 relative group">
                         <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-teal-600 transition-colors" size={20} />
                         <input
                             type="text"
@@ -1349,37 +1358,50 @@ const SerialNoMaster = () => {
                             className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500/20 focus:bg-white focus:border-teal-500 transition-all outline-none text-sm font-semibold text-slate-900 placeholder:text-slate-400"
                         />
                     </div>
-                    {activeTab === 'active' && (
-                        <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 w-full md:w-auto">
-                            <select
-                                value={selectedStatus}
-                                onChange={(e) => setSelectedStatus(e.target.value)}
-                                className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
-                            >
-                                <option value="ALL">All Statuses</option>
-                                <option value="IN_STOCK">In Stock</option>
-                                <option value="SOLD">Sold</option>
-                                <option value="ALLOCATED">Allocated</option>
-                                <option value="RETURN">Returned</option>
-                                <option value="SCRAPPED">Scrapped</option>
-                            </select>
-                            {MGR_FIELDS.map(({ key, label }) => (
-                                <select
-                                    key={key}
-                                    value={mgrFilters[key]}
-                                    onChange={(e) => setMgrFilters((prev) => ({ ...prev, [key]: e.target.value }))}
-                                    aria-label={`Filter by ${label}`}
-                                    className={`px-4 py-3 border rounded-2xl outline-none text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all max-w-[200px] truncate ${mgrFilters[key] === 'ALL' ? 'bg-slate-50 border-slate-200' : 'bg-teal-50 border-teal-300'}`}
-                                >
-                                    <option value="ALL">All {label}</option>
-                                    {mgrOptions[key].map((value) => (
-                                        <option key={value} value={value}>{value}</option>
-                                    ))}
-                                </select>
-                            ))}
-                        </div>
-                    )}
+                    <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={foldedFiltersInUse} className="shrink-0" />
                 </div>
+                {filtersOpen && (
+                    <div className="space-y-3">
+                        {/* The branches this user was given: tick one or several to show them together (list,
+                            cards, Return History, search). */}
+                        <BranchChips
+                            className="flex flex-wrap items-center gap-2"
+                            multiple
+                            selected={viewBranchIds}
+                            onChange={changeViewBranches}
+                        />
+                        {activeTab === 'active' && (
+                            <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 w-full">
+                                <select
+                                    value={selectedStatus}
+                                    onChange={(e) => setSelectedStatus(e.target.value)}
+                                    className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
+                                >
+                                    <option value="ALL">All Statuses</option>
+                                    <option value="IN_STOCK">In Stock</option>
+                                    <option value="SOLD">Sold</option>
+                                    <option value="ALLOCATED">Allocated</option>
+                                    <option value="RETURN">Returned</option>
+                                    <option value="SCRAPPED">Scrapped</option>
+                                </select>
+                                {MGR_FIELDS.map(({ key, label }) => (
+                                    <select
+                                        key={key}
+                                        value={mgrFilters[key]}
+                                        onChange={(e) => setMgrFilters((prev) => ({ ...prev, [key]: e.target.value }))}
+                                        aria-label={`Filter by ${label}`}
+                                        className={`px-4 py-3 border rounded-2xl outline-none text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all max-w-[200px] truncate ${mgrFilters[key] === 'ALL' ? 'bg-slate-50 border-slate-200' : 'bg-teal-50 border-teal-300'}`}
+                                    >
+                                        <option value="ALL">All {label}</option>
+                                        {mgrOptions[key].map((value) => (
+                                            <option key={value} value={value}>{value}</option>
+                                        ))}
+                                    </select>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-2xl border border-primary-100 bg-primary-50/60 px-4 py-3">
                     <p className="text-sm font-bold text-slate-700">

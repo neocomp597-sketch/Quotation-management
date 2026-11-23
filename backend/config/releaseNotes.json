@@ -1206,5 +1206,32 @@
     "deployedBy": "Super Admin",
     "deployedAt": "2026-11-18T21:30:00+05:30",
     "isActive": true
+  },
+  {
+    "version": "v6.8.12",
+    "title": "Serial No Transfer Counts by Home Branch, Invoice Bulk Upload Filters Fold",
+    "message": "Release Updates (19 Nov 2026): A branch's Serial No List now counts staff serials by the employee's home branch, so the Asset count and User count no longer include other branches' staff. Invoice Bulk Upload's branch buttons, status and MGR filters fold away behind a Filters button.",
+    "releaseNotes": [
+      "Serial No Transfer: serials held by another branch show under the employee's home branch in Employee Master, not the branch their customer record was created in",
+      "Serial No List: Asset count and User count follow the same rule; the User count with no working branch now counts only your company",
+      "Invoice Bulk Upload: branch buttons, status and MGR 1-5 are inside Filters, with the number of filters in use on the button"
+    ],
+    "detailedChanges": [
+      {
+        "date": "19.11.2026",
+        "module": "Master Management",
+        "submodule": "Serial No Transfer: Branch Counts",
+        "changes": "A branch sees the serial numbers it holds and those of its own customers held by another branch. For a customer that is an employee, \"own\" now means the employee's home branch in Employee Master. Before, it was the branch the customer record was first created in, and many staff records had been created in DANI PARK. So DANI PARK with MGR 1 IT showed 1,042 assets and 118 users, including NASHIK, ULARIA and EPC staff. It now shows 960 assets and 55 users. Real customers, and employees with no home branch, keep their Customer Master branch. Raise Ticket's serial lookup follows the same rule. With no working branch selected, the User count now counts only your company's users."
+      },
+      {
+        "date": "19.11.2026",
+        "module": "Master Management",
+        "submodule": "Invoice Bulk Upload: Filters",
+        "changes": "The branch buttons, the status filter and MGR 1 to MGR 5 are now behind a Filters button beside the search, as on Serial No Transfer. The button shows how many of them are in use. The chosen branches are kept in the browser tab and restored even while Filters is closed. Active Inventory, Return History, the search and Total Count stay on the screen."
+      }
+    ],
+    "deployedBy": "Super Admin",
+    "deployedAt": "2026-11-19T18:00:00+05:30",
+    "isActive": true
   }
 ]
