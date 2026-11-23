@@ -1388,51 +1388,6 @@ const SerialNoMaster = () => {
                             </div>
                         )}
 
-                        {
-                            filtersOpen && (
-                                <div className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-3">
-                                    {/* The branches this user was given: tick one or several to show them together (list,
-                            cards, Return History, search). */}
-                                    <BranchChips
-                                        className="flex flex-wrap items-center gap-2"
-                                        multiple
-                                        selected={viewBranchIds}
-                                        onChange={changeViewBranches}
-                                    />
-                                    {activeTab === 'active' && (
-                                        <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 w-full">
-                                            <select
-                                                value={selectedStatus}
-                                                onChange={(e) => setSelectedStatus(e.target.value)}
-                                                className="px-4 py-3 bg-white border border-slate-200 rounded-2xl outline-none text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
-                                            >
-                                                <option value="ALL">All Statuses</option>
-                                                <option value="IN_STOCK">In Stock</option>
-                                                <option value="SOLD">Sold</option>
-                                                <option value="ALLOCATED">Allocated</option>
-                                                <option value="RETURN">Returned</option>
-                                                <option value="SCRAPPED">Scrapped</option>
-                                            </select>
-                                            {MGR_FIELDS.map(({ key, label }) => (
-                                                <select
-                                                    key={key}
-                                                    value={mgrFilters[key]}
-                                                    onChange={(e) => setMgrFilters((prev) => ({ ...prev, [key]: e.target.value }))}
-                                                    aria-label={`Filter by ${label}`}
-                                                    className={`px-4 py-3 border rounded-2xl outline-none text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all max-w-[200px] truncate ${mgrFilters[key] === 'ALL' ? 'bg-white border-slate-200' : 'bg-teal-50 border-teal-300'}`}
-                                                >
-                                                    <option value="ALL">All {label}</option>
-                                                    {mgrOptions[key].map((value) => (
-                                                        <option key={value} value={value}>{value}</option>
-                                                    ))}
-                                                </select>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )
-                        }
-
                         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-2xl border border-primary-100 bg-primary-50/60 px-4 py-3">
                             <p className="text-sm font-bold text-slate-700">
                                 Total Count:{' '}
