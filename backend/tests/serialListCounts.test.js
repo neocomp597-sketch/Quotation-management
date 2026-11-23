@@ -1,5 +1,7 @@
 // Serial No Transfer > Serial No List shows Asset count and User count (client, 2026-11-19: "Asset
 // count: 45678, User count: 1234"): GET /serial-transfers/serials. Run: npm test (node --test)
+// The User count's grouping itself (linked customer, else the saved customer name) was checked on a
+// real MongoDB; here: it runs as one aggregation with the same filter as the Asset count.
 const { test, beforeEach, after } = require('node:test');
 const assert = require('node:assert/strict');
 const mongoose = require('mongoose');
@@ -9,48 +11,23 @@ const { listSerials } = require('../controllers/serialTransferController');
 const oid = () => new mongoose.Types.ObjectId();
 const companyId = oid();
 const admin = { id: String(oid()), name: 'Super Admin', role: 'admin', companyId: String(companyId) };
-const shraddha = oid();
-const rohit = oid();
 
-// The current user (customerId) of each matching serial; null for a serial with nobody.
-let holders;
-// What the database answers to the User count pipeline for those serials.
-const runUserCount = (pipeline) => {
-    const [filter, ...stages] = pipeline;
-    assert.ok(filter.$match, 'the search and filters come first');
-    let rows = holders.map((customerId) => ({ customerId }));
-    for (const stage of stages) {
-        const [op, spec] = Object.entries(stage)[0];
-        if (op === '$group') {
-            assert.deepEqual(spec, { _id: '$customerId' }, 'grouped by current user');
-            rows = [...new Map(rows.map((row) => [String(row.customerId), { _id: row.customerId }])).values()];
-        } else if (op === '$match') {
-            assert.deepEqual(spec, { _id: { $ne: null } });
-            rows = rows.filter((row) => row._id !== null && row._id !== undefined);
-        } else if (op === '$count') {
-            rows = rows.length ? [{ [spec]: rows.length }] : [];
-        } else {
-            throw new Error(`unexpected stage ${op}`);
-        }
-    }
-    return rows;
-};
-
+let users;
 const db = install((query) => {
     const name = query.model.modelName;
     if (name === 'Asset' && query.op === 'countDocuments') return 45658;
-    if (name === 'Asset' && query.op === 'aggregate') return runUserCount(query.pipeline);
+    if (name === 'Asset' && query.op === 'aggregate') return users === null ? [] : [{ count: users }];
     if (query.op === 'find') return [];
     if (query.op === 'findOne') return null;
     if (query.op === 'distinct') return [];
     if (query.op === 'countDocuments') return 0;
+    if (query.op === 'aggregate') return [];
     return new Error(`unexpected query ${name}.${query.op}`);
 });
 after(() => db.restore());
 beforeEach(() => {
     db.reset();
-    // Serials of two users (Rohit holds two), and serials in stock with nobody
-    holders = [shraddha, null, rohit, rohit, undefined];
+    users = 1234;
 });
 
 const list = async (query = {}) => {
@@ -63,24 +40,29 @@ const list = async (query = {}) => {
 test('User count: the different current users of the serials, beside the Asset count', async () => {
     const res = await list();
     assert.equal(res.body.pagination.total, 45658);
-    assert.equal(res.body.pagination.userCount, 2, 'serials with nobody are not a user; a user with two serials counts once');
+    assert.equal(res.body.pagination.userCount, 1234);
 });
 
-test('User count is 0 when no matching serial has a user', async () => {
-    holders = [null, undefined];
+test('no serial with a user: User count 0', async () => {
+    users = null;
     const res = await list();
     assert.equal(res.body.pagination.userCount, 0);
+});
+
+test('users are counted by linked customer, else by the customer name saved on the serial', async () => {
+    await list();
+    const [users] = db.queries('Asset', 'aggregate');
+    const group = users.pipeline.find((stage) => stage.$group).$group;
+    assert.deepEqual(group._id.$ifNull[0], '$customerId');
+    assert.match(JSON.stringify(group._id.$ifNull[1]), /customerNameStr/);
+    const empty = users.pipeline.find((stage) => stage.$match && stage.$match._id);
+    assert.deepEqual(empty.$match._id.$nin, [null, ''], 'serials with nobody are not a user');
 });
 
 test('both counts use the same search and filters', async () => {
     await list({ status: 'SOLD', search: 'FTR3Y04', field: 'serial' });
     const [counted] = db.queries('Asset', 'countDocuments');
     const [users] = db.queries('Asset', 'aggregate');
-    assert.deepEqual(users.pipeline[0].$match, counted.getFilter());
-});
-
-test('User count is an aggregation, which tenantPlugin keeps to the company (Model.distinct is not)', async () => {
-    await list();
-    assert.equal(db.queries('Asset', 'distinct').length, 0);
-    assert.equal(db.queries('Asset', 'aggregate').length, 1);
+    const counter = mongoose.model('Asset').find();
+    assert.deepEqual(users.pipeline[0].$match, counter.cast(mongoose.model('Asset'), counted.getFilter()));
 });

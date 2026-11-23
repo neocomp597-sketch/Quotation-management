@@ -12,8 +12,10 @@ const canViewSerialTransfers = requirePermission('master_serial_transfer');
 router.use(protect, canViewSerialTransfers);
 
 router.get('/serials', serialTransferController.listSerials);
+router.get('/serials/export', serialTransferController.exportSerials);
 router.get('/serials/:assetId', serialTransferController.getSerial);
 router.put('/serials/:assetId/asset-no', serialTransferController.updateAssetNo);
+router.put('/serials/:assetId/warranty-end', serialTransferController.updateWarrantyEnd);
 router.post('/serials/:assetId/transfer', serialTransferController.transferSerial);
 router.post('/serials/:assetId/past-entry', serialTransferController.addPastEntry);
 router.get('/history', serialTransferController.listHistory);
@@ -25,6 +27,7 @@ router.get('/employees/assignable-assets', serialTransferController.searchAssign
 router.get('/employees/:employeeId/assets', serialTransferController.listEmployeeAssets);
 router.post('/employees/:employeeId/assets', serialTransferController.assignEmployeeAssets);
 router.post('/employees/:employeeId/assets/:assetId/transfer', serialTransferController.transferEmployeeAsset);
+router.get('/employees/:employeeId/assets/:assetId/log', serialTransferController.employeeAssetLog);
 router.post('/employees/:employeeId/assets/move-home', acrossBranches, serialTransferController.moveEmployeeAssetsHome);
 
 // Branch Transfer works across branches; utils/serialBranchAccess.js holds its access rules.

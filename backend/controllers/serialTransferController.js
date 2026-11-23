@@ -10,10 +10,11 @@ const Product = require('../models/Product');
 require('../models/MGR'); // populated through Product mgr1..mgr5
 const SerialTransfer = require('../models/SerialTransfer');
 const SerialBranchTransfer = require('../models/SerialBranchTransfer');
-const { MGR_KEYS, formatMgrVal } = require('../utils/productMgr');
+const { MGR_KEYS, formatMgrVal, productMgrPopulate, applyProductMgrs } = require('../utils/productMgr');
 const { formatDate } = require('../utils/dateFormat');
 const { ANY_BRANCH, serialBranchScope, myBranchesScope, inScope } = require('../utils/customerBranchSerials');
 const { requestedViewBranches } = require('../utils/viewBranches');
+const { listSelectableBranches } = require('../utils/branchScope');
 const { employeeHolderLabels } = require('../services/employeeCustomerService');
 
 // The branches a list shows: ?branchIds (several at once, checked against the user's branches),
@@ -178,7 +179,20 @@ const getPagination = (query) => {
 
 const CUSTOMER_SELECT = 'customerName companyName externalCode mobile gstin billingAddress employeeProfileId';
 const customerPopulate = { path: 'customerId', select: CUSTOMER_SELECT, options: { bypassTenant: true } };
-const productPopulate = { path: 'productId', select: 'productCode productName', options: { bypassTenant: true } };
+const productPopulate = { path: 'productId', select: 'productCode productName description', options: { bypassTenant: true } };
+
+const resolveProductDescription = (product, fallbackDesc = '') => {
+    const pDesc = cleanText(product?.description);
+    if (pDesc) return pDesc;
+    const pName = cleanText(product?.productName);
+    const pCode = cleanText(product?.productCode);
+    if (pName && (!pCode || pName.toLowerCase() !== pCode.toLowerCase())) {
+        return pName;
+    }
+    const fallback = cleanText(fallbackDesc);
+    if (fallback) return fallback;
+    return pName || pCode || '';
+};
 
 const customerLabel = (customer, fallback = '') => cleanText(customer?.companyName) || cleanText(customer?.customerName) || fallback;
 
@@ -321,20 +335,30 @@ const ownershipFilter = async (ownership) => {
 };
 
 /**
- * User count of the Serial No List (client, 2026-11-19): the different current users (customers and
- * employees) holding the serials that match `filter`, beside the Asset count. An aggregation, which
- * tenantPlugin limits to the company and branches exactly as it does the Asset count's
- * countDocuments; Model.distinct skips the plugin, so with no working branch it counted the holders
- * of every company. Mongoose does not cast a pipeline, so the filter is cast first.
+ * Serial No List's User count: the different current users of the serials matching `filter`, as
+ * the Current User column shows them: the linked customer (an employee holds through theirs), else
+ * the customer name saved on the serial (older imports and Add Single Entry kept a name that was not
+ * in Customer Master). Serials with nobody are not a user.
+ *
+ * Re-checked 2026-11-19 (client: "this count seems to be wrong"): the first version counted
+ * Asset.distinct('customerId'), which missed every name-only holder, and distinct goes around
+ * tenantPlugin (no company filter). An aggregation gets the company (and, without `options`, the
+ * branch) from the plugin; its $match is cast here, as aggregation does not cast.
  */
-const countHolders = async (filter, options) => {
+const countCurrentUsers = async (filter, options = {}) => {
     const [row] = await Asset.aggregate([
-        { $match: Asset.find(filter).cast(Asset) },
-        { $group: { _id: '$customerId' } },
-        { $match: { _id: { $ne: null } } },
-        { $count: 'users' }
+        { $match: Asset.find().cast(Asset, filter) },
+        {
+            $group: {
+                _id: {
+                    $ifNull: ['$customerId', { $toLower: { $trim: { input: { $ifNull: ['$customerNameStr', ''] } } } }]
+                }
+            }
+        },
+        { $match: { _id: { $nin: [null, ''] } } },
+        { $count: 'count' }
     ]).option(options);
-    return row?.users || 0;
+    return row?.count || 0;
 };
 
 /**
@@ -386,28 +410,34 @@ exports.listSerials = async (req, res) => {
                 .limit(limit)
                 .lean(),
             Asset.countDocuments(scopedQuery).setOptions(scope.options),
-            countHolders(scopedQuery, scope.options)
+            // User count (client, 2026-11-19): the different current users (customers and employees)
+            // holding the serials that match, beside the Asset count
+            countCurrentUsers(scopedQuery, scope.options)
         ]);
 
         const holders = await employeeHolderLabels(assets.map((asset) => asset.customerId?.employeeProfileId));
-        const data = assets.map((asset) => ({
-            _id: asset._id,
-            serialNumber: asset.serialNumber,
-            assetNo: asset.assetNo || '',
-            productCode: asset.productId?.productCode || asset.productCode,
-            productName: asset.productId?.productName || asset.productName,
-            customerId: asset.customerId?._id || null,
-            customerCode: cleanText(asset.customerId?.externalCode) || asset.customerCode,
-            customerName: customerLabel(asset.customerId, asset.customerNameStr),
-            // Set when the holder is an employee: External Employee ID, name and email.
-            currentUser: holders.get(String(asset.customerId?.employeeProfileId)) || null,
-            // A serial that is not sold has a sale date only if its invoice gave one.
-            saleDate: asset.status === 'SOLD' ? saleDateOf(asset) : asset.saleDate || asset.invoiceDate || null,
-            invoiceNumber: asset.invoiceNumber,
-            status: statusOf(asset),
-            branchId: idOf(asset.branchId),
-            branchName: branchLabel(asset.branchId)
-        }));
+        const data = assets.map((asset) => {
+            const productDesc = resolveProductDescription(asset.productId, asset.productName);
+            return {
+                _id: asset._id,
+                serialNumber: asset.serialNumber,
+                assetNo: asset.assetNo || '',
+                productCode: asset.productId?.productCode || asset.productCode,
+                productName: productDesc,
+                productDescription: productDesc,
+                customerId: asset.customerId?._id || null,
+                customerCode: cleanText(asset.customerId?.externalCode) || asset.customerCode,
+                customerName: customerLabel(asset.customerId, asset.customerNameStr),
+                // Set when the holder is an employee: External Employee ID, name and email.
+                currentUser: holders.get(String(asset.customerId?.employeeProfileId)) || null,
+                // A serial that is not sold has a sale date only if its invoice gave one.
+                saleDate: asset.status === 'SOLD' ? saleDateOf(asset) : asset.saleDate || asset.invoiceDate || null,
+                invoiceNumber: asset.invoiceNumber,
+                status: statusOf(asset),
+                branchId: idOf(asset.branchId),
+                branchName: branchLabel(asset.branchId)
+            };
+        });
 
         return res.json({
             data,
@@ -424,7 +454,11 @@ exports.listSerials = async (req, res) => {
 // `scope`: which branches it may be in (default the active branch; myBranchesScope for a serial
 // opened from a list showing several branches).
 const loadSerial = async (assetId, access = null, scope = null) => {
-    const asset = await scopedSerial(scope || await serialBranchScope(), assetId, access).populate(customerPopulate).populate(branchPopulate).lean();
+    const asset = await scopedSerial(scope || await serialBranchScope(), assetId, access)
+        .populate(customerPopulate)
+        .populate(productPopulate)
+        .populate(branchPopulate)
+        .lean();
     if (!asset) return null;
 
     let history = (await historyOf(asset._id)).map((entry) => withInvoice(entry, asset));
@@ -441,19 +475,22 @@ const loadSerial = async (assetId, access = null, scope = null) => {
     }
 
     const holders = await employeeHolderLabels([asset.customerId?.employeeProfileId]);
+    const productDesc = resolveProductDescription(asset.productId, asset.productName);
     return {
         asset: {
             _id: asset._id,
             serialNumber: asset.serialNumber,
             assetNo: asset.assetNo || '',
-            productCode: asset.productCode,
-            productName: asset.productName,
+            productCode: asset.productId?.productCode || asset.productCode,
+            productName: productDesc,
+            productDescription: productDesc,
             status: statusOf(asset),
             branchId: idOf(asset.branchId),
             branchName: branchLabel(asset.branchId),
             invoiceNumber: asset.invoiceNumber,
             invoiceDate: invoiceDateOf(asset),
             saleDate: saleDateOf(asset),
+            warrantyEnd: asset.warrantyEnd || null,
             customerId: asset.customerId?._id || null,
             customerCode: cleanText(asset.customerId?.externalCode) || asset.customerCode,
             customerName: customerLabel(asset.customerId, asset.customerNameStr),
@@ -528,6 +565,51 @@ exports.updateAssetNo = async (req, res) => {
         return res.json(await loadSerial(assetId, access, scope));
     } catch (error) {
         return res.status(500).json({ message: 'Failed to save the Asset No', error: error.message });
+    }
+};
+
+/** Saves the serial's Warranty End Date: parsed as Date, or null to clear. */
+exports.updateWarrantyEnd = async (req, res) => {
+    try {
+        const { assetId } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(assetId)) {
+            return res.status(400).json({ message: 'Invalid serial record' });
+        }
+        const access = await mgrAccessCondition(req);
+        const { warrantyEnd } = req.body;
+        const parsedDate = warrantyEnd ? new Date(warrantyEnd) : null;
+        if (warrantyEnd && isNaN(parsedDate.getTime())) {
+            return res.status(400).json({ message: 'Invalid Warranty End Date' });
+        }
+        const scope = await myBranchesScope(req);
+        const previous = await Asset.findOneAndUpdate(
+            inScope({ _id: assetId, ...access }, scope),
+            { $set: { warrantyEnd: parsedDate } }
+        )
+            .setOptions(scope.options)
+            .select('warrantyEnd serialNumber companyId')
+            .lean();
+        if (!previous) return res.status(404).json({ message: 'Serial number not found' });
+
+        try {
+            await AuditLog.create({
+                action: 'WARRANTY_END_UPDATED',
+                entityType: 'Asset',
+                entityId: previous._id,
+                userId: req.user.id,
+                userName: req.user.name,
+                oldValue: { warrantyEnd: previous.warrantyEnd || null },
+                newValue: { warrantyEnd: parsedDate },
+                reason: `Warranty End Date of serial ${previous.serialNumber}`,
+                companyId: previous.companyId
+            });
+        } catch (auditError) {
+            console.error('Warranty End audit log error:', auditError);
+        }
+
+        return res.json(await loadSerial(assetId, access, scope));
+    } catch (error) {
+        return res.status(500).json({ message: 'Failed to save Warranty End Date', error: error.message });
     }
 };
 
@@ -782,7 +864,7 @@ exports.listHistory = async (req, res) => {
         const scopedQuery = branchRecords ? { $and: [query, branchRecords] } : query;
 
         const [records, total] = await Promise.all([
-            SerialTransfer.find(scopedQuery).setOptions(scope.options).sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit).lean(),
+            SerialTransfer.find(scopedQuery).setOptions(scope.options).populate(productPopulate).sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit).lean(),
             SerialTransfer.countDocuments(scopedQuery).setOptions(scope.options)
         ]);
         const assets = records.length
@@ -791,7 +873,15 @@ exports.listHistory = async (req, res) => {
                 .select('invoiceNumber invoiceDate saleDate').lean()
             : [];
         const assetById = new Map(assets.map((asset) => [String(asset._id), asset]));
-        const data = records.map((record) => withInvoice(record, assetById.get(String(record.assetId))));
+        const data = records.map((record) => {
+            const productDesc = resolveProductDescription(record.productId, record.productName);
+            return withInvoice({
+                ...record,
+                productCode: record.productId?.productCode || record.productCode,
+                productName: productDesc,
+                productDescription: productDesc
+            }, assetById.get(String(record.assetId)));
+        });
         return res.json({ data, pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
     } catch (error) {
         return sendError(res, error, 'Failed to load the transfer history');
@@ -941,7 +1031,7 @@ const withMasterData = async (rows) => {
     const idsOf = (key) => [...new Set(rows.map((row) => row[key]).filter(Boolean).map(String))];
     const [products, customers] = await Promise.all([
         Product.find({ _id: { $in: idsOf('productId') } })
-            .select(['productName productCode', ...MGR_KEYS].join(' '))
+            .select(['productName productCode description', ...MGR_KEYS].join(' '))
             .populate(MGR_KEYS.map((key) => ({ path: key, select: 'code description', options: { bypassTenant: true } })))
             .setOptions({ bypassTenant: true })
             .lean(),
@@ -957,9 +1047,11 @@ const withMasterData = async (rows) => {
         const product = productById.get(String(row.productId));
         const customer = customerById.get(String(row.customerId));
         const mgrs = Object.fromEntries(MGR_KEYS.map((key) => [key, product ? formatMgrVal(product[key]) : '']));
+        const productDesc = resolveProductDescription(product, row.productName);
         return {
             ...row,
-            productName: cleanText(product?.productName) || cleanText(row.productName),
+            productName: productDesc,
+            productDescription: productDesc,
             productCode: cleanText(product?.productCode) || cleanText(row.productCode),
             ...mgrs,
             customerName: cleanText(row.customerName) || customerLabel(customer),
@@ -1154,7 +1246,12 @@ const branchTransferResult = async (filter) => {
 /** Branches for the Branch Transfer form and filters; `canMoveFrom` marks the possible source branches. */
 exports.listTransferBranches = async (req, res) => {
     try {
-        const branches = await Branch.find({ companyId: req.user.companyId }).select('name code status').sort({ name: 1 }).lean();
+        const selectable = await listSelectableBranches(req.user, req.user.companyId);
+        const limited = limitedBranchIds(req);
+        let branches = selectable;
+        if (limited) {
+            branches = branches.filter((b) => limited.includes(String(b._id)));
+        }
         return res.json({
             branches: branches.map((branch) => ({
                 _id: branch._id,
@@ -1193,17 +1290,21 @@ exports.searchBranchSerials = async (req, res) => {
             Asset.countDocuments(query)
         ]);
         return res.json({
-            data: assets.map((asset) => ({
-                _id: asset._id,
-                serialNumber: asset.serialNumber,
-                productCode: asset.productId?.productCode || asset.productCode,
-                productName: asset.productId?.productName || asset.productName,
-                status: statusOf(asset),
-                customerName: customerLabel(asset.customerId, asset.customerNameStr),
-                invoiceNumber: asset.invoiceNumber || '',
-                branchId: branch._id,
-                branchName: branchLabel(branch)
-            })),
+            data: assets.map((asset) => {
+                const productDesc = resolveProductDescription(asset.productId, asset.productName);
+                return {
+                    _id: asset._id,
+                    serialNumber: asset.serialNumber,
+                    productCode: asset.productId?.productCode || asset.productCode,
+                    productName: productDesc,
+                    productDescription: productDesc,
+                    status: statusOf(asset),
+                    customerName: customerLabel(asset.customerId, asset.customerNameStr),
+                    invoiceNumber: asset.invoiceNumber || '',
+                    branchId: branch._id,
+                    branchName: branchLabel(branch)
+                };
+            }),
             total
         });
     } catch (error) {
@@ -1368,10 +1469,14 @@ exports.listBranchTransfers = async (req, res) => {
         // Product ids from Product.distinct are ObjectIds already, as aggregation needs.
         const access = await mgrAccessCondition(req);
         if (access) and.push(access);
+        const limited = limitedBranchIds(req);
         for (const key of ['fromBranchId', 'toBranchId']) {
             const value = cleanText(req.query[key]);
             if (!value) continue;
             if (!mongoose.Types.ObjectId.isValid(value)) throw httpError(400, 'Invalid branch filter.');
+            if (limited && !limited.includes(value)) {
+                throw httpError(403, 'You do not have access to this branch.');
+            }
             and.push({ [key]: new mongoose.Types.ObjectId(value) });
         }
         const search = cleanText(req.query.search);
@@ -1401,13 +1506,25 @@ exports.listBranchTransfers = async (req, res) => {
             : [];
         const branchName = new Map(branches.map((branch) => [String(branch._id), branchLabel(branch)]));
 
-        const data = rows.map(({ asset, requestId: _requestId, serialKey: _serialKey, status: statusAtTransfer, ...row }) => ({
-            ...row,
-            statusAtTransfer,
-            status: asset ? statusOf(asset) : statusAtTransfer,
-            currentBranchId: asset?.branchId || null,
-            currentBranchName: asset?.branchId ? branchName.get(String(asset.branchId)) || '' : ''
-        }));
+        const productIds = [...new Set(rows.map((row) => row.productId).filter(Boolean).map(String))];
+        const products = productIds.length
+            ? await Product.find({ _id: { $in: productIds } }).select('productCode productName description').setOptions({ bypassTenant: true }).lean()
+            : [];
+        const productById = new Map(products.map((p) => [String(p._id), p]));
+
+        const data = rows.map(({ asset, requestId: _requestId, serialKey: _serialKey, status: statusAtTransfer, ...row }) => {
+            const product = productById.get(String(row.productId));
+            const productDesc = resolveProductDescription(product, row.productName);
+            return {
+                ...row,
+                productName: productDesc,
+                productDescription: productDesc,
+                statusAtTransfer,
+                status: asset ? statusOf(asset) : statusAtTransfer,
+                currentBranchId: asset?.branchId || null,
+                currentBranchName: asset?.branchId ? branchName.get(String(asset.branchId)) || '' : ''
+            };
+        });
         const total = result?.total?.[0]?.count || 0;
         return res.json({ data, pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
     } catch (error) {
@@ -1421,7 +1538,8 @@ exports.getSerialBranchHistory = async (req, res) => {
         const { assetId } = req.params;
         if (!mongoose.Types.ObjectId.isValid(assetId)) throw httpError(400, 'Invalid serial record');
         const asset = await Asset.findOne({ _id: assetId, companyId: req.user.companyId, ...(await mgrAccessCondition(req)) })
-            .select('serialNumber productCode productName status branchId customerNameStr invoiceNumber')
+            .select('serialNumber productId productCode productName status branchId customerNameStr invoiceNumber')
+            .populate(productPopulate)
             .populate(branchPopulate)
             .lean();
         if (!asset) throw httpError(404, 'Serial number not found');
@@ -1432,12 +1550,14 @@ exports.getSerialBranchHistory = async (req, res) => {
         const branchesSeen = [idOf(asset.branchId), ...transfers.flatMap((t) => [t.fromBranchId, t.toBranchId])].filter(Boolean).map(String);
         if (limited && !branchesSeen.some((id) => limited.includes(id))) throw httpError(404, 'Serial number not found');
 
+        const productDesc = resolveProductDescription(asset.productId, asset.productName);
         return res.json({
             asset: {
                 _id: asset._id,
                 serialNumber: asset.serialNumber,
-                productCode: asset.productCode,
-                productName: asset.productName,
+                productCode: asset.productId?.productCode || asset.productCode,
+                productName: productDesc,
+                productDescription: productDesc,
                 status: statusOf(asset),
                 branchId: idOf(asset.branchId),
                 branchName: branchLabel(asset.branchId),
@@ -1476,17 +1596,21 @@ const employeeAndCustomer = async (req, employeeId, label = 'employee') => {
     return { employee, customer };
 };
 
-const employeeAssetRow = (asset) => ({
-    _id: asset._id,
-    serialNumber: asset.serialNumber,
-    assetNo: asset.assetNo || '',
-    productCode: asset.productId?.productCode || asset.productCode || '',
-    productName: asset.productId?.productName || asset.productName || '',
-    status: statusOf(asset),
-    branchId: idOf(asset.branchId),
-    branchName: branchLabel(asset.branchId),
-    invoiceNumber: asset.invoiceNumber || ''
-});
+const employeeAssetRow = (asset) => {
+    const productDesc = resolveProductDescription(asset.productId, asset.productName);
+    return {
+        _id: asset._id,
+        serialNumber: asset.serialNumber,
+        assetNo: asset.assetNo || '',
+        productCode: asset.productId?.productCode || asset.productCode || '',
+        productName: productDesc,
+        productDescription: productDesc,
+        status: statusOf(asset),
+        branchId: idOf(asset.branchId),
+        branchName: branchLabel(asset.branchId),
+        invoiceNumber: asset.invoiceNumber || ''
+    };
+};
 
 // The items an employee holds now, in every branch.
 const employeeAssetsOf = async (req, customer) => {
@@ -1712,5 +1836,353 @@ exports.transferEmployeeAsset = async (req, res) => {
         return sendError(res, error, 'Failed to transfer the asset');
     } finally {
         if (session) await session.endSession();
+    }
+};
+
+const LOG_TITLES = {
+    Sold: 'Sold to',
+    Allocated: 'Allocated to',
+    Assigned: 'Assigned to',
+    Transferred: 'Transferred to',
+    Returned: 'Returned by',
+    'Past Entry': 'Past entry:'
+};
+// When a customer record took effect, for placing it among the branch moves: the date it names for
+// the first customer and past entries, else the moment it was saved (a move is saved at once too).
+const loggedAt = (record) => (['Sold', 'Allocated', 'Past Entry'].includes(record.entryType) || !record.createdAt
+    ? record.transferDate
+    : record.createdAt);
+
+/**
+ * GET /employees/:employeeId/assets/:assetId/log: the Asset Log of an item the employee holds or
+ * held (client, 2026-11-19: "the asset was provided to him from another branch", and moving it to
+ * his own branch must show too). One line per event, oldest first: the item added in Invoice Bulk
+ * Upload, each customer or employee who received it (with the branch it was in at that moment),
+ * and each branch move (Branch Transfer, an employee's Branch Transfer, Move to <branch>).
+ *
+ * A branch move also re-books the item's customer records under the new branch
+ * (moveSerialsToBranch), so the branch of each record is worked out from the moves instead.
+ */
+exports.employeeAssetLog = async (req, res) => {
+    try {
+        const { assetId } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(assetId)) throw httpError(400, 'Invalid asset.');
+        const { employee, customer } = await employeeAndCustomer(req, req.params.employeeId);
+        const access = await mgrAccessCondition(req);
+        const asset = await Asset.findOne({ _id: assetId, companyId: req.user.companyId, ...access })
+            .setOptions(ANY_BRANCH)
+            .populate(customerPopulate)
+            .populate(productPopulate)
+            .populate(branchPopulate)
+            .lean();
+        if (!asset) throw httpError(404, 'Asset not found.');
+
+        const [saved, moves, home] = await Promise.all([
+            historyOf(asset._id),
+            SerialBranchTransfer.find({ assetId: asset._id }).setOptions(ANY_BRANCH).sort({ transferDate: 1, _id: 1 }).lean(),
+            homeBranchOf(req, employee)
+        ]);
+        const isEmployee = (id) => String(idOf(id) || '') === String(customer._id);
+        if (!isEmployee(asset.customerId) && !saved.some((record) => isEmployee(record.customerId))) {
+            throw httpError(404, `${asset.serialNumber} was never with ${employee.name}.`);
+        }
+        // Nothing saved yet: the invoice row's customer, as the serial's details show it.
+        const records = saved.length || !hasSaleCustomer(asset)
+            ? saved.map((record) => withInvoice(record, asset))
+            : [{ ...saleRecord(asset), _id: null, pending: true }];
+
+        // Employees among the holders show as "<External Employee ID> - Name".
+        const holderIds = [...new Set(records.map((record) => record.customerId).filter(Boolean).map(String))];
+        const holderCustomers = holderIds.length
+            ? await Customer.find({ _id: { $in: holderIds } }).select('employeeProfileId').setOptions(ANY_BRANCH).lean()
+            : [];
+        const employeeOf = new Map(holderCustomers.filter((row) => row.employeeProfileId).map((row) => [String(row._id), String(row.employeeProfileId)]));
+        const labels = await employeeHolderLabels([...employeeOf.values()]);
+        const holderOf = (record) => {
+            const label = labels.get(employeeOf.get(String(record.customerId || '')));
+            if (label) return { ...label, employee: true };
+            const name = cleanText(record.companyName) || cleanText(record.customerName) || 'Unknown customer';
+            return { title: [cleanText(record.customerCode), name].filter(Boolean).join(' - '), subtitle: '', employee: false };
+        };
+
+        // The branch the item was in at a moment: where it started, then each move up to then.
+        const start = moves.length
+            ? { id: idOf(moves[0].fromBranchId), name: moves[0].fromBranchName }
+            : { id: idOf(asset.branchId), name: branchLabel(asset.branchId) };
+        const branchAt = (when) => {
+            let branch = start;
+            for (const move of moves) {
+                if (new Date(move.transferDate) > new Date(when)) break;
+                branch = { id: idOf(move.toBranchId), name: move.toBranchName };
+            }
+            return branch;
+        };
+        const homeId = home ? String(home._id) : '';
+
+        const events = [];
+        if (asset.createdAt) {
+            events.push({
+                kind: 'added',
+                // Always the first line, also when the invoice it was sold on is older than the upload.
+                at: new Date(0),
+                date: asset.createdAt,
+                title: 'Added in Invoice Bulk Upload',
+                branchName: start.name || '',
+                invoiceNumber: asset.invoiceNumber || ''
+            });
+        }
+        records.forEach((record) => {
+            const at = loggedAt(record);
+            const branch = branchAt(at);
+            const holder = holderOf(record);
+            const toThisEmployee = isEmployee(record.customerId) && record.entryType !== 'Returned';
+            events.push({
+                kind: 'holder',
+                at,
+                date: record.transferDate,
+                entryType: record.entryType,
+                title: `${LOG_TITLES[record.entryType] || record.entryType} ${holder.title}`,
+                holder,
+                current: Boolean(record.isActive),
+                pending: Boolean(record.pending),
+                branchName: branch.name || '',
+                // Given to this employee while the item was in another branch than theirs.
+                fromOtherBranch: Boolean(toThisEmployee && homeId && branch.id && String(branch.id) !== homeId),
+                invoiceNumber: record.invoiceNumber || '',
+                remarks: record.remarks || '',
+                by: record.createdByName || ''
+            });
+        });
+        moves.forEach((move) => {
+            events.push({
+                kind: 'branch',
+                at: move.transferDate,
+                date: move.transferDate,
+                title: `Moved from ${move.fromBranchName || 'another branch'} to ${move.toBranchName || 'another branch'}`,
+                fromBranchName: move.fromBranchName || '',
+                branchName: move.toBranchName || '',
+                // Brought to this employee's own branch.
+                toHomeBranch: Boolean(homeId && String(idOf(move.toBranchId)) === homeId),
+                transferNo: move.transferNo || '',
+                reference: move.reference || '',
+                remarks: move.remarks || '',
+                by: move.createdByName || ''
+            });
+        });
+        const order = { added: 0, holder: 1, branch: 2 };
+        events.sort((a, b) => (new Date(a.at) - new Date(b.at)) || (order[a.kind] - order[b.kind]));
+
+        return res.json({
+            asset: {
+                ...employeeAssetRow(asset),
+                // Booked in another branch than the employee's own: Move to <branch> fixes it.
+                awayFromHome: Boolean(homeId && idOf(asset.branchId) && String(idOf(asset.branchId)) !== homeId),
+                withEmployee: isEmployee(asset.customerId)
+            },
+            employee: employeeSummary(employee, customer),
+            homeBranch: home ? { _id: home._id, name: branchLabel(home) } : null,
+            events: events.map(({ at: _at, ...event }) => event)
+        });
+    } catch (error) {
+        return sendError(res, error, 'Failed to load the asset log');
+    }
+};
+
+/**
+ * GET /serial-transfers/serials/export - Export Serial No Transfer list to Excel.
+ *
+ * Includes matching Total Asset Count and Total User Count in header rows.
+ * Supports multiple branches (requestedViewBranches) or active branch.
+ * Resolves Product Master description priority (Priority 1: Product Master, Priority 2: Uploaded).
+ */
+exports.exportSerials = async (req, res) => {
+    try {
+        const companyId = req.user?.companyId;
+        if (!companyId) return res.status(401).json({ message: 'Authentication required' });
+
+        const view = await requestedViewBranches(req);
+        const branches = view || (req.user?.activeBranchId
+            ? await Branch.find({ _id: req.user.activeBranchId, companyId }).select('name code').setOptions({ bypassTenant: true }).lean()
+            : []);
+
+        const query = {};
+        const and = [];
+        const status = assetStatusCondition(req.query.status);
+        if (status) and.push({ status });
+        if (req.query.ownership === 'Sold') and.push({ status: 'SOLD' });
+
+        const search = cleanText(req.query.search);
+        if (search) {
+            const pattern = searchPattern(search);
+            const { customerIds, productIds } = await matchingMasterIds(companyId, pattern);
+            const byField = {
+                serial: [{ serialNumber: pattern }],
+                product: [{ productCode: pattern }, { productName: pattern }, { productId: { $in: productIds } }],
+                customer: [{ customerNameStr: pattern }, { customerCode: pattern }, { customerId: { $in: customerIds } }]
+            };
+            and.push({ $or: byField[req.query.field] || [...byField.serial, ...byField.product, ...byField.customer] });
+        }
+
+        const range = dateRange(req.query);
+        if (range) and.push(saleDateCondition(range));
+        if (and.length) query.$and = and;
+        const { products } = await productScope(req);
+        if (products) query.productId = products;
+
+        const assetFilter = await ownershipFilter(req.query.ownership);
+        if (assetFilter) query._id = assetFilter;
+        const scope = await serialBranchScope(branches.length ? branches.map((b) => b._id) : null);
+        const scopedQuery = inScope(query, scope);
+
+        const [total, userCount] = await Promise.all([
+            Asset.countDocuments(scopedQuery).setOptions(scope.options),
+            countCurrentUsers(scopedQuery, scope.options)
+        ]);
+
+        const MAX_EXPORT_LIMIT = 50000;
+        if (total > MAX_EXPORT_LIMIT) {
+            return res.status(413).json({
+                message: `${total.toLocaleString('en-IN')} serial numbers match. One export can hold up to ${MAX_EXPORT_LIMIT.toLocaleString('en-IN')}: narrow the filters or select fewer branches.`,
+                total
+            });
+        }
+
+        const branchNames = new Map(branches.map((b) => [String(b._id), branchLabel(b)]));
+        const ist = new Date(Date.now() + BUSINESS_UTC_OFFSET_MS);
+        const dateStr = [ist.getUTCDate(), ist.getUTCMonth() + 1].map((p) => String(p).padStart(2, '0')).join('-') + `-${ist.getUTCFullYear()}`;
+        const safe = (text) => String(text || '').trim().replace(/[^A-Za-z0-9-]+/g, '_').replace(/^_+|_+$/g, '') || 'Branch';
+        const label = branches.length > 3 ? `${branches.length}_branches` : branches.map((b) => safe(b.name || b.code)).join('_');
+        const filename = `Serial_No_Transfer_${label}_${dateStr}.xlsx`;
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('x-total-count', String(total));
+        res.setHeader('x-user-count', String(userCount));
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, x-total-count, x-user-count');
+
+        const formatDDMMYYYY = (date) => {
+            if (!date) return '';
+            const d = new Date(date);
+            if (isNaN(d.getTime())) return '';
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            return `${dd}.${mm}.${yyyy}`;
+        };
+
+        const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ stream: res, useStyles: true });
+        const sheet = workbook.addWorksheet('Serial Numbers');
+        sheet.columns = [
+            { width: 18 }, // Branch
+            { width: 22 }, // Serial Number
+            { width: 18 }, // Asset No
+            { width: 22 }, // Product Code
+            { width: 35 }, // Product Description
+            { width: 30 }, // eMail id
+            { width: 25 }, // Name
+            { width: 20 }, // Customer Code
+            { width: 22 }, // Invoice Number
+            { width: 16 }, // Invoice Date
+            { width: 18 }, // Warranty End Date
+            { width: 25 }, // Remark
+            { width: 15 }, // MGR 1
+            { width: 15 }, // MGR 2
+            { width: 15 }, // MGR 3
+            { width: 15 }, // MGR 4
+            { width: 15 }  // MGR 5
+        ];
+
+        // Row 1: Summary Counts
+        const summaryRow = sheet.getRow(1);
+        summaryRow.values = ['Total Asset Count:', total, '', 'Total User Count:', userCount];
+        summaryRow.font = { bold: true, size: 11 };
+        summaryRow.commit();
+
+        // Row 2: Spacer
+        sheet.getRow(2).commit();
+
+        // Row 3: Table Column Headers
+        const headerRow = sheet.getRow(3);
+        headerRow.values = [
+            'Branch',
+            'Serial Number',
+            'Asset No',
+            'Product Code',
+            'Product Description',
+            'eMail id',
+            'Name',
+            'Customer Code',
+            'Invoice Number',
+            'Invoice Date',
+            'Warranty End Date',
+            'Remark',
+            'MGR 1',
+            'MGR 2',
+            'MGR 3',
+            'MGR 4',
+            'MGR 5'
+        ];
+        headerRow.font = { bold: true, size: 11 };
+        headerRow.commit();
+
+        const EXPORT_BATCH_SIZE = 500;
+        const writeBatch = async (batch) => {
+            const holders = await employeeHolderLabels(batch.map((a) => a.customerId?.employeeProfileId));
+            for (const item of batch) {
+                const itemWithMgrs = applyProductMgrs(item);
+                const productDesc = item.productId?.description || itemWithMgrs.productDescription || '';
+                const holder = holders.get(String(item.customerId?.employeeProfileId));
+                const invDate = invoiceDateOf(item);
+                const emailId = holder?.email || holder?.subtitle || (item.customerId?.email) || '';
+                const name = holder?.name || customerLabel(item.customerId, item.customerNameStr);
+                const custCode = holder?.externalCode || cleanText(item.customerId?.externalCode) || item.customerCode || '';
+
+                const row = sheet.addRow([
+                    branchNames.get(String(item.branchId)) || '',
+                    item.serialNumber || '',
+                    item.assetNo || '',
+                    item.productId?.productCode || item.productCode || '',
+                    productDesc,
+                    emailId,
+                    name,
+                    custCode,
+                    item.invoiceNumber || '',
+                    formatDDMMYYYY(invDate),
+                    formatDDMMYYYY(item.warrantyEnd),
+                    item.remark || item.remarks || '',
+                    itemWithMgrs.mgr1 || '',
+                    itemWithMgrs.mgr2 || '',
+                    itemWithMgrs.mgr3 || '',
+                    itemWithMgrs.mgr4 || '',
+                    itemWithMgrs.mgr5 || ''
+                ]);
+                row.commit();
+            }
+        };
+
+        // Use bounded, ordinary find queries for each page. Query cursors can stop early when
+        // populated references are involved, leaving a valid workbook with its summary and
+        // headers but none of the matching assets. The export is capped above, so paging keeps
+        // memory bounded while ensuring every counted asset is fetched and written.
+        for (let skip = 0; skip < total; skip += EXPORT_BATCH_SIZE) {
+            const batch = await Asset.find(scopedQuery)
+                .setOptions(scope.options)
+                .select('serialNumber assetNo productId productCode productName status branchId customerId customerCode customerNameStr saleDate invoiceDate invoiceNumber warrantyEnd remark remarks mgr1 mgr2 mgr3 mgr4 mgr5 createdAt')
+                .populate(customerPopulate)
+                .populate(productMgrPopulate())
+                .sort({ saleDate: -1, createdAt: -1, _id: 1 })
+                .skip(skip)
+                .limit(EXPORT_BATCH_SIZE)
+                .lean();
+            if (!batch.length) break;
+            await writeBatch(batch);
+        }
+
+        sheet.commit();
+        await workbook.commit();
+    } catch (error) {
+        console.error('exportSerials error:', error);
+        if (res.headersSent) return res.destroy(error);
+        return sendError(res, error, 'Failed to export serial numbers');
     }
 };

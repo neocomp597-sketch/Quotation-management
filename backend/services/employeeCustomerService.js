@@ -327,9 +327,13 @@ const employeeHolderLabels = async (employeeIds) => {
     return new Map(employees.map((employee) => {
         const name = clean(employee.name);
         const email = clean(employee.email);
+        const externalCode = clean(employee.externalEmployeeCode);
         return [String(employee._id), {
-            title: [clean(employee.externalEmployeeCode), name].filter(Boolean).join(' - '),
-            subtitle: sameText(email, name) ? '' : email
+            title: [externalCode, name].filter(Boolean).join(' - '),
+            subtitle: sameText(email, name) ? '' : email,
+            name,
+            email,
+            externalCode
         }];
     }));
 };

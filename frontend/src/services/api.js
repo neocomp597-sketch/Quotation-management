@@ -519,8 +519,10 @@ export const bomService = {
 // Serial No Transfer: customer-wise ownership history of sold serial numbers.
 export const serialTransferService = {
   listSerials: (params = {}) => api.get("/serial-transfers/serials", { params }),
+  exportSerials: (params = {}) => api.get("/serial-transfers/serials/export", { params, responseType: "blob" }),
   getSerial: (assetId) => api.get(`/serial-transfers/serials/${assetId}`),
   updateAssetNo: (assetId, assetNo) => api.put(`/serial-transfers/serials/${assetId}/asset-no`, { assetNo }),
+  updateWarrantyEnd: (assetId, warrantyEnd) => api.put(`/serial-transfers/serials/${assetId}/warranty-end`, { warrantyEnd }),
   transfer: (assetId, data) => api.post(`/serial-transfers/serials/${assetId}/transfer`, data),
   // An earlier customer recorded afterwards; stays inactive.
   addPastEntry: (assetId, data) => api.post(`/serial-transfers/serials/${assetId}/past-entry`, data),
@@ -538,6 +540,7 @@ export const serialTransferService = {
   assignEmployeeAssets: (employeeId, data) => api.post(`/serial-transfers/employees/${employeeId}/assets`, data),
   transferEmployeeAsset: (employeeId, assetId, data) => api.post(`/serial-transfers/employees/${employeeId}/assets/${assetId}/transfer`, data),
   moveEmployeeAssetsHome: (employeeId) => api.post(`/serial-transfers/employees/${employeeId}/assets/move-home`, {}),
+  employeeAssetLog: (employeeId, assetId) => api.get(`/serial-transfers/employees/${employeeId}/assets/${assetId}/log`, { cache: false }),
   getSerialBranchHistory: (assetId) => api.get(`/serial-transfers/branch-transfers/serials/${assetId}`),
 };
 

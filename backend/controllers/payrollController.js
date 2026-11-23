@@ -109,22 +109,36 @@ const calculateEmployeePayrollValues = (baseStructure, adjustments, settings) =>
 exports.getEmployees = async (req, res) => {
     try {
         const companyId = await getEffectiveCompanyId(req);
-        const query = companyId ? { companyId } : {};
+        const andConditions = [];
+        if (companyId) andConditions.push({ companyId });
         if (req.query.status) {
-            query.status = req.query.status;
+            andConditions.push({ status: req.query.status });
         }
         if (req.query.branchId) {
-            query.$or = [
-                { branchId: req.query.branchId },
-                { assignedBranches: req.query.branchId }
-            ];
+            andConditions.push({
+                $or: [
+                    { branchId: req.query.branchId },
+                    { assignedBranches: req.query.branchId }
+                ]
+            });
         }
         if (req.query.search) {
-            query.name = { $regex: req.query.search, $options: 'i' };
+            const escapedSearch = String(req.query.search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const searchRegex = new RegExp(escapedSearch, 'i');
+            andConditions.push({
+                $or: [
+                    { name: searchRegex },
+                    { email: searchRegex }
+                ]
+            });
         }
         
+        const query = andConditions.length > 0 ? { $and: andConditions } : {};
+        const queryOptions = (req.query.allBranches === 'true' || req.query.forReporting === 'true') ? { bypassBranch: true } : {};
+
         const employees = await EmployeeProfile.find(query)
-            .populate('reportingTo', 'name email designation')
+            .setOptions(queryOptions)
+            .populate('reportingTo', 'name email designation employeeId branchId')
             .populate('branchId', 'name code branchPrefix')
             .populate('assignedBranches', 'name code branchPrefix')
             .populate('assignedTerritories', 'name code type')
@@ -139,7 +153,7 @@ exports.getEmployees = async (req, res) => {
 exports.getEmployee = async (req, res) => {
     try {
         const employee = await EmployeeProfile.findById(req.params.id)
-            .populate('reportingTo', 'name email designation')
+            .populate('reportingTo', 'name email designation employeeId branchId')
             .populate('branchId', 'name code branchPrefix')
             .populate('assignedBranches', 'name code branchPrefix')
             .populate('assignedTerritories', 'name code type')
@@ -447,7 +461,7 @@ exports.updateEmployee = async (req, res) => {
             { $set: updateData }, 
             { new: true }
         )
-        .populate('reportingTo', 'name email designation')
+        .populate('reportingTo', 'name email designation employeeId branchId')
         .populate('branchId', 'name code branchPrefix')
         .populate('assignedBranches', 'name code branchPrefix')
         .populate('assignedTerritories', 'name code type');
