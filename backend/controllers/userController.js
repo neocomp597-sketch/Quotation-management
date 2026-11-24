@@ -577,7 +577,8 @@ exports.updateUserPermissions = async (req, res) => {
             return res.status(400).json({ message: 'Permissions are required' });
         }
 
-        if (id === req.user.id && !isSuperAdminRole(req.user.role)) {
+        const isAdmin = ['admin', 'super_admin', 'superadmin'].includes(String(req.user.role || '').toLowerCase());
+        if (id === req.user.id && !isAdmin && !isSuperAdminRole(req.user.role)) {
             return res.status(403).json({ message: 'You cannot change your own permissions. Ask another administrator.' });
         }
 

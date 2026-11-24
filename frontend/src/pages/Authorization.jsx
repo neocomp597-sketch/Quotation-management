@@ -438,8 +438,9 @@ const Authorization = () => {
         }
     };
 
-    // A user whose permissions this screen may not change: yourself, and for a delegate an administrator.
-    const isUserLocked = (user) => currentUser?.id === user._id || (isDelegate && isAdminLevelRole(user.role));
+    // Administrators can maintain their own individual permissions; delegates cannot edit themselves or admins.
+    const isUserLocked = (user) => (currentUser?.id === user._id && !isAdminLevelRole(currentUser?.role))
+        || (isDelegate && isAdminLevelRole(user.role));
     // Users of a role whose individual permissions (Team Users) make their access differ from the
     // role, so changing the role card does not fully reach them. Shown on the role card, which can
     // clear them (client, 2026-11-16: "role updated, but the user still shows the earlier access").
@@ -1016,7 +1017,7 @@ const Authorization = () => {
                                         const isMe = currentUser?.id === user._id;
                                         // A delegate (see isDelegate) cannot change an administrator's login or their own.
                                         const isDelegateLocked = isDelegate && (isMe || isAdminLevelRole(user.role));
-                                        const isLockedRow = isMe || isDelegateLocked;
+                                        const isLockedRow = (isMe && !isAdminLevelRole(currentUser?.role)) || isDelegateLocked;
                                         const isUpdating = updatingUserId === user._id;
                                         const isEditing = editingUserId === user._id;
                                         const isUserExpanded = expandedUserCards[user._id] ?? false;
@@ -1232,7 +1233,7 @@ const Authorization = () => {
                                                                 <MdLock size={16} /> Only an administrator can change an administrator's login.
                                                             </div>
                                                         )}
-                                                        {isMe && (
+                                                        {isMe && !isAdminLevelRole(currentUser?.role) && (
                                                             <div className="flex items-center gap-2 text-xs font-semibold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2">
                                                                 <MdLock size={16} /> You cannot change your own permissions. Another administrator can change them for you.
                                                             </div>

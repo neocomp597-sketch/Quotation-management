@@ -181,7 +181,7 @@ const CUSTOMER_SELECT = 'customerName companyName externalCode mobile gstin bill
 const customerPopulate = { path: 'customerId', select: CUSTOMER_SELECT, options: { bypassTenant: true } };
 const productPopulate = { path: 'productId', select: 'productCode productName description', options: { bypassTenant: true } };
 
-const resolveProductDescription = (product, fallbackDesc = '') => {
+const resolveProductDescription = (product) => {
     const pDesc = cleanText(product?.description);
     if (pDesc) return pDesc;
     const pName = cleanText(product?.productName);
@@ -189,8 +189,6 @@ const resolveProductDescription = (product, fallbackDesc = '') => {
     if (pName && (!pCode || pName.toLowerCase() !== pCode.toLowerCase())) {
         return pName;
     }
-    const fallback = cleanText(fallbackDesc);
-    if (fallback) return fallback;
     return pName || pCode || '';
 };
 
@@ -417,7 +415,7 @@ exports.listSerials = async (req, res) => {
 
         const holders = await employeeHolderLabels(assets.map((asset) => asset.customerId?.employeeProfileId));
         const data = assets.map((asset) => {
-            const productDesc = resolveProductDescription(asset.productId, asset.productName);
+            const productDesc = resolveProductDescription(asset.productId);
             return {
                 _id: asset._id,
                 serialNumber: asset.serialNumber,
@@ -475,7 +473,7 @@ const loadSerial = async (assetId, access = null, scope = null) => {
     }
 
     const holders = await employeeHolderLabels([asset.customerId?.employeeProfileId]);
-    const productDesc = resolveProductDescription(asset.productId, asset.productName);
+    const productDesc = resolveProductDescription(asset.productId);
     return {
         asset: {
             _id: asset._id,
@@ -874,7 +872,7 @@ exports.listHistory = async (req, res) => {
             : [];
         const assetById = new Map(assets.map((asset) => [String(asset._id), asset]));
         const data = records.map((record) => {
-            const productDesc = resolveProductDescription(record.productId, record.productName);
+            const productDesc = resolveProductDescription(record.productId);
             return withInvoice({
                 ...record,
                 productCode: record.productId?.productCode || record.productCode,
@@ -1047,7 +1045,7 @@ const withMasterData = async (rows) => {
         const product = productById.get(String(row.productId));
         const customer = customerById.get(String(row.customerId));
         const mgrs = Object.fromEntries(MGR_KEYS.map((key) => [key, product ? formatMgrVal(product[key]) : '']));
-        const productDesc = resolveProductDescription(product, row.productName);
+        const productDesc = resolveProductDescription(product);
         return {
             ...row,
             productName: productDesc,
@@ -1291,7 +1289,7 @@ exports.searchBranchSerials = async (req, res) => {
         ]);
         return res.json({
             data: assets.map((asset) => {
-                const productDesc = resolveProductDescription(asset.productId, asset.productName);
+                const productDesc = resolveProductDescription(asset.productId);
                 return {
                     _id: asset._id,
                     serialNumber: asset.serialNumber,
@@ -1514,7 +1512,7 @@ exports.listBranchTransfers = async (req, res) => {
 
         const data = rows.map(({ asset, requestId: _requestId, serialKey: _serialKey, status: statusAtTransfer, ...row }) => {
             const product = productById.get(String(row.productId));
-            const productDesc = resolveProductDescription(product, row.productName);
+            const productDesc = resolveProductDescription(product);
             return {
                 ...row,
                 productName: productDesc,
@@ -1550,7 +1548,7 @@ exports.getSerialBranchHistory = async (req, res) => {
         const branchesSeen = [idOf(asset.branchId), ...transfers.flatMap((t) => [t.fromBranchId, t.toBranchId])].filter(Boolean).map(String);
         if (limited && !branchesSeen.some((id) => limited.includes(id))) throw httpError(404, 'Serial number not found');
 
-        const productDesc = resolveProductDescription(asset.productId, asset.productName);
+        const productDesc = resolveProductDescription(asset.productId);
         return res.json({
             asset: {
                 _id: asset._id,
@@ -1597,7 +1595,7 @@ const employeeAndCustomer = async (req, employeeId, label = 'employee') => {
 };
 
 const employeeAssetRow = (asset) => {
-    const productDesc = resolveProductDescription(asset.productId, asset.productName);
+    const productDesc = resolveProductDescription(asset.productId);
     return {
         _id: asset._id,
         serialNumber: asset.serialNumber,

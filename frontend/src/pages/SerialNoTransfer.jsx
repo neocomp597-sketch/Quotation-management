@@ -959,6 +959,11 @@ const ActivityTab = ({ onOpen, assetId }) => {
     const prefix = assetId ? `activity.${assetId}` : 'activity';
     const [ownership, setOwnership] = useStoredState(`${prefix}.ownership`, 'Active');
     const [search, setSearch] = useStoredState(`${prefix}.search`, '');
+    const [mgr1, setMgr1] = useStoredState(`${prefix}.mgr1`, '');
+    const [mgr2, setMgr2] = useStoredState(`${prefix}.mgr2`, '');
+    const [mgr3, setMgr3] = useStoredState(`${prefix}.mgr3`, '');
+    const [mgr4, setMgr4] = useStoredState(`${prefix}.mgr4`, '');
+    const [mgr5, setMgr5] = useStoredState(`${prefix}.mgr5`, '');
     const [page, setPage] = useStoredState(`${prefix}.page`, 1);
     const range = useDateRange(prefix);
     const [filtersOpen, toggleFilters] = useFiltersOpen();
@@ -969,7 +974,9 @@ const ActivityTab = ({ onOpen, assetId }) => {
     useFirstPageOnChange(viewBranches, setPage);
     const filters = assetId
         ? { ownership, assetId }
-        : { ownership, search: debouncedSearch || undefined, ...range.params, branchIds: viewBranches };
+        : { ownership, search: debouncedSearch || undefined, mgr1: mgr1 || undefined, mgr2: mgr2 || undefined,
+            mgr3: mgr3 || undefined, mgr4: mgr4 || undefined, mgr5: mgr5 || undefined,
+            ...range.params, branchIds: viewBranches };
     const { rows, pagination, loading } = useList(serialTransferService.listActivity, { ...filters, page, limit: PAGE_SIZE }, !range.invalid);
     const offset = (pagination.page - 1) * pagination.limit;
     const inactive = ownership === 'Inactive';
@@ -1034,10 +1041,16 @@ const ActivityTab = ({ onOpen, assetId }) => {
                                 className={`${inputClass} pl-11`}
                             />
                         </div>
-                        <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[viewBranches].filter(Boolean).length + datesInUse(range)} />
+                        <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[viewBranches, mgr1, mgr2, mgr3, mgr4, mgr5].filter(Boolean).length + datesInUse(range)} />
                         {filtersOpen && (
                             <>
                                 <ViewBranchFilter />
+                                {[mgr1, mgr2, mgr3, mgr4, mgr5].map((value, index) => (
+                                    <MgrFilter key={index + 1} level={index + 1} value={value} onChange={(next) => {
+                                        [setMgr1, setMgr2, setMgr3, setMgr4, setMgr5][index](next);
+                                        setPage(1);
+                                    }} />
+                                ))}
                                 <DateRangeFilter range={range} field="Customer Since" onChange={() => setPage(1)} />
                             </>
                         )}
@@ -1059,7 +1072,6 @@ const ActivityTab = ({ onOpen, assetId }) => {
                                         subtitle={[row.productCode, row.productDescription || row.productName].filter(Boolean).join(' · ')}
                                         aside={<FlagBadge active={row.ownership === 'Active'} />}
                                     />
-                                    {row.mgr1 && <p className="mt-1 text-[10px] font-semibold text-emerald-600">{[row.mgr1, row.mgr2, row.mgr3, row.mgr4, row.mgr5].filter(Boolean).join(' · ')}</p>}
                                     <MobileFields>
                                         <MobileField label="Customer" wide>
                                             {row.customerName || '-'}
@@ -1096,7 +1108,6 @@ const ActivityTab = ({ onOpen, assetId }) => {
                                             <td className="p-4 text-slate-600 min-w-[14rem]">
                                                 <span className="font-bold text-slate-700">{row.productCode}</span>
                                                 {(row.productDescription || row.productName) && <span className="block text-xs text-slate-500">{row.productDescription || row.productName}</span>}
-                                                {row.mgr1 && <span className="block text-[10px] font-semibold text-emerald-600">{[row.mgr1, row.mgr2, row.mgr3, row.mgr4, row.mgr5].filter(Boolean).join(' · ')}</span>}
                                             </td>
                                             <td className="p-4">
                                                 <span className="font-bold text-slate-700">{row.customerName || '-'}</span>
