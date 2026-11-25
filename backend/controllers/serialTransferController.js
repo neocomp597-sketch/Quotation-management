@@ -26,6 +26,7 @@ const listScope = async (req) => {
 const { limitedBranchIds, canMoveFrom, visibleTransfersCondition } = require('../utils/serialBranchAccess');
 const { getMgrAccess, accessCondition, conditionAllowsId, describeMgrAccess, mgrAccessCondition } = require('../utils/mgrAccess');
 const { searchPattern, matchingMasterIds, assetSearchConditions } = require('../utils/assetSearch');
+const { normalizeProductKey, exactKeyRegex } = require('../utils/productUniqueness');
 
 /**
  * Serial No Transfer: the serial numbers of Invoice Bulk Upload (Asset), read straight from
@@ -191,6 +192,50 @@ const resolveProductDescription = (product) => {
     }
     return pName || pCode || '';
 };
+
+const isPopulatedProduct = (product) => (
+    Boolean(product) && typeof product === 'object' && !(product instanceof mongoose.Types.ObjectId)
+);
+
+/**
+ * Resolves Product Master records by normalized `productCode` (case- and whitespace-insensitive)
+ * for rows whose `productId` is missing or unpopulated, so unlinked serials still get their
+ * Product Master code, description and MGRs.
+ */
+const loadProductsByCode = async (rows, companyId, { withMgrs = false } = {}) => {
+    const uniqueByKey = new Map();
+    for (const row of rows || []) {
+        if (isPopulatedProduct(row?.productId)) continue;
+        const code = cleanText(row?.productCode);
+        const key = normalizeProductKey(code);
+        if (key && !uniqueByKey.has(key)) uniqueByKey.set(key, code);
+    }
+    if (!uniqueByKey.size) return new Map();
+
+    const codeFilters = [...uniqueByKey.values()].map((code) => ({ productCode: exactKeyRegex(code) }));
+    let query = Product.find({
+        ...(companyId ? { companyId } : {}),
+        $or: codeFilters
+    })
+        .select(['productCode productName description', ...(withMgrs ? MGR_KEYS : [])].join(' '))
+        .setOptions({ bypassTenant: true });
+    if (withMgrs) {
+        query = query.populate(MGR_KEYS.map((key) => ({ path: key, select: 'code description', options: { bypassTenant: true } })));
+    }
+    const products = await query.lean();
+    const byCode = new Map();
+    for (const product of products) {
+        const key = normalizeProductKey(product.productCode);
+        if (key && !byCode.has(key)) byCode.set(key, product);
+    }
+    return byCode;
+};
+
+const pickProduct = (row, fallbackByCode) => (
+    isPopulatedProduct(row?.productId)
+        ? row.productId
+        : fallbackByCode?.get(normalizeProductKey(row?.productCode)) || null
+);
 
 const customerLabel = (customer, fallback = '') => cleanText(customer?.companyName) || cleanText(customer?.customerName) || fallback;
 
@@ -413,14 +458,18 @@ exports.listSerials = async (req, res) => {
             countCurrentUsers(scopedQuery, scope.options)
         ]);
 
-        const holders = await employeeHolderLabels(assets.map((asset) => asset.customerId?.employeeProfileId));
+        const [holders, fallbackProducts] = await Promise.all([
+            employeeHolderLabels(assets.map((asset) => asset.customerId?.employeeProfileId)),
+            loadProductsByCode(assets, req.user.companyId)
+        ]);
         const data = assets.map((asset) => {
-            const productDesc = resolveProductDescription(asset.productId);
+            const product = pickProduct(asset, fallbackProducts);
+            const productDesc = resolveProductDescription(product);
             return {
                 _id: asset._id,
                 serialNumber: asset.serialNumber,
                 assetNo: asset.assetNo || '',
-                productCode: asset.productId?.productCode || asset.productCode,
+                productCode: product?.productCode || asset.productCode,
                 productName: productDesc,
                 productDescription: productDesc,
                 customerId: asset.customerId?._id || null,
@@ -472,14 +521,18 @@ const loadSerial = async (assetId, access = null, scope = null) => {
         ];
     }
 
-    const holders = await employeeHolderLabels([asset.customerId?.employeeProfileId]);
-    const productDesc = resolveProductDescription(asset.productId);
+    const [holders, fallbackProducts] = await Promise.all([
+        employeeHolderLabels([asset.customerId?.employeeProfileId]),
+        loadProductsByCode([asset], asset.companyId)
+    ]);
+    const product = pickProduct(asset, fallbackProducts);
+    const productDesc = resolveProductDescription(product);
     return {
         asset: {
             _id: asset._id,
             serialNumber: asset.serialNumber,
             assetNo: asset.assetNo || '',
-            productCode: asset.productId?.productCode || asset.productCode,
+            productCode: product?.productCode || asset.productCode,
             productName: productDesc,
             productDescription: productDesc,
             status: statusOf(asset),
@@ -865,17 +918,21 @@ exports.listHistory = async (req, res) => {
             SerialTransfer.find(scopedQuery).setOptions(scope.options).populate(productPopulate).sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit).lean(),
             SerialTransfer.countDocuments(scopedQuery).setOptions(scope.options)
         ]);
-        const assets = records.length
-            ? await Asset.find({ _id: { $in: [...new Set(records.map((r) => String(r.assetId)))] } })
-                .setOptions(ANY_BRANCH)
-                .select('invoiceNumber invoiceDate saleDate').lean()
-            : [];
+        const [assets, fallbackProducts] = await Promise.all([
+            records.length
+                ? Asset.find({ _id: { $in: [...new Set(records.map((r) => String(r.assetId)))] } })
+                    .setOptions(ANY_BRANCH)
+                    .select('invoiceNumber invoiceDate saleDate').lean()
+                : [],
+            loadProductsByCode(records, req.user.companyId)
+        ]);
         const assetById = new Map(assets.map((asset) => [String(asset._id), asset]));
         const data = records.map((record) => {
-            const productDesc = resolveProductDescription(record.productId);
+            const product = pickProduct(record, fallbackProducts);
+            const productDesc = resolveProductDescription(product);
             return withInvoice({
                 ...record,
-                productCode: record.productId?.productCode || record.productCode,
+                productCode: product?.productCode || record.productCode,
                 productName: productDesc,
                 productDescription: productDesc
             }, assetById.get(String(record.assetId)));
@@ -1025,7 +1082,7 @@ const inactiveOwners = async ({ companyId, search, range, assetId, products, ski
 
 // Adds MGR 1-5 (from Product Master) and customer email and fallback code/pincode (from
 // Customer Master) to activity rows.
-const withMasterData = async (rows) => {
+const withMasterData = async (rows, companyId) => {
     const idsOf = (key) => [...new Set(rows.map((row) => row[key]).filter(Boolean).map(String))];
     const [products, customers] = await Promise.all([
         Product.find({ _id: { $in: idsOf('productId') } })
@@ -1040,9 +1097,13 @@ const withMasterData = async (rows) => {
     ]);
     const productById = new Map(products.map((p) => [String(p._id), p]));
     const customerById = new Map(customers.map((c) => [String(c._id), c]));
+    const unmatched = rows
+        .filter((row) => !productById.has(String(row.productId)))
+        .map((row) => ({ ...row, productId: null }));
+    const fallbackProducts = await loadProductsByCode(unmatched, companyId, { withMgrs: true });
 
     return rows.map((row) => {
-        const product = productById.get(String(row.productId));
+        const product = productById.get(String(row.productId)) || fallbackProducts.get(normalizeProductKey(row.productCode));
         const customer = customerById.get(String(row.customerId));
         const mgrs = Object.fromEntries(MGR_KEYS.map((key) => [key, product ? formatMgrVal(product[key]) : '']));
         const productDesc = resolveProductDescription(product);
@@ -1091,7 +1152,7 @@ const loadActivity = async (req, paging = {}) => {
         ...paging
     };
     const { rows, total } = await (ownership === 'Active' ? activeOwners(options) : inactiveOwners(options));
-    return { ownership, serial, rows: await withMasterData(rows), total };
+    return { ownership, serial, rows: await withMasterData(rows, req.user.companyId), total };
 };
 
 /** Customer Activity Log, one page (?ownership=Active|Inactive&assetId&search&fromDate&toDate). */
@@ -1509,12 +1570,17 @@ exports.listBranchTransfers = async (req, res) => {
             ? await Product.find({ _id: { $in: productIds } }).select('productCode productName description').setOptions({ bypassTenant: true }).lean()
             : [];
         const productById = new Map(products.map((p) => [String(p._id), p]));
+        const unmatched = rows
+            .filter((row) => !productById.has(String(row.productId)))
+            .map((row) => ({ ...row, productId: null }));
+        const fallbackProducts = await loadProductsByCode(unmatched, req.user.companyId);
 
         const data = rows.map(({ asset, requestId: _requestId, serialKey: _serialKey, status: statusAtTransfer, ...row }) => {
-            const product = productById.get(String(row.productId));
+            const product = productById.get(String(row.productId)) || fallbackProducts.get(normalizeProductKey(row.productCode));
             const productDesc = resolveProductDescription(product);
             return {
                 ...row,
+                productCode: cleanText(product?.productCode) || cleanText(row.productCode),
                 productName: productDesc,
                 productDescription: productDesc,
                 statusAtTransfer,
@@ -1548,12 +1614,14 @@ exports.getSerialBranchHistory = async (req, res) => {
         const branchesSeen = [idOf(asset.branchId), ...transfers.flatMap((t) => [t.fromBranchId, t.toBranchId])].filter(Boolean).map(String);
         if (limited && !branchesSeen.some((id) => limited.includes(id))) throw httpError(404, 'Serial number not found');
 
-        const productDesc = resolveProductDescription(asset.productId);
+        const fallbackProducts = await loadProductsByCode([asset], req.user.companyId);
+        const product = pickProduct(asset, fallbackProducts);
+        const productDesc = resolveProductDescription(product);
         return res.json({
             asset: {
                 _id: asset._id,
                 serialNumber: asset.serialNumber,
-                productCode: asset.productId?.productCode || asset.productCode,
+                productCode: product?.productCode || asset.productCode,
                 productName: productDesc,
                 productDescription: productDesc,
                 status: statusOf(asset),
@@ -1594,13 +1662,14 @@ const employeeAndCustomer = async (req, employeeId, label = 'employee') => {
     return { employee, customer };
 };
 
-const employeeAssetRow = (asset) => {
-    const productDesc = resolveProductDescription(asset.productId);
+const employeeAssetRow = (asset, fallbackProducts = null) => {
+    const product = pickProduct(asset, fallbackProducts);
+    const productDesc = resolveProductDescription(product);
     return {
         _id: asset._id,
         serialNumber: asset.serialNumber,
         assetNo: asset.assetNo || '',
-        productCode: asset.productId?.productCode || asset.productCode || '',
+        productCode: product?.productCode || asset.productCode || '',
         productName: productDesc,
         productDescription: productDesc,
         status: statusOf(asset),
@@ -1619,7 +1688,8 @@ const employeeAssetsOf = async (req, customer) => {
         .populate(branchPopulate)
         .sort({ serialNumber: 1 })
         .lean();
-    return assets.map(employeeAssetRow);
+    const fallbackProducts = await loadProductsByCode(assets, req.user.companyId);
+    return assets.map((asset) => employeeAssetRow(asset, fallbackProducts));
 };
 
 const employeeSummary = (employee, customer) => ({
@@ -1725,7 +1795,8 @@ exports.searchAssignableAssets = async (req, res) => {
                 .sort({ createdAt: -1, _id: -1 }).limit(limit).lean(),
             Asset.countDocuments(query).setOptions(scope.options)
         ]);
-        return res.json({ data: assets.map(employeeAssetRow), total });
+        const fallbackProducts = await loadProductsByCode(assets, req.user.companyId);
+        return res.json({ data: assets.map((asset) => employeeAssetRow(asset, fallbackProducts)), total });
     } catch (error) {
         return sendError(res, error, 'Failed to search the assets');
     }
@@ -1970,9 +2041,10 @@ exports.employeeAssetLog = async (req, res) => {
         const order = { added: 0, holder: 1, branch: 2 };
         events.sort((a, b) => (new Date(a.at) - new Date(b.at)) || (order[a.kind] - order[b.kind]));
 
+        const fallbackProducts = await loadProductsByCode([asset], req.user.companyId);
         return res.json({
             asset: {
-                ...employeeAssetRow(asset),
+                ...employeeAssetRow(asset, fallbackProducts),
                 // Booked in another branch than the employee's own: Move to <branch> fixes it.
                 awayFromHome: Boolean(homeId && idOf(asset.branchId) && String(idOf(asset.branchId)) !== homeId),
                 withEmployee: isEmployee(asset.customerId)
@@ -2125,10 +2197,15 @@ exports.exportSerials = async (req, res) => {
 
         const EXPORT_BATCH_SIZE = 500;
         const writeBatch = async (batch) => {
-            const holders = await employeeHolderLabels(batch.map((a) => a.customerId?.employeeProfileId));
+            const [holders, fallbackProducts] = await Promise.all([
+                employeeHolderLabels(batch.map((a) => a.customerId?.employeeProfileId)),
+                loadProductsByCode(batch, companyId, { withMgrs: true })
+            ]);
             for (const item of batch) {
-                const itemWithMgrs = applyProductMgrs(item);
-                const productDesc = item.productId?.description || itemWithMgrs.productDescription || '';
+                const product = pickProduct(item, fallbackProducts);
+                const resolvedItem = isPopulatedProduct(item.productId) ? item : { ...item, productId: product };
+                const itemWithMgrs = applyProductMgrs(resolvedItem);
+                const productDesc = resolveProductDescription(product) || itemWithMgrs.productDescription || '';
                 const holder = holders.get(String(item.customerId?.employeeProfileId));
                 const invDate = invoiceDateOf(item);
                 const emailId = holder?.email || holder?.subtitle || (item.customerId?.email) || '';
@@ -2139,7 +2216,7 @@ exports.exportSerials = async (req, res) => {
                     branchNames.get(String(item.branchId)) || '',
                     item.serialNumber || '',
                     item.assetNo || '',
-                    item.productId?.productCode || item.productCode || '',
+                    product?.productCode || item.productCode || '',
                     productDesc,
                     emailId,
                     name,

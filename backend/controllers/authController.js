@@ -691,7 +691,7 @@ exports.forgotPassword = async (req, res) => {
                 reset_link: resetUrl,
                 reset_url: resetUrl
             },
-            template_id: process.env.MSG91_RESET_TEMPLATE_ID || 'password_reset',
+            template_id: process.env.MSG91_RESET_TEMPLATE_ID || 'reset_password_98',
             html: `
                 <!DOCTYPE html>
                 <html lang="en">

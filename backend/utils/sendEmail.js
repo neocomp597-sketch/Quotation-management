@@ -89,28 +89,6 @@ const sendMsg91Email = async ({
         const errorMsg = data.message || data.error || responseText || `HTTP ${response.status}`;
         console.error(`[MSG91 Email Error] (${response.status}):`, errorMsg);
 
-        // If a custom template failed (e.g. 422 because template_id like "password_reset" doesn't exist yet in MSG91 dashboard),
-        // fallback to the default approved template (e.g. "global_otp")
-        const defaultTemplate = (process.env.MSG91_TEMPLATE_ID || 'global_otp').trim();
-        if (templateId !== defaultTemplate && defaultTemplate) {
-            console.log(`[MSG91 Email] Retrying with fallback approved template "${defaultTemplate}"...`);
-            return await sendMsg91Email({
-                to,
-                name,
-                otp: otp || variables.otp || '000000',
-                company_name: companyName,
-                variables: {
-                    ...variables,
-                    company_name: companyName,
-                    otp: otp || variables.otp || '000000'
-                },
-                template_id: defaultTemplate,
-                domain: regDomain,
-                fromEmail: senderEmail,
-                authkey: key
-            });
-        }
-
         return {
             success: false,
             provider: 'msg91',

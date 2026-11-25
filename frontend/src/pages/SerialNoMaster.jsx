@@ -20,7 +20,7 @@ import usePermission from '../hooks/usePermission';
 import { useAuth } from '../context/AuthContext';
 import { MobileCard, MobileCardActions, MobileCardHead, MobileCardList, MobileEmpty, MobileField, MobileFields } from '../components/SerialMobileCards';
 import BranchChips from '../components/BranchChips';
-import { FiltersButton, useFiltersOpen } from '../components/FiltersFold';
+import { FiltersButton } from '../components/FiltersFold';
 
 const PAGE_SIZE = 15;
 
@@ -246,7 +246,8 @@ const SerialNoMaster = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
     // Branch buttons, status and MGR 1-5 fold away behind a Filters button.
-    const [filtersOpen, toggleFilters] = useFiltersOpen('ibu.filtersOpen');
+    const [filtersOpen, setFiltersOpen] = useState(false);
+    const toggleFilters = () => setFiltersOpen((prev) => !prev);
     const canViewDetails = hasAccess('master_serials_view_details');
     // Upload History lists every branch's uploads, so only administrators open it (the API checks too).
     const canSeeUploadHistory = ['admin', 'super_admin', 'superadmin'].includes(String(user?.role || '').toLowerCase());
