@@ -27,6 +27,7 @@ const { limitedBranchIds, canMoveFrom, visibleTransfersCondition } = require('..
 const { getMgrAccess, accessCondition, conditionAllowsId, describeMgrAccess, mgrAccessCondition } = require('../utils/mgrAccess');
 const { searchPattern, matchingMasterIds, assetSearchConditions } = require('../utils/assetSearch');
 const { normalizeProductKey, exactKeyRegex } = require('../utils/productUniqueness');
+const sendEmail = require('../utils/sendEmail');
 
 /**
  * Serial No Transfer: the serial numbers of Invoice Bulk Upload (Asset), read straight from
@@ -1802,6 +1803,48 @@ exports.searchAssignableAssets = async (req, res) => {
     }
 };
 
+const sendEmployeeAssetAssignedEmails = async ({ employee, customer, assets, assignedDate, assignedBy, companyId }) => {
+    const email = cleanText(employee?.email || customer?.email).toLowerCase();
+    if (!email || !assets?.length) return;
+    if (!cleanText(process.env.MSG91_AUTHKEY)) return;
+
+    const fallbackProducts = await loadProductsByCode(assets, companyId);
+    const assignedDateText = formatDate(assignedDate, '');
+    const assignedByText = cleanText(assignedBy) || 'Admin';
+    const employeeName = cleanText(employee?.name) || cleanText(customer?.customerName) || email;
+
+    await Promise.allSettled(assets.map(async (asset) => {
+        const product = pickProduct(asset, fallbackProducts);
+        const assetName = resolveProductDescription(product) || cleanText(asset.productName) || cleanText(asset.productCode) || '-';
+        const assetId = cleanText(asset.assetNo) || String(asset._id);
+        const assetCategory = cleanText(product?.productCode) || cleanText(asset.productCode) || '-';
+        const serialNumber = cleanText(asset.serialNumber) || '-';
+
+        try {
+            const result = await sendEmail({
+                to: email,
+                name: employeeName,
+                template_id: process.env.MSG91_EMPLOYEE_ASSET_TEMPLATE_ID || 'employee_asset_assigned',
+                provider: 'msg91',
+                variables: {
+                    employee_name: employeeName,
+                    asset_name: assetName,
+                    asset_id: assetId,
+                    asset_category: assetCategory,
+                    serial_number: serialNumber,
+                    assigned_date: assignedDateText,
+                    assigned_by: assignedByText
+                }
+            });
+            if (!result?.success) {
+                console.warn(`[Employee Asset Email] Failed to send to ${email} for ${serialNumber}:`, result?.error || 'Unknown error');
+            }
+        } catch (err) {
+            console.warn(`[Employee Asset Email] Error sending to ${email} for ${serialNumber}:`, err.message);
+        }
+    }));
+};
+
 /**
  * POST /employees/:employeeId/assets { assetIds, assignDate?, remarks? }: gives the employee these
  * items, all or none. Each must be in the working branch, in stock or allocated, and with nobody;
@@ -1825,6 +1868,7 @@ exports.assignEmployeeAssets = async (req, res) => {
         const assets = await Asset.find(inScope({ _id: { $in: assetIds }, companyId: req.user.companyId, ...access }, scope))
             .setOptions(scope.options)
             .populate(customerPopulate)
+            .populate(productPopulate)
             .lean();
         if (assets.length !== assetIds.length) throw httpError(404, 'Some of the selected assets were not found in this branch. Reload and select them again.');
 
@@ -1847,6 +1891,14 @@ exports.assignEmployeeAssets = async (req, res) => {
                 for (const asset of toAssign) {
                     await recordNewHolder(asset, customer, { transferDate, allocate: true, remarks, user }, session);
                 }
+            });
+            await sendEmployeeAssetAssignedEmails({
+                employee,
+                customer,
+                assets: toAssign,
+                assignedDate: transferDate,
+                assignedBy: req.user?.name || req.user?.email,
+                companyId: req.user.companyId
             });
         }
         return res.status(201).json({
@@ -1887,6 +1939,7 @@ exports.transferEmployeeAsset = async (req, res) => {
         const asset = await Asset.findOne({ _id: assetId, companyId: req.user.companyId, customerId: from.customer._id, ...access })
             .setOptions(ANY_BRANCH)
             .populate(customerPopulate)
+            .populate(productPopulate)
             .lean();
         if (!asset) throw httpError(404, `This asset is not with ${from.employee.name} any more. Reload the list.`);
         if (statusOf(asset) === 'SCRAPPED') throw httpError(400, `${asset.serialNumber} is scrapped and cannot be given to another employee.`);
@@ -1895,6 +1948,14 @@ exports.transferEmployeeAsset = async (req, res) => {
         const remarks = cleanText(req.body.remarks) || `Transferred from employee ${from.employee.name} to ${to.employee.name}`;
         session = await mongoose.startSession();
         await session.withTransaction(() => recordNewHolder(asset, to.customer, { transferDate, allocate: true, remarks, requestId, user }, session));
+        await sendEmployeeAssetAssignedEmails({
+            employee: to.employee,
+            customer: to.customer,
+            assets: [asset],
+            assignedDate: transferDate,
+            assignedBy: req.user?.name || req.user?.email,
+            companyId: req.user.companyId
+        });
         return res.status(201).json({
             employee: employeeSummary(from.employee, from.customer),
             transferredTo: employeeSummary(to.employee, to.customer),

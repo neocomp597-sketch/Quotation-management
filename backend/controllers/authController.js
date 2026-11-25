@@ -676,22 +676,19 @@ exports.forgotPassword = async (req, res) => {
         }
         const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
 
-        // Send Email via configured provider (MSG91 / SMTP)
+        // Send Email via configured provider (MSG91 template reset_password_email_4, with SMTP fallback when MSG91 is not configured)
         const emailResult = await sendEmail({
             to: user.email,
-            name: user.name,
+            name: user.name || user.email,
             subject: 'Reset your password - ARCRM',
             company_name: 'ARCRM',
-            otp: resetToken.slice(0, 6).toUpperCase(),
+            provider: process.env.MSG91_AUTHKEY ? 'msg91' : undefined,
             variables: {
-                company_name: 'ARCRM',
-                name: user.name,
-                otp: resetToken.slice(0, 6).toUpperCase(),
-                link: resetUrl,
-                reset_link: resetUrl,
-                reset_url: resetUrl
+                user_name: user.name || user.email,
+                reset_password_url: resetUrl,
+                expiry_time: '1 hour'
             },
-            template_id: process.env.MSG91_RESET_TEMPLATE_ID || 'reset_password_98',
+            template_id: process.env.MSG91_RESET_TEMPLATE_ID || 'reset_password_email_4',
             html: `
                 <!DOCTYPE html>
                 <html lang="en">

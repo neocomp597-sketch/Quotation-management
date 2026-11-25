@@ -193,11 +193,14 @@ const sendEmail = async ({
                 variables,
                 template_id
             });
-            if (result.success) {
+            if (result.success || preferredProvider === 'msg91') {
                 return result;
             }
             console.warn(`[Email Service] Primary MSG91 dispatch failed: ${result.error}. Trying SMTP fallback...`);
         } catch (msg91Err) {
+            if (preferredProvider === 'msg91') {
+                return { success: false, provider: 'msg91', error: msg91Err.message };
+            }
             console.warn(`[Email Service] Primary MSG91 dispatch threw: ${msg91Err.message}. Trying SMTP fallback...`);
         }
     }
