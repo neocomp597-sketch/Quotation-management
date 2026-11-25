@@ -754,6 +754,9 @@ exports.updateAsset = async (req, res) => {
             .setOptions(VIEW_BRANCH_OPTIONS)
             .populate({ path: 'productId', select: 'productCode productName', options: { bypassTenant: true } })
             .populate({ path: 'customerId', options: { bypassTenant: true } });
+        if (!asset) {
+            return res.status(404).json({ message: 'Invoice Bulk Upload entry not found' });
+        }
         const mgrAccess = await getMgrAccess(req);
         if (!(await entryInMyBranches(req, asset)) || !(await accessAllowsProduct(mgrAccess, asset.productId))) {
             return res.status(404).json({ message: 'Invoice Bulk Upload entry not found' });
@@ -860,7 +863,7 @@ exports.updateAsset = async (req, res) => {
         await asset.save();
 
         const updatedDoc = applyCustomerPostalCode(applyProductMgrs(
-            await Asset.findById(asset._id)
+            await Asset.findById(asset._id).setOptions(VIEW_BRANCH_OPTIONS)
                 .populate({ path: 'customerId', options: { bypassTenant: true } })
                 .populate(productMgrPopulate()).populate(DIVISION_POPULATE).populate(SEGMENT_POPULATE)
                 .lean()
