@@ -1,23 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { MdExpandMore, MdFilterList } from 'react-icons/md';
 
-/**
- * Filters that fold away behind a Filters button (client: Serial No Transfer 2026-11-17, Invoice
- * Bulk Upload 2026-11-19 — they took too much room, above all on a phone). Folded at first; open
- * or folded is remembered in this browser under `storageKey`.
- */
-export const useFiltersOpen = (storageKey) => {
-    const [open, setOpen] = useState(() => {
-        try { return localStorage.getItem(storageKey) === '1'; } catch { return false; }
-    });
-    const toggle = () => {
-        const next = !open;
-        setOpen(next);
-        try { localStorage.setItem(storageKey, next ? '1' : '0'); } catch { /* not remembered */ }
-    };
-    return [open, toggle];
-};
-
+// The Filters button of filters that fold away (open or folded: hooks/useFiltersOpen).
 // `active`: how many of the folded filters are in use, shown on the button so none is forgotten.
 export const FiltersButton = ({ open, onToggle, active, className = '' }) => (
     <button

@@ -14,7 +14,8 @@ import usePermission from '../hooks/usePermission';
 import { useAuth } from '../context/AuthContext';
 import { MobileCard, MobileCardActions, MobileCardHead, MobileCardList, MobileEmpty, MobileField, MobileFields } from '../components/SerialMobileCards';
 import BranchChips from '../components/BranchChips';
-import { FiltersButton, useFiltersOpen as useFiltersOpenAt } from '../components/FiltersFold';
+import { FiltersButton } from '../components/FiltersFold';
+import useFiltersOpenAt from '../hooks/useFiltersOpen';
 
 const PAGE_SIZE = 20;
 const TABS = [
@@ -251,8 +252,12 @@ const useMgrOptions = (type) => {
 const mgrLabel = (mgr) => (mgr.description && mgr.description !== mgr.code ? `${mgr.code} - ${mgr.description}` : mgr.code);
 
 // MGR filter of one level (Product Master MGR of the serial's product); value is the MGR id.
-const MgrFilter = ({ level, value, onChange }) => {
-    const options = useMgrOptions(`MGR${level}`);
+// `allowed`: the user's MGR access on this level ([{ _id }], from the list); when given, only those
+// values are offered, as on Invoice Bulk Upload (any other value would show nothing).
+const MgrFilter = ({ level, value, onChange, allowed }) => {
+    const all = useMgrOptions(`MGR${level}`);
+    const allowedIds = allowed?.length ? new Set(allowed.map((mgr) => String(mgr._id))) : null;
+    const options = allowedIds ? all.filter((mgr) => allowedIds.has(String(mgr._id))) : all;
     return (
         <select value={value} onChange={(e) => onChange(e.target.value)} aria-label={`Filter by MGR ${level}`} className={selectClass}>
             <option value="">All MGR {level}</option>
@@ -260,6 +265,36 @@ const MgrFilter = ({ level, value, onChange }) => {
         </select>
     );
 };
+
+// MGR 1-5 filters of a list (client, 2026-11-26: Serial No List showed none), kept in this browser
+// tab with its other filters under `${prefix}.mgr1` .. `${prefix}.mgr5`.
+const useMgrFilters = (prefix) => {
+    const [mgr1, setMgr1] = useStoredState(`${prefix}.mgr1`, '');
+    const [mgr2, setMgr2] = useStoredState(`${prefix}.mgr2`, '');
+    const [mgr3, setMgr3] = useStoredState(`${prefix}.mgr3`, '');
+    const [mgr4, setMgr4] = useStoredState(`${prefix}.mgr4`, '');
+    const [mgr5, setMgr5] = useStoredState(`${prefix}.mgr5`, '');
+    const values = [mgr1, mgr2, mgr3, mgr4, mgr5];
+    const setters = [setMgr1, setMgr2, setMgr3, setMgr4, setMgr5];
+    return {
+        values,
+        set: (index, value) => setters[index](value),
+        // The ?mgr1..?mgr5 request parameters (only those chosen).
+        params: Object.fromEntries(values.map((value, index) => [`mgr${index + 1}`, value || undefined])),
+        inUse: values.filter(Boolean).length
+    };
+};
+
+// The MGR 1-5 dropdowns of `mgrs` (useMgrFilters); `mgrAccess` trims each level to the user's access.
+const MgrFilters = ({ mgrs, mgrAccess, onChange }) => mgrs.values.map((value, index) => (
+    <MgrFilter
+        key={index + 1}
+        level={index + 1}
+        value={value}
+        allowed={mgrAccess?.[`mgr${index + 1}`]}
+        onChange={(next) => { mgrs.set(index, next); onChange(); }}
+    />
+));
 
 const DateRangeFilter = ({ range, field, onChange }) => {
     const set = (setter) => (e) => { setter(e.target.value); onChange(); };
@@ -385,6 +420,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
     const [status, setStatus] = useStoredState('list.assetStatus', '');
     const [ownership, setOwnership] = useStoredState('list.ownership', '');
     const [page, setPage] = useStoredState('list.page', 1);
+    const mgrs = useMgrFilters('list');
     const range = useDateRange('list');
     const debouncedSearch = useDebounced(search.trim());
 
@@ -396,7 +432,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
     useFirstPageOnChange(viewBranches, setPage);
     const { rows, pagination, loading, mgrAccess } = useList(serialTransferService.listSerials, {
         page, limit: PAGE_SIZE, search: debouncedSearch || undefined, field: field || undefined, status: status || undefined,
-        ownership: ownership || undefined, ...range.params, branchIds: viewBranches,
+        ownership: ownership || undefined, ...mgrs.params, ...range.params, branchIds: viewBranches,
     }, !range.invalid);
     const offset = (pagination.page - 1) * pagination.limit;
     // The row whose Download Customer Activity Log dialog is open.
@@ -445,6 +481,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                 field: field || undefined,
                 status: status || undefined,
                 ownership: ownership || undefined,
+                ...mgrs.params,
                 ...range.params
             };
             const response = await serialTransferService.exportSerials(params);
@@ -487,7 +524,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                     <option value="product">Product</option>
                     <option value="customer">Customer</option>
                 </select>
-                <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[viewBranches, status, ownership].filter(Boolean).length + datesInUse(range)} />
+                <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[viewBranches, status, ownership].filter(Boolean).length + mgrs.inUse + datesInUse(range)} />
                 <button
                     type="button"
                     onClick={openExportDialog}
@@ -507,6 +544,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                             <option value="Sold">With original customer</option>
                             <option value="Transferred">Transferred / assigned to a new customer</option>
                         </select>
+                        <MgrFilters mgrs={mgrs} mgrAccess={mgrAccess} onChange={() => setPage(1)} />
                         <DateRangeFilter range={range} field="Invoice Date" onChange={() => setPage(1)} />
                     </>
                 )}
@@ -520,7 +558,7 @@ const SerialListTab = ({ onOpen, onTransfer }) => {
                             pagination={pagination}
                             shown={rows.length}
                             noun="serial numbers"
-                            filtered={Boolean(debouncedSearch || status || ownership || range.fromDate || range.toDate)}
+                            filtered={Boolean(debouncedSearch || status || ownership || mgrs.inUse || range.fromDate || range.toDate)}
                         />
                         <MobileCardList>
                             {rows.map((row, index) => (
@@ -727,6 +765,7 @@ const HistoryTab = ({ onOpen }) => {
     const [flag, setFlag] = useStoredState('history.flag', '');
     const [entryType, setEntryType] = useStoredState('history.entryType', '');
     const [page, setPage] = useStoredState('history.page', 1);
+    const mgrs = useMgrFilters('history');
     const range = useDateRange('history');
     const [filtersOpen, toggleFilters] = useFiltersOpen();
     const debouncedSearch = useDebounced(search.trim());
@@ -734,11 +773,11 @@ const HistoryTab = ({ onOpen }) => {
     const viewBranches = useViewBranches();
     useFirstPageOnChange(viewBranches, setPage);
     const { rows, pagination, loading } = useList(serialTransferService.listHistory, {
-        page, limit: PAGE_SIZE, search: debouncedSearch || undefined, flag: flag || undefined, entryType: entryType || undefined, ...range.params, branchIds: viewBranches,
+        page, limit: PAGE_SIZE, search: debouncedSearch || undefined, flag: flag || undefined, entryType: entryType || undefined, ...mgrs.params, ...range.params, branchIds: viewBranches,
     }, !range.invalid);
 
     const emptyText = range.invalid ? 'Correct the date range to see results.'
-        : debouncedSearch || flag || entryType || range.fromDate || range.toDate ? 'No history records match.'
+        : debouncedSearch || flag || entryType || mgrs.inUse || range.fromDate || range.toDate ? 'No history records match.'
             : 'No transfers recorded yet. Transfer a serial number from the Serial No List.';
 
     return (
@@ -754,7 +793,7 @@ const HistoryTab = ({ onOpen }) => {
                         className={`${inputClass} pl-11`}
                     />
                 </div>
-                <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[viewBranches, entryType, flag].filter(Boolean).length + datesInUse(range)} />
+                <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[viewBranches, entryType, flag].filter(Boolean).length + mgrs.inUse + datesInUse(range)} />
                 {filtersOpen && (
                     <>
                         <ViewBranchFilter />
@@ -767,6 +806,7 @@ const HistoryTab = ({ onOpen }) => {
                             <option value="Active">Active (current customer)</option>
                             <option value="Inactive">Inactive (previous customers)</option>
                         </select>
+                        <MgrFilters mgrs={mgrs} onChange={() => setPage(1)} />
                         <DateRangeFilter range={range} field="Transfer Date" onChange={() => setPage(1)} />
                     </>
                 )}
@@ -779,7 +819,7 @@ const HistoryTab = ({ onOpen }) => {
                             pagination={pagination}
                             shown={rows.length}
                             noun="history records"
-                            filtered={Boolean(debouncedSearch || flag || entryType || range.fromDate || range.toDate)}
+                            filtered={Boolean(debouncedSearch || flag || entryType || mgrs.inUse || range.fromDate || range.toDate)}
                         />
                         <MobileCardList>
                             {rows.map((entry) => (
@@ -959,11 +999,7 @@ const ActivityTab = ({ onOpen, assetId }) => {
     const prefix = assetId ? `activity.${assetId}` : 'activity';
     const [ownership, setOwnership] = useStoredState(`${prefix}.ownership`, 'Active');
     const [search, setSearch] = useStoredState(`${prefix}.search`, '');
-    const [mgr1, setMgr1] = useStoredState(`${prefix}.mgr1`, '');
-    const [mgr2, setMgr2] = useStoredState(`${prefix}.mgr2`, '');
-    const [mgr3, setMgr3] = useStoredState(`${prefix}.mgr3`, '');
-    const [mgr4, setMgr4] = useStoredState(`${prefix}.mgr4`, '');
-    const [mgr5, setMgr5] = useStoredState(`${prefix}.mgr5`, '');
+    const mgrs = useMgrFilters(prefix);
     const [page, setPage] = useStoredState(`${prefix}.page`, 1);
     const range = useDateRange(prefix);
     const [filtersOpen, toggleFilters] = useFiltersOpen();
@@ -974,9 +1010,7 @@ const ActivityTab = ({ onOpen, assetId }) => {
     useFirstPageOnChange(viewBranches, setPage);
     const filters = assetId
         ? { ownership, assetId }
-        : { ownership, search: debouncedSearch || undefined, mgr1: mgr1 || undefined, mgr2: mgr2 || undefined,
-            mgr3: mgr3 || undefined, mgr4: mgr4 || undefined, mgr5: mgr5 || undefined,
-            ...range.params, branchIds: viewBranches };
+        : { ownership, search: debouncedSearch || undefined, ...mgrs.params, ...range.params, branchIds: viewBranches };
     const { rows, pagination, loading } = useList(serialTransferService.listActivity, { ...filters, page, limit: PAGE_SIZE }, !range.invalid);
     const offset = (pagination.page - 1) * pagination.limit;
     const inactive = ownership === 'Inactive';
@@ -1041,16 +1075,11 @@ const ActivityTab = ({ onOpen, assetId }) => {
                                 className={`${inputClass} pl-11`}
                             />
                         </div>
-                        <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[viewBranches, mgr1, mgr2, mgr3, mgr4, mgr5].filter(Boolean).length + datesInUse(range)} />
+                        <FiltersButton open={filtersOpen} onToggle={toggleFilters} active={[viewBranches].filter(Boolean).length + mgrs.inUse + datesInUse(range)} />
                         {filtersOpen && (
                             <>
                                 <ViewBranchFilter />
-                                {[mgr1, mgr2, mgr3, mgr4, mgr5].map((value, index) => (
-                                    <MgrFilter key={index + 1} level={index + 1} value={value} onChange={(next) => {
-                                        [setMgr1, setMgr2, setMgr3, setMgr4, setMgr5][index](next);
-                                        setPage(1);
-                                    }} />
-                                ))}
+                                <MgrFilters mgrs={mgrs} onChange={() => setPage(1)} />
                                 <DateRangeFilter range={range} field="Customer Since" onChange={() => setPage(1)} />
                             </>
                         )}
