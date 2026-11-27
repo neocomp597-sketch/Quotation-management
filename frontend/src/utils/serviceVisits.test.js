@@ -3,7 +3,8 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
     pickVisitMedia, describeLoadError, ticketOptionLabel, mergeTickets,
-    attachProductPhoto, PhotoUploadError, MAX_INLINE_PHOTO_BYTES, uploadedImageUrl
+    attachProductPhoto, PhotoUploadError, MAX_INLINE_PHOTO_BYTES, uploadedImageUrl,
+    visitsInView, visitSearchText, filterVisits, DEFAULT_VISIT_VIEW
 } from './serviceVisits.js';
 
 describe('uploadedImageUrl', () => {
@@ -164,5 +165,86 @@ describe('attachProductPhoto', () => {
             attachProductPhoto(shrunk, { compress: async (f) => f, upload: failingUpload(), toDataUrl: async () => { throw new Error('read failed'); } }),
             (err) => !(err instanceof PhotoUploadError) && err.message === 'read failed'
         );
+    });
+});
+
+describe('visitsInView', () => {
+    const visits = ['Scheduled', 'In Transit', 'Started', 'Completed', 'Cancelled'].map((status, i) => ({ _id: `v${i}`, status }));
+
+    test('the queue opens on open visits only: scheduled, in transit and started', () => {
+        assert.equal(DEFAULT_VISIT_VIEW, 'open');
+        assert.deepEqual(visitsInView(visits, 'open').map((v) => v.status), ['Scheduled', 'In Transit', 'Started']);
+    });
+
+    test('the Closed view holds completed and cancelled visits', () => {
+        assert.deepEqual(visitsInView(visits, 'closed').map((v) => v.status), ['Completed', 'Cancelled']);
+    });
+
+    test('the All view holds every visit', () => {
+        assert.equal(visitsInView(visits, 'all').length, 5);
+    });
+
+    test('a visit whose ticket is closed, resolved or cancelled is closed, whatever its own status', () => {
+        const ofTicket = (status) => ({ _id: status, status: 'Scheduled', ticketId: { status } });
+        const mixed = ['Open', 'In Progress', 'Closed', 'Resolved', 'Cancelled'].map(ofTicket);
+        assert.deepEqual(visitsInView(mixed, 'open').map((v) => v._id), ['Open', 'In Progress']);
+        assert.deepEqual(visitsInView(mixed, 'closed').map((v) => v._id), ['Closed', 'Resolved', 'Cancelled']);
+    });
+});
+
+const visit = {
+    _id: 'v1', visitNo: 'VST-2026-0040', status: 'Completed', billingStatus: 'Under AMC',
+    scheduledDate: '2026-11-06T17:09:00.000Z', visitReport: 'Replaced the fuse',
+    ticketId: {
+        ticketNo: 'CSM-2026-0267', issueTitle: 'group id check check', pincode: '422001', manualInvoiceNo: 'INV/77',
+        customerId: { customerName: 'Saket Ashok Kadave' },
+        invoiceId: { voucherNumber: 'SV-1001' },
+        assetId: { serialNumber: 'SN-ABC-9' }
+    },
+    engineerId: { name: 'Saket Ashok Kadave', email: 'saket@x.in' },
+    branchId: { name: 'DANI PARK', code: 'DP' }
+};
+
+describe('visitSearchText', () => {
+    test('carries every detail the queue shows, in lower case', () => {
+        const text = visitSearchText(visit, (d) => `06.NOV.26 ${d ? '' : ''}`.trim());
+        for (const part of ['vst-2026-0040', 'completed', 'under amc', 'csm-2026-0267', 'group id check', '422001', 'inv/77',
+            'saket ashok kadave', 'sv-1001', 'sn-abc-9', 'saket@x.in', 'dani park', 'dp', '06.nov.26', 'replaced the fuse']) {
+            assert.ok(text.includes(part), `missing ${part}`);
+        }
+    });
+
+    test('an unpopulated visit (ids only) does not throw', () => {
+        assert.equal(visitSearchText({ visitNo: 'VST-1', ticketId: 'abc', engineerId: 'def' }), 'vst-1');
+        assert.equal(visitSearchText(null), '');
+    });
+});
+
+describe('filterVisits', () => {
+    const open = { ...visit, _id: 'v2', visitNo: 'VST-2026-0041', status: 'Scheduled', engineerId: { name: 'Rahul Pawar' } };
+    const visits = [visit, open];
+
+    test('no query: the visits of the view', () => {
+        assert.deepEqual(filterVisits(visits).map((v) => v._id), ['v2']);
+        assert.deepEqual(filterVisits(visits, { view: 'closed' }).map((v) => v._id), ['v1']);
+        assert.deepEqual(filterVisits(visits, { view: 'all', query: '   ' }).map((v) => v._id), ['v1', 'v2']);
+    });
+
+    test('finds a visit by ticket no, customer, engineer, serial no or visit no, whatever the case', () => {
+        assert.deepEqual(filterVisits(visits, { view: 'all', query: 'csm-2026-0267' }).length, 2);
+        assert.deepEqual(filterVisits(visits, { view: 'all', query: 'rahul' }).map((v) => v._id), ['v2']);
+        assert.deepEqual(filterVisits(visits, { view: 'all', query: '0040' }).map((v) => v._id), ['v1']);
+        assert.deepEqual(filterVisits(visits, { view: 'all', query: 'SN-ABC' }).length, 2);
+    });
+
+    test('every word must match, and only within the view', () => {
+        assert.deepEqual(filterVisits(visits, { view: 'all', query: 'saket rahul' }).map((v) => v._id), ['v2']);
+        assert.deepEqual(filterVisits(visits, { view: 'all', query: 'saket nobody' }), []);
+        assert.deepEqual(filterVisits(visits, { view: 'open', query: 'completed' }), []);
+    });
+
+    test('searches the scheduled date as the queue shows it', () => {
+        const fmt = () => '06.NOV.26, 10:39 PM';
+        assert.equal(filterVisits(visits, { view: 'all', query: '06.nov', formatDateTime: fmt }).length, 2);
     });
 });

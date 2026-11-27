@@ -17,7 +17,8 @@ import SearchableSelect from '../components/SearchableSelect';
 import PhotoPickButton from '../components/PhotoPickButton';
 import {
     pickVisitMedia, describeLoadError, TICKET_OPTIONS_LIMIT, ticketOptionLabel, mergeTickets,
-    PRODUCT_PHOTO_MAX_SIDE, attachProductPhoto, PhotoUploadError
+    PRODUCT_PHOTO_MAX_SIDE, attachProductPhoto, PhotoUploadError,
+    filterVisits, visitsInView, VISIT_VIEWS, DEFAULT_VISIT_VIEW
 } from '../utils/serviceVisits';
 
 const visitStatusClass = (status) => (
@@ -259,6 +260,9 @@ const ServiceVisits = () => {
     const [loading, setLoading] = useState(false);
     const [loadError, setLoadError] = useState('');
     const [visits, setVisits] = useState([]);
+    // The queue shows open visits unless Closed or All is picked; the search narrows the view further
+    const [visitView, setVisitView] = useState(DEFAULT_VISIT_VIEW);
+    const [visitSearch, setVisitSearch] = useState('');
     // The visit open in the full-width workspace; null shows the queue
     const [selectedVisit, setSelectedVisit] = useState(null);
     // Last visit opened (or scheduled) from the queue, highlighted and scrolled back into view
@@ -563,7 +567,11 @@ const ServiceVisits = () => {
                 // Scheduled from a visit's workspace: move the workspace to the new visit.
                 // Scheduled from the queue: stay on the queue with the new visit highlighted.
                 if (selectedVisit) handleSelectVisit(created);
-                else setLastOpenedVisitId(created._id);
+                else {
+                    // A new visit is open: make sure the view it is highlighted in is showing
+                    setVisitView((view) => (view === 'closed' ? 'open' : view));
+                    setLastOpenedVisitId(created._id);
+                }
             }
         } catch (error) {
             const errMsg = error.response?.data?.message || 'Failed to schedule visit';
@@ -855,6 +863,10 @@ const ServiceVisits = () => {
         }
     }, [signatureVisitKey]);
 
+    const shownVisits = filterVisits(visits, { view: visitView, query: visitSearch, formatDateTime });
+    const viewCounts = Object.fromEntries(VISIT_VIEWS.map(({ key }) => [key, visitsInView(visits, key).length]));
+    const currentView = VISIT_VIEWS.find(({ key }) => key === visitView) || VISIT_VIEWS[0];
+
     return (
         <div className="p-6 space-y-6 max-w-7xl mx-auto animate-fade-in-up">
             {!selectedVisit ? (
@@ -887,12 +899,58 @@ const ServiceVisits = () => {
                                 <MdLocalShipping size={18} className="text-primary-600" />
                                 Service Visits Queue
                                 <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-slate-200 text-slate-700">
-                                    {visits.length}
+                                    {shownVisits.length}
                                 </span>
                             </h2>
                             {loading && visits.length > 0 && (
                                 <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Refreshing...</span>
                             )}
+                        </div>
+
+                        {/* Search across every detail of a visit, and the Open / Closed / All view */}
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                            <div className="relative flex-1 min-w-0">
+                                <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
+                                <input
+                                    type="search"
+                                    value={visitSearch}
+                                    onChange={(e) => setVisitSearch(e.target.value)}
+                                    placeholder="Search visit no, ticket no, subject, customer, engineer, serial no, invoice, branch, date..."
+                                    aria-label="Search service visits"
+                                    className="w-full pl-12 pr-10 py-3 rounded-2xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold"
+                                />
+                                {visitSearch && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setVisitSearch('')}
+                                        aria-label="Clear search"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                                    >
+                                        <MdClose size={16} />
+                                    </button>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-2xl shrink-0 self-start sm:self-auto" role="tablist" aria-label="Visit status view">
+                                {VISIT_VIEWS.map(({ key, label }) => (
+                                    <button
+                                        key={key}
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={visitView === key}
+                                        onClick={() => setVisitView(key)}
+                                        className={`px-3.5 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 ${
+                                            visitView === key
+                                                ? 'bg-white text-primary-700 shadow-sm'
+                                                : 'text-slate-500 hover:text-slate-800'
+                                        }`}
+                                    >
+                                        {label}
+                                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${visitView === key ? 'bg-primary-50 text-primary-700' : 'bg-slate-200 text-slate-600'}`}>
+                                            {viewCounts[key]}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                         {loading && visits.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-20 space-y-3">
@@ -926,11 +984,59 @@ const ServiceVisits = () => {
                                     </>
                                 )}
                             </div>
+                        ) : shownVisits.length === 0 ? (
+                            <div className="text-center py-16 text-slate-400 space-y-4">
+                                {visitSearch.trim() ? (
+                                    <>
+                                        <p className="text-lg font-bold">No {visitView === 'all' ? '' : `${currentView.label.toLowerCase()} `}visits match "{visitSearch.trim()}".</p>
+                                        <div className="flex flex-wrap items-center justify-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setVisitSearch('')}
+                                                className="px-4 py-2.5 bg-slate-900 hover:bg-black text-white font-black uppercase text-xs rounded-xl shadow-md"
+                                            >
+                                                Clear search
+                                            </button>
+                                            {visitView !== 'all' && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setVisitView('all')}
+                                                    className="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-black uppercase text-xs rounded-xl"
+                                                >
+                                                    Search all visits
+                                                </button>
+                                            )}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p className="text-lg font-bold">{currentView.empty}</p>
+                                        {visitView === 'open' && viewCounts.closed > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setVisitView('closed')}
+                                                className="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-black uppercase text-xs rounded-xl"
+                                            >
+                                                Show {viewCounts.closed} closed visit{viewCounts.closed === 1 ? '' : 's'}
+                                            </button>
+                                        )}
+                                        {visitView === 'closed' && viewCounts.open > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setVisitView('open')}
+                                                className="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-black uppercase text-xs rounded-xl"
+                                            >
+                                                Show {viewCounts.open} open visit{viewCounts.open === 1 ? '' : 's'}
+                                            </button>
+                                        )}
+                                    </>
+                                )}
+                            </div>
                         ) : (
                             <>
                                 {/* Mobile Cards View (Phone Screens) */}
                                 <div className="space-y-3 block sm:hidden">
-                                    {visits.map((v) => {
+                                    {shownVisits.map((v) => {
                                         const isLastOpened = lastOpenedVisitId === v._id;
                                         return (
                                             <div
@@ -985,7 +1091,7 @@ const ServiceVisits = () => {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
-                                            {visits.map((v) => {
+                                            {shownVisits.map((v) => {
                                                 const isLastOpened = lastOpenedVisitId === v._id;
                                                 return (
                                                     <tr

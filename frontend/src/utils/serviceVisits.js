@@ -17,6 +17,69 @@ export const describeLoadError = (error) => {
     return 'Could not reach the server. Check the connection and retry.';
 };
 
+// Visits still to be made or under way, and those done with (client, 2026-11-26: the queue
+// shows open visits only; closed ones are reached through the Closed view).
+export const OPEN_VISIT_STATUSES = ['Scheduled', 'In Transit', 'Started'];
+export const CLOSED_VISIT_STATUSES = ['Completed', 'Cancelled'];
+// A visit of a ticket that is done with is closed too, whatever the visit's own status
+// (the same statuses the tickets API leaves out of "Open Tickets").
+export const CLOSED_TICKET_STATUSES = ['Closed', 'Resolved', 'Cancelled'];
+
+export const VISIT_VIEWS = [
+    { key: 'open', label: 'Open', empty: 'No open service visits.' },
+    { key: 'closed', label: 'Closed', empty: 'No closed service visits.' },
+    { key: 'all', label: 'All', empty: 'No field service visits scheduled.' }
+];
+export const DEFAULT_VISIT_VIEW = 'open';
+
+export const isClosedVisit = (visit) => CLOSED_VISIT_STATUSES.includes(visit?.status)
+    || CLOSED_TICKET_STATUSES.includes(visit?.ticketId?.status);
+
+/** The visits of `visits` the view `view` ('open' | 'closed' | 'all') holds. */
+export const visitsInView = (visits, view) => {
+    if (view === 'open') return visits.filter((v) => !isClosedVisit(v));
+    if (view === 'closed') return visits.filter(isClosedVisit);
+    return visits;
+};
+
+/**
+ * Everything the queue knows about `visit` as one lower-case string, for the search:
+ * visit no, status, billing, ticket no, subject, customer, invoice, serial no, pincode,
+ * engineer, branch, scheduled date (as shown, when `formatDateTime` is given) and the report.
+ */
+export const visitSearchText = (visit, formatDateTime) => {
+    const ticket = visit?.ticketId && typeof visit.ticketId === 'object' ? visit.ticketId : {};
+    const customer = ticket.customerId && typeof ticket.customerId === 'object' ? ticket.customerId : {};
+    const invoice = ticket.invoiceId && typeof ticket.invoiceId === 'object' ? ticket.invoiceId : {};
+    const asset = ticket.assetId && typeof ticket.assetId === 'object' ? ticket.assetId : {};
+    const engineer = visit?.engineerId && typeof visit.engineerId === 'object' ? visit.engineerId : {};
+    const branch = visit?.branchId && typeof visit.branchId === 'object' ? visit.branchId : {};
+    const scheduled = visit?.scheduledDate ? [String(visit.scheduledDate), formatDateTime?.(visit.scheduledDate)] : [];
+    return [
+        visit?.visitNo, visit?.status, visit?.billingStatus, visit?.ticketType,
+        ticket.ticketNo, ticket.issueTitle, ticket.status, ticket.manualInvoiceNo, ticket.pincode,
+        customer.customerName, customer.companyName,
+        invoice.voucherNumber, invoice.invoiceNumber, asset.serialNumber,
+        engineer.name, engineer.email, branch.name, branch.code,
+        ...scheduled, visit?.visitReport, visit?.nextAction
+    ].filter((part) => part !== undefined && part !== null && part !== '').join(' ').toLowerCase();
+};
+
+/**
+ * The visits of `visits` in `view` that match `query`: every word of the query must occur
+ * somewhere in the visit's details (visitSearchText), whatever the case. An empty query
+ * matches every visit.
+ */
+export const filterVisits = (visits, { view = DEFAULT_VISIT_VIEW, query = '', formatDateTime } = {}) => {
+    const inView = visitsInView(visits || [], view);
+    const words = String(query || '').toLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length) return inView;
+    return inView.filter((visit) => {
+        const text = visitSearchText(visit, formatDateTime);
+        return words.every((word) => text.includes(word));
+    });
+};
+
 // The schedule form lists the newest tickets (the most the tickets API returns at once); any
 // other ticket is found by typing in the ticket search, which asks the server
 export const TICKET_OPTIONS_LIMIT = 100;

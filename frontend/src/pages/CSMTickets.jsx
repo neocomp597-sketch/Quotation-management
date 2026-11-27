@@ -150,7 +150,12 @@ const CSMTickets = () => {
 
     const handleTabChange = (newTab) => {
         setPage(1);
-        setSearchParams({ tab: newTab });
+        // The analytics views and metric filters are left behind; the status picked stays applied
+        setSearchParams((previous) => {
+            const next = new URLSearchParams({ tab: newTab });
+            if (previous.get('status')) next.set('status', previous.get('status'));
+            return next;
+        });
     };
 
     const [loading, setLoading] = useState(false);
@@ -161,6 +166,20 @@ const CSMTickets = () => {
     const [totalPages, setTotalPages] = useState(1);
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState(searchParams.get('status') || '');
+    // The status picked is kept in the URL too (client, 2026-11-26: it must stay applied until
+    // changed by hand), so it survives a tab switch, a new ticket and coming back from a ticket's details.
+    const applyStatusFilter = (status) => {
+        setFilterStatus(status);
+        setPage(1);
+        setSearchParams((previous) => {
+            const next = new URLSearchParams(previous);
+            if (status) next.set('status', status);
+            else next.delete('status');
+            // A status in the URL would otherwise count as a metric filter and change the default tab
+            if (!next.has('tab')) next.set('tab', activeTab);
+            return next;
+        }, { replace: true });
+    };
     const [filterPriority, setFilterPriority] = useState('');
     const [filterInvoiceType, setFilterInvoiceType] = useState('');
     const [filterCustomer, setFilterCustomer] = useState('');
@@ -744,6 +763,7 @@ const CSMTickets = () => {
         }
     };
 
+    // A status in the URL (a dashboard card, a tab switch, Back) is the status applied
     useEffect(() => {
         const urlStatus = searchParams.get('status');
         if (urlStatus !== null) {
@@ -1310,7 +1330,7 @@ const CSMTickets = () => {
             setManualImages({ front: null, back: null, left: null, right: null, invoice: null });
             setShowModal(false);
             setPageView('list');
-            navigate('/csm/tickets');
+            navigate({ pathname: '/csm/tickets', search: searchParams.toString() });
             fetchTickets();
             fetchTicketCustomers();
             setGeneratedSerial('');
@@ -1489,7 +1509,7 @@ const CSMTickets = () => {
             toast.success('Manual Support ticket registered successfully!');
             setShowManualModal(false);
             setPageView('list');
-            navigate('/csm/tickets');
+            navigate({ pathname: '/csm/tickets', search: searchParams.toString() });
             fetchTickets();
             fetchTicketCustomers();
             
@@ -2574,7 +2594,7 @@ const CSMTickets = () => {
                             <span className="text-xs font-black uppercase tracking-wider text-slate-400">Status</span>
                             <select
                                 value={filterStatus}
-                                onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
+                                onChange={(e) => applyStatusFilter(e.target.value)}
                                 className="bg-transparent border-none focus:outline-none text-xs font-bold text-slate-700 cursor-pointer"
                             >
                                 <option value="">All Statuses</option>

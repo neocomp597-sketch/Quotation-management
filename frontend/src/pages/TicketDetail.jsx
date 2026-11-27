@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { csmService, userService, uploadService } from '../services/api';
 import { formatDate, formatDateTime } from '../utils/helpers';
 import { toast } from 'react-toastify';
@@ -66,6 +66,13 @@ const parseDescriptionAndImages = (rawDesc = '') => {
 const TicketDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
+    // Back returns to the register as it was left (tab, status and filters in its URL) when the
+    // ticket was opened from inside the app; a ticket opened by its link goes to the plain register.
+    const backToRegister = () => {
+        if (location.key && location.key !== 'default') navigate(-1);
+        else navigate('/csm/tickets');
+    };
     const { can, activeBranchId } = useAuth();
     const { canModify } = usePermission('csm_tickets');
     const [loading, setLoading] = useState(true);
@@ -559,7 +566,7 @@ const TicketDetail = () => {
             {/* Nav Header */}
             <div className="flex flex-wrap items-center gap-4">
                 <button
-                    onClick={() => navigate('/csm/tickets')}
+                    onClick={backToRegister}
                     className="p-2 bg-slate-100 hover:bg-slate-200 rounded-full transition-all text-slate-600"
                 >
                     <MdArrowBack size={20} />
