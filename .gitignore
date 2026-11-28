@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment files hold passwords and keys: never commit them. Production's values are set in
+# Coolify (Backend > Environment Variables); backend/.env.example lists the keys.
+.env
+.env.local
+.env.*.local
