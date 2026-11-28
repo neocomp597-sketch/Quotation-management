@@ -521,10 +521,6 @@ const LandingPage = () => {
                 <section className="relative pt-8 pb-24 px-6">
                     <div className="max-w-[1280px] mx-auto grid lg:grid-cols-2 gap-16 items-center">
                         <div className="z-10 text-left">
-                            <div className="inline-flex items-center gap-2 px-4 py-1 bg-[#006c49]/10 text-[#006c49] rounded-full mb-4 animate-pulse">
-                                <span className="material-symbols-outlined text-[16px]">spark</span>
-                                <span className="text-[11px] font-semibold uppercase tracking-wider">New: AI-Powered Product Categorization</span>
-                            </div>
                             <h1 className="text-4xl lg:text-5xl font-extrabold text-[#191c1e] mb-4 leading-tight">
                                 Win More Deals with <span className="emerald-gradient-text">Better Quotes.</span>
                             </h1>
