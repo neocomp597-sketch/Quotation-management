@@ -1561,6 +1561,54 @@ const CSMTickets = () => {
         fetchTickets();
     };
 
+    // New Ticket: an empty standard form; with a serial number (Own Assets' Raise ticket) it is
+    // looked up at once, filling the customer and product as choosing it in the form does.
+    const openNewTicket = (serialNumber = '') => {
+        const lowPriority = priorities.find(p => p.name?.toLowerCase() === 'low');
+        const form = {
+            customerId: '',
+            contactId: '',
+            contactName: '',
+            contactDesignationId: '',
+            contactDesignation: '',
+            contactPhone: '',
+            contactEmail: '',
+            priorityId: lowPriority ? lowPriority._id : '',
+            categoryId: '',
+            typeId: '',
+            productId: '',
+            assetId: '',
+            invoiceId: '',
+            complaintTypeId: '',
+            complaintDetail: '',
+            issueTitle: '',
+            description: '',
+            source: 'Web Portal',
+            serialNumber
+        };
+        setFormData(form);
+        latestFormRef.current = form;
+        setCustomerContacts([]);
+        setAssetSummary(null);
+        setShowAllProducts(false);
+        setGeneratedSerial('');
+        setPageView('standard');
+        if (serialNumber) handleSerialNoLookup(serialNumber, null, true);
+    };
+
+    // /csm/tickets?raiseFor=<serial> (Own Assets' Raise ticket) opens New Ticket for that serial once.
+    const raiseFor = searchParams.get('raiseFor') || '';
+    useEffect(() => {
+        if (!raiseFor) return;
+        const next = new URLSearchParams(searchParams);
+        next.delete('raiseFor');
+        setSearchParams(next, { replace: true });
+        if (canCreate) openNewTicket(raiseFor);
+        else toast.error('You do not have permission to raise tickets.');
+        // Runs for the serial in the URL only; the form functions are recreated on every render.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [raiseFor]);
+
     const handleSerialNoLookup = async (serialNo, preloadedAsset = null, isExplicit = false) => {
         const cleanSN = String(serialNo || '').trim();
         if (!cleanSN && !preloadedAsset) return;
@@ -2406,35 +2454,7 @@ const CSMTickets = () => {
                 <div className="flex flex-wrap items-center gap-3">
                     {canCreate && (
                         <button
-                            onClick={() => {
-                                const lowPriority = priorities.find(p => p.name?.toLowerCase() === 'low');
-                                setFormData({
-                                    customerId: '',
-                                    contactId: '',
-                                    contactName: '',
-                                    contactDesignationId: '',
-                                    contactDesignation: '',
-                                    contactPhone: '',
-                                    contactEmail: '',
-                                    priorityId: lowPriority ? lowPriority._id : '',
-                                    categoryId: '',
-                                    typeId: '',
-                                    productId: '',
-                                    assetId: '',
-                                    invoiceId: '',
-                                    complaintTypeId: '',
-                                    complaintDetail: '',
-                                    issueTitle: '',
-                                    description: '',
-                                    source: 'Web Portal',
-                                    serialNumber: ''
-                                });
-                                setCustomerContacts([]);
-                                setAssetSummary(null);
-                                setShowAllProducts(false);
-                                setGeneratedSerial('');
-                                setPageView('standard');
-                            }}
+                            onClick={() => openNewTicket()}
                             className="flex items-center gap-2 px-6 py-4 bg-primary-600 hover:bg-primary-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-lg shadow-primary-600/20 active:scale-95 self-start md:self-auto"
                         >
                             <MdAdd size={18} />

@@ -55,6 +55,9 @@ import {
     MdClose,
     MdHowToReg,
     MdSwapHoriz,
+    MdDevices,
+    MdSupervisorAccount,
+    MdGroups,
 } from 'react-icons/md';
 import { useAuth } from '../context/AuthContext';
 import { companySettingsService, stockAuditService } from '../services/api';
@@ -241,6 +244,10 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'sale_invoices', name: 'Invoices', icon: <MdReceipt size={18} />, path: '/invoices' },
                 { key: 'sales_approvals', name: 'Approvals', icon: <MdLock size={18} />, path: '/sales/approvals' },
                 { key: 'sales_orders', name: 'Orders', icon: <MdShoppingCart size={18} />, path: '/sales/orders' },
+                // Own Assets (client, 2026-11-28: in Quotations); its switches stay their own group in Authorization.
+                { key: 'own_assets_manager', name: 'Manager Assets', icon: <MdSupervisorAccount size={18} />, path: '/own-assets/manager' },
+                { key: 'own_assets_mine', name: 'My Assets', icon: <MdDevices size={18} />, path: '/own-assets/mine' },
+                { key: 'own_assets_team', name: 'My Team Assets', icon: <MdGroups size={18} />, path: '/own-assets/team' },
             ]
         },
         {

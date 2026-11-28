@@ -46,6 +46,14 @@ const resolveVoucherKeys = async (req, subPath) => {
 
 const importRule = (name, key, routes = { 'POST /': 'create' }) => ({ prefix: `/api/import/${name}`, key, onlyRoutes: routes });
 
+// Own Assets: /api/own-assets/<mine|manager|team>/... belongs to that list's screen; an unknown
+// list needs any of them (the controller then answers 404).
+const resolveOwnAssetKeys = async (req, subPath) => {
+    const { OWN_ASSET_VIEWS, OWN_ASSET_PERMISSION_KEYS } = require('./ownAssetViews');
+    const view = OWN_ASSET_VIEWS[subPath.split('/').filter(Boolean)[0]];
+    return view ? [view.permissionKey] : OWN_ASSET_PERMISSION_KEYS;
+};
+
 const API_PERMISSION_RULES = [
     // ── Master ────────────────────────────────────────────────────────────
     { prefix: '/api/customers/analytics', key: 'master_customers' },
@@ -208,6 +216,14 @@ const API_PERMISSION_RULES = [
             'POST /employees/:employeeId/assets': 'modify', 'POST /employees/:employeeId/assets/:assetId/transfer': 'modify',
             'POST /employees/:employeeId/assets/move-home': 'modify'
         }
+    },
+
+    // ── Own Assets ────────────────────────────────────────────────────────
+    // Searching items to add belongs to Add (Create); Edit (Asset No, hand over) is Modify and
+    // Take back is Delete (controllers/ownAssetController.js).
+    {
+        prefix: '/api/own-assets', key: 'own_assets_mine', resolveKeys: resolveOwnAssetKeys,
+        routes: { 'GET /:view/assignable': 'create', 'POST /:view/:assetId/return': 'delete' }
     },
 
     // ── Contracts ─────────────────────────────────────────────────────────

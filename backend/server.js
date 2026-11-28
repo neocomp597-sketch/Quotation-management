@@ -141,6 +141,7 @@ const landingPlanRoutes = require("./routes/landingPlanRoutes");
 const developerRoutes = require("./routes/developerRoutes");
 const inventoryRoutes = require("./routes/inventoryRoutes");
 const stockAuditRoutes = require("./routes/stockAuditRoutes");
+const ownAssetRoutes = require("./routes/ownAssetRoutes");
 const publicApiV1 = require("./routes/public-api/v1");
 const scheduler = require("./utils/scheduler");
 
@@ -149,6 +150,7 @@ app.use("/api/v1", publicApiV1);
 app.use("/api/developer", developerRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/stock-audits", stockAuditRoutes);
+app.use("/api/own-assets", ownAssetRoutes);
 app.use("/api/landing-plans", landingPlanRoutes);
 app.use("/api/city-master", cityMasterRoutes);
 app.use("/api/flowcharts", flowchartRoutes);

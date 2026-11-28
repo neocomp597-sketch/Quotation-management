@@ -544,6 +544,16 @@ export const serialTransferService = {
   getSerialBranchHistory: (assetId) => api.get(`/serial-transfers/branch-transfers/serials/${assetId}`),
 };
 
+// Own Assets: company items held by the user (mine), their manager (manager) and their team (team).
+export const ownAssetService = {
+  list: (view) => api.get(`/own-assets/${view}`, { cache: false }),
+  assignable: (view, params = {}) => api.get(`/own-assets/${view}/assignable`, { params, cache: false }),
+  assign: (view, data) => api.post(`/own-assets/${view}/assign`, data),
+  log: (view, assetId) => api.get(`/own-assets/${view}/${assetId}/log`, { cache: false }),
+  update: (view, assetId, data) => api.put(`/own-assets/${view}/${assetId}`, data),
+  takeBack: (view, assetId, data) => api.post(`/own-assets/${view}/${assetId}/return`, data),
+};
+
 export const companySettingsService = {
   get: () => api.get("/company-settings"),
   update: (data) => api.put("/company-settings", data),

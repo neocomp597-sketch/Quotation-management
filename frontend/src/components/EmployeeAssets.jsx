@@ -32,18 +32,21 @@ const LOG_ICONS = { added: MdInventory2, holder: MdPerson, branch: MdSwapHoriz }
 /**
  * Asset Log of one item (client, 2026-11-19): added in Invoice Bulk Upload, each person it was
  * given to with the branch it was in then (flagged when that was not the employee's own branch),
- * and each branch move, such as Move to <branch>. Oldest first.
+ * and each branch move, such as Move to <branch>. Oldest first. `load` reads it another way (Own
+ * Assets); by default it comes from Employee Master's endpoint.
  */
-const AssetLogModal = ({ employeeId, asset, onClose }) => {
+export const AssetLogModal = ({ employeeId, asset, onClose, load }) => {
     const [log, setLog] = useState(null);
     const [error, setError] = useState('');
 
     useEffect(() => {
         let cancelled = false;
-        serialTransferService.employeeAssetLog(employeeId, asset._id)
+        (load ? load() : serialTransferService.employeeAssetLog(employeeId, asset._id))
             .then((res) => { if (!cancelled) setLog(res.data); })
             .catch((err) => { if (!cancelled) setError(err.response?.data?.message || 'Could not load the asset log.'); });
         return () => { cancelled = true; };
+        // `load` is a new function on every render of the caller; the item is what matters.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [employeeId, asset._id]);
 
     const home = log?.homeBranch?.name;

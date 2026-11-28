@@ -144,6 +144,20 @@ const MENU_GROUPS = [
         ]
     },
     {
+        // Company items (Invoice Bulk Upload serial numbers such as laptops) held by the user, their
+        // manager and their team (controllers/ownAssetController.js). View lists them and opens the
+        // Asset Log; Create adds items, Modify changes the Asset No or hands an item over, Delete
+        // takes an item back to stock.
+        key: 'own_assets',
+        label: 'Own Assets',
+        description: 'Company items held by you, your reporting manager and your team (in the Quotations menu)',
+        children: [
+            { key: 'own_assets_manager', label: 'Manager Assets', description: 'Items held by your reporting manager in Employee Master' },
+            { key: 'own_assets_mine', label: 'My Assets', description: 'Items held by you' },
+            { key: 'own_assets_team', label: 'My Team Assets', description: 'Items held by the people who report to you, directly or further down' }
+        ]
+    },
+    {
         key: 'planning',
         label: 'Planning',
         description: 'Revenue planning and simulation screens',
@@ -281,6 +295,12 @@ const LEGACY_PERMISSION_FALLBACKS = {
 // Upload entries could not be edited). A role with no saved value gets them only when it
 // is the admin role, whatever its other defaults are; an admin grants them to others.
 const ADMIN_DEFAULT_ONLY_KEYS = new Set(['master_serials_edit']);
+
+// Screens every role sees, whose Create, Modify and Delete start off for every role but admin:
+// a role without saved values for them gets View alone until an admin ticks the actions. Own
+// Assets shows each person their own circle's items; giving, handing over and taking back items
+// is for those an admin allows.
+const ADMIN_DEFAULT_ACTION_KEYS = ['own_assets_manager', 'own_assets_mine', 'own_assets_team'];
 
 // Sales has some Inventory screens but not Invoice Bulk Upload or Serial No Transfer, which
 // it never had while they were under Master (then Quotations).
@@ -473,9 +493,22 @@ const hasPermission = (permissions = {}, key, action = 'view') => {
 // Employee: employee access - payslips, payroll, csm tickets, csm attendance, csm kb, dashboard
 const DEFAULT_ROLE_PERMISSIONS = {
     admin: buildPermissions(FULL_ACCESS_KEYS),
-    manager: withoutAdminOnlyKeys(buildPermissions(['dashboard', 'master', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'sale', 'purchase', 'inventory', 'planning', 'reports', 'settings', 'csm', 'tender', 'payroll_org_chart'])),
-    sales: withoutAdminOnlyKeys(withKeysOff(buildPermissions(['dashboard', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'inventory_items', 'inventory_stock_in', 'inventory_stock_out', 'inventory_transfers', 'csm_tickets', 'csm_attendance', 'csm_kb', 'tender_dashboard', 'tender_register', 'payroll_org_chart']), SALES_WITHHELD_KEYS)),
-    employee: withoutAdminOnlyKeys(buildPermissions(['dashboard', 'payroll_org_chart', 'csm_tickets', 'csm_attendance', 'csm_kb', 'settings_profile']))
+    manager: withoutAdminOnlyKeys(buildPermissions(['dashboard', 'master', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'sale', 'purchase', 'inventory', 'own_assets', 'planning', 'reports', 'settings', 'csm', 'tender', 'payroll_org_chart'])),
+    sales: withoutAdminOnlyKeys(withKeysOff(buildPermissions(['dashboard', 'enquiry', 'sales_pipeline', 'quotation', 'meetings', 'inventory_items', 'inventory_stock_in', 'inventory_stock_out', 'inventory_transfers', 'own_assets', 'csm_tickets', 'csm_attendance', 'csm_kb', 'tender_dashboard', 'tender_register', 'payroll_org_chart']), SALES_WITHHELD_KEYS)),
+    employee: withoutAdminOnlyKeys(buildPermissions(['dashboard', 'own_assets', 'payroll_org_chart', 'csm_tickets', 'csm_attendance', 'csm_kb', 'settings_profile']))
+};
+
+/** `stored` with the actions of ADMIN_DEFAULT_ACTION_KEYS off where nothing is saved, for roles but admin. */
+const withAdminDefaultActions = (role, stored) => {
+    if (String(role || '').toLowerCase() === 'admin') return stored;
+    const next = { ...stored };
+    ADMIN_DEFAULT_ACTION_KEYS.forEach((key) => {
+        getModuleActions(key).forEach((action) => {
+            const flagKey = actionKey(key, action);
+            if (action !== 'view' && typeof next[flagKey] !== 'boolean') next[flagKey] = false;
+        });
+    });
+    return next;
 };
 
 /**
@@ -556,7 +589,7 @@ const resolvePermissions = (role, savedPermissions = {}) => {
         return permissions;
     }, {});
 
-    return applyActionPermissions(permissions, storedPermissions);
+    return applyActionPermissions(permissions, withAdminDefaultActions(role, storedPermissions));
 };
 
 /**

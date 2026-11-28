@@ -55,6 +55,7 @@ const SerialNoMaster = lazy(() => import('./pages/SerialNoMaster'));
 const AssetLifecycle = lazy(() => import('./pages/AssetLifecycle'));
 const SerialNoTransfer = lazy(() => import('./pages/SerialNoTransfer'));
 const SerialNoDetails = lazy(() => import('./pages/SerialNoTransfer').then((m) => ({ default: m.SerialNoDetails })));
+const OwnAssets = lazy(() => import('./pages/OwnAssets'));
 const Contacts = lazy(() => import('./pages/Contacts'));
 const Contact360Workspace = lazy(() => import('./pages/Contact360Workspace'));
 const SuperAdmin = lazy(() => import('./pages/SuperAdmin'));
@@ -297,6 +298,11 @@ function App() {
             <Route path="/serial-no-transfer" element={<PermissionRoute permissionKey="master_serial_transfer"><Layout><SerialNoTransfer /></Layout></PermissionRoute>} />
             <Route path="/serial-no-transfer/:assetId" element={<PermissionRoute permissionKey="master_serial_transfer"><Layout><SerialNoDetails /></Layout></PermissionRoute>} />
             <Route path="/serial-no-transfer/:assetId/transfer" element={<PermissionRoute permissionKey="master_serial_transfer"><Layout><SerialNoDetails transfer /></Layout></PermissionRoute>} />
+            {/* Own Assets: each list is its own screen in Authorization */}
+            <Route path="/own-assets" element={<Navigate to="/own-assets/mine" replace />} />
+            <Route path="/own-assets/mine" element={<PermissionRoute permissionKey="own_assets_mine"><Layout><OwnAssets key="mine" view="mine" /></Layout></PermissionRoute>} />
+            <Route path="/own-assets/manager" element={<PermissionRoute permissionKey="own_assets_manager"><Layout><OwnAssets key="manager" view="manager" /></Layout></PermissionRoute>} />
+            <Route path="/own-assets/team" element={<PermissionRoute permissionKey="own_assets_team"><Layout><OwnAssets key="team" view="team" /></Layout></PermissionRoute>} />
             <Route path="/serial-no-master/view/:serialNumber" element={<PermissionRoute permissionKey="master_serials_view_details"><Layout><AssetLifecycle /></Layout></PermissionRoute>} />
             <Route path="/flowcharts" element={<PermissionRoute permissionKey="flowchart_view"><Layout><Flowcharts /></Layout></PermissionRoute>} />
             <Route path="/settings" element={<PermissionRoute permissionKey="settings_profile"><Layout><Settings /></Layout></PermissionRoute>} />

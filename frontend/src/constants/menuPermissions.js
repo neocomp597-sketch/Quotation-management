@@ -130,6 +130,17 @@ export const MENU_PERMISSION_GROUPS = [
         ]
     },
     {
+        key: 'own_assets',
+        label: 'Own Assets',
+        description: 'Company items held by you, your reporting manager and your team (in the Quotations menu)',
+        defaultRoute: '/own-assets/mine',
+        children: [
+            { key: 'own_assets_manager', label: 'Manager Assets', description: 'Items held by your reporting manager in Employee Master', defaultRoute: '/own-assets/manager' },
+            { key: 'own_assets_mine', label: 'My Assets', description: 'Items held by you', defaultRoute: '/own-assets/mine' },
+            { key: 'own_assets_team', label: 'My Team Assets', description: 'Items held by the people who report to you, directly or further down', defaultRoute: '/own-assets/team' }
+        ]
+    },
+    {
         key: 'planning',
         label: 'Planning',
         description: 'Revenue planning, simulations, and financial breakdown views',
