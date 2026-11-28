@@ -239,6 +239,9 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'sales_cpq', name: 'Configurator', icon: <MdBuildCircle size={18} />, path: '/sales/cpq/configurator' },
                 { key: 'sales_cpq', name: 'Quote Simulator', icon: <MdSpeed size={18} />, path: '/sales/cpq/simulator' },
                 { key: 'sale_invoices', name: 'Invoices', icon: <MdReceipt size={18} />, path: '/invoices' },
+                { key: 'master_serials', name: 'Invoice Bulk Upload', icon: <MdTag size={18} />, path: '/serial-no-master' },
+                // Sorted as if named after Invoice Bulk Upload so it sits directly below it.
+                { key: 'master_serial_transfer', name: 'Serial No Transfer', sortName: 'Invoice Bulk Upload 2', icon: <MdSwapHoriz size={18} />, path: '/serial-no-transfer' },
                 { key: 'sales_approvals', name: 'Approvals', icon: <MdLock size={18} />, path: '/sales/approvals' },
                 { key: 'sales_orders', name: 'Orders', icon: <MdShoppingCart size={18} />, path: '/sales/orders' },
             ]
@@ -269,10 +272,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { key: 'inventory_items', name: 'Items & Matrix', icon: <MdInventory size={18} />, path: '/inventory/stock' },
                 { key: 'inventory_warehouses', name: 'Warehouses', icon: <MdStorefront size={18} />, path: '/inventory/warehouses' },
                 { key: 'purchase_grn', name: 'GRN', icon: <MdLocalShipping size={18} />, path: '/grn' },
-                // Moved here from Quotations (client, 2026-11-26); the permission keys are unchanged.
-                { key: 'master_serials', name: 'Invoice Bulk Upload', icon: <MdTag size={18} />, path: '/serial-no-master' },
-                // Sorted as if named after Invoice Bulk Upload so it sits directly below it.
-                { key: 'master_serial_transfer', name: 'Serial No Transfer', sortName: 'Invoice Bulk Upload 2', icon: <MdSwapHoriz size={18} />, path: '/serial-no-transfer' },
                 { key: 'inventory_transfers', name: 'Stock Transfers', icon: <MdCompareArrows size={18} />, path: '/inventory/transfers' },
                 { key: 'inventory_adjustments', name: 'Adjustments', icon: <MdTune size={18} />, path: '/inventory/adjustments' },
                 { key: 'inventory_stock_counts', name: 'Physical Audit', icon: <MdFactCheck size={18} />, path: '/inventory/counts' },

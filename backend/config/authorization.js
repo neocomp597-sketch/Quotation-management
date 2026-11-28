@@ -91,12 +91,18 @@ const MENU_GROUPS = [
     {
         key: 'quotation',
         label: 'Quotations',
-        description: 'Quotation registers, CPQ tools, invoices, approvals, and orders',
+        description: 'Quotation registers, CPQ tools, invoices, invoice bulk upload, serial transfers, approvals, and orders',
         children: [
             { key: 'quotation_list', label: 'Quotation Register', description: 'View, create, and manage trade quotations' },
             { key: 'reports_main', label: 'Quote Conversion Report', description: 'Quotation conversion analytics' },
             { key: 'sales_cpq', label: 'Guided Selling & Configurator', description: 'Interactive product configurator and quote simulator' },
             { key: 'sale_invoices', label: 'Invoices', description: 'Billing invoices and payment schedules' },
+            // Keys keep their master_ prefix from when these screens were under Master: roles,
+            // user overrides and API rules are saved against them.
+            { key: 'master_serials', label: 'Invoice Bulk Upload', description: 'Invoice bulk upload and serial asset management' },
+            { key: 'master_serials_view_details', label: 'Invoice Bulk Upload: View Details', description: 'Open the lifecycle details of an Invoice Bulk Upload entry' },
+            { key: 'master_serials_edit', label: 'Invoice Bulk Upload: Edit Entry', description: 'Change a saved Invoice Bulk Upload entry' },
+            { key: 'master_serial_transfer', label: 'Serial No Transfer', description: 'Serial number ownership history; Modify allows transfers and past entries' },
             { key: 'sales_approvals', label: 'Approvals Queue', description: 'Manage discount and high-value quotation approvals' },
             { key: 'sales_orders', label: 'Sales Orders', description: 'Sales order processing and status tracking' }
         ]
@@ -120,19 +126,12 @@ const MENU_GROUPS = [
     {
         key: 'inventory',
         label: 'Inventory',
-        description: 'Stock ledger, multi-warehouse stock, invoice bulk upload, serial transfers, adjustments, physical audit, and alerts',
+        description: 'Stock ledger, multi-warehouse stock, transfers, adjustments, physical audit, and alerts',
         children: [
             { key: 'inventory_dashboard', label: 'Dashboard', description: 'Stock valuation, movement feed, and KPI metrics' },
             { key: 'inventory_items', label: 'Items & Stock Matrix', description: 'Warehouse-wise stock and batch details' },
             { key: 'inventory_warehouses', label: 'Warehouses', description: 'Manage warehouses and storage bins' },
             { key: 'purchase_grn', label: 'GRN / Inward Goods', description: 'Goods receipt note and material tracking screens' },
-            // Keys keep their master_ prefix from when these screens were under Master (then Quotations):
-            // roles,
-            // user overrides and API rules are saved against them.
-            { key: 'master_serials', label: 'Invoice Bulk Upload', description: 'Invoice bulk upload and serial asset management' },
-            { key: 'master_serials_view_details', label: 'Invoice Bulk Upload: View Details', description: 'Open the lifecycle details of an Invoice Bulk Upload entry' },
-            { key: 'master_serials_edit', label: 'Invoice Bulk Upload: Edit Entry', description: 'Change a saved Invoice Bulk Upload entry' },
-            { key: 'master_serial_transfer', label: 'Serial No Transfer', description: 'Serial number ownership history; Modify allows transfers and past entries' },
             { key: 'inventory_stock_in', label: 'Stock In / GRN', description: 'Record inward goods receipts' },
             { key: 'inventory_stock_out', label: 'Stock Out / Dispatch', description: 'Record outward material issues' },
             { key: 'inventory_transfers', label: 'Stock Transfers', description: 'Inter-warehouse transfers and approvals' },
@@ -282,8 +281,8 @@ const LEGACY_PERMISSION_FALLBACKS = {
 // is the admin role, whatever its other defaults are; an admin grants them to others.
 const ADMIN_DEFAULT_ONLY_KEYS = new Set(['master_serials_edit']);
 
-// Sales has some Inventory screens but not Invoice Bulk Upload or Serial No Transfer, which
-// it never had while they were under Master (then Quotations).
+// Sales has the Quotations module but not Invoice Bulk Upload or Serial No Transfer, which
+// it never had while they were under Master.
 const SALES_WITHHELD_KEYS = ['master_serials', 'master_serials_view_details', 'master_serials_edit', 'master_serial_transfer'];
 
 const withKeysOff = (permissions, keys) => {
